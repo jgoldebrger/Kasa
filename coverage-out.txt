@@ -1,0 +1,34 @@
+﻿
+> kasa-family-management@1.0.0 test:route-logic-coverage
+> vitest run --config vitest.route-logic.config.ts --coverage
+
+
+ RUN  v4.1.6 C:/Users/jgoldberger/Desktop/KASA
+      Coverage enabled with v8
+
+node.exe : 
+At line:1 char:1
++ & "C:\Users\jgoldberger\nodejs\node-v24.15.0-win-x64/node.exe" "C:\Us ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Unhandled Error ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+Error: ENOENT: no such file or directory, open 
+'C:\Users\jgoldberger\Desktop\KASA\coverage-route-logic\.tmp\coverage-0.json'
+ Γ¥» open node:internal/fs/promises:640:25
+ Γ¥» Object.readFile node:internal/fs/promises:1287:14
+ Γ¥» node_modules/vitest/dist/chunks/coverage.DM_a_rWm.js:763:23
+ Γ¥» V8CoverageProvider.readCoverageFiles node_modules/vitest/dist/chunks/coverage.DM_a_rWm.js:762:5
+ Γ¥» V8CoverageProvider.generateCoverage node_modules/@vitest/coverage-v8/dist/provider.js:32:3
+ Γ¥» node_modules/vitest/dist/chunks/cli-api.B5majYba.js:13588:23
+ Γ¥» node_modules/vitest/dist/chunks/cli-api.B5majYba.js:13601:11
+ Γ¥» node_modules/vitest/dist/chunks/cli-api.B5majYba.js:13463:19
+ Γ¥» startVitest node_modules/vitest/dist/chunks/cli-api.B5majYba.js:14538:8
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+Serialized Error: { errno: -4058, code: 'ENOENT', syscall: 'open', path: 
+'C:\Users\jgoldberger\Desktop\KASA\coverage-route-logic\.tmp\coverage-0.json' }
+
+
+

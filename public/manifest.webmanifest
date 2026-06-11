@@ -1,0 +1,37 @@
+{
+  "name": "Kasa Family Management",
+  "short_name": "Kasa",
+  "description": "Family financial management system with age-based payment plans",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Families",
+      "url": "/families",
+      "description": "Open the families list"
+    },
+    {
+      "name": "Tasks",
+      "url": "/tasks",
+      "description": "Open the tasks page"
+    },
+    {
+      "name": "Statements",
+      "url": "/statements",
+      "description": "Open the statements page"
+    }
+  ]
+}

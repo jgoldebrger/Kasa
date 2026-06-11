@@ -1,0 +1,34 @@
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:setup","message":"globalSetup enter","data":{"refs":1,"reused":false},"hypothesisId":"A","timestamp":1781185932082}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:setup","message":"created MongoMemoryServer","data":{"refs":1,"ms":5314},"hypothesisId":"A","timestamp":1781185937416}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:setup","message":"globalSetup enter","data":{"refs":2,"reused":true},"hypothesisId":"A","timestamp":1781185937514}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:setup","message":"reused existing MongoMemoryServer","data":{"refs":2},"hypothesisId":"A","timestamp":1781185937515}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:setup","message":"globalSetup enter","data":{"refs":1,"reused":false},"hypothesisId":"A","timestamp":1781191032874}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:setup","message":"created MongoMemoryServer","data":{"refs":1,"ms":1264},"hypothesisId":"A","timestamp":1781191034143}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:setup","message":"globalSetup enter","data":{"refs":2,"reused":true},"hypothesisId":"A","timestamp":1781191034161}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:setup","message":"reused existing MongoMemoryServer","data":{"refs":2},"hypothesisId":"A","timestamp":1781191034161}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:teardown","message":"globalSetup teardown enter","data":{"refs":1},"hypothesisId":"B","timestamp":1781191180548}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:teardown","message":"globalSetup teardown enter","data":{"refs":0},"hypothesisId":"B","timestamp":1781191180560}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:teardown","message":"skipped mongo stop (refs remain)","data":{"refs":1},"hypothesisId":"B","timestamp":1781191180557}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:teardown","message":"stopped MongoMemoryServer","data":{"ms":325},"hypothesisId":"B","timestamp":1781191181471}
+{"sessionId":"f5eee9","location":"e2e/start-dev.ts","message":"mongo ready","data":{"ms":764},"hypothesisId":"C","timestamp":1781191191571}
+{"sessionId":"f5eee9","location":"e2e/start-dev.ts","message":"seed complete","data":{"ms":403,"bulkFamilies":0},"hypothesisId":"C","timestamp":1781191191989}
+{"sessionId":"f5eee9","location":"e2e/start-dev.ts","message":"mongo ready","data":{"ms":960},"hypothesisId":"C","timestamp":1781191290379}
+{"sessionId":"f5eee9","location":"e2e/start-dev.ts","message":"seed complete","data":{"ms":531,"bulkFamilies":0},"hypothesisId":"C","timestamp":1781191290926}
+{"sessionId":"f5eee9","location":"e2e/start-dev.ts","message":"mongo ready","data":{"ms":742},"hypothesisId":"C","timestamp":1781192231509}
+{"sessionId":"f5eee9","location":"e2e/start-dev.ts","message":"seed complete","data":{"ms":402,"bulkFamilies":0},"hypothesisId":"C","timestamp":1781192231926}
+{"sessionId":"f5eee9","location":"e2e/start-dev.ts","message":"mongo ready","data":{"ms":711},"hypothesisId":"C","timestamp":1781192441553}
+{"sessionId":"f5eee9","location":"e2e/start-dev.ts","message":"seed complete","data":{"ms":391,"bulkFamilies":0},"hypothesisId":"C","timestamp":1781192441959}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:setup","message":"globalSetup enter","data":{"refs":1,"reused":false},"hypothesisId":"A","timestamp":1781192626351}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:setup","message":"created MongoMemoryServer","data":{"refs":1,"ms":818},"hypothesisId":"A","timestamp":1781192627175}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:setup","message":"globalSetup enter","data":{"refs":2,"reused":true},"hypothesisId":"A","timestamp":1781192627194}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:setup","message":"reused existing MongoMemoryServer","data":{"refs":2},"hypothesisId":"A","timestamp":1781192627194}
+{"sessionId":"f5eee9","location":"e2e/start-dev.ts","message":"mongo ready","data":{"ms":1025},"hypothesisId":"C","timestamp":1781192758545}
+{"sessionId":"f5eee9","location":"e2e/start-dev.ts","message":"seed complete","data":{"ms":542,"bulkFamilies":0},"hypothesisId":"C","timestamp":1781192759106}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:teardown","message":"globalSetup teardown enter","data":{"refs":1},"hypothesisId":"B","timestamp":1781192769037}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:teardown","message":"skipped mongo stop (refs remain)","data":{"refs":1},"hypothesisId":"B","timestamp":1781192769052}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:teardown","message":"globalSetup teardown enter","data":{"refs":0},"hypothesisId":"B","timestamp":1781192769056}
+{"sessionId":"f5eee9","location":"vitest.global-setup.ts:teardown","message":"stopped MongoMemoryServer","data":{"ms":200},"hypothesisId":"B","timestamp":1781192770106}
+{"sessionId":"f5eee9","location":"e2e/start-dev.ts","message":"mongo ready","data":{"ms":748},"hypothesisId":"C","timestamp":1781193001566}
+{"sessionId":"f5eee9","location":"e2e/start-dev.ts","message":"seed complete","data":{"ms":452,"bulkFamilies":0},"hypothesisId":"C","timestamp":1781193002035}
+{"sessionId":"f5eee9","location":"e2e/start-dev.ts","message":"mongo ready","data":{"ms":961},"hypothesisId":"C","timestamp":1781193324742}
+{"sessionId":"f5eee9","location":"e2e/start-dev.ts","message":"seed complete","data":{"ms":604,"bulkFamilies":0},"hypothesisId":"C","timestamp":1781193325369}

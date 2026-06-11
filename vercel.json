@@ -1,0 +1,39 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "build": {
+    "env": {
+      "NEXT_TELEMETRY_DISABLED": "1"
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/jobs/generate-monthly-statements",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/jobs/send-monthly-statements",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/jobs/process-recurring-payments",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/jobs/cycle-rollover",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/jobs/wedding-converter",
+      "schedule": "0 4 * * *"
+    }
+  ]
+}
+

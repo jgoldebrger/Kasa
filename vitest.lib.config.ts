@@ -1,0 +1,75 @@
+import path from 'path'
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    name: 'lib',
+    environment: 'node',
+    globals: false,
+    setupFiles: ['./vitest.setup.ts'],
+    testTimeout: 120_000,
+    hookTimeout: 120_000,
+    pool: 'forks',
+    fileParallelism: true,
+    include: [
+      'lib/**/*.test.ts',
+      'lib/**/*.unit.test.ts',
+      'lib/**/*.integration.test.ts',
+      'lib/**/*.dom.test.ts',
+      'lib/**/*.internals.test.ts',
+      'app/**/*.test.ts',
+    ],
+    exclude: [
+      'app/api/api-routes.integration.test.ts',
+      'app/api/route-logic-finish.integration.test.ts',
+      'lib/route-logic/**',
+      'lib/import-route-logic.integration.test.ts',
+      'lib/import-csv.unit.test.ts',
+      'lib/import-csv.integration.test.ts',
+      'lib/stripe-webhook.integration.test.ts',
+    ],
+    // @ts-expect-error vitest InlineConfig typing (environmentMatchGlobs supported at runtime)
+    environmentMatchGlobs: [['lib/**/*.dom.test.ts', 'happy-dom']],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'text-summary', 'lcov', 'json-summary'],
+      reportsDirectory: './coverage',
+      include: ['lib/**/*.ts'],
+      exclude: [
+        'lib/**/*.test.ts',
+        'lib/**/*.unit.test.ts',
+        'lib/**/*.integration.test.ts',
+        'lib/**/*.dom.test.ts',
+        'lib/**/*.internals.test.ts',
+        'lib/**/*.tsx',
+        'lib/models.ts',
+        'lib/schemas/index.ts',
+        'lib/client/**/*.tsx',
+        'lib/client/i18n.tsx',
+        'lib/client/useColumnVisibility.ts',
+        'lib/client/useCopyToClipboard.ts',
+        'lib/client/useFormState.ts',
+        'lib/client/useOrgBranding.ts',
+        'lib/client/useOrgChanged.ts',
+        'lib/client/useOrgRole.ts',
+        'lib/client/useRequestGeneration.ts',
+        'lib/i18n/**',
+        'lib/test/**',
+        'lib/api-handlers/**',
+        'lib/route-logic/**',
+      ],
+      thresholds: {
+        lines: 100,
+        statements: 88,
+        branches: 75,
+        functions: 90,
+      },
+    },
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, '.'),
+      'next/server': path.resolve(__dirname, 'node_modules/next/server.js'),
+    },
+  },
+})

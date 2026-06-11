@@ -1,0 +1,128 @@
+name: security
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'security/**'
+      - 'app/**'
+      - 'middleware.ts'
+      - 'lib/**'
+      - 'e2e/**'
+      - '.github/workflows/security.yml'
+  pull_request:
+    paths:
+      - 'security/**'
+      - 'app/**'
+      - 'middleware.ts'
+      - 'lib/**'
+      - 'e2e/**'
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Security environment (local | staging | production-like)'
+        required: false
+        default: 'local'
+      allow_destructive:
+        description: 'Run destructive probes (stored XSS, upload abuse, fuzzing)'
+        required: false
+        default: 'false'
+      run_zap_full:
+        description: 'Run OWASP ZAP full (active) scan after Playwright'
+        required: false
+        default: 'false'
+
+jobs:
+  security-playwright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SECURITY_ENV: ${{ github.event.inputs.target_env || 'local' }}
+      SECURITY_ALLOW_DESTRUCTIVE: ${{ github.event.inputs.allow_destructive || 'true' }}
+      SECURITY_OWNER_EMAIL: e2e@kasa.test
+      SECURITY_OWNER_PASSWORD: E2eTestPass123!
+      SECURITY_MEMBER_EMAIL: e2e-member@kasa.test
+      SECURITY_MEMBER_PASSWORD: E2eMemberPass123!
+      SECURITY_ORG_ALPHA: E2E Org Alpha
+      SECURITY_ORG_BETA: E2E Org Beta
+      SECURITY_CAPTURE_HAR: 'false'
+      E2E_BULK_FAMILIES: '0'
+      PLATFORM_ADMIN_EMAILS: e2e@kasa.test
+      SECURITY_STRICT_RATE_LIMITS: '1'
+      CRON_SECRET: ci-cron-secret-placeholder
+      MONGODB_URI: mongodb://127.0.0.1:27017/kasa-security-ci
+      NEXTAUTH_SECRET: ci-security-nextauth-secret-placeholder
+      AUTH_SECRET: ci-security-nextauth-secret-placeholder
+      ENCRYPTION_KEY: ci-security-encryption-key-placeholder
+      NEXTAUTH_URL: http://127.0.0.1:3000
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Generate API route catalog
+        run: npm run security:catalog:generate
+
+      - name: Run security suite
+        run: npm run security:test
+
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            security/reports/output/
+            security/reports/playwright-html/
+            security/catalog/api-routes.json
+          retention-days: 14
+
+  zap-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: security-playwright
+    if: github.event_name == 'workflow_dispatch'
+    env:
+      SECURITY_ENV: local
+      SECURITY_ZAP_ENABLED: 'true'
+      SECURITY_TARGET_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start app for ZAP
+        run: |
+          npx tsx e2e/start-dev.ts &
+          npx wait-on http://127.0.0.1:3000 --timeout 180000
+
+      - name: OWASP ZAP baseline scan
+        run: npx tsx scripts/security-zap.ts baseline
+
+      - name: OWASP ZAP full scan
+        if: github.event.inputs.run_zap_full == 'true'
+        run: npx tsx scripts/security-zap.ts full
+
+      - name: Upload ZAP reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-reports
+          path: security/reports/output/zap/
+          retention-days: 14

@@ -1,0 +1,113 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+# Env notes for Playwright jobs (no secrets required):
+# - e2e-smoke: MongoMemoryServer is started by e2e/start-dev.ts via Playwright webServer.
+#   Set E2E_BULK_FAMILIES=0 for fast seeding. Auth/session secrets come from e2e/seed.ts.
+# - security-safe: Same local boot path as security.yml; SECURITY_ALLOW_DESTRUCTIVE=false
+#   (via security:test:safe) skips destructive XSS/fuzz/upload probes. Placeholder env vars
+#   satisfy Next.js boot checks; the webServer overrides MONGODB_URI at runtime.
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Test
+        run: npm run test:coverage --if-present
+
+      - name: Build
+        env:
+          # Placeholders that satisfy boot-time env checks without leaking real values.
+          MONGODB_URI: mongodb://placeholder.invalid/ci
+          NEXTAUTH_SECRET: ci-placeholder-secret-do-not-use
+          AUTH_SECRET: ci-placeholder-secret-do-not-use
+          ENCRYPTION_KEY: ci-placeholder-encryption-key
+          NEXT_TELEMETRY_DISABLED: '1'
+        run: npm run build
+
+  e2e-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      E2E_BULK_FAMILIES: '0'
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: E2E smoke (guest + org switch)
+        run: npx playwright test e2e/guest.spec.ts e2e/org-switch.spec.ts
+
+  security-safe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SECURITY_ENV: local
+      SECURITY_ALLOW_DESTRUCTIVE: 'false'
+      SECURITY_OWNER_EMAIL: e2e@kasa.test
+      SECURITY_OWNER_PASSWORD: E2eTestPass123!
+      SECURITY_MEMBER_EMAIL: e2e-member@kasa.test
+      SECURITY_MEMBER_PASSWORD: E2eMemberPass123!
+      SECURITY_ORG_ALPHA: E2E Org Alpha
+      SECURITY_ORG_BETA: E2E Org Beta
+      SECURITY_CAPTURE_HAR: 'false'
+      E2E_BULK_FAMILIES: '0'
+      PLATFORM_ADMIN_EMAILS: e2e@kasa.test
+      SECURITY_STRICT_RATE_LIMITS: '1'
+      CRON_SECRET: ci-cron-secret-placeholder
+      MONGODB_URI: mongodb://placeholder.invalid/ci-security
+      NEXTAUTH_SECRET: ci-security-nextauth-secret-placeholder
+      AUTH_SECRET: ci-security-nextauth-secret-placeholder
+      ENCRYPTION_KEY: ci-security-encryption-key-placeholder
+      NEXTAUTH_URL: http://127.0.0.1:3000
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Generate API route catalog
+        run: npm run security:catalog:generate
+
+      - name: Security suite (safe)
+        run: npm run security:test:safe

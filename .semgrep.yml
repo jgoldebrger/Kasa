@@ -1,0 +1,49 @@
+rules:
+  - id: hardcoded-secret
+    patterns:
+      - pattern-either:
+          - pattern: $VAR = "..."
+          - pattern: password = "..."
+          - pattern: api_key = "..."
+    metavariable-regex:
+      metavariable: $VAR
+      regex: (?i)(password|secret|api[_-]?key|token|private[_-]?key)
+    message: Possible hardcoded secret — use environment variables.
+    severity: ERROR
+    languages: [javascript, typescript]
+
+  - id: eval-usage
+    pattern: eval(...)
+    message: Avoid eval() — injection risk.
+    severity: ERROR
+    languages: [javascript, typescript]
+
+  - id: dangerously-set-inner-html
+    pattern: dangerouslySetInnerHTML
+    message: Review XSS risk when using dangerouslySetInnerHTML.
+    severity: WARNING
+    languages: [typescript]
+
+  - id: mongoose-find-with-user-input
+    patterns:
+      - pattern: $MODEL.find({ $KEY: $VAL })
+    message: Ensure $VAL is validated/sanitized before Mongo queries.
+    severity: WARNING
+    languages: [javascript, typescript]
+
+  - id: no-verify-api-csrf-on-mutation
+    patterns:
+      - pattern: |
+          export async function $METHOD(request: NextRequest) {
+            ...
+          }
+      - pattern-not: verifyApiCsrf(request)
+      - metavariable-regex:
+          metavariable: $METHOD
+          regex: (POST|PUT|PATCH|DELETE)
+    paths:
+      include:
+        - app/api/
+    message: Legacy mutating API route may be missing verifyApiCsrf().
+    severity: INFO
+    languages: [typescript]
