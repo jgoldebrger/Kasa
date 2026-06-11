@@ -1,40 +1,36 @@
 import mongoose from 'mongoose'
 
-// MongoDB connection string from environment variable (REQUIRED)
-const MONGODB_URI = process.env.MONGODB_URI
-
-if (!MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI environment variable inside .env.local')
-}
-
-// TypeScript assertion: we've checked above that MONGODB_URI is defined
-let MONGODB_URI_STRING: string = MONGODB_URI
-
-// Hosted-deploy safety: strip dev-only TLS bypass flags from the connection
-// URI so a copy-paste mistake in `.env` doesn't disable certificate
-// validation on Vercel / CI. We gate on platform env vars rather than
-// `NODE_ENV === 'production'` so a developer can still `npm run build &&
-// npm start` locally (which sets NODE_ENV=production) without losing the
-// dev TLS workaround their cluster requires.
-const isHostedDeploy =
-  process.env.VERCEL === '1' ||
-  process.env.CI === 'true' ||
-  process.env.KUBERNETES_SERVICE_HOST !== undefined
-if (isHostedDeploy) {
-  if (/tlsAllowInvalidCertificates=true/i.test(MONGODB_URI_STRING)) {
-    console.warn(
-      '[database] tlsAllowInvalidCertificates=true detected in hosted MONGODB_URI; stripping it.'
-    )
-    MONGODB_URI_STRING = MONGODB_URI_STRING.replace(/[?&]tlsAllowInvalidCertificates=true/gi, '')
-      .replace(/[?&]$/, '')
+function resolveMongoUri(): string {
+  const raw = process.env.MONGODB_URI
+  if (!raw) {
+    throw new Error('Please define the MONGODB_URI environment variable inside .env.local')
   }
-  if (/tlsInsecure=true/i.test(MONGODB_URI_STRING)) {
+
+  // Hosted-deploy safety: strip dev-only TLS bypass flags from the connection
+  // URI so a copy-paste mistake in `.env` doesn't disable certificate
+  // validation on Vercel / CI. We gate on platform env vars rather than
+  // `NODE_ENV === 'production'` so a developer can still `npm run build &&
+  // npm start` locally (which sets NODE_ENV=production) without losing the
+  // dev TLS workaround their cluster requires.
+  const isHostedDeploy =
+    process.env.VERCEL === '1' ||
+    process.env.CI === 'true' ||
+    process.env.KUBERNETES_SERVICE_HOST !== undefined
+
+  if (!isHostedDeploy) return raw
+
+  let uri = raw
+  if (/tlsAllowInvalidCertificates=true/i.test(uri)) {
     console.warn(
-      '[database] tlsInsecure=true detected in hosted MONGODB_URI; stripping it.'
+      '[database] tlsAllowInvalidCertificates=true detected in hosted MONGODB_URI; stripping it.',
     )
-    MONGODB_URI_STRING = MONGODB_URI_STRING.replace(/[?&]tlsInsecure=true/gi, '')
-      .replace(/[?&]$/, '')
+    uri = uri.replace(/[?&]tlsAllowInvalidCertificates=true/gi, '').replace(/[?&]$/, '')
   }
+  if (/tlsInsecure=true/i.test(uri)) {
+    console.warn('[database] tlsInsecure=true detected in hosted MONGODB_URI; stripping it.')
+    uri = uri.replace(/[?&]tlsInsecure=true/gi, '').replace(/[?&]$/, '')
+  }
+  return uri
 }
 
 interface MongooseCache {
@@ -79,7 +75,9 @@ async function connectDB() {
       ...(testDbName ? { dbName: testDbName } : {}),
     }
 
-    cached.promise = mongoose.connect(MONGODB_URI_STRING, opts).then((mongoose) => {
+    const uri = resolveMongoUri()
+
+    cached.promise = mongoose.connect(uri, opts).then((mongoose) => {
       console.log('MongoDB connected successfully')
       // Tear down the cached promise on any subsequent disconnect/error
       // so the next `connectDB()` call rebuilds it instead of returning
@@ -117,4 +115,3 @@ async function connectDB() {
 }
 
 export default connectDB
-

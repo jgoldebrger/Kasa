@@ -10,11 +10,14 @@ describe('database (unit)', () => {
     vi.unstubAllGlobals()
   })
 
-  it('throws when MONGODB_URI is missing at module load', async () => {
+  it('throws when MONGODB_URI is missing on connect', async () => {
     const saved = process.env.MONGODB_URI
     delete process.env.MONGODB_URI
     vi.resetModules()
-    await expect(import('./database')).rejects.toThrow(/MONGODB_URI/)
+
+    const connectDB = (await import('./database')).default
+    await expect(connectDB()).rejects.toThrow(/MONGODB_URI/)
+
     if (saved !== undefined) process.env.MONGODB_URI = saved
     else delete process.env.MONGODB_URI
     vi.resetModules()
