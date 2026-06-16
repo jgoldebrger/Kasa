@@ -5,7 +5,8 @@ import { LifecycleEventPayment } from '@/lib/models'
 import { EVENTS_LIST_PAGE_SIZE } from '@/lib/client/events-list'
 import { encodeCompoundCursor } from '@/lib/pagination'
 import { formatLifecycleEventPayments } from '@/lib/route-logic/events'
-import EventsView from './EventsView'
+import { serializeForRsc } from '@/lib/serialize-rsc'
+import EventsView, { type EventsViewProps } from './EventsView'
 import EventsLoading from './loading'
 
 export const dynamic = 'force-dynamic'
@@ -32,7 +33,7 @@ async function fetchInitialEvents(organizationId: string) {
 
   const items = await formatLifecycleEventPayments(organizationId, pageRows)
   return {
-    items: items.map((r) => JSON.parse(JSON.stringify(r))),
+    items: items.map((r) => serializeForRsc(r)),
     nextCursor,
   }
 }
@@ -41,7 +42,7 @@ async function EventsServer() {
   const ctx = await requireServerOrgContext({ minRole: 'admin' })
   try {
     const { items, nextCursor } = await fetchInitialEvents(ctx.organizationId)
-    return <EventsView initialEvents={items} initialNextCursor={nextCursor} />
+    return <EventsView initialEvents={items as NonNullable<EventsViewProps['initialEvents']>} initialNextCursor={nextCursor} />
   } catch (err) {
     console.error('[events] server prefetch failed:', err)
     return <EventsView />

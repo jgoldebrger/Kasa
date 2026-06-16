@@ -4,6 +4,7 @@ import { hasMinRole } from '@/lib/auth-helpers'
 import connectDB from '@/lib/database'
 import { Family, FamilyMember, Task, YearlyCalculation } from '@/lib/models'
 import { loadSetupProgress } from '@/lib/organizations/setup-progress-data'
+import { serializeForRsc } from '@/lib/serialize-rsc'
 import DashboardView from './DashboardView'
 import Loading from './loading'
 
@@ -57,9 +58,7 @@ async function fetchInitialDashboardData(organizationId: string, includeFinancia
     balance,
   }
 
-  // JSON round-trip serializes every ObjectId / Date / Mongoose internal
-  // into plain JSON before it crosses the server→client component boundary.
-  const initialTasks = taskDocs.map((t) => JSON.parse(JSON.stringify(t)))
+  const initialTasks = taskDocs.map((t) => serializeForRsc(t))
 
   // Financial cards are only trustworthy when a cached YearlyCalculation exists.
   // Without it the client must run the live calc via /api/dashboard-stats.

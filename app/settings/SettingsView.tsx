@@ -276,20 +276,27 @@ export default function SettingsView({
     { name: '', yearlyPrice: '0' },
   )
 
+  const resetEventTypeForm = useCallback(() => {
+    setEventTypeFormData({ type: '', name: '', amount: '' })
+    setEditingEventType(null)
+  }, [])
+
+  const resetPlanForm = useCallback(() => {
+    setPlanFormData({ name: '', yearlyPrice: '0' })
+  }, [])
+
   // Centralized closers so Escape + backdrop dismiss + the explicit
   // Cancel button all do the same thing (reset form state, not just
   // hide the modal).
   const closeEventTypeModal = useCallback(() => {
     setShowEventTypeModal(false)
     resetEventTypeForm()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [resetEventTypeForm])
   const closePlanModal = useCallback(() => {
     setShowPlanModal(false)
     setEditingPlan(null)
     resetPlanForm()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [resetPlanForm])
 
   // Global Escape handler — closes whichever modal is open. Native
   // `<dialog>` would handle this for free, but these modals are
@@ -511,7 +518,7 @@ export default function SettingsView({
   }, [activeTab, orgFetchEpoch])
 
   // Email Configuration functions
-  const fetchEmailConfig = async () => {
+  const fetchEmailConfig = useCallback(async () => {
     const gen = settingsFetchGenRef.current
     try {
       const res = await fetch('/api/email-config')
@@ -547,7 +554,7 @@ export default function SettingsView({
       // briefly hide the skeleton while the NEW fetch is still loading.
       if (gen === settingsFetchGenRef.current) setLoading(false)
     }
-  }
+  }, [toast])
 
   const handleSaveEmailConfig = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -725,34 +732,6 @@ export default function SettingsView({
       setAutomationSaving(false)
     }
   }
-
-  // Lazy-fetch the automation config the first time the user opens the
-  // tab. Also pull event types + plans if those tabs haven't been
-  // visited yet — automation dropdowns need them.
-  useEffect(() => {
-    if (activeTab !== 'automation') return
-    if (hasFetchedAutomationRef.current) return
-    hasFetchedAutomationRef.current = true
-    let cancelled = false
-    void fetchAutomationConfig().finally(() => {
-      if (cancelled) hasFetchedAutomationRef.current = false
-    })
-    if (!hasFetchedEventTypesRef.current) {
-      hasFetchedEventTypesRef.current = true
-      void fetchEventTypes().finally(() => {
-        if (cancelled) hasFetchedEventTypesRef.current = false
-      })
-    }
-    if (!hasFetchedPlansRef.current) {
-      hasFetchedPlansRef.current = true
-      void fetchPlans().finally(() => {
-        if (cancelled) hasFetchedPlansRef.current = false
-      })
-    }
-    return () => {
-      cancelled = true
-    }
-  }, [activeTab, fetchAutomationConfig, orgFetchEpoch])
 
   // ──────────────── Letterhead ────────────────
   const hasFetchedLetterheadRef = useRef(false)
@@ -983,7 +962,7 @@ export default function SettingsView({
   }, [auditActionFilter, auditUserFilter, auditResourceTypeFilter, auditFromDate, auditToDate])
 
   // Cycle Configuration functions
-  const fetchCycleConfig = async () => {
+  const fetchCycleConfig = useCallback(async () => {
     const gen = settingsFetchGenRef.current
     try {
       setCycleLoading(true)
@@ -1013,7 +992,7 @@ export default function SettingsView({
     } finally {
       if (gen === settingsFetchGenRef.current) setCycleLoading(false)
     }
-  }
+  }, [])
 
   const handleSaveCycleConfig = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1057,7 +1036,7 @@ export default function SettingsView({
   }
 
   // Event Types functions
-  const fetchEventTypes = async () => {
+  const fetchEventTypes = useCallback(async () => {
     const gen = settingsFetchGenRef.current
     try {
       const data = await cachedFetch<LifecycleEventType[]>('/api/lifecycle-event-types', {
@@ -1081,16 +1060,7 @@ export default function SettingsView({
     } finally {
       if (gen === settingsFetchGenRef.current) setEventTypesLoading(false)
     }
-  }
-
-  const resetEventTypeForm = () => {
-    setEventTypeFormData({
-      type: '',
-      name: '',
-      amount: ''
-    })
-    setEditingEventType(null)
-  }
+  }, [toast])
 
   const handleEditEventType = (eventType: LifecycleEventType) => {
     setEditingEventType(eventType)
@@ -1189,7 +1159,7 @@ export default function SettingsView({
   }
 
   // Payment Plans functions
-  const fetchPlans = async (opts?: { force?: boolean }) => {
+  const fetchPlans = useCallback(async (opts?: { force?: boolean }) => {
     const gen = settingsFetchGenRef.current
     try {
       const data = await cachedFetch<PaymentPlan[]>('/api/payment-plans', {
@@ -1210,7 +1180,7 @@ export default function SettingsView({
     } finally {
       if (gen === settingsFetchGenRef.current) setPlansLoading(false)
     }
-  }
+  }, [toast])
 
   const planSubmittingRef = useRef(false)
   const [planSubmitting, setPlanSubmitting] = useState(false)
@@ -1292,14 +1262,6 @@ export default function SettingsView({
       setMessage({ type: 'error', text: 'Failed to delete payment plan' })
     }
   }
-
-  const resetPlanForm = () => {
-    setPlanFormData({
-      name: '',
-      yearlyPrice: '0',
-    })
-  }
-
 
   // Kevittel functions
   const fetchKevittelData = async () => {
@@ -1387,6 +1349,31 @@ export default function SettingsView({
 
   // Lazy-fetch core settings tabs on first visit (or after org switch).
   useEffect(() => {
+    if (activeTab !== 'automation') return
+    if (hasFetchedAutomationRef.current) return
+    hasFetchedAutomationRef.current = true
+    let cancelled = false
+    void fetchAutomationConfig().finally(() => {
+      if (cancelled) hasFetchedAutomationRef.current = false
+    })
+    if (!hasFetchedEventTypesRef.current) {
+      hasFetchedEventTypesRef.current = true
+      void fetchEventTypes().finally(() => {
+        if (cancelled) hasFetchedEventTypesRef.current = false
+      })
+    }
+    if (!hasFetchedPlansRef.current) {
+      hasFetchedPlansRef.current = true
+      void fetchPlans().finally(() => {
+        if (cancelled) hasFetchedPlansRef.current = false
+      })
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [activeTab, fetchAutomationConfig, fetchEventTypes, fetchPlans, orgFetchEpoch])
+
+  useEffect(() => {
     if (activeTab !== 'email') return
     if (hasFetchedEmailRef.current) return
     hasFetchedEmailRef.current = true
@@ -1397,8 +1384,7 @@ export default function SettingsView({
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, orgFetchEpoch])
+  }, [activeTab, fetchEmailConfig, orgFetchEpoch])
 
   useEffect(() => {
     if (activeTab !== 'eventTypes') return
@@ -1411,8 +1397,7 @@ export default function SettingsView({
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, orgFetchEpoch])
+  }, [activeTab, fetchEventTypes, orgFetchEpoch])
 
   useEffect(() => {
     if (activeTab !== 'paymentPlans') return
@@ -1425,8 +1410,7 @@ export default function SettingsView({
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, orgFetchEpoch])
+  }, [activeTab, fetchPlans, orgFetchEpoch])
 
   useEffect(() => {
     if (activeTab !== 'cycle') return
@@ -1439,8 +1423,7 @@ export default function SettingsView({
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, orgFetchEpoch])
+  }, [activeTab, fetchCycleConfig, orgFetchEpoch])
 
   // Per-tab loading: render the page immediately and let each tab
   // show its own skeleton (defined inline below) so users can navigate

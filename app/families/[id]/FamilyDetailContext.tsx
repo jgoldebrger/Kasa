@@ -116,6 +116,7 @@ export function FamilyDetailProvider({
     toast,
     confirm,
   })
+  const { setShowTaskModal, fetchFamilyTasks } = deferred
 
   const fetchFamilyDetails = useCallback(
     async (sharedGen?: number) => {
@@ -185,7 +186,7 @@ export function FamilyDetailProvider({
       await fetchFamilyDetails(gen)
       await ledger.refreshLedgerTab(activeTab, gen)
     },
-    [beginFamilyFetch, fetchFamilyDetails, ledger.refreshLedgerTab, activeTab, ledger],
+    [beginFamilyFetch, fetchFamilyDetails, activeTab, ledger],
   )
 
   const members = useFamilyMemberActions({
@@ -197,6 +198,7 @@ export function FamilyDetailProvider({
     toast,
     confirm,
   })
+  const { memberActiveTab, setMemberActiveTab } = members
 
   const statements = useFamilyStatements({
     familyId,
@@ -236,10 +238,10 @@ export function FamilyDetailProvider({
   // tasks ?add=true deep link
   useEffect(() => {
     if (activeTab === 'tasks' && searchParams.get('add') === 'true') {
-      deferred.setShowTaskModal(true)
+      setShowTaskModal(true)
       router.replace(familyTabHref(familyId, 'tasks'))
     }
-  }, [activeTab, searchParams, familyId, router, deferred.setShowTaskModal])
+  }, [activeTab, searchParams, familyId, router, setShowTaskModal])
 
   useEffect(() => {
     if (roleLoading) return
@@ -302,19 +304,19 @@ export function FamilyDetailProvider({
 
   useEffect(() => {
     if (activeTab === 'tasks' && params.id) {
-      void deferred.fetchFamilyTasks()
+      void fetchFamilyTasks()
     }
-  }, [activeTab, params.id, deferred.fetchFamilyTasks])
+  }, [activeTab, params.id, fetchFamilyTasks])
 
   useEffect(() => {
     if (roleLoading) return
     if (!isAdmin && ADMIN_ONLY_FAMILY_TABS.has(activeTab)) {
       router.replace(familyTabHref(familyId, 'info'))
     }
-    if (!isAdmin && members.memberActiveTab !== 'info') {
-      members.setMemberActiveTab('info')
+    if (!isAdmin && memberActiveTab !== 'info') {
+      setMemberActiveTab('info')
     }
-  }, [isAdmin, roleLoading, activeTab, members.memberActiveTab, familyId, router, members.setMemberActiveTab])
+  }, [isAdmin, roleLoading, activeTab, memberActiveTab, familyId, router, setMemberActiveTab])
 
   const handleFieldEdit = (fieldName: string, currentValue: any) => {
     if (fieldName === 'weddingDate' && currentValue) {

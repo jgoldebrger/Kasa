@@ -7,6 +7,10 @@
 
 # testing
 /coverage
+coverage-*/
+coverage-out.txt
+coverage-*.txt
+coverage-documents-targets.json
 /e2e/.auth/
 /security/playwright/.auth/
 /security/reports/output/
@@ -45,10 +49,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-
-.vercel
-
-.vercel
-
-.vercel
