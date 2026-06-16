@@ -19,8 +19,8 @@ rules:
         - "**/*.test.ts"
         - "**/*.test.tsx"
         - "**/*.integration.test.ts"
-        - "e2e/**"
-        - "scripts/**"
+        - "**/e2e/**"
+        - "**/scripts/**"
     message: Possible hardcoded secret — use environment variables.
     severity: ERROR
     languages: [javascript, typescript]
