@@ -15,6 +15,7 @@ const FULLSCREEN_PATHS = [
   '/privacy',
   '/terms',
   '/subprocessors',
+  '/pricing',
 ]
 
 export default function AppShell({ children }: { children: React.ReactNode }) {

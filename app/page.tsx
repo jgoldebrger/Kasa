@@ -3,6 +3,7 @@ import { requireServerOrgContext } from '@/lib/auth-server'
 import { hasMinRole } from '@/lib/auth-helpers'
 import connectDB from '@/lib/database'
 import { Family, FamilyMember, Task, YearlyCalculation } from '@/lib/models'
+import { loadSetupProgress } from '@/lib/organizations/setup-progress-data'
 import DashboardView from './DashboardView'
 import Loading from './loading'
 
@@ -45,9 +46,8 @@ async function fetchInitialDashboardData(organizationId: string, includeFinancia
   }
   // Note: we intentionally do NOT fall back to calculateYearlyBalance() here.
   // That helper kicks off ~6 sequential Mongo reads and would block first
-  // paint for new/empty orgs. The client's /api/dashboard-stats useEffect
-  // does it instead — the user sees zeroes briefly and then real data
-  // populates, but the page is interactive immediately.
+  // paint for new/empty orgs. The client fetches /api/dashboard-stats instead;
+  // DashboardView shows skeletons until that live calc completes.
 
   const initialStats = {
     totalFamilies,
@@ -61,7 +61,20 @@ async function fetchInitialDashboardData(organizationId: string, includeFinancia
   // into plain JSON before it crosses the server→client component boundary.
   const initialTasks = taskDocs.map((t) => JSON.parse(JSON.stringify(t)))
 
-  return { initialStats, initialTasks }
+  // Financial cards are only trustworthy when a cached YearlyCalculation exists.
+  // Without it the client must run the live calc via /api/dashboard-stats.
+  const financialsComplete = !includeFinancials || calcDoc != null
+
+  let initialSetupProgress = null
+  if (includeFinancials) {
+    try {
+      initialSetupProgress = await loadSetupProgress(organizationId)
+    } catch (err) {
+      console.error('[dashboard] setup-progress prefetch failed:', err)
+    }
+  }
+
+  return { initialStats, initialTasks, financialsComplete, initialSetupProgress }
 }
 
 async function DashboardServer() {
@@ -73,6 +86,8 @@ async function DashboardServer() {
       <DashboardView
         initialStats={data.initialStats}
         initialTasks={data.initialTasks}
+        initialFinancialsComplete={data.financialsComplete}
+        initialSetupProgress={data.initialSetupProgress}
         showFinancials={showFinancials}
       />
     )

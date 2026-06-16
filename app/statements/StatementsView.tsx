@@ -143,14 +143,12 @@ export default function StatementsView({
   const confirm = useConfirm()
   const { format: formatMoney } = useCurrency()
   const statementTxColumns = useMemo(() => buildStatementTxColumns(formatMoney), [formatMoney])
-  const hasInitialStatements = Array.isArray(initialStatements) && initialStatements.length > 0
+  const statementsHydrated = initialStatements !== undefined
   const [statements, setStatements] = useState<Statement[]>(initialStatements ?? [])
   const [families, setFamilies] = useState<Family[]>(initialFamilies ?? [])
-  const [loading, setLoading] = useState(!hasInitialStatements)
+  const [loading, setLoading] = useState(!statementsHydrated)
   const [error, setError] = useState(false)
-  // StrictMode-safe gate (a mutated "first run" flag is flipped on the
-  // first dev-mode strict pass and the second pass would refetch).
-  const hasFetchedRef = useRef(hasInitialStatements)
+  const hasFetchedRef = useRef(statementsHydrated)
   const mountedRef = useRef(true)
   const pollGenRef = useRef(0)
   const { begin, invalidate, isStale } = useRequestGeneration()

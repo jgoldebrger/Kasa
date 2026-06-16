@@ -16,7 +16,9 @@
  *    cells return JSX still filter correctly (matches what `exportValue` does).
  */
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+
+const SEARCH_DEBOUNCE_MS = 200
 import { reactNodeToText } from '@/lib/client/export'
 
 export type FilterType =
@@ -331,7 +333,17 @@ export function useDataFilters<T>(
   opts: UseDataFiltersOptions<T> = {},
 ): DataFiltersApi<T> {
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [columnFilters, setColumnFiltersState] = useState<Record<string, FilterValue>>({})
+
+  useEffect(() => {
+    if (search === '') {
+      setDebouncedSearch('')
+      return
+    }
+    const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(id)
+  }, [search])
 
   const filterableColumns = useMemo(() => columns.filter((c) => !!c.filter), [columns])
   const globalSearchEnabled = !!opts.globalSearch
@@ -394,21 +406,21 @@ export function useDataFilters<T>(
 
   const filteredRows = useMemo<T[]>(
     () =>
-      filterDataRows(rows, columns, search, columnFilters, {
+      filterDataRows(rows, columns, debouncedSearch, columnFilters, {
         globalSearch: opts.globalSearch,
         filterableColumns,
         globalGetText,
       }),
-    [rows, search, columnFilters, filterableColumns, globalGetText, columns, opts.globalSearch],
+    [rows, debouncedSearch, columnFilters, filterableColumns, globalGetText, columns, opts.globalSearch],
   )
 
   const activeFilters = useMemo<ActiveFilter[]>(() => {
     const out: ActiveFilter[] = []
-    if (search.trim()) {
+    if (debouncedSearch.trim()) {
       out.push({
         id: '__search__',
         label: 'Search',
-        display: `"${search.trim()}"`,
+        display: `"${debouncedSearch.trim()}"`,
         clear: () => setSearch(''),
       })
     }
@@ -423,7 +435,7 @@ export function useDataFilters<T>(
       })
     }
     return out
-  }, [search, columnFilters, filterableColumns, setColumnFilter])
+  }, [debouncedSearch, columnFilters, filterableColumns, setColumnFilter])
 
   return {
     filteredRows,

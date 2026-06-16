@@ -732,13 +732,15 @@ describe.sequential('route-logic coverage gaps', () => {
       }
     })
 
-    it('dashboard-stats returns partial payload when calc throws', async () => {
+    it('dashboard-stats returns partial payload when calc throws with compute=1', async () => {
       bindSession(ctx)
       const calcMod = await import('@/lib/calculations')
       const spy = vi.spyOn(calcMod, 'calculateYearlyBalance').mockRejectedValueOnce(new Error('dash calc fail'))
       try {
         const { GET } = await import('@/lib/route-logic/dashboard-stats')
-        const res = await GET(orgJsonReq('/api/dashboard-stats', 'GET'))
+        const res = await GET(
+          orgJsonReq('/api/dashboard-stats', 'GET', undefined, { query: '?compute=1' }),
+        )
         expect(res.status).toBe(200)
       } finally {
         spy.mockRestore()

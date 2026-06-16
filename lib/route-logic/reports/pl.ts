@@ -1,12 +1,12 @@
 import { handler } from '@/lib/api/handler'
-import { Payment, LifecycleEventPayment, Organization } from '@/lib/models'
+import { Payment, LifecycleEventPayment } from '@/lib/models'
 import { yearParam } from '@/lib/schemas'
-import { buildPaymentYearFilter } from '@/lib/calculations'
-import { netPaymentAmount } from '@/lib/money'
 import { PAYMENT_PUBLIC_SELECT } from '@/lib/payments/select'
+import { netPaymentAmount } from '@/lib/money'
+import { collectCompoundCursorPages } from '@/lib/pagination'
 import { validateDateRange } from '@/lib/validate-date-range'
 import { checkRateLimit } from '@/lib/rate-limit'
-import { collectCompoundCursorPages } from '@/lib/pagination'
+import { buildPlReportForYear } from '@/lib/reports/pl-data'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,22 +35,19 @@ export const GET = handler({
     const eventFilter: any = { organizationId: ctx!.organizationId }
     let paymentFilter: Record<string, unknown> = { organizationId: ctx!.organizationId }
     if (year) {
-      const parsed = yearParam.safeParse(year)
-      if (!parsed.success) {
-        return { status: 400, data: { error: 'Invalid year' } }
-      }
-      const yearNum = parsed.data
       if (startDate || endDate) {
         return {
           status: 400,
           data: { error: 'Provide either year or startDate/endDate, not both' },
         }
       }
-      const org = await Organization.findById(ctx!.organizationId)
-        .select('timezone')
-        .lean<{ timezone?: string }>()
-      paymentFilter = buildPaymentYearFilter(yearNum, ctx!.organizationId, org?.timezone)
-      eventFilter.year = yearNum
+      const parsed = yearParam.safeParse(year)
+      if (!parsed.success) {
+        return { status: 400, data: { error: 'Invalid year' } }
+      }
+      const yearNum = parsed.data
+      const report = await buildPlReportForYear(ctx!.organizationId, yearNum)
+      return { data: report }
     } else if (startDate || endDate) {
       if (!startDate || !endDate) {
         return {

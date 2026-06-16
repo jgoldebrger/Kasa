@@ -47,7 +47,7 @@ const stubFamily = {
 }
 
 const stubPlan = {
-  _id: 'plan-smoke-1',
+  _id: '507f1f77bcf86cd799439011',
   name: 'Standard',
   yearlyPrice: 500,
 }
@@ -112,5 +112,53 @@ describe('FamiliesView smoke', () => {
     })
 
     expect((await screen.findAllByText('Page Two Family')).length).toBeGreaterThan(0)
+  })
+
+  it('POSTs family create when the modal form is submitted', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(
+      <FamiliesView
+        initialFamilies={[]}
+        initialPaymentPlans={[stubPlan]}
+        isAdmin
+      />,
+    )
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add Family' })[0])
+    const dialog = screen.getByRole('dialog', { name: 'Add Family' })
+
+    fireEvent.change(dialog.querySelector('input[autocomplete="family-name"]')!, {
+      target: { value: 'New Family' },
+    })
+    fireEvent.change(dialog.querySelector('input[lang="he"]')!, {
+      target: { value: 'משפחה' },
+    })
+    fireEvent.change(dialog.querySelector('input[type="date"]')!, {
+      target: { value: '2020-06-01' },
+    })
+    fireEvent.change(dialog.querySelector('select')!, {
+      target: { value: stubPlan._id },
+    })
+
+    const hebrewInputs = dialog.querySelectorAll('input[lang="he"]')
+    fireEvent.change(hebrewInputs[1]!, { target: { value: 'דוד' } })
+    fireEvent.change(hebrewInputs[3]!, { target: { value: 'שרה' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create family' }))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/families',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('"name":"New Family"'),
+        }),
+      )
+    })
   })
 })

@@ -12,8 +12,10 @@ import { getYearInTimeZone } from '@/lib/date-utils'
  *
  * This endpoint:
  *   - Counts families and members with $count (no document hydration).
- *   - Returns the current year's calculated totals, computing on the fly
- *     if no YearlyCalculation document exists yet.
+ *   - Returns the current year's calculated totals from a cached
+ *     YearlyCalculation when one exists. When none exists, returns zeros
+ *     with `financialsPending: true` unless `?compute=1` is passed (client
+ *     uses that to trigger calculateYearlyBalance without blocking first paint).
  *   - Sets a short private cache so client-side navigations re-show the
  *     dashboard instantly.
  */
@@ -25,6 +27,7 @@ export const GET = handler({
     const org = await Organization.findById(ctx!.organizationId).select('timezone').lean<{ timezone?: string }>()
 
     const { searchParams } = new URL(request.url)
+    const compute = searchParams.get('compute') === '1'
     const yearParam = searchParams.get('year')
     let year = getYearInTimeZone(org?.timezone)
     if (yearParam) {
@@ -50,12 +53,13 @@ export const GET = handler({
     let calculatedIncome = 0
     let calculatedExpenses = 0
     let balance = 0
+    let financialsPending = false
     if (isAdmin) {
       if (calcDoc) {
         calculatedIncome = calcDoc.calculatedIncome ?? 0
         calculatedExpenses = calcDoc.calculatedExpenses ?? 0
         balance = calcDoc.balance ?? calculatedIncome - calculatedExpenses
-      } else {
+      } else if (compute) {
         try {
           const computed = await calculateYearlyBalance(year, ctx!.organizationId)
           calculatedIncome = computed.calculatedIncome ?? 0
@@ -64,6 +68,8 @@ export const GET = handler({
         } catch (err) {
           console.error('[dashboard-stats] calc failed:', err)
         }
+      } else {
+        financialsPending = true
       }
     }
 
@@ -72,7 +78,7 @@ export const GET = handler({
         totalFamilies,
         totalMembers,
         ...(isAdmin
-          ? { calculatedIncome, calculatedExpenses, balance, year }
+          ? { calculatedIncome, calculatedExpenses, balance, year, financialsPending }
           : {}),
       },
       headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=300' },

@@ -57,7 +57,9 @@ const nextConfig = {
       '@heroicons/react/24/solid',
       '@heroicons/react/20/solid',
       '@stripe/react-stripe-js',
+      '@tanstack/react-virtual',
       'date-fns',
+      'lodash',
     ],
   },
   // Hide the dev-only "x-powered-by" header.

@@ -1,18 +1,26 @@
 import { Family, LifecycleEventPayment, LifecycleEvent, Organization } from '@/lib/models'
 import { lifecycle as lifecycleSchemas } from '@/lib/schemas'
-import { updateYearlyCalculationForEvent } from '@/lib/calculations'
+import { scheduleYearlyCalculationRefresh } from '@/lib/calculations'
 import { getYearInTimeZone } from '@/lib/date-utils'
 import { audit } from '@/lib/audit'
 import { checkRateLimit } from '@/lib/rate-limit'
-import { collectCompoundCursorPages } from '@/lib/pagination'
 import { handler } from '@/lib/api/handler'
+import {
+  familyLedgerListQuery,
+  listFamilyLedger,
+} from '@/lib/family-ledger-list'
+
+const LEDGER_CACHE_HEADERS = {
+  'Cache-Control': 'private, max-age=15, stale-while-revalidate=60',
+}
 
 export const GET = handler({
   auth: 'org',
   minRole: 'admin',
   idParams: ['id'],
+  query: familyLedgerListQuery,
   name: 'GET /api/families/[id]/lifecycle-events',
-  fn: async ({ params, ctx, request }) => {
+  fn: async ({ params, ctx, request, query }) => {
     const rateVerdict = await checkRateLimit(
       request,
       'family-lifecycle-events',
@@ -28,20 +36,38 @@ export const GET = handler({
     if (!fam) {
       return { status: 404, data: { error: 'Family not found' } }
     }
-    const events = await collectCompoundCursorPages(
-      (filter, limit) =>
-        LifecycleEventPayment.find(filter)
-          .sort({ eventDate: -1, _id: -1 })
-          .limit(limit).lean(),
-      { familyId: id, organizationId: ctx!.organizationId },
-      'eventDate',
-      -1,
-      (last) => ({
-        v: last.eventDate ? new Date(last.eventDate as string | Date).getTime() : null,
-        id: String(last._id),
-      }),
-    )
-    return { data: events }
+
+    const baseFilter = { familyId: id, organizationId: ctx!.organizationId }
+    const loadPage = (filter: Record<string, unknown>, limit: number) =>
+      LifecycleEventPayment.find(filter)
+        .sort({ eventDate: -1, _id: -1 })
+        .limit(limit)
+        .lean()
+
+    const effectiveQuery = {
+      limit: query.limit ?? 0,
+      cursor: query.cursor,
+    }
+
+    try {
+      const data = await listFamilyLedger(
+        baseFilter,
+        loadPage,
+        'eventDate',
+        -1,
+        (last) => ({
+          v: last.eventDate ? new Date(last.eventDate as string | Date).getTime() : null,
+          id: String(last._id),
+        }),
+        effectiveQuery,
+      )
+      return { data, headers: LEDGER_CACHE_HEADERS }
+    } catch (err) {
+      if (err instanceof Error && err.message === 'Invalid cursor') {
+        return { status: 400, data: { error: 'Invalid cursor' } }
+      }
+      throw err
+    }
   },
 })
 
@@ -126,9 +152,7 @@ export const POST = handler({
       request,
     })
 
-    updateYearlyCalculationForEvent(parsedYear, ctx!.organizationId).catch((err) => {
-      console.error('Failed to invalidate YearlyCalculation:', err)
-    })
+    scheduleYearlyCalculationRefresh(parsedYear, ctx!.organizationId)
 
     return { status: 201, data: event }
   },

@@ -278,7 +278,7 @@ export default function ImportModal({
             </h3>
             <div className="overflow-x-auto rounded-lg border border-border">
               <table className="w-full text-xs">
-                <thead className="border-b border-border bg-app-subtle text-left text-fg-muted">
+                <thead className="border-b border-border bg-app-subtle text-left text-muted-on-subtle">
                   <tr>
                     {headers.map((h) => (
                       <th key={h} className="whitespace-nowrap px-3 py-1.5 font-medium">

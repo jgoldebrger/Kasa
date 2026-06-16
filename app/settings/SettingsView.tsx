@@ -2,26 +2,17 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type React from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { EnvelopeIcon, PlusIcon, TrashIcon, CalendarIcon, CreditCardIcon, UserGroupIcon, PrinterIcon, DocumentArrowDownIcon, PhotoIcon, IdentificationIcon, TagIcon, ClockIcon, GlobeAltIcon } from '@heroicons/react/24/outline'
 import { useConfirm, useToast } from '@/app/components/Toast'
-import { convertToHebrewDate } from '@/lib/hebrew-date'
-import { escapeHtml } from '@/lib/html-escape'
-import { invalidate as invalidateCache } from '@/lib/client-cache'
+import { cachedFetch, invalidate as invalidateCache } from '@/lib/client-cache'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { isFiniteDate } from '@/lib/date-utils'
-import { PageHeader, SkeletonRows, Tabs } from '@/app/components/ui'
-import MembersPanel from '@/app/components/settings/MembersPanel'
-import BrandingPanel from '@/app/components/settings/BrandingPanel'
-import TrashPanel from '@/app/components/settings/TrashPanel'
-import LetterheadPanel from '@/app/components/settings/LetterheadPanel'
-import MailLabelsPanel from '@/app/components/settings/MailLabelsPanel'
-import LocalizationPanel from '@/app/components/settings/LocalizationPanel'
-import ActivityPanel from '@/app/components/settings/ActivityPanel'
-import PaymentPlansTable from '@/app/components/settings/PaymentPlansTable'
-import EventTypesTable from '@/app/components/settings/EventTypesTable'
-import BillingPanel, { type BillingSnapshot } from '@/app/components/settings/BillingPanel'
+import { PageHeader, SkeletonRows } from '@/app/components/ui'
+import SettingsNav, { type SettingsTabId } from '@/app/components/settings/SettingsNav'
+import PanelSkeleton from './panels/PanelSkeleton'
+import type { BillingSnapshot } from '@/app/components/settings/BillingPanel'
 
 interface LifecycleEventType {
   _id: string
@@ -60,21 +51,7 @@ const EMPTY_LETTERHEAD = {
   taxDeductibleDisclosure: '',
 }
 
-type TabType =
-  | 'email'
-  | 'eventTypes'
-  | 'paymentPlans'
-  | 'automation'
-  | 'kevittel'
-  | 'cycle'
-  | 'branding'
-  | 'letterhead'
-  | 'labels'
-  | 'localization'
-  | 'activity'
-  | 'members'
-  | 'billing'
-  | 'trash'
+type TabType = SettingsTabId
 
 const VALID_TABS: readonly TabType[] = [
   'email',
@@ -97,31 +74,50 @@ function isValidTab(s: string | null | undefined): s is TabType {
   return !!s && (VALID_TABS as readonly string[]).includes(s)
 }
 
-// Hebrew month numbers follow @hebcal: 1=Nisan ... 7=Tishrei ... 12=Adar
-// (or Adar I in a leap year), 13=Adar II (leap years only). We render all
-// 13 so admins can pick Adar II if they want, with a parenthetical that
-// flags its leap-year-only nature.
-const HEBREW_MONTH_OPTIONS: { value: number; label: string }[] = [
-  { value: 7, label: 'Tishrei' },
-  { value: 8, label: 'Cheshvan' },
-  { value: 9, label: 'Kislev' },
-  { value: 10, label: 'Tevet' },
-  { value: 11, label: 'Shevat' },
-  { value: 12, label: 'Adar (Adar I in leap years)' },
-  { value: 13, label: 'Adar II (leap years only)' },
-  { value: 1, label: 'Nisan' },
-  { value: 2, label: 'Iyar' },
-  { value: 3, label: 'Sivan' },
-  { value: 4, label: 'Tammuz' },
-  { value: 5, label: 'Av' },
-  { value: 6, label: 'Elul' },
-]
-
-function hebrewMonthLabel(month: number | undefined | null): string {
-  const m = Number(month)
-  const hit = HEBREW_MONTH_OPTIONS.find((o) => o.value === m)
-  return hit ? hit.label.replace(/ \(.*\)$/, '') : ''
-}
+const DynamicEmailPanel = dynamic(() => import('./panels/EmailPanel'), {
+  loading: () => <PanelSkeleton />,
+})
+const DynamicEventTypesPanel = dynamic(() => import('./panels/EventTypesPanel'), {
+  loading: () => <PanelSkeleton />,
+})
+const DynamicPaymentPlansPanel = dynamic(() => import('./panels/PaymentPlansPanel'), {
+  loading: () => <PanelSkeleton />,
+})
+const DynamicAutomationPanel = dynamic(() => import('./panels/AutomationPanel'), {
+  loading: () => <PanelSkeleton />,
+})
+const DynamicKevittelPanel = dynamic(() => import('./panels/KevittelPanel'), {
+  loading: () => <PanelSkeleton />,
+})
+const DynamicCyclePanel = dynamic(() => import('./panels/CyclePanel'), {
+  loading: () => <PanelSkeleton />,
+})
+const DynamicLabelsPanel = dynamic(() => import('./panels/LabelsPanel'), {
+  loading: () => <PanelSkeleton />,
+})
+const DynamicActivityPanel = dynamic(() => import('./panels/ActivityPanel'), {
+  loading: () => <PanelSkeleton />,
+})
+const DynamicLetterheadPanel = dynamic(
+  () => import('@/app/components/settings/LetterheadPanel'),
+  { loading: () => <PanelSkeleton /> },
+)
+const DynamicMembersPanel = dynamic(() => import('@/app/components/settings/MembersPanel'), {
+  loading: () => <PanelSkeleton />,
+})
+const DynamicBrandingPanel = dynamic(() => import('@/app/components/settings/BrandingPanel'), {
+  loading: () => <PanelSkeleton />,
+})
+const DynamicTrashPanel = dynamic(() => import('@/app/components/settings/TrashPanel'), {
+  loading: () => <PanelSkeleton />,
+})
+const DynamicBillingPanel = dynamic(() => import('@/app/components/settings/BillingPanel'), {
+  loading: () => <PanelSkeleton />,
+})
+const DynamicLocalizationPanel = dynamic(
+  () => import('@/app/components/settings/LocalizationPanel'),
+  { loading: () => <PanelSkeleton /> },
+)
 
 export interface SettingsViewProps {
   initialEmailConfig?: any | null
@@ -207,7 +203,7 @@ export default function SettingsView({
   }, [])
 
   const changeTab = useCallback(
-    (id: string) => {
+    (id: SettingsTabId) => {
       if (!isValidTab(id)) return
       setActiveTab(id)
       // Keep the URL in sync so reload / back works.
@@ -251,7 +247,7 @@ export default function SettingsView({
   }
   
   // Event Types state
-  const hasInitialEventTypes = Array.isArray(initialEventTypes) && initialEventTypes.length > 0
+  const hasInitialEventTypes = initialEventTypes !== undefined
   const seededEventTypes = hasInitialEventTypes
     ? [...(initialEventTypes as LifecycleEventType[])].sort((a, b) => a.name.localeCompare(b.name))
     : []
@@ -266,7 +262,7 @@ export default function SettingsView({
   })
 
   // Payment Plans state
-  const hasInitialPaymentPlans = Array.isArray(initialPaymentPlans) && initialPaymentPlans.length > 0
+  const hasInitialPaymentPlans = initialPaymentPlans !== undefined
   const [plans, setPlans] = useState<PaymentPlan[]>(initialPaymentPlans ?? [])
   const [plansLoading, setPlansLoading] = useState(!hasInitialPaymentPlans)
   const [showPlanModal, setShowPlanModal] = useState(false)
@@ -405,6 +401,7 @@ export default function SettingsView({
   const hasFetchedEventTypesRef = useRef(hasInitialEventTypes)
   const hasFetchedPlansRef = useRef(hasInitialPaymentPlans)
   const hasFetchedCycleRef = useRef(hasInitialCycleConfig)
+  const hasFetchedKevittelRef = useRef(false)
   // `settingsFetchGenRef` is bumped EXACTLY ONCE per org change (see
   // `useOrgChanged` below). Every fetcher captures the current value
   // when it starts (`const gen = settingsFetchGenRef.current`) and
@@ -422,34 +419,6 @@ export default function SettingsView({
   const settingsFetchGenRef = useRef(0)
   const [orgFetchEpoch, setOrgFetchEpoch] = useState(0)
 
-  useEffect(() => {
-    let cancelled = false
-    if (!hasFetchedEmailRef.current) {
-      hasFetchedEmailRef.current = true
-      void fetchEmailConfig()
-    }
-    if (!hasFetchedEventTypesRef.current) {
-      hasFetchedEventTypesRef.current = true
-      void fetchEventTypes()
-    }
-    if (!hasFetchedPlansRef.current) {
-      hasFetchedPlansRef.current = true
-      void fetchPlans()
-    }
-    if (!hasFetchedCycleRef.current) {
-      hasFetchedCycleRef.current = true
-      void fetchCycleConfig()
-    }
-    // Kevittel is always fetched on mount — it's lazy in the active-tab
-    // effect anyway, but keep this for back-compat (no server prefetch yet).
-    void fetchKevittelData()
-    return () => {
-      cancelled = true
-    }
-    // Mount-only bootstrap; org switches refetch via useOrgChanged below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   useOrgChanged(useCallback(() => {
     // Bump the shared fetch-generation ONCE — fetchers below capture the
     // post-bump value and bail if a *subsequent* org change invalidates
@@ -460,6 +429,7 @@ export default function SettingsView({
     hasFetchedEventTypesRef.current = false
     hasFetchedPlansRef.current = false
     hasFetchedCycleRef.current = false
+    hasFetchedKevittelRef.current = false
     hasFetchedAutomationRef.current = false
     hasFetchedLetterheadRef.current = false
     hasFetchedLabelsRef.current = false
@@ -485,6 +455,11 @@ export default function SettingsView({
     // with the previous org's email or letterhead/automation state.
     setEmailConfig(null)
     setEmailFormData({ email: '', password: '', fromName: 'Kasa Family Management' })
+    setLoading(true)
+    setEventTypesLoading(true)
+    setPlansLoading(true)
+    setCycleLoading(true)
+    setKevittelLoading(true)
     setAutomationConfig({
       barMitzvahAutoAssignPlanId: null,
       barMitzvahAutoCreateEventTypeId: null,
@@ -501,11 +476,6 @@ export default function SettingsView({
     setLabelsLoading(true)
     setOrgFetchEpoch((e) => e + 1)
     invalidateCache(/.*/)
-    fetchEmailConfig()
-    fetchEventTypes()
-    fetchPlans()
-    fetchCycleConfig()
-    fetchKevittelData()
     // Refetch role separately — it's a tiny call and we want tab gates
     // updated before the user clicks anything.
     void (async () => {
@@ -527,11 +497,18 @@ export default function SettingsView({
 
   // Refresh Kevittel data when switching to the Kevittel tab
   useEffect(() => {
-    if (activeTab === 'kevittel' && !kevittelLoading) {
-      fetchKevittelData()
+    if (activeTab !== 'kevittel') return
+    if (hasFetchedKevittelRef.current) return
+    hasFetchedKevittelRef.current = true
+    let cancelled = false
+    void fetchKevittelData().finally(() => {
+      if (cancelled) hasFetchedKevittelRef.current = false
+    })
+    return () => {
+      cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab])
+  }, [activeTab, orgFetchEpoch])
 
   // Email Configuration functions
   const fetchEmailConfig = async () => {
@@ -655,30 +632,25 @@ export default function SettingsView({
     const gen = settingsFetchGenRef.current
     try {
       setAutomationLoading(true)
-      const res = await fetch('/api/organizations/automation')
+      const data = await cachedFetch<Record<string, unknown>>('/api/organizations/automation', {
+        ttl: 60_000,
+      })
       if (gen !== settingsFetchGenRef.current) return
-      if (res.ok) {
-        const data = await res.json().catch(() => ({}))
-        if (gen !== settingsFetchGenRef.current) return
-        setAutomationConfig({
-          barMitzvahAutoAssignPlanId: data.barMitzvahAutoAssignPlanId ?? null,
-          barMitzvahAutoCreateEventTypeId: data.barMitzvahAutoCreateEventTypeId ?? null,
-          weddingConversionDefaultPlanId: data.weddingConversionDefaultPlanId ?? null,
-          monthlyStatementAutoGenerate: !!data.monthlyStatementAutoGenerate,
-          monthlyStatementAutoEmail: !!data.monthlyStatementAutoEmail,
-          monthlyStatementCalendar:
-            data.monthlyStatementCalendar === 'hebrew' ? 'hebrew' : 'gregorian',
-          monthlyStatementDay:
-            typeof data.monthlyStatementDay === 'number' ? data.monthlyStatementDay : 1,
-          monthlyStatementHebrewDay:
-            typeof data.monthlyStatementHebrewDay === 'number'
-              ? data.monthlyStatementHebrewDay
-              : 1,
-        })
-      } else {
-        if (gen !== settingsFetchGenRef.current) return
-        toast.error('Failed to load automation settings.')
-      }
+      setAutomationConfig({
+        barMitzvahAutoAssignPlanId: (data.barMitzvahAutoAssignPlanId as string | null) ?? null,
+        barMitzvahAutoCreateEventTypeId: (data.barMitzvahAutoCreateEventTypeId as string | null) ?? null,
+        weddingConversionDefaultPlanId: (data.weddingConversionDefaultPlanId as string | null) ?? null,
+        monthlyStatementAutoGenerate: !!data.monthlyStatementAutoGenerate,
+        monthlyStatementAutoEmail: !!data.monthlyStatementAutoEmail,
+        monthlyStatementCalendar:
+          data.monthlyStatementCalendar === 'hebrew' ? 'hebrew' : 'gregorian',
+        monthlyStatementDay:
+          typeof data.monthlyStatementDay === 'number' ? data.monthlyStatementDay : 1,
+        monthlyStatementHebrewDay:
+          typeof data.monthlyStatementHebrewDay === 'number'
+            ? data.monthlyStatementHebrewDay
+            : 1,
+      })
     } catch (error) {
       if (gen !== settingsFetchGenRef.current) return
       console.error('Error fetching automation config:', error)
@@ -731,6 +703,7 @@ export default function SettingsView({
               : 1,
         })
         toast.success('Automation settings saved')
+        invalidateCache('/api/organizations/automation')
       } else {
         const err = await res.json().catch(() => ({}))
         toast.error(err.error || 'Failed to save automation settings')
@@ -754,7 +727,8 @@ export default function SettingsView({
   }
 
   // Lazy-fetch the automation config the first time the user opens the
-  // tab. Placed here so the `useCallback` above is in scope.
+  // tab. Also pull event types + plans if those tabs haven't been
+  // visited yet — automation dropdowns need them.
   useEffect(() => {
     if (activeTab !== 'automation') return
     if (hasFetchedAutomationRef.current) return
@@ -763,6 +737,18 @@ export default function SettingsView({
     void fetchAutomationConfig().finally(() => {
       if (cancelled) hasFetchedAutomationRef.current = false
     })
+    if (!hasFetchedEventTypesRef.current) {
+      hasFetchedEventTypesRef.current = true
+      void fetchEventTypes().finally(() => {
+        if (cancelled) hasFetchedEventTypesRef.current = false
+      })
+    }
+    if (!hasFetchedPlansRef.current) {
+      hasFetchedPlansRef.current = true
+      void fetchPlans().finally(() => {
+        if (cancelled) hasFetchedPlansRef.current = false
+      })
+    }
     return () => {
       cancelled = true
     }
@@ -1074,10 +1060,9 @@ export default function SettingsView({
   const fetchEventTypes = async () => {
     const gen = settingsFetchGenRef.current
     try {
-      const res = await fetch('/api/lifecycle-event-types')
-      if (gen !== settingsFetchGenRef.current) return
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json().catch(() => [])
+      const data = await cachedFetch<LifecycleEventType[]>('/api/lifecycle-event-types', {
+        ttl: 60_000,
+      })
       if (gen !== settingsFetchGenRef.current) return
       if (Array.isArray(data)) {
         // Copy before sort — `.sort()` mutates the source array, and
@@ -1134,6 +1119,7 @@ export default function SettingsView({
       })
 
       if (res.ok) {
+        invalidateCache('/api/lifecycle-event-types')
         setMessage({ type: 'success', text: 'Event type deleted successfully!' })
         fetchEventTypes()
       } else {
@@ -1147,6 +1133,7 @@ export default function SettingsView({
   }
 
   const eventTypeSubmittingRef = useRef(false)
+  const [eventTypeSubmitting, setEventTypeSubmitting] = useState(false)
   const handleSubmitEventType = async (e: React.FormEvent) => {
     e.preventDefault()
     // Re-entrancy guard. The submit button isn't disabled while the
@@ -1159,6 +1146,7 @@ export default function SettingsView({
       return
     }
     eventTypeSubmittingRef.current = true
+    setEventTypeSubmitting(true)
     try {
       const url = editingEventType
         ? `/api/lifecycle-event-types/${editingEventType._id}`
@@ -1179,6 +1167,7 @@ export default function SettingsView({
       })
 
       if (res.ok) {
+        invalidateCache('/api/lifecycle-event-types')
         setShowEventTypeModal(false)
         resetEventTypeForm()
         setMessage({ 
@@ -1195,6 +1184,7 @@ export default function SettingsView({
       setMessage({ type: 'error', text: 'Failed to save event type' })
     } finally {
       eventTypeSubmittingRef.current = false
+      setEventTypeSubmitting(false)
     }
   }
 
@@ -1202,20 +1192,15 @@ export default function SettingsView({
   const fetchPlans = async (opts?: { force?: boolean }) => {
     const gen = settingsFetchGenRef.current
     try {
-      // Server returns Cache-Control: max-age=60; bypass it on post-mutation
-      // refetches so we always see the latest.
-      const res = await fetch('/api/payment-plans', opts?.force ? { cache: 'no-store' } : {})
+      const data = await cachedFetch<PaymentPlan[]>('/api/payment-plans', {
+        ttl: 60_000,
+        bypass: opts?.force,
+      })
       if (gen !== settingsFetchGenRef.current) return
-      const data = await res.json().catch(() => null)
-      if (gen !== settingsFetchGenRef.current) return
-      if (res.ok && Array.isArray(data)) {
+      if (Array.isArray(data)) {
         setPlans(data)
       } else {
-        // Transient failure: surface to the user but DON'T blow away the
-        // currently-rendered plans. Previously this cleared the table on
-        // any non-OK response — e.g. a 502 from the CDN — leaving an
-        // empty UI with no toast.
-        console.error('Failed to fetch payment plans:', res.status, data)
+        console.error('Failed to fetch payment plans: unexpected response', data)
         toast.error('Could not reload payment plans.')
       }
     } catch (error) {
@@ -1228,6 +1213,7 @@ export default function SettingsView({
   }
 
   const planSubmittingRef = useRef(false)
+  const [planSubmitting, setPlanSubmitting] = useState(false)
   const handleSubmitPlan = async (e: React.FormEvent) => {
     e.preventDefault()
     // Re-entrancy guard — see `handleSubmitEventType` for rationale.
@@ -1238,6 +1224,7 @@ export default function SettingsView({
       return
     }
     planSubmittingRef.current = true
+    setPlanSubmitting(true)
     try {
       const url = editingPlan 
         ? `/api/payment-plans/${editingPlan._id}`
@@ -1267,6 +1254,7 @@ export default function SettingsView({
       setMessage({ type: 'error', text: 'Failed to save payment plan' })
     } finally {
       planSubmittingRef.current = false
+      setPlanSubmitting(false)
     }
   }
 
@@ -1397,6 +1385,63 @@ export default function SettingsView({
     }
   }
 
+  // Lazy-fetch core settings tabs on first visit (or after org switch).
+  useEffect(() => {
+    if (activeTab !== 'email') return
+    if (hasFetchedEmailRef.current) return
+    hasFetchedEmailRef.current = true
+    let cancelled = false
+    void fetchEmailConfig().finally(() => {
+      if (cancelled) hasFetchedEmailRef.current = false
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, orgFetchEpoch])
+
+  useEffect(() => {
+    if (activeTab !== 'eventTypes') return
+    if (hasFetchedEventTypesRef.current) return
+    hasFetchedEventTypesRef.current = true
+    let cancelled = false
+    void fetchEventTypes().finally(() => {
+      if (cancelled) hasFetchedEventTypesRef.current = false
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, orgFetchEpoch])
+
+  useEffect(() => {
+    if (activeTab !== 'paymentPlans') return
+    if (hasFetchedPlansRef.current) return
+    hasFetchedPlansRef.current = true
+    let cancelled = false
+    void fetchPlans().finally(() => {
+      if (cancelled) hasFetchedPlansRef.current = false
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, orgFetchEpoch])
+
+  useEffect(() => {
+    if (activeTab !== 'cycle') return
+    if (hasFetchedCycleRef.current) return
+    hasFetchedCycleRef.current = true
+    let cancelled = false
+    void fetchCycleConfig().finally(() => {
+      if (cancelled) hasFetchedCycleRef.current = false
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, orgFetchEpoch])
+
   // Per-tab loading: render the page immediately and let each tab
   // show its own skeleton (defined inline below) so users can navigate
   // between tabs without waiting for every fetch to settle.
@@ -1416,360 +1461,61 @@ export default function SettingsView({
       <div className="max-w-6xl mx-auto">
         <PageHeader title="Settings" subtitle="Manage your system configuration." />
 
-        {/* Tabs */}
-        <div className="bg-surface rounded-2xl shadow border border-border mb-6 p-2 sm:p-3">
-          <Tabs
-            label="Settings sections"
-            activeId={activeTab}
-            onChange={changeTab}
-            items={[
-              {
-                id: 'email',
-                label: (
-                  <span className="inline-flex items-center gap-2">
-                    <EnvelopeIcon className="h-4 w-4" aria-hidden="true" /> Email
-                  </span>
-                ),
-              },
-              {
-                id: 'eventTypes',
-                label: (
-                  <span className="inline-flex items-center gap-2">
-                    <CalendarIcon className="h-4 w-4" aria-hidden="true" /> Event Types
-                  </span>
-                ),
-              },
-              {
-                id: 'paymentPlans',
-                label: (
-                  <span className="inline-flex items-center gap-2">
-                    <CreditCardIcon className="h-4 w-4" aria-hidden="true" /> Payment Plans
-                  </span>
-                ),
-              },
-              {
-                id: 'automation',
-                label: (
-                  <span className="inline-flex items-center gap-2">
-                    <CalendarIcon className="h-4 w-4" aria-hidden="true" /> Automation
-                  </span>
-                ),
-              },
-              {
-                id: 'kevittel',
-                label: (
-                  <span className="inline-flex items-center gap-2">
-                    <UserGroupIcon className="h-4 w-4" aria-hidden="true" /> Kevittel
-                  </span>
-                ),
-              },
-              {
-                id: 'cycle',
-                label: (
-                  <span className="inline-flex items-center gap-2">
-                    <CalendarIcon className="h-4 w-4" aria-hidden="true" /> Cycle
-                  </span>
-                ),
-              },
-              {
-                id: 'branding',
-                label: (
-                  <span className="inline-flex items-center gap-2">
-                    <PhotoIcon className="h-4 w-4" aria-hidden="true" /> Branding
-                  </span>
-                ),
-              },
-              {
-                id: 'labels',
-                label: (
-                  <span className="inline-flex items-center gap-2">
-                    <TagIcon className="h-4 w-4" aria-hidden="true" /> Mail Labels
-                  </span>
-                ),
-              },
-              {
-                id: 'localization',
-                label: (
-                  <span className="inline-flex items-center gap-2">
-                    <GlobeAltIcon className="h-4 w-4" aria-hidden="true" /> Localization
-                  </span>
-                ),
-              },
-              // Letterhead + Activity (audit log) are admin/owner-only.
-              // Members and Trash are also admin/owner-only. We hide the
-              // tabs entirely for plain members so the UI doesn't tease
-              // at gated functionality.
-              ...(canSeePrivilegedTabs
-                ? [
-                    {
-                      id: 'letterhead' as const,
-                      label: (
-                        <span className="inline-flex items-center gap-2">
-                          <IdentificationIcon className="h-4 w-4" aria-hidden="true" /> Letterhead
-                        </span>
-                      ),
-                    },
-                    {
-                      id: 'activity' as const,
-                      label: (
-                        <span className="inline-flex items-center gap-2">
-                          <ClockIcon className="h-4 w-4" aria-hidden="true" /> Activity
-                        </span>
-                      ),
-                    },
-                    {
-                      id: 'members' as const,
-                      label: (
-                        <span className="inline-flex items-center gap-2">
-                          <UserGroupIcon className="h-4 w-4" aria-hidden="true" /> Members
-                        </span>
-                      ),
-                    },
-                    {
-                      id: 'billing' as const,
-                      label: (
-                        <span className="inline-flex items-center gap-2">
-                          <CreditCardIcon className="h-4 w-4" aria-hidden="true" /> Billing
-                        </span>
-                      ),
-                    },
-                    {
-                      id: 'trash' as const,
-                      label: (
-                        <span className="inline-flex items-center gap-2">
-                          <TrashIcon className="h-4 w-4" aria-hidden="true" /> Recycle bin
-                        </span>
-                      ),
-                    },
-                  ]
-                : []),
-            ]}
-          />
-        </div>
-
-        {/* Per-tab skeleton while the relevant fetch is in flight. */}
-        {isTabLoading && (
-          <div className="bg-surface rounded-lg shadow p-6 mb-6">
-            <SkeletonRows count={5} />
-          </div>
-        )}
-
-        {/* Email Configuration Tab */}
-        {activeTab === 'email' && !isTabLoading && (
-          <div className="bg-surface rounded-lg shadow-lg p-4 sm:p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <EnvelopeIcon className="h-6 w-6 text-purple-600" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-fg">Email Configuration</h2>
-                <p className="text-sm text-fg-muted">Configure Gmail settings for sending statements</p>
-              </div>
-            </div>
-
-            {emailConfig && (
-              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-800">
-                  <strong>✓ Email configuration is active:</strong> {emailConfig.email}
-                </p>
-                <p className="text-xs text-green-700 mt-1">
-                  Your email settings are saved and will be used automatically for sending statements.
-                </p>
-              </div>
-            )}
-
-            <form onSubmit={handleSaveEmailConfig} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1 text-fg">
-                  Gmail Address *
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={emailFormData.email}
-                  onChange={(e) => setEmailFormData({ ...emailFormData, email: e.target.value })}
-                  placeholder="your-email@gmail.com"
-                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-                <p className="text-xs text-fg-muted mt-1">
-                  Gmail account to send statements from
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1 text-fg">
-                  Gmail App Password {emailConfig ? '(leave empty to keep current)' : '*'}
-                </label>
-                <input
-                  type="password"
-                  required={!emailConfig}
-                  value={emailFormData.password}
-                  onChange={(e) => setEmailFormData({ ...emailFormData, password: e.target.value })}
-                  placeholder={emailConfig ? "Leave empty to keep current password" : "16-character app password"}
-                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-                <p className="text-xs text-fg-muted mt-1">
-                  Generate an app password from{' '}
-                  <a 
-                    href="https://myaccount.google.com/apppasswords" 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="text-accent underline hover:text-accent-hover"
-                  >
-                    Google Account Settings
-                  </a>
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1 text-fg">
-                  From Name
-                </label>
-                <input
-                  type="text"
-                  value={emailFormData.fromName}
-                  onChange={(e) => setEmailFormData({ ...emailFormData, fromName: e.target.value })}
-                  placeholder="Kasa Family Management"
-                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-                <p className="text-xs text-fg-muted mt-1">
-                  Display name shown in sent emails
-                </p>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="focus-ring bg-accent text-accent-fg px-4 py-2 rounded-md flex items-center gap-2 hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                >
-                  <EnvelopeIcon className="h-4 w-4" />
-                  {saving ? 'Saving...' : emailConfig ? 'Update Configuration' : 'Save Configuration'}
-                </button>
-
-                {emailConfig && (
-                  <button
-                    type="button"
-                    onClick={handleTestEmail}
-                    disabled={saving}
-                    className="focus-ring border border-border bg-surface text-fg px-4 py-2 rounded-md flex items-center gap-2 hover:bg-fg/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                  >
-                    <EnvelopeIcon className="h-4 w-4" />
-                    Send Test Email
-                  </button>
-                )}
-              </div>
-            </form>
-
-            {emailConfig && (
-              <div className="mt-6 p-4 bg-accent/10 border border-accent/20 rounded-lg">
-                <h3 className="font-semibold text-fg mb-2">How It Works</h3>
-                <ul className="text-sm text-accent-hover space-y-1 list-disc list-inside">
-                  <li>Email configuration is stored securely in the database</li>
-                  <li>Saved settings are used automatically for all statement emails</li>
-                  <li>Opt in to monthly auto-send from the Automation tab to email statements on the 1st of each month</li>
-                  <li>You can send individual statements from the Statements page or Family detail page</li>
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Event Types Tab */}
-        {activeTab === 'eventTypes' && !isTabLoading && (
-          <div className="bg-surface rounded-lg shadow-lg p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">
-                  <CalendarIcon className="h-6 w-6 text-accent" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-fg">Lifecycle Event Types</h2>
-                  <p className="text-sm text-fg-muted">Manage event types and their default amounts</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    resetEventTypeForm()
-                    setShowEventTypeModal(true)
-                  }}
-                  className="bg-accent text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-accent-hover transition-colors"
-                >
-                  <PlusIcon className="h-5 w-5" />
-                  Add Event Type
-                </button>
-              </div>
-            </div>
-
-            <EventTypesTable
-              eventTypes={eventTypes}
-              onEdit={handleEditEventType}
-              onDelete={handleDeleteEventType}
-              tableId="settings-event-types"
-              emptyCta={
-                eventTypes.length === 0
-                  ? {
-                      label: 'Add event type',
-                      onClick: () => {
-                        resetEventTypeForm()
-                        setShowEventTypeModal(true)
-                      },
-                    }
-                  : undefined
-              }
+        <div className="flex flex-col md:flex-row gap-6 items-start">
+          <aside className="w-full md:w-56 lg:w-64 shrink-0 md:sticky md:top-6">
+            <SettingsNav
+              activeId={activeTab}
+              onChange={changeTab}
+              canSeePrivilegedTabs={canSeePrivilegedTabs}
             />
-            {eventTypes.length > 0 && (
-              <div className="mt-3 flex justify-end text-sm">
-                <span className="text-fg-muted">
-                  Total ({eventTypes.length} event types):{' '}
-                  <span className="font-bold text-fg tabular">
-                    {formatMoney(
-                      eventTypes.reduce((sum, e) => {
-                        const n = Number(e.amount)
-                        return sum + (Number.isFinite(n) ? n : 0)
-                      }, 0),
-                    )}
-                  </span>
-                </span>
+          </aside>
+
+          <div className="flex-1 min-w-0 w-full">
+            {/* Per-tab skeleton while the relevant fetch is in flight. */}
+            {isTabLoading && (
+              <div className="surface-card p-6 mb-6">
+                <SkeletonRows count={5} />
               </div>
             )}
-          </div>
-        )}
+
+            {/* Email Configuration Tab */}
+            {activeTab === 'email' && !isTabLoading && (
+              <DynamicEmailPanel
+                emailConfig={emailConfig}
+                emailFormData={emailFormData}
+                setEmailFormData={setEmailFormData}
+                saving={saving}
+                onSubmit={handleSaveEmailConfig}
+                onTest={handleTestEmail}
+              />
+            )}
+
+            {/* Event Types Tab */}
+            {activeTab === 'eventTypes' && !isTabLoading && (
+              <DynamicEventTypesPanel
+                eventTypes={eventTypes}
+                formatMoney={formatMoney}
+                onAdd={() => {
+                  resetEventTypeForm()
+                  setShowEventTypeModal(true)
+                }}
+                onEdit={handleEditEventType}
+                onDelete={handleDeleteEventType}
+              />
+            )}
 
         {/* Payment Plans Tab */}
         {activeTab === 'paymentPlans' && !isTabLoading && (
-          <div className="bg-surface rounded-lg shadow-lg p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <CreditCardIcon className="h-6 w-6 text-green-600" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-fg">Payment Plans</h2>
-                  <p className="text-sm text-fg-muted">Manage payment plans and view families using each plan</p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  resetPlanForm()
-                  setEditingPlan(null)
-                  setShowPlanModal(true)
-                }}
-                className="focus-ring bg-accent text-accent-fg px-4 py-2 rounded-md flex items-center gap-2 hover:bg-accent-hover transition-colors text-sm font-medium"
-              >
-                <PlusIcon className="h-4 w-4" />
-                Add Payment Plan
-              </button>
-            </div>
-
-            <PaymentPlansTable
-              plans={plans}
-              onEdit={handleEditPlan}
-              onDelete={handleDeletePlan}
-              tableId="settings-payment-plans"
-            />
-          </div>
+          <DynamicPaymentPlansPanel
+            plans={plans}
+            onAdd={() => {
+              resetPlanForm()
+              setEditingPlan(null)
+              setShowPlanModal(true)
+            }}
+            onEdit={handleEditPlan}
+            onDelete={handleDeletePlan}
+          />
         )}
 
         {/* Event Type Modal */}
@@ -1849,9 +1595,10 @@ export default function SettingsView({
                 <div className="flex gap-4 pt-4">
                   <button
                     type="submit"
-                    className="flex-1 bg-accent text-white px-4 py-2 rounded-lg hover:bg-accent-hover"
+                    disabled={eventTypeSubmitting}
+                    className="flex-1 bg-accent text-white px-4 py-2 rounded-lg hover:bg-accent-hover disabled:opacity-50"
                   >
-                    {editingEventType ? 'Update' : 'Create'}
+                    {eventTypeSubmitting ? 'Saving…' : editingEventType ? 'Update' : 'Create'}
                   </button>
                   <button
                     type="button"
@@ -1869,654 +1616,23 @@ export default function SettingsView({
           </div>
         )}
 
-        {/* Automation Tab */}
-        {activeTab === 'automation' && !isTabLoading && (
-          <div className="bg-surface rounded-lg shadow-lg p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">
-                <CalendarIcon className="h-6 w-6 text-accent" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-fg">Automation</h2>
-                <p className="text-sm text-fg-muted">
-                  Optional rules that fire automatically when member data changes.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-5 max-w-2xl">
-              <div className="border border-border rounded-lg p-5">
-                <h3 className="text-lg font-semibold text-fg mb-1">Bar Mitzvah</h3>
-                <p className="text-sm text-fg-muted mb-5">
-                  When a male member reaches Bar Mitzvah age (Hebrew calendar), the
-                  actions below trigger automatically. Each rule is independent — leave
-                  a dropdown blank to skip that action.
-                </p>
-
-                <div className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="auto-assign-plan"
-                      className="block text-sm font-medium text-fg mb-1"
-                    >
-                      Auto-assign payment plan
-                    </label>
-                    <select
-                      id="auto-assign-plan"
-                      value={automationConfig.barMitzvahAutoAssignPlanId || ''}
-                      onChange={(e) =>
-                        setAutomationConfig((c) => ({
-                          ...c,
-                          barMitzvahAutoAssignPlanId: e.target.value || null,
-                        }))
-                      }
-                      className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg outline-none"
-                    >
-                      <option value="">— Do not auto-assign —</option>
-                      {plans.map((p) => (
-                        <option key={p._id} value={p._id}>
-                          {p.name} ({formatMoney(p.yearlyPrice)}/yr)
-                        </option>
-                      ))}
-                    </select>
-                    {plans.length === 0 && (
-                      <p className="text-xs text-fg-muted mt-1">
-                        No payment plans configured yet. Add one in the Payment Plans
-                        tab first.
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="auto-create-event"
-                      className="block text-sm font-medium text-fg mb-1"
-                    >
-                      Auto-create lifecycle event
-                    </label>
-                    <select
-                      id="auto-create-event"
-                      value={automationConfig.barMitzvahAutoCreateEventTypeId || ''}
-                      onChange={(e) =>
-                        setAutomationConfig((c) => ({
-                          ...c,
-                          barMitzvahAutoCreateEventTypeId: e.target.value || null,
-                        }))
-                      }
-                      className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg outline-none"
-                    >
-                      <option value="">— Do not auto-create —</option>
-                      {eventTypes.map((ev) => (
-                        <option key={ev._id} value={ev._id}>
-                          {ev.name} ({formatMoney(ev.amount)})
-                        </option>
-                      ))}
-                    </select>
-                    {eventTypes.length === 0 && (
-                      <p className="text-xs text-fg-muted mt-1">
-                        No event types configured yet. Add one in the Event Types tab
-                        first.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="border border-border rounded-lg p-5">
-                <h3 className="text-lg font-semibold text-fg mb-1">Monthly statements</h3>
-                <p className="text-sm text-fg-muted mb-5">
-                  Run the &ldquo;Generate Monthly Batch&rdquo; and email steps
-                  automatically every month for the previous month&rsquo;s period.
-                  Both toggles are independent — turn on only generation, only
-                  email, or both. The email step requires a saved Gmail
-                  configuration in the Email tab, and skips any family marked
-                  &ldquo;Opt out of bulk statement emails&rdquo; on the family form.
-                </p>
-
-                <div className="space-y-4">
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={automationConfig.monthlyStatementAutoGenerate}
-                      onChange={(e) =>
-                        setAutomationConfig((c) => ({
-                          ...c,
-                          monthlyStatementAutoGenerate: e.target.checked,
-                        }))
-                      }
-                      className="mt-1 h-4 w-4 accent-accent"
-                    />
-                    <span className="text-sm">
-                      <span className="block font-medium text-fg">
-                        Auto-generate monthly statements
-                      </span>
-                      <span className="block text-fg-muted">
-                        Equivalent to clicking &ldquo;Generate Monthly Batch&rdquo;
-                        every month for last month&rsquo;s period.
-                      </span>
-                    </span>
-                  </label>
-
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={automationConfig.monthlyStatementAutoEmail}
-                      onChange={(e) =>
-                        setAutomationConfig((c) => ({
-                          ...c,
-                          monthlyStatementAutoEmail: e.target.checked,
-                        }))
-                      }
-                      className="mt-1 h-4 w-4 accent-accent"
-                    />
-                    <span className="text-sm">
-                      <span className="block font-medium text-fg">
-                        Auto-email monthly statements
-                      </span>
-                      <span className="block text-fg-muted">
-                        Sends a PDF statement to every family with an email address
-                        on file (and not opted out). Requires email configuration
-                        in the Email tab.
-                      </span>
-                      {automationConfig.monthlyStatementAutoEmail && !emailConfig?.email && (
-                        <span className="mt-2 inline-block text-xs text-yellow-700 dark:text-yellow-400">
-                          No email configuration found yet — set one up in the Email
-                          tab or the cron will fail for this org.
-                        </span>
-                      )}
-                    </span>
-                  </label>
-
-                  <div className="pt-2 border-t border-border space-y-3">
-                    <div>
-                      <span className="block text-sm font-medium text-fg mb-2">
-                        Schedule by
-                      </span>
-                      <div
-                        role="radiogroup"
-                        aria-label="Schedule calendar"
-                        className="inline-flex rounded-md border border-border overflow-hidden"
-                      >
-                        {(['gregorian', 'hebrew'] as const).map((cal) => {
-                          const active = automationConfig.monthlyStatementCalendar === cal
-                          const disabled =
-                            !automationConfig.monthlyStatementAutoGenerate &&
-                            !automationConfig.monthlyStatementAutoEmail
-                          return (
-                            <button
-                              key={cal}
-                              type="button"
-                              role="radio"
-                              aria-checked={active}
-                              disabled={disabled}
-                              onClick={() =>
-                                setAutomationConfig((c) => ({
-                                  ...c,
-                                  monthlyStatementCalendar: cal,
-                                }))
-                              }
-                              className={`focus-ring px-3 py-1.5 text-sm transition-colors ${
-                                active
-                                  ? 'bg-accent text-accent-fg'
-                                  : 'bg-surface text-fg hover:bg-fg/5'
-                              } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                              {cal === 'gregorian' ? 'Gregorian calendar' : 'Hebrew calendar'}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    {automationConfig.monthlyStatementCalendar === 'gregorian' ? (
-                      <div>
-                        <label
-                          htmlFor="monthly-statement-day"
-                          className="block text-sm font-medium text-fg mb-1"
-                        >
-                          Day of the Gregorian month to run
-                        </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            id="monthly-statement-day"
-                            type="number"
-                            min={1}
-                            max={31}
-                            value={automationConfig.monthlyStatementDay}
-                            onChange={(e) => {
-                              const raw = parseInt(e.target.value, 10)
-                              const clamped = Number.isFinite(raw)
-                                ? Math.max(1, Math.min(31, raw))
-                                : 1
-                              setAutomationConfig((c) => ({
-                                ...c,
-                                monthlyStatementDay: clamped,
-                              }))
-                            }}
-                            disabled={
-                              !automationConfig.monthlyStatementAutoGenerate &&
-                              !automationConfig.monthlyStatementAutoEmail
-                            }
-                            className="focus-ring w-24 bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg outline-none disabled:opacity-50"
-                          />
-                          <span className="text-sm text-fg-muted">of every Gregorian month</span>
-                        </div>
-                        <p className="text-xs text-fg-muted mt-2">
-                          Generate runs at 2 AM UTC, email runs at 3 AM UTC. If the
-                          month is shorter than this day (e.g. you pick 31 but it&rsquo;s
-                          February), the job runs on the last day of that month so it
-                          never gets skipped.
-                        </p>
-                      </div>
-                    ) : (
-                      <div>
-                        <label
-                          htmlFor="monthly-statement-hebrew-day"
-                          className="block text-sm font-medium text-fg mb-1"
-                        >
-                          Day of the Hebrew month to run
-                        </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            id="monthly-statement-hebrew-day"
-                            type="number"
-                            min={1}
-                            max={30}
-                            value={automationConfig.monthlyStatementHebrewDay}
-                            onChange={(e) => {
-                              const raw = parseInt(e.target.value, 10)
-                              const clamped = Number.isFinite(raw)
-                                ? Math.max(1, Math.min(30, raw))
-                                : 1
-                              setAutomationConfig((c) => ({
-                                ...c,
-                                monthlyStatementHebrewDay: clamped,
-                              }))
-                            }}
-                            disabled={
-                              !automationConfig.monthlyStatementAutoGenerate &&
-                              !automationConfig.monthlyStatementAutoEmail
-                            }
-                            className="focus-ring w-24 bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg outline-none disabled:opacity-50"
-                          />
-                          <span className="text-sm text-fg-muted">of every Hebrew month</span>
-                        </div>
-                        <p className="text-xs text-fg-muted mt-2">
-                          Generate runs at 2 AM UTC, email runs at 3 AM UTC. Hebrew
-                          months are 29 or 30 days; if you pick 30 in a 29-day month,
-                          the job runs on the 29th so it&rsquo;s never skipped.
-                        </p>
-                        <p className="text-xs text-fg-muted mt-1">
-                          For reference, today is{' '}
-                          <span className="font-medium text-fg">
-                            {convertToHebrewDate(new Date()) || '—'}
-                          </span>
-                          .
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="border border-border rounded-lg p-5">
-                <h3 className="text-lg font-semibold text-fg mb-1">
-                  Child → family conversion
-                </h3>
-                <p className="text-sm text-fg-muted mb-5">
-                  When a child member reaches their wedding date (cron) or is
-                  converted manually, the newly created family is assigned this
-                  default plan. Leave blank to create the family with no plan and
-                  assign one yourself.
-                </p>
-
-                <div>
-                  <label
-                    htmlFor="wedding-default-plan"
-                    className="block text-sm font-medium text-fg mb-1"
-                  >
-                    Default plan for newly converted families
-                  </label>
-                  <select
-                    id="wedding-default-plan"
-                    value={automationConfig.weddingConversionDefaultPlanId || ''}
-                    onChange={(e) =>
-                      setAutomationConfig((c) => ({
-                        ...c,
-                        weddingConversionDefaultPlanId: e.target.value || null,
-                      }))
-                    }
-                    className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg outline-none"
-                  >
-                    <option value="">— Do not auto-assign —</option>
-                    {plans.map((p) => (
-                      <option key={p._id} value={p._id}>
-                        {p.name} ({formatMoney(p.yearlyPrice)}/yr)
-                      </option>
-                    ))}
-                  </select>
-                  {plans.length === 0 && (
-                    <p className="text-xs text-fg-muted mt-1">
-                      No payment plans configured yet. Add one in the Payment Plans
-                      tab first.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <button
-                  type="button"
-                  onClick={handleSaveAutomationConfig}
-                  disabled={automationSaving}
-                  className="bg-accent text-white px-5 py-2 rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-60"
-                >
-                  {automationSaving ? 'Saving…' : 'Save automation settings'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+            {/* Automation Tab */}
+            {activeTab === 'automation' && !isTabLoading && (
+              <DynamicAutomationPanel
+                automationConfig={automationConfig}
+                setAutomationConfig={setAutomationConfig}
+                plans={plans}
+                eventTypes={eventTypes}
+                formatMoney={formatMoney}
+                emailConfig={emailConfig}
+                saving={automationSaving}
+                onSave={handleSaveAutomationConfig}
+              />
+            )}
 
         {/* Kevittel Tab */}
         {activeTab === 'kevittel' && !isTabLoading && (
-          <div className="bg-surface rounded-lg shadow-lg p-6">
-            <div className="flex items-center justify-end mb-6">
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    const printWindow = window.open('', '_blank')
-                    if (printWindow) {
-                      const familiesWithKevittel = kevittelFamilies
-                        .filter((family) => {
-                          const hasHusbandName = family.husbandHebrewName && family.husbandHebrewName.trim() !== ''
-                          const hasWifeName = family.wifeHebrewName && family.wifeHebrewName.trim() !== ''
-                          const hasChildren = (family.members || []).some((child: any) => child.hebrewFirstName && child.hebrewFirstName.trim() !== '')
-                          return hasHusbandName || hasWifeName || hasChildren
-                        })
-                        .map((family) => {
-                          const husbandHebrewName = family.husbandHebrewName || ''
-                          const husbandFatherHebrewName = family.husbandFatherHebrewName || ''
-                          const wifeHebrewName = family.wifeHebrewName || ''
-                          const wifeFatherHebrewName = family.wifeFatherHebrewName || ''
-                          const children = family.members || []
-                          
-                          const entries: string[] = []
-                          
-                          if (husbandHebrewName && husbandHebrewName.trim() !== '') {
-                            let husbandEntry = escapeHtml(husbandHebrewName)
-                            if (husbandFatherHebrewName && husbandFatherHebrewName.trim() !== '') {
-                              husbandEntry += ` בן ${escapeHtml(husbandFatherHebrewName)}`
-                            }
-                            entries.push(husbandEntry)
-                          }
-                          
-                          if (wifeHebrewName && wifeHebrewName.trim() !== '') {
-                            // Match the on-screen render: wives are prefixed
-                            // with `וזו'` (the Hebrew "and his wife..."
-                            // formula). Print + PDF dropped the prefix
-                            // historically — they now agree with the screen.
-                            let wifeEntry = `וזו' ${escapeHtml(wifeHebrewName)}`
-                            if (wifeFatherHebrewName && wifeFatherHebrewName.trim() !== '') {
-                              wifeEntry += ` בת ${escapeHtml(wifeFatherHebrewName)}`
-                            }
-                            entries.push(wifeEntry)
-                          }
-                          
-                          children.forEach((child: any) => {
-                            const childHebrewName = child.hebrewFirstName || ''
-                            if (childHebrewName && childHebrewName.trim() !== '') {
-                              entries.push(`ב' ${escapeHtml(childHebrewName)}`)
-                            }
-                          })
-                          
-                          return entries.join('<br>')
-                        })
-                        .filter(text => text.trim() !== '')
-                      
-                      printWindow.document.write(`
-                        <html>
-                          <head>
-                            <title>Kevittel</title>
-                            <style>
-                              @media print {
-                                @page { margin: 2cm; }
-                                body { margin: 0; }
-                              }
-                              body {
-                                font-family: Arial Hebrew, David, sans-serif;
-                                direction: rtl;
-                                text-align: right;
-                                padding: 40px;
-                                line-height: 2;
-                                font-size: 18px;
-                              }
-                              .kevittel-item {
-                                margin-bottom: 20px;
-                                padding: 10px 0;
-                                border-bottom: 1px solid #eee;
-                              }
-                              .kevittel-item:last-child {
-                                border-bottom: none;
-                              }
-                            </style>
-                          </head>
-                          <body>
-                            ${familiesWithKevittel.map(text => `<div class="kevittel-item">${text}</div>`).join('')}
-                          </body>
-                        </html>
-                      `)
-                      printWindow.document.close()
-                      printWindow.print()
-                    }
-                  }}
-                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 transition-colors"
-                >
-                  <PrinterIcon className="h-5 w-5" />
-                  Print
-                </button>
-                <button
-                  onClick={() => {
-                    const printWindow = window.open('', '_blank')
-                    if (printWindow) {
-                      const familiesWithKevittel = kevittelFamilies
-                        .filter((family) => {
-                          const hasHusbandName = family.husbandHebrewName && family.husbandHebrewName.trim() !== ''
-                          const hasWifeName = family.wifeHebrewName && family.wifeHebrewName.trim() !== ''
-                          const hasChildren = (family.members || []).some((child: any) => child.hebrewFirstName && child.hebrewFirstName.trim() !== '')
-                          return hasHusbandName || hasWifeName || hasChildren
-                        })
-                        .map((family) => {
-                          const husbandHebrewName = family.husbandHebrewName || ''
-                          const husbandFatherHebrewName = family.husbandFatherHebrewName || ''
-                          const wifeHebrewName = family.wifeHebrewName || ''
-                          const wifeFatherHebrewName = family.wifeFatherHebrewName || ''
-                          const children = family.members || []
-                          
-                          const entries: string[] = []
-                          
-                          if (husbandHebrewName && husbandHebrewName.trim() !== '') {
-                            let husbandEntry = escapeHtml(husbandHebrewName)
-                            if (husbandFatherHebrewName && husbandFatherHebrewName.trim() !== '') {
-                              husbandEntry += ` בן ${escapeHtml(husbandFatherHebrewName)}`
-                            }
-                            entries.push(husbandEntry)
-                          }
-                          
-                          if (wifeHebrewName && wifeHebrewName.trim() !== '') {
-                            // Match the on-screen render: wives are prefixed
-                            // with `וזו'` (the Hebrew "and his wife..."
-                            // formula). Print + PDF dropped the prefix
-                            // historically — they now agree with the screen.
-                            let wifeEntry = `וזו' ${escapeHtml(wifeHebrewName)}`
-                            if (wifeFatherHebrewName && wifeFatherHebrewName.trim() !== '') {
-                              wifeEntry += ` בת ${escapeHtml(wifeFatherHebrewName)}`
-                            }
-                            entries.push(wifeEntry)
-                          }
-                          
-                          children.forEach((child: any) => {
-                            const childHebrewName = child.hebrewFirstName || ''
-                            if (childHebrewName && childHebrewName.trim() !== '') {
-                              entries.push(`ב' ${escapeHtml(childHebrewName)}`)
-                            }
-                          })
-                          
-                          return entries.join('<br>')
-                        })
-                        .filter(text => text.trim() !== '')
-                      
-                      printWindow.document.write(`
-                        <html>
-                          <head>
-                            <title>Kevittel</title>
-                            <style>
-                              @media print {
-                                @page { margin: 2cm; }
-                                body { margin: 0; }
-                              }
-                              body {
-                                font-family: Arial Hebrew, David, sans-serif;
-                                direction: rtl;
-                                text-align: right;
-                                padding: 40px;
-                                line-height: 2;
-                                font-size: 18px;
-                              }
-                              .kevittel-item {
-                                margin-bottom: 20px;
-                                padding: 10px 0;
-                                border-bottom: 1px solid #eee;
-                              }
-                              .kevittel-item:last-child {
-                                border-bottom: none;
-                              }
-                            </style>
-                          </head>
-                          <body>
-                            ${familiesWithKevittel.map(text => `<div class="kevittel-item">${text}</div>`).join('')}
-                          </body>
-                        </html>
-                      `)
-                      printWindow.document.close()
-                      printWindow.print()
-                    }
-                  }}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 transition-colors"
-                >
-                  <DocumentArrowDownIcon className="h-5 w-5" />
-                  Save as PDF
-                </button>
-              </div>
-            </div>
-
-            <div id="kevittel-content" className="space-y-4 print:space-y-2">
-              {kevittelLoading ? (
-                <div className="text-center py-12 text-fg-muted">
-                  Loading families...
-                </div>
-              ) : (() => {
-                const familiesWithHebrewNames = kevittelFamilies.filter((family) => {
-                  // Only show families that have at least one Hebrew name.
-                  const hasHusbandName = family.husbandHebrewName && family.husbandHebrewName.trim() !== ''
-                  const hasWifeName = family.wifeHebrewName && family.wifeHebrewName.trim() !== ''
-                  const hasChildren = (family.members || []).some((child: any) => child.hebrewFirstName && child.hebrewFirstName.trim() !== '')
-                  return hasHusbandName || hasWifeName || hasChildren
-                })
-
-                
-                if (kevittelFamilies.length === 0) {
-                  return (
-                    <div className="text-center py-12 text-fg-muted">
-                      No families found.
-                    </div>
-                  )
-                }
-                
-                if (familiesWithHebrewNames.length === 0) {
-                  return (
-                    <div className="text-center py-12">
-                      <p className="text-fg-muted mb-4">
-                        No families with Hebrew names found.
-                      </p>
-                      <p className="text-sm text-fg-subtle">
-                        Please add Hebrew names to families in the Families section.
-                      </p>
-                      {kevittelFamilies.length > 0 && (
-                        <p className="text-xs text-fg-subtle mt-2">
-                          {kevittelFamilies.length} families loaded, but none have qualifying entries to print.
-                        </p>
-                      )}
-                    </div>
-                  )
-                }
-                
-                return (
-                  <>
-                    {familiesWithHebrewNames.map((family) => {
-                      const husbandHebrewName = family.husbandHebrewName || ''
-                      const husbandFatherHebrewName = family.husbandFatherHebrewName || ''
-                      const wifeHebrewName = family.wifeHebrewName || ''
-                      const wifeFatherHebrewName = family.wifeFatherHebrewName || ''
-                      const children = family.members || []
-                      
-                      // Build separate entries for each person (each on its own row)
-                      const entries: string[] = []
-                      
-                      // Husband: name + בן + father's name
-                      if (husbandHebrewName && husbandHebrewName.trim() !== '') {
-                        let husbandEntry = husbandHebrewName
-                        if (husbandFatherHebrewName && husbandFatherHebrewName.trim() !== '') {
-                          husbandEntry += ` בן ${husbandFatherHebrewName}`
-                        }
-                        entries.push(husbandEntry)
-                      }
-                      
-                      // Wife: זו' + name + בת + father's name
-                      if (wifeHebrewName && wifeHebrewName.trim() !== '') {
-                        let wifeEntry = `וזו' ${wifeHebrewName}`
-                        if (wifeFatherHebrewName && wifeFatherHebrewName.trim() !== '') {
-                          wifeEntry += ` בת ${wifeFatherHebrewName}`
-                        }
-                        entries.push(wifeEntry)
-                      }
-                      
-                      // Add children with "ב" prefix, sorted by age (oldest first)
-                      children.forEach((child: any) => {
-                        const childHebrewName = child.hebrewFirstName || ''
-                        if (childHebrewName && childHebrewName.trim() !== '') {
-                          entries.push(`ב' ${childHebrewName}`)
-                        }
-                      })
-                      
-                      if (entries.length === 0) {
-                        return null
-                      }
-                      
-                      return (
-                        <div 
-                          key={family._id} 
-                          className="border-b border-border py-3 print:py-2 print:border-border"
-                        >
-                          {entries.map((entry, index) => (
-                            <div 
-                              key={index}
-                              className="text-xl font-semibold text-fg print:text-lg print:font-normal mb-2 last:mb-0"
-                              dir="rtl"
-                              lang="he"
-                              style={{ fontFamily: 'Arial Hebrew, David, sans-serif', textAlign: 'right', lineHeight: '1.8' }}
-                            >
-                              {entry}
-                            </div>
-                          ))}
-                        </div>
-                      )
-                    }).filter(Boolean)}
-                  </>
-                )
-              })()}
-            </div>
-          </div>
+          <DynamicKevittelPanel families={kevittelFamilies} loading={kevittelLoading} />
         )}
 
         {/* Payment Plan Modal */}
@@ -2574,9 +1690,10 @@ export default function SettingsView({
                   </button>
                   <button
                     type="submit"
-                    className="focus-ring px-4 py-2 bg-accent text-accent-fg rounded-md hover:bg-accent-hover transition-colors text-sm font-medium"
+                    disabled={planSubmitting}
+                    className="focus-ring px-4 py-2 bg-accent text-accent-fg rounded-md hover:bg-accent-hover transition-colors text-sm font-medium disabled:opacity-50"
                   >
-                    {editingPlan ? 'Update' : 'Create'}
+                    {planSubmitting ? 'Saving…' : editingPlan ? 'Update' : 'Create'}
                   </button>
                 </div>
               </form>
@@ -2586,17 +1703,17 @@ export default function SettingsView({
 
         {/* Branding Tab — visible to all members, write-gated by role inside. */}
         {activeTab === 'branding' && (
-          <BrandingPanel canManage={canSeePrivilegedTabs} />
+          <DynamicBrandingPanel canManage={canSeePrivilegedTabs} />
         )}
 
         {/* Members Tab — admin / owner only. */}
         {activeTab === 'members' && canSeePrivilegedTabs && (
-          <MembersPanel onRoleResolved={setCurrentRole} />
+          <DynamicMembersPanel onRoleResolved={setCurrentRole} />
         )}
 
         {/* Billing Tab — admin / owner can view; owner manages subscription. */}
         {activeTab === 'billing' && canSeePrivilegedTabs && (
-          <BillingPanel
+          <DynamicBillingPanel
             canManage={canSeePrivilegedTabs}
             isOwner={isOwner}
             initialBilling={initialBilling}
@@ -2605,7 +1722,7 @@ export default function SettingsView({
 
         {/* Trash Tab — admin / owner only, purge is owner-only. */}
         {activeTab === 'trash' && canSeePrivilegedTabs && (
-          <TrashPanel canPurge={canPurge} />
+          <DynamicTrashPanel canPurge={canPurge} />
         )}
 
         {/* If a privileged tab was deep-linked by a non-privileged user,
@@ -2624,7 +1741,7 @@ export default function SettingsView({
 
         {/* Letterhead Tab — admin / owner only. */}
         {activeTab === 'letterhead' && canSeePrivilegedTabs && !isTabLoading && (
-          <LetterheadPanel
+          <DynamicLetterheadPanel
             letterhead={letterhead}
             setLetterhead={setLetterhead}
             saving={letterheadSaving}
@@ -2634,7 +1751,7 @@ export default function SettingsView({
 
         {/* Mail Labels Tab — visible to all members. Print-only. */}
         {activeTab === 'labels' && !isTabLoading && (
-          <MailLabelsPanel
+          <DynamicLabelsPanel
             families={labelFamilies}
             plans={plans}
             filters={labelFilters}
@@ -2644,12 +1761,12 @@ export default function SettingsView({
 
         {/* Localization (currency + locale) Tab — admin/owner only. */}
         {activeTab === 'localization' && canSeePrivilegedTabs && (
-          <LocalizationPanel />
+          <DynamicLocalizationPanel />
         )}
 
         {/* Activity (audit log) Tab — admin / owner only. */}
         {activeTab === 'activity' && canSeePrivilegedTabs && (
-          <ActivityPanel
+          <DynamicActivityPanel
             items={auditItems}
             nextCursor={auditNextCursor}
             loading={auditLoading}
@@ -2669,257 +1786,18 @@ export default function SettingsView({
           />
         )}
 
-        {/* Cycle Configuration Tab */}
-        {activeTab === 'cycle' && !isTabLoading && (
-          <div className="bg-surface rounded-lg shadow-lg p-6">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-fg">Cycle Configuration</h2>
-              <p className="text-sm text-fg-muted">Configure the membership year start date</p>
-            </div>
-
-            {cycleConfig && (
-              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-green-800">
-                  <strong>✓ Cycle configuration is active:</strong> Membership year starts on{' '}
-                  {cycleConfig.cycleCalendar === 'hebrew'
-                    ? `${cycleConfig.cycleStartHebrewDay || 1} ${hebrewMonthLabel(cycleConfig.cycleStartHebrewMonth || 7)} (Hebrew calendar)`
-                    : new Date(
-                        2024,
-                        cycleConfig.cycleStartMonth - 1,
-                        cycleConfig.cycleStartDay,
-                      ).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
-                </p>
-                <p className="text-sm text-green-700 mt-1">
-                  {cycleConfig.cycleAutoRollover
-                    ? 'Auto-rollover is ON — each cycle start, every family is charged their plan\u2019s yearly price and balances are updated automatically.'
-                    : 'Auto-rollover is OFF — this date is informational only. Turn on the toggle below to have balances charged automatically each cycle.'}
-                </p>
-            </div>
+            {/* Cycle Configuration Tab */}
+            {activeTab === 'cycle' && !isTabLoading && (
+              <DynamicCyclePanel
+                cycleConfig={cycleConfig}
+                cycleFormData={cycleFormData}
+                setCycleFormData={setCycleFormData}
+                saving={cycleSaving}
+                onSubmit={handleSaveCycleConfig}
+              />
             )}
-
-            <form onSubmit={handleSaveCycleConfig} className="space-y-4">
-              <div>
-                <span className="block text-sm font-medium mb-2 text-fg">
-                  Calendar
-                </span>
-                <div
-                  role="radiogroup"
-                  aria-label="Cycle calendar"
-                  className="inline-flex rounded-md border border-border overflow-hidden"
-                >
-                  {(['gregorian', 'hebrew'] as const).map((cal) => {
-                    const active = cycleFormData.cycleCalendar === cal
-                    return (
-                      <button
-                        key={cal}
-                        type="button"
-                        role="radio"
-                        aria-checked={active}
-                        onClick={() =>
-                          setCycleFormData({ ...cycleFormData, cycleCalendar: cal })
-                        }
-                        className={`focus-ring px-3 py-1.5 text-sm transition-colors ${
-                          active
-                            ? 'bg-accent text-accent-fg'
-                            : 'bg-surface text-fg hover:bg-fg/5'
-                        }`}
-                      >
-                        {cal === 'gregorian' ? 'Gregorian calendar' : 'Hebrew calendar'}
-                      </button>
-                    )
-                  })}
-                </div>
-                <p className="text-xs text-fg-muted mt-2">
-                  Pick which calendar drives the cycle start date.
-                </p>
-              </div>
-
-              {cycleFormData.cycleCalendar === 'gregorian' ? (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">
-                      Cycle Start Month *
-                    </label>
-                    <select
-                      value={cycleFormData.cycleStartMonth}
-                      onChange={(e) =>
-                        setCycleFormData({
-                          ...cycleFormData,
-                          cycleStartMonth: parseInt(e.target.value),
-                        })
-                      }
-                      className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                      required
-                    >
-                      <option value={1}>January</option>
-                      <option value={2}>February</option>
-                      <option value={3}>March</option>
-                      <option value={4}>April</option>
-                      <option value={5}>May</option>
-                      <option value={6}>June</option>
-                      <option value={7}>July</option>
-                      <option value={8}>August</option>
-                      <option value={9}>September</option>
-                      <option value={10}>October</option>
-                      <option value={11}>November</option>
-                      <option value={12}>December</option>
-                    </select>
-                    <p className="text-xs text-fg-muted mt-1">
-                      The Gregorian month when the membership year begins
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">
-                      Cycle Start Day *
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="31"
-                      value={cycleFormData.cycleStartDay}
-                      onChange={(e) =>
-                        setCycleFormData({
-                          ...cycleFormData,
-                          cycleStartDay: parseInt(e.target.value) || 1,
-                        })
-                      }
-                      className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                      required
-                    />
-                    <p className="text-xs text-fg-muted mt-1">
-                      The day of the Gregorian month when the membership year begins (1-31)
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">
-                      Hebrew Month *
-                    </label>
-                    <select
-                      value={cycleFormData.cycleStartHebrewMonth}
-                      onChange={(e) =>
-                        setCycleFormData({
-                          ...cycleFormData,
-                          cycleStartHebrewMonth: parseInt(e.target.value),
-                        })
-                      }
-                      className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                      required
-                    >
-                      {HEBREW_MONTH_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-fg-muted mt-1">
-                      The Hebrew month when the membership year begins. Tishrei is the
-                      traditional start of the civil year.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">
-                      Hebrew Day *
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="30"
-                      value={cycleFormData.cycleStartHebrewDay}
-                      onChange={(e) =>
-                        setCycleFormData({
-                          ...cycleFormData,
-                          cycleStartHebrewDay: parseInt(e.target.value) || 1,
-                        })
-                      }
-                      className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                      required
-                    />
-                    <p className="text-xs text-fg-muted mt-1">
-                      The day of the Hebrew month (1–30). If you pick 30 in a 29-day
-                      Hebrew month, the cycle starts on the 29th of that month.
-                    </p>
-                    <p className="text-xs text-fg-muted mt-1">
-                      For reference, today is{' '}
-                      <span className="font-medium text-fg">
-                        {convertToHebrewDate(new Date()) || '—'}
-                      </span>
-                      .
-                    </p>
-                  </div>
-                </>
-              )}
-
-              <div className="border-t border-border pt-4">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={cycleFormData.cycleAutoRollover}
-                    onChange={(e) =>
-                      setCycleFormData({
-                        ...cycleFormData,
-                        cycleAutoRollover: e.target.checked,
-                      })
-                    }
-                    className="mt-1 h-4 w-4 text-orange-600 focus:ring-orange-500 border-border rounded"
-                  />
-                  <span>
-                    <span className="block text-sm font-medium text-fg">
-                      Auto-charge families on each cycle start
-                    </span>
-                    <span className="block text-xs text-fg-muted mt-1">
-                      When enabled, a daily background job will charge every family their
-                      plan&rsquo;s yearly price the moment the cycle date arrives in the
-                      calendar you picked above. Each charge is recorded once per cycle —
-                      re-running the job on the same day is safe and has no effect. Leave
-                      this off if you want to keep handling annual billing manually.
-                    </span>
-                  </span>
-                </label>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2 text-fg">
-                  Description
-                </label>
-                <input
-                  type="text"
-                  value={cycleFormData.description}
-                  onChange={(e) => setCycleFormData({ ...cycleFormData, description: e.target.value })}
-                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                  placeholder="Membership cycle start date"
-                />
-                <p className="text-xs text-fg-muted mt-1">
-                  Optional description for this cycle configuration
-                </p>
-              </div>
-
-              <div className="pt-4 border-t">
-                <div className="bg-accent/10 border border-accent/20 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-accent-hover">
-                    <strong>How it works:</strong> When the cycle start date arrives each year, 
-                    family balances will be increased based on their payment plans. This ensures 
-                    that membership fees are properly tracked and calculated annually.
-                  </p>
-                </div>
-
-                <div className="flex gap-4">
-                  <button
-                    type="submit"
-                    disabled={cycleSaving}
-                    className="focus-ring px-4 py-2 bg-accent text-accent-fg rounded-md hover:bg-accent-hover transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {cycleSaving ? 'Saving...' : cycleConfig ? 'Update Configuration' : 'Save Configuration'}
-                  </button>
-                </div>
-              </div>
-            </form>
           </div>
-        )}
+        </div>
       </div>
     </main>
   )

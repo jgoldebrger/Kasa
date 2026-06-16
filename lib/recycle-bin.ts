@@ -29,6 +29,7 @@ import {
 import { audit } from './audit'
 import type { OrgContext } from './auth-helpers'
 import { netPaymentAmount } from './money'
+import { scheduleYearlyCalculationRefreshForPayment } from './calculations'
 
 export const RECYCLE_BIN_RETENTION_DAYS = 30
 
@@ -178,6 +179,10 @@ export async function softDeleteOne(
     metadata: { ...opts.metadata, deletedKind: opts.kind || 'manual' },
     request: opts.request,
   })
+
+  if (kind === 'payment') {
+    scheduleYearlyCalculationRefreshForPayment(doc)
+  }
 
   return doc
 }
@@ -363,6 +368,10 @@ export async function restoreFromBin(
     metadata: { cascadeRestored, name: meta.describe(doc) },
     request: opts.request,
   })
+
+  if (kind === 'payment') {
+    scheduleYearlyCalculationRefreshForPayment(doc)
+  }
 
   return { doc, cascadeRestored }
 }

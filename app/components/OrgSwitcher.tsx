@@ -44,6 +44,7 @@ export default function OrgSwitcher() {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [switching, setSwitching] = useState(false)
+  const [creating, setCreating] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
   const ref = useRef<HTMLDivElement | null>(null)
@@ -130,7 +131,9 @@ export default function OrgSwitcher() {
 
   const createOrg = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (newName.trim().length < 2) return
+    if (newName.trim().length < 2 || creating || switching) return
+    setCreating(true)
+    try {
     const res = await fetch('/api/organizations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -147,6 +150,9 @@ export default function OrgSwitcher() {
     invalidateOrgCache()
     await load(true)
     if (created?.id) await switchTo(created.id)
+    } finally {
+      setCreating(false)
+    }
   }
 
   if (orgs.length === 0) return null
@@ -189,7 +195,8 @@ export default function OrgSwitcher() {
                 <button
                   key={o.id}
                   onClick={() => switchTo(o.id)}
-                  className={`w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-fg/5 ${
+                  disabled={switching || creating}
+                  className={`w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-fg/5 disabled:opacity-50 disabled:pointer-events-none ${
                     isActive ? 'bg-accent/10' : ''
                   }`}
                 >
@@ -210,7 +217,8 @@ export default function OrgSwitcher() {
             {!showCreate ? (
               <button
                 onClick={() => setShowCreate(true)}
-                className="w-full px-2 py-1.5 text-sm text-accent hover:bg-accent/10 rounded flex items-center gap-2"
+                disabled={switching || creating}
+                className="w-full px-2 py-1.5 text-sm text-accent hover:bg-accent/10 rounded flex items-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
               >
                 <PlusIcon className="h-4 w-4" />
                 New organization
@@ -228,9 +236,10 @@ export default function OrgSwitcher() {
                 <div className="flex gap-1">
                   <button
                     type="submit"
-                    className="flex-1 text-xs bg-accent text-accent-fg px-2 py-1 rounded hover:bg-accent-hover"
+                    disabled={creating || switching || newName.trim().length < 2}
+                    className="flex-1 text-xs bg-accent text-accent-fg px-2 py-1 rounded hover:bg-accent-hover disabled:opacity-50"
                   >
-                    Create
+                    {creating ? 'Creating…' : 'Create'}
                   </button>
                   <button
                     type="button"

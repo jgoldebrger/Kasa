@@ -10,6 +10,7 @@ import { sanitizeStripeErrorMessage } from '@/lib/payments/sanitize'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { enforceMemberChargeGate } from '@/lib/billing/feature-gate'
 import { addMonthsClamped, getYearInTimeZone } from '@/lib/date-utils'
+import { scheduleYearlyCalculationRefresh } from '@/lib/calculations'
 import Stripe from 'stripe'
 import https from 'https'
 
@@ -426,6 +427,7 @@ export const POST = handler({
         },
         request,
       })
+      scheduleYearlyCalculationRefresh(paymentData.year, ctx!.organizationId)
     }
 
     return NextResponse.json({

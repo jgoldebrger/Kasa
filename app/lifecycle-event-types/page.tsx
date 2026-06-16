@@ -1,7 +1,4 @@
-'use client'
-
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { redirect } from 'next/navigation'
 
 /**
  * Backwards-compat redirect — the lifecycle-event-types UI now lives as
@@ -10,11 +7,5 @@ import { useRouter } from 'next/navigation'
  * single source of truth for event-type management.
  */
 export default function LifecycleEventTypesRedirect() {
-  const router = useRouter()
-  useEffect(() => {
-    router.replace('/settings?tab=eventTypes')
-  }, [router])
-  return (
-    <div className="p-6 text-sm text-fg-muted">Redirecting to Settings…</div>
-  )
+  redirect('/settings?tab=eventTypes')
 }

@@ -2,8 +2,8 @@
  * @vitest-environment happy-dom
  */
 import React from 'react'
-import { beforeAll, describe, it, expect } from 'vitest'
-import { render } from '@testing-library/react'
+import { afterEach, beforeAll, describe, it, expect } from 'vitest'
+import { cleanup, render } from '@testing-library/react'
 import CalculationsView from './CalculationsView'
 
 beforeAll(() => {
@@ -13,6 +13,10 @@ beforeAll(() => {
     disconnect() {}
   }
   global.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver
+})
+
+afterEach(() => {
+  cleanup()
 })
 
 const stubCalculation = {
@@ -37,5 +41,12 @@ describe('CalculationsView smoke', () => {
       <CalculationsView initialCalculations={[stubCalculation]} />,
     )
     expect(container).toBeDefined()
+  })
+
+  it('renders the how-is-this-calculated help panel', () => {
+    const { getByText } = render(
+      <CalculationsView initialCalculations={[stubCalculation]} />,
+    )
+    expect(getByText('How is this calculated?')).toBeDefined()
   })
 })

@@ -12,13 +12,13 @@ import {
   ExclamationTriangleIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
-  SparklesIcon,
   BoltIcon,
   DocumentTextIcon,
   CalculatorIcon,
-  CheckCircleIcon,
   ClipboardDocumentListIcon,
   ArrowPathIcon,
+  InformationCircleIcon,
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline'
 import Link from 'next/link'
 import { formatLocaleDate, isFiniteDate } from '@/lib/date-utils'
@@ -27,8 +27,10 @@ import { cachedFetch } from '@/lib/client-cache'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { useCurrency } from '@/lib/client/useCurrency'
-import { EmptyState, PageHeader, SkeletonRows } from './components/ui'
+import { useT } from '@/lib/client/i18n'
+import { EmptyState, PageHeader, SkeletonRows, Tooltip } from './components/ui'
 import { Skeleton } from './components/ui/Skeleton'
+import OnboardingChecklist from './components/OnboardingChecklist'
 
 interface DashboardStats {
   totalFamilies: number
@@ -54,6 +56,10 @@ interface Task {
 export interface DashboardViewProps {
   initialStats?: DashboardStats
   initialTasks?: Task[]
+  /** False when server could not resolve balance/income (no cached yearly calc). */
+  initialFinancialsComplete?: boolean
+  /** Server-prefetched onboarding checklist (admin dashboard). */
+  initialSetupProgress?: import('@/lib/organizations/setup-progress-data').SetupProgressPayload | null
   /** When false, hide org-wide balance/income and admin quick actions. */
   showFinancials?: boolean
 }
@@ -61,12 +67,16 @@ export interface DashboardViewProps {
 export default function DashboardView({
   initialStats,
   initialTasks,
+  initialFinancialsComplete = true,
+  initialSetupProgress = null,
   showFinancials = true,
 }: DashboardViewProps = {}) {
   const toast = useToast()
+  const t = useT()
   const { format: formatMoney } = useCurrency()
   const hasInitialStats = initialStats !== undefined
-  const hasInitialTasks = Array.isArray(initialTasks) && initialTasks.length > 0
+  const tasksHydrated = initialTasks !== undefined
+  const needsFinancialCompute = showFinancials && !initialFinancialsComplete
   const [stats, setStats] = useState<DashboardStats>(
     initialStats ?? {
       totalFamilies: 0,
@@ -76,11 +86,12 @@ export default function DashboardView({
       balance: 0,
     },
   )
-  const [loadingStats, setLoadingStats] = useState(!hasInitialStats)
+  const [loadingCounts, setLoadingCounts] = useState(!hasInitialStats)
+  const [loadingFinancials, setLoadingFinancials] = useState(needsFinancialCompute)
   const [statsError, setStatsError] = useState(false)
 
   const [tasks, setTasks] = useState<Task[]>(initialTasks ?? [])
-  const [loadingTasks, setLoadingTasks] = useState(!hasInitialTasks)
+  const [loadingTasks, setLoadingTasks] = useState(!tasksHydrated)
   const [taskFilter, setTaskFilter] = useState<'all' | 'pending' | 'today' | 'overdue'>('all')
   const [tasksError, setTasksError] = useState(false)
   // StrictMode-safe gating: track *what we already have data for* instead of
@@ -89,9 +100,9 @@ export default function DashboardView({
   // have data for ("all" because that's what the server prefetched); for
   // stats we track a single boolean.
   const fetchedTaskFilterRef = useRef<typeof taskFilter | null>(
-    hasInitialTasks ? 'all' : null,
+    tasksHydrated ? 'all' : null,
   )
-  const hasFetchedStatsRef = useRef(hasInitialStats)
+  const hasFetchedStatsRef = useRef(hasInitialStats && !needsFinancialCompute)
   const { begin, invalidate, isStale } = useRequestGeneration()
 
   const fetchTasksInline = useCallback(async () => {
@@ -111,23 +122,25 @@ export default function DashboardView({
       if (isStale(gen)) return
       setTasksError(true)
       setTasks([])
-      toast.error('Could not load tasks. Pull to refresh or try again.')
+      toast.error(t('dashboard.error.loadTasks'))
     } finally {
       if (!isStale(gen)) setLoadingTasks(false)
     }
-  }, [taskFilter, toast, begin, isStale])
+  }, [taskFilter, toast, begin, isStale, t])
 
-  const fetchDashboardData = useCallback(async () => {
+  const fetchDashboardData = useCallback(async (compute = false) => {
     const gen = begin()
     setStatsError(false)
     try {
+      const url = compute ? '/api/dashboard-stats?compute=1' : '/api/dashboard-stats'
       const data = await cachedFetch<{
         totalFamilies: number
         totalMembers: number
         calculatedIncome: number
         calculatedExpenses: number
         balance: number
-      }>(`/api/dashboard-stats`, { ttl: 30_000 })
+        financialsPending?: boolean
+      }>(url, { ttl: 30_000 })
       if (isStale(gen)) return
 
       setStats({
@@ -140,11 +153,14 @@ export default function DashboardView({
     } catch (error) {
       if (isStale(gen)) return
       setStatsError(true)
-      toast.error('Could not load dashboard stats.')
+      toast.error(t('dashboard.error.loadStats'))
     } finally {
-      if (!isStale(gen)) setLoadingStats(false)
+      if (!isStale(gen)) {
+        setLoadingCounts(false)
+        setLoadingFinancials(false)
+      }
     }
-  }, [toast, showFinancials, begin, isStale])
+  }, [toast, showFinancials, begin, isStale, t])
 
   useEffect(() => {
     if (!showFinancials) return
@@ -160,8 +176,8 @@ export default function DashboardView({
   useEffect(() => {
     if (hasFetchedStatsRef.current) return
     hasFetchedStatsRef.current = true
-    fetchDashboardData()
-  }, [fetchDashboardData])
+    fetchDashboardData(needsFinancialCompute || !hasInitialStats)
+  }, [fetchDashboardData, needsFinancialCompute, hasInitialStats])
 
   useOrgChanged(useCallback(() => {
     invalidate()
@@ -169,13 +185,12 @@ export default function DashboardView({
     hasFetchedStatsRef.current = false
     setTasks([])
     setLoadingTasks(true)
-    setLoadingStats(true)
+    setLoadingCounts(true)
+    setLoadingFinancials(showFinancials)
     fetchedTaskFilterRef.current = taskFilter
     if (showFinancials) fetchTasksInline()
-    fetchDashboardData()
+    fetchDashboardData(showFinancials)
   }, [taskFilter, fetchTasksInline, fetchDashboardData, showFinancials, invalidate]))
-
-  const isFirstRun = !loadingStats && !statsError && stats.totalFamilies === 0
 
   const pendingTasks = tasks.filter((t) => t.status === 'pending').length
   const overdueTasks = tasks.filter((t) => {
@@ -189,19 +204,34 @@ export default function DashboardView({
     <div className="min-h-screen bg-app p-4 sm:p-6 md:p-8">
       <div className="max-w-7xl mx-auto">
         <PageHeader
-          title="Dashboard"
-          subtitle="Welcome back — here's your workspace at a glance."
+          title={t('dashboard.title')}
+          subtitle={t('dashboard.subtitle')}
         />
 
-        {isFirstRun && <FirstRunChecklist />}
+        {showFinancials && <OnboardingChecklist initialProgress={initialSetupProgress} />}
+        {!showFinancials && <MemberWelcomeChecklist />}
 
         {/* Stats: hero (Balance) + secondary cards */}
+        {statsError && !loadingCounts && !loadingFinancials ? (
+          <div className="mb-8">
+            <EmptyState
+              icon={<ExclamationTriangleIcon />}
+              title={t('dashboard.statsLoadError')}
+              description={t('dashboard.statsLoadErrorDesc')}
+              cta={{
+                label: t('common.retry'),
+                onClick: () => fetchDashboardData(showFinancials),
+                icon: <ArrowPathIcon className="h-4 w-4" />,
+              }}
+            />
+          </div>
+        ) : (
         <div
           className={`grid grid-cols-1 gap-4 mb-8 ${
             showFinancials ? 'md:grid-cols-4' : 'md:grid-cols-2'
           }`}
         >
-          {loadingStats && showFinancials ? (
+          {showFinancials && loadingFinancials ? (
             <>
               <div className="md:col-span-2 surface-card p-6">
                 <Skeleton h={14} w="30%" />
@@ -209,27 +239,40 @@ export default function DashboardView({
                 <div className="mt-3"><Skeleton h={12} w="40%" /></div>
               </div>
               <div className="surface-card p-5"><Skeleton h={14} w="50%" /><div className="mt-3"><Skeleton h={28} w="60%" /></div></div>
+            </>
+          ) : showFinancials ? (
+            <>
+              <HeroStatCard
+                title={t('dashboard.balance')}
+                tooltip="Cash received minus lifecycle expenses for the current cycle."
+                value={stats.balance}
+                familiesCount={stats.totalFamilies}
+              />
+              <SmallStatCard
+                title={t('dashboard.paymentsReceived')}
+                tooltip="Total payments recorded this cycle, net of refunds."
+                value={formatMoney(stats.totalIncome)}
+                icon={CurrencyDollarIcon}
+              />
+            </>
+          ) : null}
+          {loadingCounts ? (
+            <>
               <div className="surface-card p-5"><Skeleton h={14} w="50%" /><div className="mt-3"><Skeleton h={28} w="60%" /></div></div>
+              {!showFinancials && (
+                <div className="surface-card p-5"><Skeleton h={14} w="50%" /><div className="mt-3"><Skeleton h={28} w="60%" /></div></div>
+              )}
             </>
           ) : (
             <>
-              {showFinancials && (
-                <>
-                  <HeroStatCard
-                    title="Balance"
-                    value={stats.balance}
-                    familiesCount={stats.totalFamilies}
-                  />
-                  <SmallStatCard title="Total Income" value={formatMoney(stats.totalIncome)} icon={CurrencyDollarIcon} />
-                </>
-              )}
-              <SmallStatCard title="Total Families" value={stats.totalFamilies} icon={UserGroupIcon} />
+              <SmallStatCard title={t('dashboard.totalFamilies')} value={stats.totalFamilies} icon={UserGroupIcon} />
               {!showFinancials && (
-                <SmallStatCard title="Total Members" value={stats.totalMembers} icon={UserGroupIcon} />
+                <SmallStatCard title={t('dashboard.totalMembers')} value={stats.totalMembers} icon={UserGroupIcon} />
               )}
             </>
           )}
         </div>
+        )}
 
         {/* Main Content Grid */}
         <div className={`grid grid-cols-1 gap-6 mb-6${showFinancials ? ' lg:grid-cols-3' : ''}`}>
@@ -243,38 +286,41 @@ export default function DashboardView({
                     <CalendarIcon className="h-5 w-5 text-fg-muted" aria-hidden="true" />
                   </div>
                   <div className="min-w-0">
-                    <h2 className="text-base font-semibold text-fg truncate">Tasks</h2>
+                    <h2 className="text-base font-semibold text-fg truncate">{t('dashboard.tasks')}</h2>
                     <p className="text-xs text-fg-muted">
-                      {pendingTasks} pending · {overdueTasks} overdue
+                      {pendingTasks} {t('dashboard.pending')} · {overdueTasks} {t('dashboard.overdue')}
                     </p>
                   </div>
                 </div>
                 <Link
                   href="/tasks"
                   className="focus-ring inline-flex items-center gap-1.5 px-3 py-2 bg-accent text-accent-fg rounded-md hover:bg-accent-hover transition-colors text-sm font-medium min-h-[var(--touch-target)] sm:min-h-0"
-                  aria-label="Open tasks page"
+                  aria-label={t('dashboard.openTasksPage')}
                 >
                   <PlusIcon className="h-4 w-4" aria-hidden="true" />
-                  <span className="hidden sm:inline">Add Task</span>
+                  <span className="hidden sm:inline">{t('dashboard.addTask')}</span>
                 </Link>
               </div>
 
               {/* Task Filters */}
-              <div className="flex flex-wrap gap-1.5 mb-4" role="tablist" aria-label="Task filters">
-                {[
-                  { key: 'all', label: 'All' },
-                  { key: 'pending', label: 'Pending' },
-                  { key: 'today', label: 'Due Today' },
-                  { key: 'overdue', label: 'Overdue' },
-                ].map((filter) => {
+              <div className="flex flex-wrap gap-1.5 mb-4" role="tablist" aria-label={t('dashboard.taskFilters')}>
+                {(
+                  [
+                    { key: 'all', label: t('dashboard.filter.all') },
+                    { key: 'pending', label: t('dashboard.filter.pending') },
+                    { key: 'today', label: t('dashboard.filter.today') },
+                    { key: 'overdue', label: t('dashboard.filter.overdue') },
+                  ] as const
+                ).map((filter) => {
                   const active = taskFilter === filter.key
                   return (
                     <button
                       key={filter.key}
                       onClick={() => setTaskFilter(filter.key as any)}
+                      disabled={loadingTasks}
                       role="tab"
                       aria-selected={active}
-                      className={`focus-ring px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      className={`focus-ring px-3 py-1.5 min-h-[var(--touch-target)] sm:min-h-0 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none ${
                         active ? 'bg-fg text-app' : 'bg-fg/5 text-fg-muted hover:bg-fg/10 hover:text-fg'
                       }`}
                     >
@@ -290,20 +336,20 @@ export default function DashboardView({
               ) : tasksError ? (
                 <EmptyState
                   icon={<ExclamationTriangleIcon />}
-                  title="Couldn't load tasks"
-                  description="Check your connection and try again."
-                  cta={{ label: 'Retry', onClick: () => fetchTasksInline(), icon: <ArrowPathIcon className="h-4 w-4" /> }}
+                  title={t('dashboard.tasksLoadError')}
+                  description={t('dashboard.tasksLoadErrorDesc')}
+                  cta={{ label: t('common.retry'), onClick: () => fetchTasksInline(), icon: <ArrowPathIcon className="h-4 w-4" /> }}
                 />
               ) : tasks.length === 0 ? (
                 <EmptyState
                   icon={<ClipboardDocumentListIcon />}
-                  title="No tasks here yet"
+                  title={t('dashboard.noTasks')}
                   description={
                     taskFilter === 'all'
-                      ? 'Create a task to track follow-ups, deadlines, and reminders.'
-                      : 'Try switching the filter or create a new task.'
+                      ? t('dashboard.noTasksAll')
+                      : t('dashboard.noTasksFiltered')
                   }
-                  cta={{ label: 'Open tasks', href: '/tasks' }}
+                  cta={{ label: t('dashboard.openTasks'), href: '/tasks' }}
                 />
               ) : (
                 <div className="space-y-2">
@@ -318,17 +364,17 @@ export default function DashboardView({
                     const priorityColors: Record<string, string> = {
                       low: 'bg-fg/5 text-fg-muted',
                       medium: 'bg-accent/10 text-accent',
-                      high: 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300',
-                      urgent: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300',
+                      high: 'bg-warning/10 text-warning',
+                      urgent: 'bg-danger/10 text-danger',
                     }
 
                     return (
                       <Link
                         key={task._id}
                         href="/tasks"
-                        className={`focus-ring block p-3 rounded-md border transition-colors ${
+                        className={`focus-ring block p-3 min-h-[var(--touch-target)] sm:min-h-0 rounded-md border transition-colors ${
                           isOverdue
-                            ? 'bg-red-50/30 dark:bg-red-500/5 border-red-200/60 dark:border-red-500/20 hover:bg-red-50/50 dark:hover:bg-red-500/10'
+                            ? 'bg-danger/5 border-danger/20 hover:bg-danger/10'
                             : 'bg-surface border-border hover:bg-fg/[0.03]'
                         }`}
                       >
@@ -340,15 +386,15 @@ export default function DashboardView({
                                 {task.priority}
                               </span>
                               {isDueToday && task.status !== 'completed' && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide font-medium bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300 flex items-center gap-1">
+                                <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide font-medium bg-warning/10 text-warning flex items-center gap-1">
                                   <ClockIcon className="h-3 w-3" aria-hidden="true" />
-                                  Today
+                                  {t('dashboard.today')}
                                 </span>
                               )}
                               {isOverdue && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide font-medium bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300 flex items-center gap-1">
+                                <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide font-medium bg-danger/10 text-danger flex items-center gap-1">
                                   <ExclamationTriangleIcon className="h-3 w-3" aria-hidden="true" />
-                                  Overdue
+                                  {t('dashboard.overdueBadge')}
                                 </span>
                               )}
                             </div>
@@ -378,7 +424,7 @@ export default function DashboardView({
                         href="/tasks"
                         className="focus-ring text-accent hover:text-accent-hover font-medium text-sm inline-flex items-center gap-1 rounded"
                       >
-                        View all {tasks.length} tasks <span aria-hidden="true">→</span>
+                        {t('dashboard.viewAll')} {tasks.length} {t('dashboard.tasksWord')} <span aria-hidden="true">→</span>
                       </Link>
                     </div>
                   )}
@@ -395,15 +441,15 @@ export default function DashboardView({
                 <div className="p-2 bg-fg/5 rounded-md">
                   <BoltIcon className="h-5 w-5 text-fg-muted" aria-hidden="true" />
                 </div>
-                <h2 className="text-base font-semibold text-fg">Quick Actions</h2>
+                <h2 className="text-base font-semibold text-fg">{t('dashboard.quickActions')}</h2>
               </div>
               <div className="space-y-1.5">
-                <ActionButton href="/families" label="Manage Families" icon={UserGroupIcon} />
+                <ActionButton href="/families" label={t('dashboard.manageFamilies')} icon={UserGroupIcon} />
                 {showFinancials && (
                   <>
-                    <ActionButton href="/calculations" label="View Calculations" icon={CalculatorIcon} />
-                    <ActionButton href="/statements" label="Generate Statements" icon={DocumentTextIcon} />
-                    <ActionButton href="/projections" label="Dues calculator" icon={ChartBarSquareIcon} />
+                    <ActionButton href="/calculations" label={t('dashboard.viewCalculations')} icon={CalculatorIcon} />
+                    <ActionButton href="/statements" label={t('dashboard.generateStatements')} icon={DocumentTextIcon} />
+                    <ActionButton href="/projections" label={t('dashboard.duesCalculator')} icon={ChartBarSquareIcon} />
                   </>
                 )}
               </div>
@@ -415,27 +461,27 @@ export default function DashboardView({
   )
 }
 
-function FirstRunChecklist() {
+function MemberWelcomeChecklist() {
+  const t = useT()
   const steps = [
-    { title: 'Add your first family', href: '/families', done: false },
-    { title: 'Set up payment plans', href: '/settings', done: false },
-    { title: 'Configure your cycle start month', href: '/settings', done: false },
+    { title: t('dashboard.member.browseFamilies'), href: '/families', done: false },
+    { title: t('dashboard.member.viewMembers'), href: '/families', done: false },
   ]
   return (
     <section
       className="mb-8 surface-card p-5 sm:p-6 animate-ui-fade"
-      aria-labelledby="first-run-title"
+      aria-labelledby="member-welcome-title"
     >
       <div className="flex items-start gap-3">
         <div className="inline-flex items-center justify-center h-10 w-10 rounded-md bg-accent/10 text-accent shrink-0" aria-hidden="true">
-          <SparklesIcon className="h-5 w-5" />
+          <UserGroupIcon className="h-5 w-5" />
         </div>
         <div className="flex-1 min-w-0">
-          <h2 id="first-run-title" className="text-base font-semibold text-fg">
-            Welcome to Kasa
+          <h2 id="member-welcome-title" className="text-base font-semibold text-fg">
+            {t('dashboard.welcomeKasa')}
           </h2>
           <p className="mt-1 text-sm text-fg-muted">
-            Let&apos;s get you set up in three quick steps.
+            {t('dashboard.memberSubtitle')}
           </p>
           <ol className="mt-4 divide-y divide-border rounded-md border border-border bg-app-subtle overflow-hidden">
             {steps.map((s, i) => (
@@ -456,36 +502,69 @@ function FirstRunChecklist() {
               </li>
             ))}
           </ol>
+          <div className="mt-4">
+            <Link
+              href="/families"
+              className="focus-ring inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-accent-fg rounded-md hover:bg-accent-hover transition-colors text-sm font-medium min-h-[var(--touch-target)] sm:min-h-0"
+            >
+              {t('dashboard.member.browseFamilies')}
+            </Link>
+          </div>
         </div>
       </div>
     </section>
   )
 }
 
+function MetricLabel({ label, tooltip }: { label: string; tooltip?: string }) {
+  if (!tooltip) {
+    return (
+      <p className="text-xs uppercase tracking-wider font-medium text-fg-muted">{label}</p>
+    )
+  }
+  return (
+    <div className="flex items-center gap-1">
+      <p className="text-xs uppercase tracking-wider font-medium text-fg-muted">{label}</p>
+      <Tooltip content={tooltip} side="bottom">
+        <button
+          type="button"
+          className="text-fg-subtle hover:text-fg-muted focus-ring rounded"
+          aria-label={`About ${label}`}
+        >
+          <InformationCircleIcon className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      </Tooltip>
+    </div>
+  )
+}
+
 function HeroStatCard({
   title,
+  tooltip,
   value,
   familiesCount,
 }: {
   title: string
+  tooltip?: string
   value: number
   familiesCount: number
 }) {
+  const t = useT()
   const { format: formatMoney } = useCurrency()
   const isPositive = value >= 0
   return (
     <div className="md:col-span-2 surface-card p-6 flex flex-col justify-between">
       <div className="flex items-center justify-between">
-        <p className="text-xs uppercase tracking-wider font-medium text-fg-muted">{title}</p>
+        <MetricLabel label={title} tooltip={tooltip} />
         <div className="p-2 bg-fg/5 rounded-md">
           <ChartBarIcon className="h-5 w-5 text-fg-muted" aria-hidden="true" />
         </div>
       </div>
       <div className="mt-4 flex items-baseline gap-2">
-        <p className={`text-4xl sm:text-5xl font-semibold tracking-tight tabular ${isPositive ? 'text-fg' : 'text-red-600 dark:text-red-400'}`}>
+        <p className={`text-4xl sm:text-5xl font-semibold tracking-tight tabular ${isPositive ? 'text-fg' : 'text-danger'}`}>
           {formatMoney(Math.abs(value))}
         </p>
-        <span className={`inline-flex items-center ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} aria-label={isPositive ? 'Positive balance' : 'Negative balance'}>
+        <span className={`inline-flex items-center ${isPositive ? 'text-success' : 'text-danger'}`} aria-label={isPositive ? t('dashboard.positiveBalance') : t('dashboard.negativeBalance')}>
           {isPositive ? (
             <ArrowTrendingUpIcon className="h-5 w-5" aria-hidden="true" />
           ) : (
@@ -494,7 +573,8 @@ function HeroStatCard({
         </span>
       </div>
       <p className="mt-2 text-xs text-fg-muted">
-        Across {familiesCount} {familiesCount === 1 ? 'family' : 'families'}
+        {t('dashboard.across')} {familiesCount}{' '}
+        {familiesCount === 1 ? t('dashboard.familySingular') : t('dashboard.familyPlural')}
       </p>
     </div>
   )
@@ -502,17 +582,19 @@ function HeroStatCard({
 
 function SmallStatCard({
   title,
+  tooltip,
   value,
   icon: Icon,
 }: {
   title: string
+  tooltip?: string
   value: string | number
   icon: React.ComponentType<{ className?: string }>
 }) {
   return (
     <div className="surface-card p-5 hover:bg-fg/[0.02] transition-colors">
       <div className="flex items-start justify-between mb-3">
-        <p className="text-xs uppercase tracking-wider font-medium text-fg-muted">{title}</p>
+        <MetricLabel label={title} tooltip={tooltip} />
         <div className="p-1.5 bg-fg/5 rounded-md shrink-0">
           <Icon className="h-4 w-4 text-fg-muted" />
         </div>

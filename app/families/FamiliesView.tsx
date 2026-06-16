@@ -8,6 +8,8 @@ import {
   UserGroupIcon,
   UserPlusIcon,
   ClipboardDocumentListIcon,
+  ExclamationTriangleIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -19,10 +21,12 @@ import {
   familiesListUrl,
   parseFamiliesListResponse,
 } from '@/lib/client/families-list'
+import { parseFamilySaveError, validateFamilyFormFields } from '@/lib/client/family-form'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { formatLocaleDate, isFiniteDate } from '@/lib/date-utils'
 import { useCurrency } from '@/lib/client/useCurrency'
+import { useT } from '@/lib/client/i18n'
 import {
   ActionMenu,
   Button,
@@ -153,14 +157,17 @@ export default function FamiliesView({
 }: FamiliesViewProps = {}) {
   const toast = useToast()
   const confirm = useConfirm()
+  const t = useT()
   const router = useRouter()
   const { format: formatMoney } = useCurrency()
-  const hasInitialFamilies = Array.isArray(initialFamilies) && initialFamilies.length > 0
+  const familiesHydrated = initialFamilies !== undefined
+  const plansHydrated = initialPaymentPlans !== undefined
   const [families, setFamilies] = useState<Family[]>(initialFamilies ?? [])
   const [nextCursor, setNextCursor] = useState<string | null>(initialFamiliesNextCursor)
   const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>(initialPaymentPlans ?? [])
-  const [loading, setLoading] = useState(!hasInitialFamilies)
+  const [loading, setLoading] = useState(!familiesHydrated)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [loadError, setLoadError] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editingFamily, setEditingFamily] = useState<Family | null>(null)
   const [sort, setSort] = useState<{ id: string; dir: SortDir } | null>(null)
@@ -175,15 +182,14 @@ export default function FamiliesView({
   // StrictMode-safe gates: track whether each resource was server-prefetched.
   // Mutating a "first-run" flag inside the effect breaks under React 18 dev
   // strict-mode (the second pass sees the flag flipped to false and runs).
-  const hasFetchedFamiliesRef = useRef(hasInitialFamilies)
+  const hasFetchedFamiliesRef = useRef(familiesHydrated)
   // Re-entrancy lock for the Add/Edit Family modal. Without this a
   // fast double-click or double Enter would POST the form twice and
   // create a duplicate family row before React could disable the
   // submit button.
   const formSubmittingRef = useRef(false)
-  const hasFetchedPlansRef = useRef(
-    Array.isArray(initialPaymentPlans) && initialPaymentPlans.length > 0,
-  )
+  const [formSubmitting, setFormSubmitting] = useState(false)
+  const hasFetchedPlansRef = useRef(plansHydrated)
   const { begin, invalidate, isStale } = useRequestGeneration()
 
   const mergeAdminBalances = useCallback(
@@ -216,6 +222,7 @@ export default function FamiliesView({
       const url = familiesListUrl(cursor, FAMILIES_LIST_PAGE_SIZE)
       if (mode === 'reset') setLoading(true)
       else setLoadingMore(true)
+      if (mode === 'reset') setLoadError(false)
       try {
         const data = await cachedFetch<any>(url, {
           ttl: 30_000,
@@ -231,11 +238,10 @@ export default function FamiliesView({
       } catch {
         if (isStale(gen)) return
         if (mode === 'reset') {
-          setFamilies([])
-          setNextCursor(null)
-          toast.error('Could not load families.')
+          setLoadError(true)
+          toast.error(t('families.error.load'))
         } else {
-          toast.error('Could not load more families.')
+          toast.error(t('families.error.loadMore'))
         }
       } finally {
         if (!isStale(gen)) {
@@ -244,7 +250,7 @@ export default function FamiliesView({
         }
       }
     },
-    [toast, begin, isStale, mergeAdminBalances],
+    [toast, begin, isStale, mergeAdminBalances, t],
   )
 
   const fetchFamilies = useCallback(async () => {
@@ -275,9 +281,9 @@ export default function FamiliesView({
       setNextCursor(null)
       return merged
     } catch {
-      if (!isStale(gen)) toast.error('Could not load all families for export.')
+      if (!isStale(gen)) toast.error(t('families.error.loadExport'))
     }
-  }, [nextCursor, begin, isStale, mergeAdminBalances, toast])
+  }, [nextCursor, begin, isStale, mergeAdminBalances, toast, t])
 
   const fetchPaymentPlans = useCallback(async (opts?: { force?: boolean }) => {
     const gen = begin()
@@ -320,6 +326,7 @@ export default function FamiliesView({
     setNextCursor(null)
     setPaymentPlans([])
     setSelectedIds(new Set())
+    setLoadError(false)
     setLoading(true)
     fetchFamilies()
     fetchPaymentPlans({ force: true })
@@ -335,10 +342,18 @@ export default function FamiliesView({
         const plan = paymentPlans.find((p: any) => p.planNumber === currentPlan)
         if (plan) return plan.name
       }
-      return 'Unknown Plan'
+      return t('families.unknownPlan')
     },
-    [paymentPlans],
+    [paymentPlans, t],
   )
+
+  const resetFamilyModal = useCallback(() => {
+    formSubmittingRef.current = false
+    setFormSubmitting(false)
+    setShowModal(false)
+    setEditingFamily(null)
+    setFormData(initialForm)
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -352,16 +367,23 @@ export default function FamiliesView({
       husbandCellPhone: formatPhone(formData.husbandCellPhone),
       wifeCellPhone: formatPhone(formData.wifeCellPhone),
       phone: formatPhone(formData.phone),
-      email: formData.email || '',
+      email: (formData.email || '').trim(),
       emailOptOut: !!formData.emailOptOut,
     }
 
+    const validationError = validateFamilyFormFields(formattedData)
+    if (validationError) {
+      toast.error(validationError)
+      return
+    }
+
     if (formattedData.email && !validateEmail(formattedData.email)) {
-      toast.error('Please enter a valid email address.')
+      toast.error(t('families.error.invalidEmail'))
       return
     }
 
     formSubmittingRef.current = true
+    setFormSubmitting(true)
     try {
       const url = editingFamily ? `/api/families/${editingFamily._id}` : '/api/families'
       const method = editingFamily ? 'PUT' : 'POST'
@@ -372,28 +394,31 @@ export default function FamiliesView({
       })
 
       if (res.ok) {
-        setShowModal(false)
-        setEditingFamily(null)
-        setFormData(initialForm)
+        resetFamilyModal()
         invalidateCache(/^\/api\/families/)
         invalidateCache(/^\/api\/dashboard-stats/)
         fetchFamilies()
-        toast.success(editingFamily ? `${formattedData.name} updated.` : `${formattedData.name} created.`)
+        toast.success(
+          editingFamily
+            ? t('families.success.updated').replace('{name}', formattedData.name)
+            : t('families.success.created').replace('{name}', formattedData.name),
+        )
       } else {
         const error = await res.json().catch(() => ({}))
-        toast.error(error.error || error.details || 'Could not save family.')
+        toast.error(parseFamilySaveError(error))
       }
     } catch {
-      toast.error('Network error — please try again.')
+      toast.error(t('common.networkError'))
     } finally {
       formSubmittingRef.current = false
+      setFormSubmitting(false)
     }
   }
 
   const handleEdit = (family: Family) => {
     setEditingFamily(family)
     if (!family.paymentPlanId) {
-      toast.error('Family is missing a payment plan. Please update the family.')
+      toast.error(t('families.error.missingPlan'))
       return
     }
     setFormData({
@@ -425,10 +450,10 @@ export default function FamiliesView({
   const handleDelete = async (id: string, name: string) => {
     if (
       !(await confirm({
-        title: 'Delete family?',
-        message: `This permanently deletes ${name} and all of their data.`,
+        title: t('families.deleteTitle'),
+        message: t('families.deleteMessage').replace('{name}', name),
         destructive: true,
-        confirmLabel: 'Delete',
+        confirmLabel: t('common.delete'),
       }))
     )
       return
@@ -439,13 +464,13 @@ export default function FamiliesView({
         invalidateCache(/^\/api\/families/)
         invalidateCache(/^\/api\/dashboard-stats/)
         fetchFamilies()
-        toast.success(`${name} deleted.`)
+        toast.success(t('families.success.deleted').replace('{name}', name))
       } else {
         const body = await res.json().catch(() => ({}))
-        toast.error(body?.error || 'Could not delete family.')
+        toast.error(body?.error || t('families.error.delete'))
       }
     } catch {
-      toast.error('Network error — please try again.')
+      toast.error(t('common.networkError'))
     }
   }
 
@@ -524,8 +549,7 @@ export default function FamiliesView({
       }
       if (added < visibleIds.length - prev.size) {
         toast.error(
-          `Selection capped at ${BULK_SELECTION_CAP.toLocaleString()} families. ` +
-          `Run bulk actions in batches to cover the rest.`,
+          t('families.bulkSelectionCap').replace('{cap}', BULK_SELECTION_CAP.toLocaleString()),
         )
       }
       return next
@@ -537,9 +561,11 @@ export default function FamiliesView({
     const ids = Array.from(selectedIds)
     if (ids.length === 0) return
     const ok = await confirm({
-      title: `Delete ${ids.length} ${ids.length === 1 ? 'family' : 'families'}?`,
-      message: 'They will be moved to the recycle bin and can be restored within 30 days.',
-      confirmLabel: 'Delete',
+      title: t('families.bulkDeleteTitle')
+        .replace('{count}', String(ids.length))
+        .replace('{unit}', ids.length === 1 ? t('families.familyUnit') : t('families.familiesUnit')),
+      message: t('families.bulkDeleteMessage'),
+      confirmLabel: t('common.delete'),
       destructive: true,
     })
     if (!ok) return
@@ -553,15 +579,15 @@ export default function FamiliesView({
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        toast.error(data.error || 'Bulk delete failed.')
+        toast.error(data.error || t('families.error.bulkDelete'))
         return
       }
-      toast.success(`Deleted ${data.modified || ids.length} families.`)
+      toast.success(t('families.success.bulkDeleted').replace('{count}', String(data.modified || ids.length)))
       clearSelection()
       invalidateCache(/^\/api\/families/)
       fetchFamilies()
     } catch {
-      toast.error('Network error.')
+      toast.error(t('common.networkErrorShort'))
     } finally {
       setBulkBusy(false)
     }
@@ -584,17 +610,17 @@ export default function FamiliesView({
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        toast.error(data.error || 'Bulk plan change failed.')
+        toast.error(data.error || t('families.error.bulkPlan'))
         return
       }
-      toast.success(`Updated ${data.modified || ids.length} families.`)
+      toast.success(t('families.success.bulkUpdated').replace('{count}', String(data.modified || ids.length)))
       setShowBulkPlanModal(false)
       setBulkPlanValue('')
       clearSelection()
       invalidateCache(/^\/api\/families/)
       fetchFamilies()
     } catch {
-      toast.error('Network error.')
+      toast.error(t('common.networkErrorShort'))
     } finally {
       setBulkBusy(false)
     }
@@ -612,15 +638,15 @@ export default function FamiliesView({
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        toast.error(data.error || 'Bulk update failed.')
+        toast.error(data.error || t('families.error.bulkUpdate'))
         return
       }
-      toast.success(`Updated ${data.modified || ids.length} families.`)
+      toast.success(t('families.success.bulkUpdated').replace('{count}', String(data.modified || ids.length)))
       clearSelection()
       invalidateCache(/^\/api\/families/)
       fetchFamilies()
     } catch {
-      toast.error('Network error.')
+      toast.error(t('common.networkErrorShort'))
     } finally {
       setBulkBusy(false)
     }
@@ -632,8 +658,8 @@ export default function FamiliesView({
       header: (
         <input
           type="checkbox"
-          aria-label="Select all matching the current filter (capped at 500)"
-          title="Select all matching the current filter (capped at 500)"
+          aria-label={t('families.selectAll')}
+          title={t('families.selectAll')}
           className="cursor-pointer"
           checked={
             sortedFamilies.length > 0 &&
@@ -655,7 +681,7 @@ export default function FamiliesView({
       cell: (f) => (
         <input
           type="checkbox"
-          aria-label={`Select ${f.name}`}
+          aria-label={t('families.selectFamily').replace('{name}', f.name)}
           className="cursor-pointer"
           checked={selectedIds.has(f._id)}
           onClick={(e) => e.stopPropagation()}
@@ -667,8 +693,8 @@ export default function FamiliesView({
     },
     {
       id: 'name',
-      header: 'Name',
-      headerText: 'Name',
+      header: t('common.name'),
+      headerText: t('common.name'),
       sortable: true,
       cell: (f) => (
         <Link href={`/families/${f._id}`} className="font-medium text-accent hover:text-accent-hover hover:underline focus-ring rounded">
@@ -676,20 +702,20 @@ export default function FamiliesView({
         </Link>
       ),
       exportValue: (f) => f.name,
-      filter: { type: 'text', placeholder: 'Family name…' },
+      filter: { type: 'text', placeholder: t('families.nameFilterPlaceholder') },
     },
     {
       id: 'hebrewName',
-      header: 'Hebrew Name',
-      headerText: 'Hebrew Name',
+      header: t('family.hebrewName'),
+      headerText: t('family.hebrewName'),
       defaultHidden: true,
       cell: (f) => <span className="text-fg-muted">{f.hebrewName || '—'}</span>,
       exportValue: (f) => f.hebrewName || '',
     },
     {
       id: 'weddingDate',
-      header: 'Wedding Date',
-      headerText: 'Wedding Date',
+      header: t('family.weddingDate'),
+      headerText: t('family.weddingDate'),
       sortable: true,
       hideBelow: 'md',
       cell: (f) => <span className="tabular">{formatLocaleDate(f.weddingDate)}</span>,
@@ -698,8 +724,8 @@ export default function FamiliesView({
     },
     {
       id: 'members',
-      header: 'Members',
-      headerText: 'Members',
+      header: t('family.members'),
+      headerText: t('family.members'),
       sortable: true,
       hideBelow: 'md',
       cell: (f) => (
@@ -713,8 +739,8 @@ export default function FamiliesView({
     },
     {
       id: 'plan',
-      header: 'Plan',
-      headerText: 'Plan',
+      header: t('family.plan'),
+      headerText: t('family.plan'),
       sortable: true,
       hideBelow: 'lg',
       cell: (f) => <span className="text-fg-muted">{getPlanNameById(f.paymentPlanId, f.currentPlan)}</span>,
@@ -723,24 +749,24 @@ export default function FamiliesView({
     },
     {
       id: 'email',
-      header: 'Email',
-      headerText: 'Email',
+      header: t('common.email'),
+      headerText: t('common.email'),
       defaultHidden: true,
       cell: (f) => <span className="text-fg-muted">{f.email || '—'}</span>,
       exportValue: (f) => f.email || '',
     },
     {
       id: 'phone',
-      header: 'Phone',
-      headerText: 'Phone',
+      header: t('common.phone'),
+      headerText: t('common.phone'),
       defaultHidden: true,
       cell: (f) => <span className="text-fg-muted tabular">{f.phone || f.husbandCellPhone || f.wifeCellPhone || '—'}</span>,
       exportValue: (f) => f.phone || f.husbandCellPhone || f.wifeCellPhone || '',
     },
     {
       id: 'address',
-      header: 'Address',
-      headerText: 'Address',
+      header: t('common.address'),
+      headerText: t('common.address'),
       defaultHidden: true,
       cell: (f) => (
         <span className="text-fg-muted">
@@ -751,8 +777,8 @@ export default function FamiliesView({
     },
     {
       id: 'balance',
-      header: 'Balance',
-      headerText: 'Open Balance',
+      header: t('family.balance'),
+      headerText: t('family.openBalance'),
       sortable: true,
       align: 'right',
       cell: (f) => <span className="tabular font-medium">{formatMoney(f.openBalance)}</span>,
@@ -762,30 +788,30 @@ export default function FamiliesView({
     {
       id: 'actions',
       header: '',
-      headerText: 'Actions',
+      headerText: t('common.actions'),
       align: 'right',
       cell: (f) => (
         <div className="flex items-center justify-end">
           <ActionMenu
-            ariaLabel={`Actions for ${f.name}`}
+            ariaLabel={t('families.actionsFor').replace('{name}', f.name)}
             items={[
               {
-                label: 'Add child',
+                label: t('families.addChild'),
                 icon: <UserPlusIcon className="h-4 w-4" />,
                 onClick: () => router.push(`/families/${f._id}?tab=members&add=true`),
               },
               {
-                label: 'Add task',
+                label: t('families.addTask'),
                 icon: <ClipboardDocumentListIcon className="h-4 w-4" />,
                 onClick: () => setTaskFamily(f),
               },
               {
-                label: 'Edit family',
+                label: t('families.editFamily'),
                 icon: <PencilIcon className="h-4 w-4" />,
                 onClick: () => handleEdit(f),
               },
               {
-                label: 'Delete family',
+                label: t('families.deleteFamily'),
                 icon: <TrashIcon className="h-4 w-4" />,
                 destructive: true,
                 onClick: () => handleDelete(f._id, f.name),
@@ -805,8 +831,8 @@ export default function FamiliesView({
     <div className="min-h-screen bg-app p-4 sm:p-6 md:p-8">
       <div className="max-w-7xl mx-auto">
         <PageHeader
-          title="Families"
-          subtitle="Manage family members and their information."
+          title={t('nav.families')}
+          subtitle={t('families.subtitle')}
           actions={
             isAdmin ? (
             <Button
@@ -820,7 +846,7 @@ export default function FamiliesView({
                 void fetchPaymentPlans({ force: true })
               }}
             >
-              Add Family
+              {t('families.addFamily')}
             </Button>
             ) : undefined
           }
@@ -829,14 +855,14 @@ export default function FamiliesView({
         {isAdmin && selectedIds.size > 0 && (
           <div className="sticky top-0 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 shadow-sm">
             <span className="text-sm font-medium text-fg">
-              {selectedIds.size} selected
+              {selectedIds.size} {t('families.selected')}
             </span>
             <button
               type="button"
               onClick={clearSelection}
               className="text-xs text-fg-muted hover:text-fg underline"
             >
-              Clear
+              {t('common.clear')}
             </button>
             <div className="flex-1" />
             <Button
@@ -848,7 +874,7 @@ export default function FamiliesView({
                 setShowBulkPlanModal(true)
               }}
             >
-              Change plan
+              {t('families.changePlan')}
             </Button>
             <Button
               size="sm"
@@ -856,7 +882,7 @@ export default function FamiliesView({
               disabled={bulkBusy}
               onClick={() => handleBulkSetEmailOptOut(true)}
             >
-              Opt out of email
+              {t('families.optOutEmail')}
             </Button>
             <Button
               size="sm"
@@ -864,7 +890,7 @@ export default function FamiliesView({
               disabled={bulkBusy}
               onClick={() => handleBulkSetEmailOptOut(false)}
             >
-              Opt in to email
+              {t('families.optInEmail')}
             </Button>
             <Button
               size="sm"
@@ -872,7 +898,7 @@ export default function FamiliesView({
               disabled={bulkBusy}
               onClick={handleBulkDelete}
             >
-              Delete
+              {t('common.delete')}
             </Button>
           </div>
         )}
@@ -881,6 +907,17 @@ export default function FamiliesView({
           <div className="surface-card p-6">
             <SkeletonRows count={8} />
           </div>
+        ) : loadError ? (
+          <EmptyState
+            icon={<ExclamationTriangleIcon />}
+            title={t('families.error.load')}
+            description={t('dashboard.tasksLoadErrorDesc')}
+            cta={{
+              label: t('common.retry'),
+              onClick: () => fetchFamilies(),
+              icon: <ArrowPathIcon className="h-4 w-4" />,
+            }}
+          />
         ) : (
           <>
             <DataView
@@ -890,7 +927,7 @@ export default function FamiliesView({
               rowKey={(f) => f._id}
               sort={sort}
               onSortChange={(id, dir) => setSort({ id, dir })}
-              globalSearch={{ placeholder: 'Search by name, email, phone, address, plan…' }}
+              globalSearch={{ placeholder: t('families.searchPlaceholder') }}
               expandExportRows={nextCursor ? expandExportRows : undefined}
               import={isAdmin ? { type: 'families' as const, onImported: () => fetchFamilies() } : undefined}
               mobileCard={(f) => (
@@ -907,12 +944,12 @@ export default function FamiliesView({
               empty={
                 <EmptyState
                   icon={<UserGroupIcon className="h-10 w-10" />}
-                  title="No families yet"
-                  description="Create your first family to start tracking payments and members."
+                  title={t('families.noFamilies')}
+                  description={t('families.noFamiliesDesc')}
                   cta={
                     isAdmin
                       ? {
-                          label: 'Add Family',
+                          label: t('families.addFamily'),
                           onClick: () => {
                             setFormData(initialForm)
                             setEditingFamily(null)
@@ -928,7 +965,7 @@ export default function FamiliesView({
             {nextCursor && (
               <div className="mt-4 flex justify-center">
                 <Button variant="secondary" loading={loadingMore} onClick={loadMoreFamilies}>
-                  Load more
+                  {t('common.loadMore')}
                 </Button>
               </div>
             )}
@@ -937,25 +974,18 @@ export default function FamiliesView({
 
         <Modal
           open={showModal}
-          onClose={() => {
-            setShowModal(false)
-            setEditingFamily(null)
-            setFormData(initialForm)
-          }}
-          title={editingFamily ? `Edit ${editingFamily.name}` : 'Add Family'}
+          onClose={resetFamilyModal}
+          title={editingFamily ? `${t('common.edit')} ${editingFamily.name}` : t('families.addFamily')}
           maxWidth="max-w-3xl"
         >
           <FamilyModalBody
             formData={formData}
             setFormData={setFormData}
             onSubmit={handleSubmit}
-            onClose={() => {
-              setShowModal(false)
-              setEditingFamily(null)
-              setFormData(initialForm)
-            }}
+            onClose={resetFamilyModal}
             editing={!!editingFamily}
             paymentPlans={paymentPlans}
+            submitting={formSubmitting}
           />
         </Modal>
 
@@ -976,19 +1006,24 @@ export default function FamiliesView({
             setShowBulkPlanModal(false)
             setBulkPlanValue('')
           }}
-          title={`Change plan for ${selectedIds.size} ${selectedIds.size === 1 ? 'family' : 'families'}`}
+          title={t('families.bulkPlanTitle')
+            .replace('{count}', String(selectedIds.size))
+            .replace(
+              '{unit}',
+              selectedIds.size === 1 ? t('families.familyUnit') : t('families.familiesUnit'),
+            )}
           maxWidth="max-w-md"
         >
           <div className="p-4 space-y-4">
             <p className="text-sm text-fg-muted">
-              Assign a payment plan to all selected families. Choose "No plan" to clear the assignment.
+              {t('families.bulkPlanDesc')}
             </p>
             <select
               value={bulkPlanValue}
               onChange={(e) => setBulkPlanValue(e.target.value)}
               className="focus-ring w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg"
             >
-              <option value="">No plan</option>
+              <option value="">{t('families.noPlan')}</option>
               {paymentPlans.map((p: any) => (
                 <option key={p._id} value={p._id}>
                   {p.name || `Plan #${p.planNumber}`}
@@ -1003,10 +1038,10 @@ export default function FamiliesView({
                   setBulkPlanValue('')
                 }}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button onClick={handleBulkSetPlan} loading={bulkBusy}>
-                Apply
+                {t('common.apply')}
               </Button>
             </div>
           </div>
@@ -1033,6 +1068,7 @@ function FamilyMobileCard({
   onAddChild: () => void
   onAddTask: () => void
 }) {
+  const t = useT()
   const { format: formatMoney } = useCurrency()
   return (
     <div className="surface-card p-4">
@@ -1045,25 +1081,25 @@ function FamilyMobileCard({
         </Link>
         {canMutate && (
         <ActionMenu
-          ariaLabel={`Actions for ${family.name}`}
+          ariaLabel={t('families.actionsFor').replace('{name}', family.name)}
           items={[
             {
-              label: 'Add child',
+              label: t('families.addChild'),
               icon: <UserPlusIcon className="h-4 w-4" />,
               onClick: onAddChild,
             },
             {
-              label: 'Add task',
+              label: t('families.addTask'),
               icon: <ClipboardDocumentListIcon className="h-4 w-4" />,
               onClick: onAddTask,
             },
             {
-              label: 'Edit family',
+              label: t('families.editFamily'),
               icon: <PencilIcon className="h-4 w-4" />,
               onClick: onEdit,
             },
             {
-              label: 'Delete family',
+              label: t('families.deleteFamily'),
               icon: <TrashIcon className="h-4 w-4" />,
               destructive: true,
               onClick: onDelete,
@@ -1074,21 +1110,21 @@ function FamilyMobileCard({
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-fg">
         <div>
-          <dt className="text-fg-muted">Wedding</dt>
+          <dt className="text-fg-muted">{t('family.wedding')}</dt>
           <dd className="tabular">{formatLocaleDate(family.weddingDate)}</dd>
         </div>
         <div>
-          <dt className="text-fg-muted">Members</dt>
+          <dt className="text-fg-muted">{t('family.members')}</dt>
           <dd className="tabular">{family.memberCount || 0}</dd>
         </div>
         {canMutate && (
           <>
         <div>
-          <dt className="text-fg-muted">Plan</dt>
+          <dt className="text-fg-muted">{t('family.plan')}</dt>
           <dd className="truncate">{planName}</dd>
         </div>
-        <div className="text-right">
-          <dt className="text-fg-muted">Balance</dt>
+        <div className="text-end">
+          <dt className="text-fg-muted">{t('family.balance')}</dt>
           <dd className="font-semibold text-fg tabular">{formatMoney(family.openBalance)}</dd>
         </div>
           </>
@@ -1105,6 +1141,7 @@ function FamilyModalBody({
   onClose,
   editing,
   paymentPlans,
+  submitting,
 }: {
   formData: any
   setFormData: (data: any) => void
@@ -1112,14 +1149,16 @@ function FamilyModalBody({
   onClose: () => void
   editing: boolean
   paymentPlans: PaymentPlan[]
+  submitting: boolean
 }) {
   const toast = useToast()
+  const t = useT()
   const { format: formatMoney } = useCurrency()
   return (
     <form onSubmit={onSubmit} className="space-y-4" noValidate>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">Family Name *</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.familyName')}</label>
           <input
             type="text"
             required
@@ -1133,7 +1172,7 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">Family Name (Hebrew) *</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.familyNameHebrew')}</label>
           <input
             type="text"
             required
@@ -1149,7 +1188,7 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">Husband First Name</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.husbandFirstName')}</label>
           <input
             type="text"
             autoComplete="given-name"
@@ -1162,7 +1201,7 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">Husband First Name (Hebrew) *</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.husbandFirstNameHebrew')}</label>
           <input
             type="text"
             required
@@ -1178,7 +1217,7 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">Husband&apos;s Father (Hebrew)</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.husbandFatherHebrew')}</label>
           <input
             type="text"
             dir="rtl"
@@ -1193,7 +1232,7 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">Wife First Name</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.wifeFirstName')}</label>
           <input
             type="text"
             autoComplete="given-name"
@@ -1206,7 +1245,7 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">Wife First Name (Hebrew) *</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.wifeFirstNameHebrew')}</label>
           <input
             type="text"
             required
@@ -1222,7 +1261,7 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">Wife&apos;s Father (Hebrew)</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.wifeFatherHebrew')}</label>
           <input
             type="text"
             dir="rtl"
@@ -1237,7 +1276,7 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">Husband Cell Phone</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.husbandCell')}</label>
           <input
             type="tel"
             autoComplete="tel"
@@ -1249,7 +1288,7 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">Wife Cell Phone</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.wifeCell')}</label>
           <input
             type="tel"
             autoComplete="tel"
@@ -1261,7 +1300,7 @@ function FamilyModalBody({
           />
         </div>
         <div className="sm:col-span-2">
-          <label className="block text-sm font-medium text-fg mb-1.5">Street</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.street')}</label>
           <input
             type="text"
             autoComplete="street-address"
@@ -1271,7 +1310,7 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">City</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.city')}</label>
           <input
             type="text"
             autoComplete="address-level2"
@@ -1281,7 +1320,7 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">State</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.state')}</label>
           <input
             type="text"
             autoComplete="address-level1"
@@ -1291,7 +1330,17 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">Email</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.zip')}</label>
+          <input
+            type="text"
+            autoComplete="postal-code"
+            value={formData.zip}
+            onChange={(e) => setFormData({ ...formData, zip: e.target.value })}
+            className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-fg mb-1.5">{t('common.email')}</label>
           <input
             type="email"
             autoComplete="email"
@@ -1299,7 +1348,7 @@ function FamilyModalBody({
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             onBlur={(e) => {
               if (e.target.value && !validateEmail(e.target.value)) {
-                toast.error('Please enter a valid email address.')
+                toast.error(t('families.error.invalidEmail'))
               }
             }}
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none"
@@ -1312,17 +1361,15 @@ function FamilyModalBody({
               className="mt-0.5 h-4 w-4 accent-accent"
             />
             <span>
-              <span className="font-medium">Opt out of bulk statement emails</span>
+              <span className="font-medium">{t('families.form.emailOptOut')}</span>
               <span className="block text-xs text-fg-muted">
-                Skip this family in &ldquo;Send via Email&rdquo; jobs and the monthly
-                auto-email cron. Ad-hoc per-family sends from the family page are
-                unaffected.
+                {t('families.form.emailOptOutDesc')}
               </span>
             </span>
           </label>
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">Phone</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">{t('common.phone')}</label>
           <input
             type="tel"
             autoComplete="tel"
@@ -1334,7 +1381,7 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">Wedding Date *</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.weddingDate')}</label>
           <input
             type="date"
             required
@@ -1344,27 +1391,29 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">Payment Plan *</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.paymentPlan')}</label>
           <select
             required
             value={formData.paymentPlanId || ''}
             onChange={(e) => setFormData({ ...formData, paymentPlanId: e.target.value })}
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none"
           >
-            <option value="">Select a payment plan…</option>
+            <option value="">{t('families.form.selectPlan')}</option>
             {paymentPlans.map((plan) => (
               <option key={plan._id} value={plan._id}>
-                {plan.name} — {formatMoney(plan.yearlyPrice)}/year
+                {plan.name} — {t('families.form.planYearly').replace('{price}', formatMoney(plan.yearlyPrice))}
               </option>
             ))}
           </select>
         </div>
       </div>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3 pt-2">
-        <Button type="button" variant="secondary" onClick={onClose}>
-          Cancel
+        <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
+          {t('common.cancel')}
         </Button>
-        <Button type="submit">{editing ? 'Save changes' : 'Create family'}</Button>
+        <Button type="submit" loading={submitting}>
+          {editing ? t('common.saveChanges') : t('families.createFamily')}
+        </Button>
       </div>
     </form>
   )

@@ -11,6 +11,10 @@ import { getOrgMoneyContext } from '@/lib/money.server'
 import { formatMoney } from '@/lib/currency'
 import { getYearInTimeZone } from '@/lib/date-utils'
 import {
+  scheduleYearlyCalculationRefresh,
+  scheduleYearlyCalculationRefreshForPayment,
+} from '@/lib/calculations'
+import {
   handleCheckoutSessionCompleted,
   syncSubscriptionToOrganization,
 } from '@/lib/billing/subscription-webhook'
@@ -229,6 +233,7 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
   payment.refundedAt = new Date()
   payment.refundedAmount = newRefunded
   await payment.save()
+  scheduleYearlyCalculationRefreshForPayment(payment)
 
   await audit({
     organizationId: payment.organizationId?.toString(),
@@ -270,6 +275,7 @@ async function syncPaymentRefundFromStripeCharge(
     payment.disputeStatus = disputeStatus
   }
   await payment.save()
+  scheduleYearlyCalculationRefreshForPayment(payment)
 }
 
 async function handleDisputeCreated(dispute: Stripe.Dispute) {
@@ -586,6 +592,7 @@ async function handlePaymentIntentSucceeded(intent: Stripe.PaymentIntent) {
   // zero-decimal at Stripe and dividing by 100 silently records the
   // payment at 1/100th of its real value.
   const amountMajor = fromMinorUnits(intent.amount || 0, intent.currency || 'usd')
+  const paymentYear = getYearInTimeZone(orgTz, paidAt)
 
   try {
     await Payment.create({
@@ -593,13 +600,14 @@ async function handlePaymentIntentSucceeded(intent: Stripe.PaymentIntent) {
       familyId,
       amount: amountMajor,
       paymentDate: paidAt,
-      year: getYearInTimeZone(orgTz, paidAt),
+      year: paymentYear,
       type: 'membership',
       paymentMethod: 'credit_card',
       stripePaymentIntentId: intent.id,
       paymentFrequency: 'one-time',
       notes: 'Recovered from Stripe webhook (confirm-payment did not complete)',
     })
+    scheduleYearlyCalculationRefresh(paymentYear, organizationId)
   } catch (err: any) {
     // 11000 → another writer beat us to it. Ignore.
     if (err?.code !== 11000) throw err

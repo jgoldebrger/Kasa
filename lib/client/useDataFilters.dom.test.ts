@@ -1,9 +1,17 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useDataFilters, type FilterableColumn } from './useDataFilters'
+
+const SEARCH_DEBOUNCE_MS = 200
+
+function flushSearchDebounce() {
+  act(() => {
+    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS)
+  })
+}
 
 type Row = {
   name: string
@@ -68,6 +76,14 @@ const rows: Row[] = [
 ]
 
 describe('useDataFilters', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('filters by global search and column filters', () => {
     const { result } = renderHook(() =>
       useDataFilters(baseColumns, rows, { globalSearch: true }),
@@ -76,6 +92,7 @@ describe('useDataFilters', () => {
     act(() => {
       result.current.setSearch('ali')
     })
+    flushSearchDebounce()
     expect(result.current.filteredRows.map((r) => r.name)).toEqual(['Alice'])
     expect(result.current.activeCount).toBe(1)
 
@@ -274,6 +291,7 @@ describe('useDataFilters', () => {
       result.current.setSearch('bob')
       result.current.setColumnFilter('joined', { type: 'dateRange', from: null, to: '2024-03-01' })
     })
+    flushSearchDebounce()
     expect(result.current.activeFilters.map((f) => f.display)).toEqual(
       expect.arrayContaining(['"bob"', 'to 2024-03-01']),
     )

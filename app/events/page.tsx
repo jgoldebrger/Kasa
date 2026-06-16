@@ -53,13 +53,13 @@ async function fetchInitialEvents(organizationId: string) {
 
 async function EventsServer() {
   const ctx = await requireServerOrgContext({ minRole: 'admin' })
-  let initialEvents: any[] = []
   try {
-    initialEvents = await fetchInitialEvents(ctx.organizationId)
+    const initialEvents = await fetchInitialEvents(ctx.organizationId)
+    return <EventsView initialEvents={initialEvents} />
   } catch (err) {
     console.error('[events] server prefetch failed:', err)
+    return <EventsView />
   }
-  return <EventsView initialEvents={initialEvents} />
 }
 
 export default function EventsPage() {

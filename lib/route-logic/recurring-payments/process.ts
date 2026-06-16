@@ -10,6 +10,7 @@ import { getOrgCurrency } from '@/lib/money.server'
 import { addMonthsClamped, getYearInTimeZone, startOfDayInTimeZone } from '@/lib/date-utils'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { enforceMemberChargeGate } from '@/lib/billing/feature-gate'
+import { scheduleYearlyCalculationRefreshForPayment } from '@/lib/calculations'
 import Stripe from 'stripe'
 import https from 'https'
 
@@ -317,6 +318,8 @@ export const POST = handler({
             }
           }
         }
+
+        if (payment) scheduleYearlyCalculationRefreshForPayment(payment)
 
         results.push({
           recurringPaymentId: recurringPayment._id.toString(),

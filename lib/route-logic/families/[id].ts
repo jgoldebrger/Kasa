@@ -1,4 +1,5 @@
 import { Types } from 'mongoose'
+import { z } from 'zod'
 import { Family, FamilyMember, Payment, Withdrawal, LifecycleEventPayment, PaymentPlan, CycleCharge } from '@/lib/models'
 // Withdrawal is still imported above because the GET handler reads it; only the
 // DELETE handler used to hard-delete it (now replaced by the cascade).
@@ -12,14 +13,25 @@ import { PAYMENT_PUBLIC_SELECT } from '@/lib/payments/select'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { loadAllByIdCursor } from '@/lib/org-pagination'
 import { collectCompoundCursorPages } from '@/lib/pagination'
+import { fetchFamilySummary } from '@/lib/family-detail-summary'
+
+const SUMMARY_CACHE_HEADERS = {
+  'Cache-Control': 'private, max-age=15, stale-while-revalidate=60',
+}
+
+const getQuery = z.object({
+  view: z.enum(['summary', 'full']).optional(),
+})
 
 // GET /api/families/[id] — family + members for all org roles; ledger
 // detail (payments, balance, etc.) is admin-only.
+// `?view=summary` returns family + members + balance only (fast path).
 export const GET = handler({
   auth: 'org',
   idParams: ['id'],
+  query: getQuery,
   name: 'GET /api/families/[id]',
-  fn: async ({ params, ctx, request }) => {
+  fn: async ({ params, ctx, request, query }) => {
     const rateVerdict = await checkRateLimit(
       request,
       'family-detail',
@@ -35,6 +47,13 @@ export const GET = handler({
     if (!Types.ObjectId.isValid(id)) {
       return { status: 400, data: { error: 'Invalid family id' } }
     }
+
+    if (query.view === 'summary') {
+      const summary = await fetchFamilySummary(ctx!.organizationId, id, ctx!.role)
+      if (!summary) return { status: 404, data: { error: 'Family not found' } }
+      return { data: summary, headers: SUMMARY_CACHE_HEADERS }
+    }
+
     const fam = await Family.findOne({ _id: id, organizationId: ctx!.organizationId })
     if (!fam) return { status: 404, data: { error: 'Family not found' } }
 

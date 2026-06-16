@@ -1,6 +1,5 @@
 import { Types } from 'mongoose'
 import { Payment, Organization, Family, FamilyMember } from '@/lib/models'
-import { collectCompoundCursorPages } from '@/lib/pagination'
 import { audit } from '@/lib/audit'
 import { handler } from '@/lib/api/handler'
 import { z } from 'zod'
@@ -8,14 +7,24 @@ import { isoDate, moneyAmount, objectId, optionalString, yearParam } from '@/lib
 import { getYearInTimeZone } from '@/lib/date-utils'
 import { PAYMENT_PUBLIC_SELECT } from '@/lib/payments/select'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { scheduleYearlyCalculationRefresh } from '@/lib/calculations'
+import {
+  familyLedgerListQuery,
+  listFamilyLedger,
+} from '@/lib/family-ledger-list'
+
+const LEDGER_CACHE_HEADERS = {
+  'Cache-Control': 'private, max-age=15, stale-while-revalidate=60',
+}
 
 // GET /api/families/[id]/payments — list payments for one family.
 export const GET = handler({
   auth: 'org',
   minRole: 'admin',
   idParams: ['id'],
+  query: familyLedgerListQuery,
   name: 'GET /api/families/[id]/payments',
-  fn: async ({ params, ctx, request }) => {
+  fn: async ({ params, ctx, request, query }) => {
     const rateVerdict = await checkRateLimit(
       request,
       'family-payments-list',
@@ -33,21 +42,39 @@ export const GET = handler({
     }
     const fam = await Family.findOne({ _id: id, organizationId: ctx!.organizationId }).select('_id')
     if (!fam) return { status: 404, data: { error: 'Family not found' } }
-    const payments = await collectCompoundCursorPages(
-      (filter, limit) =>
-        Payment.find(filter)
-          .select(PAYMENT_PUBLIC_SELECT)
-          .sort({ paymentDate: -1, _id: -1 })
-          .limit(limit).lean(),
-      { familyId: id, organizationId: ctx!.organizationId },
-      'paymentDate',
-      -1,
-      (last) => ({
-        v: last.paymentDate ? new Date(last.paymentDate as string | Date).getTime() : null,
-        id: String(last._id),
-      }),
-    )
-    return { data: payments }
+
+    const baseFilter = { familyId: id, organizationId: ctx!.organizationId }
+    const loadPage = (filter: Record<string, unknown>, limit: number) =>
+      Payment.find(filter)
+        .select(PAYMENT_PUBLIC_SELECT)
+        .sort({ paymentDate: -1, _id: -1 })
+        .limit(limit)
+        .lean()
+
+    const effectiveQuery = {
+      limit: query.limit ?? 0,
+      cursor: query.cursor,
+    }
+
+    try {
+      const data = await listFamilyLedger(
+        baseFilter,
+        loadPage,
+        'paymentDate',
+        -1,
+        (last) => ({
+          v: last.paymentDate ? new Date(last.paymentDate as string | Date).getTime() : null,
+          id: String(last._id),
+        }),
+        effectiveQuery,
+      )
+      return { data, headers: LEDGER_CACHE_HEADERS }
+    } catch (err) {
+      if (err instanceof Error && err.message === 'Invalid cursor') {
+        return { status: 400, data: { error: 'Invalid cursor' } }
+      }
+      throw err
+    }
   },
 })
 
@@ -170,6 +197,8 @@ export const POST = handler({
       },
       request,
     })
+
+    scheduleYearlyCalculationRefresh(body.year, ctx!.organizationId)
 
     return { status: 201, data: await Payment.findOne({
       _id: payment._id,

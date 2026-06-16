@@ -37,16 +37,15 @@ async function fetchInitialTasksData(organizationId: string) {
 
 async function TasksServer() {
   const ctx = await requireServerOrgContext({ minRole: 'admin' })
-  let initialTasks: any[] = []
-  let initialFamilies: any[] = []
   try {
     const data = await fetchInitialTasksData(ctx.organizationId)
-    initialTasks = data.initialTasks
-    initialFamilies = data.initialFamilies
+    return (
+      <TasksView initialTasks={data.initialTasks} initialFamilies={data.initialFamilies} />
+    )
   } catch (err) {
     console.error('[tasks] server prefetch failed:', err)
+    return <TasksView />
   }
-  return <TasksView initialTasks={initialTasks} initialFamilies={initialFamilies} />
 }
 
 export default function TasksPage() {

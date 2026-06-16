@@ -1,7 +1,4 @@
-'use client'
-
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { redirect } from 'next/navigation'
 
 /**
  * Backwards-compat redirect — the payment-plans UI now lives as a tab
@@ -10,11 +7,5 @@ import { useRouter } from 'next/navigation'
  * of truth for plan management.
  */
 export default function PaymentPlansRedirect() {
-  const router = useRouter()
-  useEffect(() => {
-    router.replace('/settings?tab=paymentPlans')
-  }, [router])
-  return (
-    <div className="p-6 text-sm text-fg-muted">Redirecting to Settings…</div>
-  )
+  redirect('/settings?tab=paymentPlans')
 }

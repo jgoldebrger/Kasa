@@ -27,6 +27,7 @@ interface FamilyShape {
   _id: string
   name: string
   street?: string
+  address?: string
   city?: string
   state?: string
   zip?: string
@@ -169,10 +170,10 @@ function buildTestSheetHTML(): string {
 
 function formatAddressRow(f: FamilyShape) {
   const cityState = [f.city, f.state].filter(Boolean).join(', ')
-  const cityStateZip = [cityState, f.zip].filter(Boolean).join(' ')
+  const cityStateZip = [cityState, f.zip?.trim()].filter(Boolean).join(' ')
   return {
     name: f.name || '',
-    street: f.street || '',
+    street: (f.street || f.address || '').trim(),
     cityState: cityStateZip,
   }
 }
@@ -212,7 +213,8 @@ export default function MailLabelsPanel({ families, plans, filters, setFilters }
   const filtered = useMemo(() => {
     const search = filters.search.trim().toLowerCase()
     return families.filter((f) => {
-      if (filters.requireAddress && !(f.street && f.street.trim() !== '')) return false
+      const streetLine = (f.street || f.address || '').trim()
+      if (filters.requireAddress && !streetLine) return false
       if (filters.planIds.length > 0) {
         const pid = f.paymentPlanId ? String(f.paymentPlanId) : ''
         if (!filters.planIds.includes(pid)) return false
@@ -225,7 +227,8 @@ export default function MailLabelsPanel({ families, plans, filters, setFilters }
         if (bal === undefined || bal >= 0) return false
       }
       if (search) {
-        const hay = `${f.name || ''} ${f.street || ''} ${f.city || ''}`.toLowerCase()
+        const hay =
+          `${f.name || ''} ${f.street || ''} ${f.address || ''} ${f.city || ''} ${f.state || ''} ${f.zip || ''}`.toLowerCase()
         if (!hay.includes(search)) return false
       }
       return true

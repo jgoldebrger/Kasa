@@ -63,6 +63,7 @@ const PaymentSchema = new Schema({
   notes: String,
 }, { timestamps: true })
 PaymentSchema.index({ organizationId: 1, paymentDate: -1 })
+PaymentSchema.index({ organizationId: 1, familyId: 1, paymentDate: -1 })
 PaymentSchema.index({ organizationId: 1, familyId: 1, year: 1 })
 // Idempotency: per-org unique Stripe PaymentIntent ID. Stripe webhook
 // handlers and the recurring-payment cron both look up payments by

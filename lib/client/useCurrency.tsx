@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
+import { cachedFetch } from '@/lib/client-cache'
 import { formatMoney, currencySymbol } from '@/lib/currency'
 
 interface CurrencyContextValue {
@@ -22,37 +23,40 @@ const DEFAULT_VALUE: CurrencyContextValue = {
 
 const Ctx = createContext<CurrencyContextValue>(DEFAULT_VALUE)
 
-/**
- * Hook used by any component that needs to format money. Reads the
- * current org's currency / locale from the API (cached for the
- * session). Always returns a working formatter — never blocks
- * rendering on the network.
- */
 export function useCurrency(): CurrencyContextValue {
   return useContext(Ctx)
 }
 
-/**
- * Provider — mount once at the top of the app shell. Fetches
- * `/api/organizations/current` exactly once per session and stashes the
- * currency / locale in context so every consumer is consistent without
- * waterfall fetches.
- */
-export function OrgCurrencyProvider({ children }: { children: React.ReactNode }) {
+export interface OrgCurrencyProviderProps {
+  children: React.ReactNode
+  initialCurrency?: string
+  initialLocale?: string
+}
+
+export function OrgCurrencyProvider({
+  children,
+  initialCurrency,
+  initialLocale,
+}: OrgCurrencyProviderProps) {
   const { data: session, status } = useSession()
   const sessionUserId = session?.user?.id
-  const [currency, setCurrency] = useState('USD')
-  const [locale, setLocale] = useState('en-US')
+  const serverSeeded = initialCurrency !== undefined
+  const [currency, setCurrency] = useState(
+    (initialCurrency || 'USD').toUpperCase(),
+  )
+  const [locale, setLocale] = useState(initialLocale || 'en-US')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (status !== 'authenticated') return
     let cancelled = false
 
-    const fetchCurrent = () => {
+    const fetchCurrent = (opts?: { bypass?: boolean }) => {
       setLoading(true)
-      fetch('/api/organizations/current', { cache: 'no-store' })
-        .then((r) => (r.ok ? r.json() : null))
+      cachedFetch<{ currency?: string; locale?: string }>(
+        '/api/organizations/current',
+        { ttl: 60_000, bypass: opts?.bypass },
+      )
         .then((data) => {
           if (cancelled || !data) return
           if (typeof data.currency === 'string') setCurrency(data.currency.toUpperCase())
@@ -63,19 +67,18 @@ export function OrgCurrencyProvider({ children }: { children: React.ReactNode })
           if (!cancelled) setLoading(false)
         })
     }
-    fetchCurrent()
 
-    // Refetch whenever OrgSwitcher dispatches `kasa:org-changed` so
-    // currency/locale update *immediately* on workspace switch, instead
-    // of users seeing the prior org's $ / en-US until the next hard
-    // navigation.
-    const onOrgChange = () => fetchCurrent()
+    if (!serverSeeded) {
+      fetchCurrent()
+    }
+
+    const onOrgChange = () => fetchCurrent({ bypass: true })
     window.addEventListener('kasa:org-changed', onOrgChange)
     return () => {
       cancelled = true
       window.removeEventListener('kasa:org-changed', onOrgChange)
     }
-  }, [status, sessionUserId])
+  }, [status, sessionUserId, serverSeeded])
 
   const value = useMemo<CurrencyContextValue>(
     () => ({

@@ -3,6 +3,8 @@
 import { usePathname } from 'next/navigation'
 import { Bars3Icon } from '@heroicons/react/24/outline'
 import OrgLogo from './OrgLogo'
+import GlobalSearch from './GlobalSearch'
+import NotificationsBell from './NotificationsBell'
 
 /**
  * Map a route prefix to a friendly title shown in the mobile top bar.
@@ -48,7 +50,7 @@ export default function MobileTopBar({ onOpenMenu, menuOpen }: MobileTopBarProps
 
   return (
     <header
-      className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-border bg-surface px-3 md:hidden"
+      className="sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-border bg-surface px-3 md:hidden"
       role="banner"
     >
       <button
@@ -57,7 +59,7 @@ export default function MobileTopBar({ onOpenMenu, menuOpen }: MobileTopBarProps
         aria-label="Open navigation menu"
         aria-controls="primary-sidebar"
         aria-expanded={menuOpen}
-        className="focus-ring inline-flex h-11 w-11 items-center justify-center rounded-md text-fg-muted hover:bg-fg/5 hover:text-fg"
+        className="focus-ring inline-flex min-h-[var(--touch-target)] min-w-[var(--touch-target)] items-center justify-center rounded-md text-fg-muted hover:bg-fg/5 hover:text-fg"
       >
         <Bars3Icon className="h-6 w-6" aria-hidden="true" />
       </button>
@@ -67,7 +69,13 @@ export default function MobileTopBar({ onOpenMenu, menuOpen }: MobileTopBarProps
         <h1 className="truncate text-sm font-semibold text-fg">{title}</h1>
       </div>
 
-      <div className="h-11 w-11" aria-hidden="true" />
+      <div className="flex shrink-0 items-center">
+        <GlobalSearch variant="icon" mobileFullscreen />
+        {/* Dropdown opens downward from the top bar (sidebar footer opens upward). */}
+        <div className="[&_div.bottom-full]:bottom-auto [&_div.bottom-full]:top-full [&_div.bottom-full]:mb-0 [&_div.bottom-full]:mt-2 [&>div>button]:min-h-[var(--touch-target)] [&>div>button]:min-w-[var(--touch-target)]">
+          <NotificationsBell />
+        </div>
+      </div>
     </header>
   )
 }

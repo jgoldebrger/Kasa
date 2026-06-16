@@ -66,9 +66,14 @@ async function connectDB() {
     // deploys.
     const isProd = process.env.NODE_ENV === 'production'
     const testDbName = process.env.KASA_TEST_DB_NAME
+    const poolFromEnv = process.env.MONGODB_MAX_POOL_SIZE
+      ? parseInt(process.env.MONGODB_MAX_POOL_SIZE, 10)
+      : NaN
+    const maxPoolSize =
+      Number.isFinite(poolFromEnv) && poolFromEnv > 0 ? poolFromEnv : isProd ? 30 : 10
     const opts = {
       bufferCommands: false,
-      maxPoolSize: isProd ? 30 : 10,
+      maxPoolSize,
       minPoolSize: isProd ? 2 : 0,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,

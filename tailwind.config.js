@@ -32,6 +32,9 @@ module.exports = {
           soft: 'rgb(var(--c-accent-soft) / <alpha-value>)',
           fg: 'rgb(var(--c-accent-fg) / <alpha-value>)',
         },
+        success: 'rgb(var(--c-success) / <alpha-value>)',
+        warning: 'rgb(var(--c-warning) / <alpha-value>)',
+        danger: 'rgb(var(--c-danger) / <alpha-value>)',
       },
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],

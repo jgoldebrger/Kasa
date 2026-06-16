@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowPathIcon } from '@heroicons/react/24/outline'
-import { PageHeader } from '@/app/components/ui'
+import { ArrowPathIcon, InformationCircleIcon } from '@heroicons/react/24/outline'
+import { PageHeader, Tooltip } from '@/app/components/ui'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useToast } from '@/app/components/Toast'
@@ -287,7 +287,18 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                       <th className="text-right px-3 py-2">Total payers</th>
                       <th className="text-right px-3 py-2">Expected expenses</th>
                       <th className="text-right px-3 py-2 bg-accent/5">
-                        Recommended dues / payer
+                        <span className="inline-flex items-center justify-end gap-1">
+                          Recommended dues / payer
+                          <Tooltip content="Planning estimate — assumes flat event costs and linear growth.">
+                            <button
+                              type="button"
+                              className="text-fg-subtle hover:text-fg-muted focus-ring rounded normal-case"
+                              aria-label="About recommended dues"
+                            >
+                              <InformationCircleIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                            </button>
+                          </Tooltip>
+                        </span>
                       </th>
                     </tr>
                   </thead>
@@ -345,9 +356,16 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
               </div>
             </section>
 
-            {/* How this is calculated (formula + per-event breakdown, collapsed-ish) */}
-            <section className="surface-card p-4 sm:p-6 space-y-4" aria-label="Calculation breakdown">
-              <h2 className="text-sm font-semibold text-fg">How this is calculated</h2>
+            {/* How this is calculated (formula + per-event breakdown, collapsed by default) */}
+            <details className="surface-card border border-border rounded-lg" aria-label="Calculation breakdown">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-fg focus-ring rounded-lg">
+                How is this calculated?
+              </summary>
+              <div className="border-t border-border p-4 sm:p-6 space-y-4">
+              <p className="text-xs text-fg-muted">
+                Formulas live in{' '}
+                <code className="rounded bg-app-subtle px-1 py-0.5 text-xs text-fg">lib/projections.ts</code>.
+              </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2 text-xs text-fg-muted">
                   <p className="text-fg">
@@ -428,7 +446,8 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                   )}
                 </div>
               </div>
-            </section>
+              </div>
+            </details>
           </>
         )}
       </div>

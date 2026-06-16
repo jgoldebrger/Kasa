@@ -9,6 +9,9 @@
 // The yearly snapshot persists two flexible arrays — `byPlan` and
 // `byEvent` — alongside the headline aggregates the dashboard reads
 // (`calculatedIncome`, `calculatedExpenses`, `balance`, …).
+// Headline income is actual cash received (`totalPayments` + manual
+// extra donation), not expected plan dues. `planIncome` / `byPlan` are
+// kept as a reference breakdown only.
 
 import {
   Family,
@@ -243,10 +246,10 @@ export function buildPaymentYearFilter(
 /**
  * Compute yearly income for an org based on its configured payment plans.
  *
- * `totalPayments` is informational (sum of actual payments hitting the
- * books that year — computed against the supplied `year`) and intentionally
- * NOT folded into income — income is the *expected* revenue from plan
- * assignments, not cash received.
+ * `totalPayments` is the sum of net payments recorded for `year`
+ * (via `Payment.year` or `paymentDate` fallback). `calculatedIncome`
+ * is actual cash in: `totalPayments + extraDonation`. `planIncome` /
+ * `byPlan` are reference-only expected dues from the current roster.
  *
  * KNOWN LIMITATION — historical reconstruction is approximate.
  *
@@ -295,8 +298,10 @@ export async function calculateYearlyIncome(
     NET_PAYMENT_SUM,
   )
 
-  const totalIncome = planIncome
-  const calculatedIncome = roundMoneyValue(planIncome + (Number(extraDonation) || 0))
+  const calculatedIncome = roundMoneyValue(
+    totalPayments + (Number(extraDonation) || 0),
+  )
+  const totalIncome = calculatedIncome
 
   return {
     byPlan,
@@ -475,6 +480,37 @@ export async function updateYearlyCalculationForEvent(
   } catch (error) {
     console.error(`Error updating yearly calculation for year ${eventYear}:`, error)
   }
+}
+
+/** Fire-and-forget refresh of a saved YearlyCalculation snapshot. */
+export function scheduleYearlyCalculationRefresh(
+  year: number,
+  organizationId: string,
+): void {
+  if (!Number.isFinite(year) || year < 1900 || year > 2200) return
+  updateYearlyCalculationForEvent(year, organizationId).catch((err) => {
+    console.error(`Failed to refresh YearlyCalculation for year ${year}:`, err)
+  })
+}
+
+export function scheduleYearlyCalculationRefreshForYears(
+  years: Iterable<number>,
+  organizationId: string,
+): void {
+  const seen = new Set<number>()
+  for (const year of years) {
+    if (seen.has(year)) continue
+    seen.add(year)
+    scheduleYearlyCalculationRefresh(year, organizationId)
+  }
+}
+
+export function scheduleYearlyCalculationRefreshForPayment(payment: {
+  year?: number | null
+  organizationId?: unknown
+}): void {
+  if (payment.year == null || payment.organizationId == null) return
+  scheduleYearlyCalculationRefresh(Number(payment.year), String(payment.organizationId))
 }
 
 // ---------------------------------------------------------------------------

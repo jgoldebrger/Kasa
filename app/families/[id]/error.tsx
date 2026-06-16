@@ -3,6 +3,8 @@
 import { useEffect } from 'react'
 import * as Sentry from '@sentry/nextjs'
 
+import { Button } from '@/app/components/ui'
+
 /**
  * Scoped error boundary for the family-detail page. Catches errors in
  * the nested payments / withdrawals / members tabs without unmounting
@@ -36,17 +38,11 @@ export default function FamilyDetailError({
         {error?.digest && (
           <p className="mt-1 text-xs text-fg-subtle">Ref: {error.digest}</p>
         )}
-        <div className="mt-5 flex justify-center gap-2">
-          <button
-            type="button"
-            onClick={() => reset()}
-            className="focus-ring inline-flex h-9 items-center rounded-md bg-accent px-4 text-sm font-medium text-accent-fg hover:opacity-90"
-          >
-            Try again
-          </button>
+        <div className="mt-5 flex flex-col-reverse justify-center gap-2 sm:flex-row">
+          <Button onClick={() => reset()}>Try again</Button>
           <a
             href="/families"
-            className="focus-ring inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium text-fg hover:bg-fg/5"
+            className="focus-ring inline-flex min-h-[var(--touch-target)] items-center justify-center rounded-lg border border-border bg-surface px-4 text-sm font-medium text-fg shadow-sm hover:bg-fg/5 sm:min-h-10"
           >
             Back to families
           </a>

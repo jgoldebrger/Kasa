@@ -6,11 +6,12 @@ import SessionProviderWrapper from './components/SessionProviderWrapper'
 import AppShell from './components/AppShell'
 import { ToastProvider } from './components/Toast'
 import WebVitals from './components/WebVitals'
-import { OrgCurrencyProvider } from '@/lib/client/useCurrency'
-import { I18nProvider } from '@/lib/client/i18n'
 import PwaInit from './components/PwaInit'
 import CookieNotice from './components/CookieNotice'
-import { getCachedAuth } from '@/lib/auth-server'
+import OrgShellProviders from './components/OrgShellProviders'
+import { getCachedAuth, getServerOrgContext } from '@/lib/auth-server'
+import { loadServerOrgShell } from '@/lib/server-org-shell'
+import { OrgRoleProvider } from '@/lib/client/useOrgRole'
 import { headers, cookies } from 'next/headers'
 
 const inter = Inter({
@@ -67,6 +68,8 @@ export default async function RootLayout({
   // Memoized via React cache(): if any nested server component also resolves
   // the session this request, both calls share a single NextAuth invocation.
   const session = await getCachedAuth()
+  const orgCtx = await getServerOrgContext()
+  const orgShell = orgCtx ? await loadServerOrgShell(orgCtx.organizationId) : null
 
   // Pull the per-request CSP nonce that middleware set on the request
   // headers. We stamp it on our inline theme bootstrap so the production
@@ -117,13 +120,17 @@ export default async function RootLayout({
       </head>
       <body className="bg-app text-fg antialiased min-h-screen font-sans">
         <SessionProviderWrapper session={session}>
-          <I18nProvider>
-            <OrgCurrencyProvider>
+          <OrgRoleProvider initialRole={orgCtx?.role ?? null}>
+            <OrgShellProviders
+              initialCurrency={orgShell?.currency}
+              initialLocale={orgShell?.locale}
+              initialBranding={orgShell?.branding ?? null}
+            >
               <ToastProvider>
                 <AppShell>{children}</AppShell>
               </ToastProvider>
-            </OrgCurrencyProvider>
-          </I18nProvider>
+            </OrgShellProviders>
+          </OrgRoleProvider>
         </SessionProviderWrapper>
         <PwaInit />
         <CookieNotice />

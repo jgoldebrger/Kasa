@@ -85,7 +85,7 @@ export function Tabs({ items, activeId, onChange, label = 'Tabs', className = ''
             disabled={item.disabled}
             onClick={() => !item.disabled && onChange(item.id)}
             onKeyDown={(e) => onKeyDown(e, idx)}
-            className={`focus-ring relative inline-flex shrink-0 items-center gap-2 whitespace-nowrap px-3 py-2.5 -mb-px text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 border-b-2 ${
+            className={`focus-ring relative inline-flex shrink-0 items-center gap-2 whitespace-nowrap px-3 py-2.5 -mb-px text-sm font-medium transition-colors min-h-[var(--touch-target)] sm:min-h-0 disabled:cursor-not-allowed disabled:opacity-50 border-b-2 ${
               selected
                 ? 'border-accent text-fg'
                 : 'border-transparent text-fg-muted hover:text-fg hover:border-border-strong'

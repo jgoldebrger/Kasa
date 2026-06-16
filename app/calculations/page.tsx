@@ -22,14 +22,13 @@ async function fetchInitialCalculations(organizationId: string) {
 
 async function CalculationsServer() {
   const ctx = await requireServerOrgContext({ minRole: 'admin' })
-  let initialCalculations: any[] = []
   try {
-    initialCalculations = await fetchInitialCalculations(ctx.organizationId)
+    const initialCalculations = await fetchInitialCalculations(ctx.organizationId)
+    return <CalculationsView initialCalculations={initialCalculations} />
   } catch (err) {
-    // Best-effort prefetch — the client view will fall back to /api/calculations.
     console.error('[calculations] server prefetch failed:', err)
+    return <CalculationsView />
   }
-  return <CalculationsView initialCalculations={initialCalculations} />
 }
 
 export default function CalculationsPage() {

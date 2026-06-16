@@ -365,7 +365,7 @@ describe.sequential('route-logic finish coverage', () => {
       try {
         const { GET } = await import('@/lib/route-logic/dashboard-stats')
         const res = await GET(
-          orgJsonReq('/api/dashboard-stats', 'GET', undefined, { query: `?year=${y}` }),
+          orgJsonReq('/api/dashboard-stats', 'GET', undefined, { query: `?year=${y}&compute=1` }),
         )
         expect(res.status).toBe(200)
         const body = await res.json()

@@ -22,6 +22,11 @@ import { formatLocaleDate } from '@/lib/date-utils'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
+import {
+  PAYMENTS_LIST_PAGE_SIZE,
+  parsePaymentsListResponse,
+} from '@/lib/client/payments-list'
+import { Button } from '@/app/components/ui'
 
 interface Payment {
   _id: string
@@ -68,65 +73,78 @@ const paymentMethodLabels = {
   quick_pay: 'Quick Pay',
 }
 
-export default function PaymentsView({ initialPayments }: { initialPayments?: Payment[] } = {}) {
+export default function PaymentsView({
+  initialPayments,
+  initialNextCursor = null,
+}: {
+  initialPayments?: Payment[]
+  initialNextCursor?: string | null
+} = {}) {
   const toast = useToast()
   const { format: formatMoney } = useCurrency()
-  const hasInitial = Array.isArray(initialPayments) && initialPayments.length > 0
+  const serverHydrated = initialPayments !== undefined
   const [allPayments, setAllPayments] = useState<Payment[]>(initialPayments ?? [])
-  const [loading, setLoading] = useState(!hasInitial)
+  const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor)
+  const [loading, setLoading] = useState(!serverHydrated)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(false)
-  // <DataView> notifies us of its filtered set so the summary cards / total
-  // line below stay in sync with whatever the user is currently viewing.
   const [visiblePayments, setVisiblePayments] = useState<Payment[]>([])
-  // StrictMode-safe gate: don't mutate inside the effect or the dev-mode
-  // effect-replay will flip this to `false` and refetch anyway.
-  const hasFetchedRef = useRef(hasInitial)
+  const hasFetchedRef = useRef(serverHydrated)
   const { begin, invalidate, isStale } = useRequestGeneration()
 
-  const fetchPayments = useCallback(async () => {
-    const gen = begin()
-    try {
-      setLoading(true)
-      setError(false)
-      const res = await fetch(`/api/payments`)
-      if (isStale(gen)) return
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json().catch(() => null)
-      if (isStale(gen)) return
-      if (Array.isArray(data)) {
-        setAllPayments(data)
-      } else {
-        setAllPayments([])
-        setError(true)
-        toast.error('Unexpected response from server.')
+  const fetchPayments = useCallback(
+    async (opts?: { cursor?: string | null; append?: boolean }) => {
+      const gen = begin()
+      const append = opts?.append ?? false
+      try {
+        if (append) setLoadingMore(true)
+        else {
+          setLoading(true)
+          setError(false)
+        }
+        const params = new URLSearchParams({ limit: String(PAYMENTS_LIST_PAGE_SIZE) })
+        if (opts?.cursor) params.set('cursor', opts.cursor)
+        const res = await fetch(`/api/payments?${params}`)
+        if (isStale(gen)) return
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json().catch(() => null)
+        if (isStale(gen)) return
+        const { items, nextCursor: pageNext } = parsePaymentsListResponse(data)
+        setAllPayments((prev) => (append ? [...prev, ...(items as Payment[])] : (items as Payment[])))
+        setNextCursor(pageNext)
+      } catch {
+        if (isStale(gen)) return
+        if (!append) {
+          setAllPayments([])
+          setNextCursor(null)
+          setError(true)
+          toast.error('Could not load payments.')
+        } else {
+          toast.error('Could not load more payments.')
+        }
+      } finally {
+        if (!isStale(gen)) {
+          setLoading(false)
+          setLoadingMore(false)
+        }
       }
-    } catch {
-      if (isStale(gen)) return
-      setAllPayments([])
-      setError(true)
-      toast.error('Could not load payments.')
-    } finally {
-      if (!isStale(gen)) setLoading(false)
-    }
-  }, [toast, begin, isStale])
+    },
+    [toast, begin, isStale],
+  )
 
   useEffect(() => {
     if (hasFetchedRef.current) return
     hasFetchedRef.current = true
-    let cancelled = false
-    void fetchPayments().finally(() => {
-      if (cancelled) setAllPayments([])
-    })
-    return () => {
-      cancelled = true
-    }
+    void fetchPayments()
   }, [fetchPayments])
 
   useOrgChanged(useCallback(() => {
     invalidate()
     hasFetchedRef.current = false
     setAllPayments([])
+    setNextCursor(null)
     setLoading(true)
+    hasFetchedRef.current = true
     fetchPayments()
   }, [fetchPayments, invalidate]))
 
@@ -370,6 +388,18 @@ export default function PaymentsView({ initialPayments }: { initialPayments?: Pa
               />
             }
           />
+        )}
+
+        {!loading && !error && nextCursor && (
+          <div className="mt-4 flex justify-center">
+            <Button
+              variant="secondary"
+              loading={loadingMore}
+              onClick={() => fetchPayments({ cursor: nextCursor, append: true })}
+            >
+              {loadingMore ? 'Loading…' : 'Load more'}
+            </Button>
+          </div>
         )}
 
         {/* Summary Cards reflect the currently filtered set */}

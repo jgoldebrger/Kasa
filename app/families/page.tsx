@@ -76,25 +76,20 @@ async function fetchInitialData(organizationId: string, isAdmin: boolean) {
 async function FamiliesServer() {
   const ctx = await requireServerOrgContext()
   const isAdmin = hasMinRole(ctx.role, 'admin')
-  let initialFamilies: any[] = []
-  let initialPaymentPlans: any[] = []
-  let initialFamiliesNextCursor: string | null = null
   try {
     const data = await fetchInitialData(ctx.organizationId, isAdmin)
-    initialFamilies = data.initialFamilies
-    initialPaymentPlans = data.initialPaymentPlans
-    initialFamiliesNextCursor = data.initialFamiliesNextCursor
+    return (
+      <FamiliesView
+        initialFamilies={data.initialFamilies}
+        initialPaymentPlans={data.initialPaymentPlans}
+        initialFamiliesNextCursor={data.initialFamiliesNextCursor}
+        isAdmin={isAdmin}
+      />
+    )
   } catch (err) {
     console.error('[families] server prefetch failed:', err)
+    return <FamiliesView isAdmin={isAdmin} />
   }
-  return (
-    <FamiliesView
-      initialFamilies={initialFamilies}
-      initialPaymentPlans={initialPaymentPlans}
-      initialFamiliesNextCursor={initialFamiliesNextCursor}
-      isAdmin={isAdmin}
-    />
-  )
 }
 
 export default function FamiliesPage() {

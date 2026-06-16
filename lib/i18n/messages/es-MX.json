@@ -1,0 +1,18 @@
+{
+  "nav.dashboard": "Panel",
+  "nav.families": "Familias",
+  "nav.payments": "Pagos",
+  "nav.tasks": "Tareas",
+  "nav.events": "Eventos",
+  "nav.reports": "Informes",
+  "nav.statements": "Estados",
+  "nav.settings": "Configuración",
+  "nav.signOut": "Cerrar sesión",
+  "auth.welcomeBack": "Bienvenido",
+  "auth.signIn": "Iniciar sesión",
+  "auth.email": "Correo",
+  "auth.password": "Contraseña",
+  "common.save": "Guardar",
+  "common.cancel": "Cancelar",
+  "common.delete": "Eliminar"
+}

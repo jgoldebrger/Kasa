@@ -23,6 +23,10 @@
   --c-accent-soft:    238 242 255;
   --c-accent-fg:      255 255 255;
 
+  --c-success:        22 163 74;
+  --c-warning:        217 119 6;
+  --c-danger:         220 38 38;
+
   /* Spacing scale (multiples of 4px). */
   --space-1: 4px;
   --space-2: 8px;
@@ -66,6 +70,10 @@
   --c-accent-hover:   129 140 248;
   --c-accent-soft:    30 27 75;
   --c-accent-fg:      255 255 255;
+
+  --c-success:        74 222 128;
+  --c-warning:        251 191 36;
+  --c-danger:         248 113 113;
 }
 
 html {
@@ -97,6 +105,14 @@ body {
 }
 .dark .surface-card {
   box-shadow: none;
+}
+
+/* Muted labels on subtle surfaces — brighter in dark mode for readability. */
+.text-muted-on-subtle {
+  color: rgb(var(--c-fg-muted));
+}
+.dark .text-muted-on-subtle {
+  color: rgb(var(--c-fg) / 0.65);
 }
 
 /* Reduced motion: kill non-essential animations entirely. */

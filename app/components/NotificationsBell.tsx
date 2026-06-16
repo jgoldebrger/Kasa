@@ -20,58 +20,89 @@ interface Notification {
 }
 
 /**
- * Header bell that pulls in-app notifications and offers a dropdown
- * with mark-read affordances. Polls every 60s while open, every 5min
- * while closed — cheap to do because the response is small (~50 rows
- * max) and the endpoint is org-scoped.
+ * Fetches on first open (or after idle) — not on every page mount.
  */
 export default function NotificationsBell() {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<Notification[]>([])
   const [unread, setUnread] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [fetchError, setFetchError] = useState(false)
+  const [hasFetched, setHasFetched] = useState(false)
   const toast = useToast()
   const t = useT()
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const idleScheduledRef = useRef(false)
   const { begin, invalidate, isStale } = useRequestGeneration()
 
   const fetchNotifs = useCallback(async () => {
     const gen = begin()
     try {
       setLoading(true)
+      setFetchError(false)
       const res = await fetch('/api/notifications')
       if (isStale(gen)) return
-      if (!res.ok) return
+      if (!res.ok) {
+        setFetchError(true)
+        toast.error('Could not load notifications.')
+        return
+      }
       const data = await res.json().catch(() => ({}))
       if (isStale(gen)) return
       setItems(data.items || [])
       setUnread(data.unreadCount || 0)
+      setHasFetched(true)
+    } catch {
+      if (!isStale(gen)) {
+        setFetchError(true)
+        toast.error('Could not load notifications.')
+      }
     } finally {
       if (!isStale(gen)) setLoading(false)
     }
-  }, [begin, isStale])
+  }, [begin, isStale, toast])
+
+  const scheduleIdlePrefetch = useCallback(() => {
+    if (idleScheduledRef.current || hasFetched) return
+    idleScheduledRef.current = true
+    const run = () => {
+      void fetchNotifs()
+    }
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(run)
+    } else {
+      window.setTimeout(run, 3000)
+    }
+  }, [fetchNotifs, hasFetched])
 
   useEffect(() => {
-    let cancelled = false
+    scheduleIdlePrefetch()
+  }, [scheduleIdlePrefetch])
+
+  useEffect(() => {
+    if (!open || hasFetched) return
     void fetchNotifs()
+  }, [open, hasFetched, fetchNotifs])
+
+  useEffect(() => {
+    if (!hasFetched) return
     const interval = setInterval(() => {
-      if (!cancelled) void fetchNotifs()
+      void fetchNotifs()
     }, open ? 60_000 : 5 * 60_000)
-    return () => {
-      cancelled = true
-      clearInterval(interval)
-    }
-  }, [fetchNotifs, open])
+    return () => clearInterval(interval)
+  }, [fetchNotifs, open, hasFetched])
 
   useOrgChanged(useCallback(() => {
     invalidate()
     setItems([])
     setUnread(0)
     setOpen(false)
+    setHasFetched(false)
+    setFetchError(false)
+    idleScheduledRef.current = false
     void fetchNotifs()
   }, [fetchNotifs, invalidate]))
 
-  // Close on outside-click.
   useEffect(() => {
     if (!open) return
     const onClick = (e: MouseEvent) => {
@@ -100,6 +131,7 @@ export default function NotificationsBell() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        onMouseEnter={scheduleIdlePrefetch}
         aria-label={t('nav.notifications')}
         title={t('nav.notifications')}
         className="focus-ring relative inline-flex h-9 w-9 items-center justify-center rounded-md text-fg-muted hover:bg-fg/5 hover:text-fg transition-colors"
@@ -132,6 +164,17 @@ export default function NotificationsBell() {
           <div className="overflow-y-auto max-h-[60vh]">
             {loading && items.length === 0 ? (
               <div className="p-4 text-center text-sm text-fg-muted">{t('common.loading')}</div>
+            ) : fetchError ? (
+              <div className="p-4 text-center">
+                <p className="text-sm text-fg-muted mb-2">Couldn&apos;t load notifications.</p>
+                <button
+                  type="button"
+                  onClick={() => void fetchNotifs()}
+                  className="text-xs text-accent hover:text-accent-hover"
+                >
+                  {t('common.retry')}
+                </button>
+              </div>
             ) : items.length === 0 ? (
               <div className="p-6 text-center text-sm text-fg-muted">{t('common.empty')}</div>
             ) : (
@@ -159,7 +202,6 @@ export default function NotificationsBell() {
                     if (!n.read) void markRead([n._id])
                     setOpen(false)
                   }
-                  // Only follow same-origin links.
                   const safeLink = n.link && n.link.startsWith('/') && !n.link.startsWith('//') ? n.link : null
                   return (
                     <li key={n._id}>

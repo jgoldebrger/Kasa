@@ -7,9 +7,10 @@ import mongoose, { Schema } from 'mongoose'
 //
 //   - `byPlan`  : one entry per configured PaymentPlan that contributed
 //   - `byEvent` : one entry per configured LifecycleEvent that contributed
-//   - aggregates (`planIncome`, `totalIncome`, `totalExpenses`,
-//     `calculatedIncome`, `calculatedExpenses`, `balance`, …) consumed
-//     by the dashboard prefetch + the calculations summary table.
+//   - aggregates (`totalPayments`, `planIncome`, `totalIncome`,
+//     `totalExpenses`, `calculatedIncome`, `calculatedExpenses`,
+//     `balance`, …) consumed by the dashboard + calculations table.
+//     `calculatedIncome` = actual cash in (`totalPayments` + extra donation).
 //
 // Pre-refactor snapshots that used `plan1..plan4` / `chasenaCount`-style
 // fixed slots will read back as empty (zeros / undefined arrays). One

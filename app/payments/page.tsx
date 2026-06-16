@@ -3,10 +3,11 @@ import { requireServerOrgContext } from '@/lib/auth-server'
 import connectDB from '@/lib/database'
 import { Payment } from '@/lib/models'
 import { PAYMENT_PUBLIC_SELECT } from '@/lib/payments/select'
+import { PAYMENTS_LIST_PAGE_SIZE } from '@/lib/client/payments-list'
+import { encodeCompoundCursor } from '@/lib/pagination'
 import PaymentsView from './PaymentsView'
 import PaymentsLoading from './loading'
 
-// Page depends on the active-org cookie + session; never statically render.
 export const dynamic = 'force-dynamic'
 
 async function fetchInitialPayments(organizationId: string) {
@@ -14,26 +15,38 @@ async function fetchInitialPayments(organizationId: string) {
   const rows = await Payment.find({ organizationId })
     .select(PAYMENT_PUBLIC_SELECT)
     .populate('familyId', 'name hebrewName email phone')
-    .sort({ paymentDate: -1 })
-    .limit(200)
+    .sort({ paymentDate: -1, _id: -1 })
+    .limit(PAYMENTS_LIST_PAGE_SIZE + 1)
     .lean<any[]>()
 
-  // JSON round-trip flattens every ObjectId/Date into a string — required
-  // for the RSC payload to serialize without falling back to a slow path.
-  return rows.map((r) => JSON.parse(JSON.stringify(r)))
+  let nextCursor: string | null = null
+  let items = rows
+  if (rows.length > PAYMENTS_LIST_PAGE_SIZE) {
+    items = rows.slice(0, PAYMENTS_LIST_PAGE_SIZE)
+    const last = items[items.length - 1]
+    if (last) {
+      nextCursor = encodeCompoundCursor({
+        v: last.paymentDate ? new Date(last.paymentDate).getTime() : null,
+        id: String(last._id),
+      })
+    }
+  }
+
+  return {
+    items: items.map((r) => JSON.parse(JSON.stringify(r))),
+    nextCursor,
+  }
 }
 
 async function PaymentsServer() {
   const ctx = await requireServerOrgContext({ minRole: 'admin' })
-  let initialPayments: any[] = []
   try {
-    initialPayments = await fetchInitialPayments(ctx.organizationId)
+    const { items, nextCursor } = await fetchInitialPayments(ctx.organizationId)
+    return <PaymentsView initialPayments={items} initialNextCursor={nextCursor} />
   } catch (err) {
-    // Server prefetch is best-effort — the client view will fall back to
-    // fetching via /api/payments if this throws.
     console.error('[payments] server prefetch failed:', err)
+    return <PaymentsView />
   }
-  return <PaymentsView initialPayments={initialPayments} />
 }
 
 export default function PaymentsPage() {

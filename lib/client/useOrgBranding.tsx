@@ -1,31 +1,25 @@
 'use client'
 
-/**
- * useOrgBranding — fetches the active org's branding (logo + accent color)
- * once per session and caches it via `client-cache`. Listens for a custom
- * `branding-updated` window event so the sidebar refreshes the instant the
- * settings page saves a new logo.
- */
-
-import { useCallback, useEffect, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import { cachedFetch, invalidate as invalidateCache } from '@/lib/client-cache'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 
 const URL = '/api/organizations/branding'
-const TTL_MS = 5 * 60 * 1000 // 5 min — branding rarely changes
+const TTL_MS = 5 * 60 * 1000
 const EVENT = 'kasa:branding-updated'
 const ORG_CHANGED = 'kasa:org-changed'
 
 export interface OrgBranding {
   name: string | null
   slug: string | null
-  /** Inline data URL — preserved for backward compatibility. Prefer `logoUrl`. */
   logoDataUrl: string | null
-  /**
-   * Versioned binary endpoint URL. Browsers cache this forever (immutable
-   * + version-bump on update), so repeated page loads don't reship the
-   * ~200KB data URL inline.
-   */
   logoUrl: string | null
   accentColor: string | null
 }
@@ -38,14 +32,28 @@ const EMPTY: OrgBranding = {
   accentColor: null,
 }
 
-export function useOrgBranding(): {
+interface BrandingContextValue {
   branding: OrgBranding
   loading: boolean
   refresh: () => Promise<void>
-} {
-  const [branding, setBranding] = useState<OrgBranding>(EMPTY)
-  const [loading, setLoading] = useState(true)
+}
+
+const BrandingCtx = createContext<BrandingContextValue | null>(null)
+
+export interface OrgBrandingProviderProps {
+  children: React.ReactNode
+  initialBranding?: OrgBranding
+}
+
+export function OrgBrandingProvider({
+  children,
+  initialBranding,
+}: OrgBrandingProviderProps) {
+  const serverSeeded = initialBranding !== undefined
+  const [branding, setBranding] = useState<OrgBranding>(initialBranding ?? EMPTY)
+  const [loading, setLoading] = useState(!serverSeeded)
   const { begin, invalidate, isStale } = useRequestGeneration()
+  const seededRef = useRef(serverSeeded)
 
   const refresh = useCallback(async () => {
     const gen = begin()
@@ -70,14 +78,17 @@ export function useOrgBranding(): {
       })
     } catch {
       if (isStale(gen)) return
-      setBranding(EMPTY)
+      if (!seededRef.current) setBranding(EMPTY)
     } finally {
       if (!isStale(gen)) setLoading(false)
     }
   }, [begin, isStale])
 
   useEffect(() => {
-    void refresh()
+    if (!serverSeeded) {
+      void refresh()
+    }
+
     const onBrandingUpdated = () => {
       invalidateCache(URL)
       invalidate()
@@ -86,6 +97,7 @@ export function useOrgBranding(): {
     const onOrgChanged = () => {
       invalidateCache(URL)
       invalidate()
+      seededRef.current = false
       setBranding(EMPTY)
       void refresh()
     }
@@ -95,15 +107,23 @@ export function useOrgBranding(): {
       window.removeEventListener(EVENT, onBrandingUpdated)
       window.removeEventListener(ORG_CHANGED, onOrgChanged)
     }
-  }, [refresh, invalidate])
+  }, [refresh, invalidate, serverSeeded])
 
-  return { branding, loading, refresh }
+  return (
+    <BrandingCtx.Provider value={{ branding, loading, refresh }}>
+      {children}
+    </BrandingCtx.Provider>
+  )
 }
 
-/**
- * Fire from the Settings page after a successful logo save so every consumer
- * of `useOrgBranding` re-fetches and shows the new logo without a page reload.
- */
+export function useOrgBranding(): BrandingContextValue {
+  const ctx = useContext(BrandingCtx)
+  if (!ctx) {
+    throw new Error('useOrgBranding must be used within OrgBrandingProvider')
+  }
+  return ctx
+}
+
 export function notifyBrandingUpdated() {
   invalidateCache(URL)
   if (typeof window !== 'undefined') {

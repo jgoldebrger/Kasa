@@ -13,6 +13,7 @@ import {
   countOrgFamilies,
   loadOrgBillingSnapshot,
 } from '@/lib/billing/feature-gate'
+import { scheduleYearlyCalculationRefreshForYears } from '@/lib/calculations'
 
 export const dynamic = 'force-dynamic'
 
@@ -655,6 +656,7 @@ async function importPayments(
   boundFamilyId?: string,
   boundMemberId?: string,
 ) {
+  const yearsToRefresh = new Set<number>()
   const getValue = (row: string[], field: string): string => {
     const index = headerMap[normalizeColumnName(field)]
     return index !== undefined ? (row[index] || '').trim() : ''
@@ -769,10 +771,15 @@ async function importPayments(
         ...(refundedAmount > 0 ? { refundedAmount } : {}),
       })
 
+      yearsToRefresh.add(year)
       imported.push(i)
     } catch (error: any) {
       errors.push(`Row ${i + 2}: ${sanitizeStripeErrorMessage(error.message) || 'Failed to import payment'}`)
     }
+  }
+
+  if (yearsToRefresh.size > 0) {
+    scheduleYearlyCalculationRefreshForYears(yearsToRefresh, organizationId)
   }
 }
 

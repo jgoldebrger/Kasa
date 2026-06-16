@@ -1,0 +1,18 @@
+{
+  "nav.dashboard": "Tableau de bord",
+  "nav.families": "Familles",
+  "nav.payments": "Paiements",
+  "nav.tasks": "Tâches",
+  "nav.events": "Événements",
+  "nav.reports": "Rapports",
+  "nav.statements": "Relevés",
+  "nav.settings": "Paramètres",
+  "nav.signOut": "Déconnexion",
+  "auth.welcomeBack": "Bon retour",
+  "auth.signIn": "Connexion",
+  "auth.email": "E-mail",
+  "auth.password": "Mot de passe",
+  "common.save": "Enregistrer",
+  "common.cancel": "Annuler",
+  "common.delete": "Supprimer"
+}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { CalculatorIcon } from '@heroicons/react/24/outline'
+import { CalculatorIcon, InformationCircleIcon, ExclamationTriangleIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
@@ -13,6 +13,8 @@ import {
   Modal,
   PageHeader,
   Select,
+  SkeletonRows,
+  Tooltip,
 } from '@/app/components/ui'
 
 interface PlanBreakdown {
@@ -103,8 +105,8 @@ export default function CalculationsView({
   const sortedInitial = Array.isArray(initialCalculations)
     ? [...initialCalculations].sort((a, b) => b.year - a.year)
     : []
-  const hasInitial = sortedInitial.length > 0
-  const hasFetchedRef = useRef(hasInitial)
+  const serverHydrated = initialCalculations !== undefined
+  const hasFetchedRef = useRef(serverHydrated)
   const { begin, invalidate, isStale } = useRequestGeneration()
   const [calculations, setCalculations] = useState<YearlyCalculation[]>(sortedInitial)
   const [showModal, setShowModal] = useState(false)
@@ -119,9 +121,13 @@ export default function CalculationsView({
   })
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(!serverHydrated)
+  const [loadError, setLoadError] = useState(false)
 
   const fetchCalculations = useCallback(async () => {
     const gen = begin()
+    setLoading(true)
+    setLoadError(false)
     try {
       const res = await fetch('/api/calculations')
       if (isStale(gen)) return
@@ -135,7 +141,10 @@ export default function CalculationsView({
       }
     } catch {
       if (isStale(gen)) return
+      setLoadError(true)
       setCalculations([])
+    } finally {
+      if (!isStale(gen)) setLoading(false)
     }
   }, [begin, isStale])
 
@@ -150,6 +159,7 @@ export default function CalculationsView({
     hasFetchedRef.current = false
     setCalculations([])
     setSelectedYear(null)
+    setLoadError(false)
     fetchCalculations()
   }, [fetchCalculations, invalidate]))
 
@@ -247,7 +257,7 @@ export default function CalculationsView({
       <div className="mx-auto max-w-7xl">
         <PageHeader
           title="Yearly Calculations"
-          subtitle="Income, expenses, and balance per organization year."
+          subtitle="Actual payments received, lifecycle expenses, and net balance for each year."
           actions={
             <Button onClick={openModal} leftIcon={<CalculatorIcon className="h-5 w-5" />}>
               Calculate Year
@@ -255,11 +265,71 @@ export default function CalculationsView({
           }
         />
 
-        {normalized.length === 0 ? (
+        <details className="mb-6 surface-card border border-border rounded-lg">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-fg focus-ring rounded-lg">
+            How is this calculated?
+          </summary>
+          <div className="border-t border-border px-4 py-4 text-sm text-fg-muted space-y-3">
+            <p>
+              Yearly snapshots use the formulas in{' '}
+              <code className="rounded bg-app-subtle px-1 py-0.5 text-xs text-fg">lib/calculations.ts</code>.
+              Headline numbers reflect <span className="font-medium text-fg">actual cash</span>, not expected plan dues.
+            </p>
+            <dl className="space-y-2 text-xs">
+              <div>
+                <dt className="font-medium text-fg">Payments received</dt>
+                <dd>Sum of net payments recorded for the year (payment year or payment date), refunds included.</dd>
+              </div>
+              <div>
+                <dt className="font-medium text-fg">Total received (calculated income)</dt>
+                <dd>
+                  <span className="tabular">totalPayments + extraDonation</span>
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium text-fg">Calculated expenses</dt>
+                <dd>
+                  Lifecycle event payments for the year plus any manual extra expense (
+                  <span className="tabular">totalExpenses + extraExpense</span>).
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium text-fg">Net balance</dt>
+                <dd>
+                  <span className="tabular">calculatedIncome − calculatedExpenses</span>
+                </dd>
+              </div>
+              <div>
+                <dt className="font-medium text-fg">Expected plan dues (reference)</dt>
+                <dd>
+                  Current roster × each plan&apos;s yearly price — not a historical snapshot. Compare against payments
+                  received; do not treat as billed revenue for past years.
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </details>
+
+        {loading ? (
+          <div className="surface-card p-6">
+            <SkeletonRows count={6} />
+          </div>
+        ) : loadError ? (
+          <EmptyState
+            icon={<ExclamationTriangleIcon />}
+            title="Couldn't load calculations"
+            description="Check your connection and try again."
+            cta={{
+              label: 'Retry',
+              onClick: () => fetchCalculations(),
+              icon: <ArrowPathIcon className="h-4 w-4" />,
+            }}
+          />
+        ) : normalized.length === 0 ? (
           <EmptyState
             icon={<CalculatorIcon />}
             title="No calculations yet"
-            description="Run a yearly calculation to see income, expenses, and balance for any year."
+            description="Refresh a year's totals from the latest payments, lifecycle events, and plan roster."
             cta={{
               label: 'Calculate a year',
               onClick: openModal,
@@ -309,9 +379,22 @@ export default function CalculationsView({
                   filter: { type: 'select', getValue: (c) => String(c.year) },
                 },
                 {
+                  id: 'payments',
+                  header: 'Payments Received',
+                  headerText: 'Payments Received',
+                  align: 'right',
+                  cell: (c) => (
+                    <span className="tabular text-green-700 dark:text-green-400">
+                      {formatMoney(c.totalPayments)}
+                    </span>
+                  ),
+                  exportValue: (c) => c.totalPayments,
+                  filter: { type: 'numberRange', getValue: (c) => c.totalPayments },
+                },
+                {
                   id: 'income',
-                  header: 'Income',
-                  headerText: 'Income',
+                  header: 'Total In',
+                  headerText: 'Total In',
                   align: 'right',
                   cell: (c) => (
                     <span className="tabular text-green-700 dark:text-green-400">
@@ -395,9 +478,9 @@ export default function CalculationsView({
                   </div>
                   <dl className="mt-2 grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <dt className="text-fg-muted">Income</dt>
+                      <dt className="text-fg-muted">Payments</dt>
                       <dd className="tabular text-green-700 dark:text-green-400">
-                        {formatMoney(c.calculatedIncome)}
+                        {formatMoney(c.totalPayments)}
                       </dd>
                     </div>
                     <div>
@@ -424,9 +507,11 @@ export default function CalculationsView({
             </div>
             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="rounded-lg border border-border bg-app-subtle p-4">
-                <dt className="text-sm text-fg-muted">Total Income</dt>
+                <dt className="text-sm text-fg-muted">Total Payments Received</dt>
                 <dd className="mt-1 tabular text-2xl font-semibold text-green-700 dark:text-green-400">
-                  {formatMoney(summary.calculatedIncome)}
+                  {formatMoney(
+                    normalized.reduce((sum, c) => sum + c.totalPayments, 0),
+                  )}
                 </dd>
               </div>
               <div className="rounded-lg border border-border bg-app-subtle p-4">
@@ -449,8 +534,8 @@ export default function CalculationsView({
               </div>
             </dl>
             <p className="mt-4 text-xs italic text-fg-muted">
-              Summary aggregates the saved snapshot for each year. Recompute a year above to refresh
-              its contribution.
+              Totals use actual payments recorded for each year. Click Calculate Year to refresh a
+              snapshot after new payments or lifecycle events.
             </p>
           </div>
         )}
@@ -470,71 +555,84 @@ export default function CalculationsView({
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              {/* Income */}
+              {/* Cash received */}
               <div className="md:border-r md:border-border md:pr-6">
                 <h3 className="mb-4 text-lg font-semibold text-green-700 dark:text-green-400">
-                  Income
+                  Money In
                 </h3>
-                {detail.year !== new Date().getFullYear() && (
-                  <p className="mb-3 rounded-md border border-amber-300/40 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-100">
-                    Heads up: plan-income figures use the current family
-                    roster, not a snapshot of {detail.year}. Payments shown
-                    below are bounded to that year correctly.
-                  </p>
-                )}
                 <div className="space-y-2">
-                  {detail.byPlan.length === 0 ? (
-                    <div className="text-sm italic text-fg-muted">
-                      No payment plans configured for this year.
-                    </div>
-                  ) : (
-                    detail.byPlan.map((p) => (
-                      <div
-                        key={p.planId || `plan-${p.planNumber}-${p.name}`}
-                        className="flex justify-between"
-                      >
-                        <span>
-                          {p.name}
-                          {' '}
-                          (
-                          {typeof p.familyCount === 'number'
-                            ? `${p.familyCount} ${p.familyCount === 1 ? 'family' : 'families'}, ${p.count} ${p.count === 1 ? 'member' : 'members'}`
-                            : `${p.count} ${p.count === 1 ? 'member' : 'members'}`}
-                          ):
-                        </span>
-                        <span className="tabular font-medium">
-                          {formatMoney(p.income || 0)}
-                        </span>
-                      </div>
-                    ))
-                  )}
-                  <div className="mt-2 flex justify-between border-t border-border pt-2">
-                    <span>Plan Income:</span>
-                    <span className="tabular font-medium">
-                      {formatMoney(detail.planIncome)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm text-fg-muted">
-                    <span>Payments (from year) - informational only:</span>
-                    <span className="tabular font-medium">
+                  <div className="flex justify-between">
+                    <span className="font-medium">Payments received ({detail.year}):</span>
+                    <span className="tabular font-semibold text-green-700 dark:text-green-400">
                       {formatMoney(detail.totalPayments)}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Extra Donation:</span>
+                    <span>Extra donation (manual):</span>
                     <span className="tabular font-medium">
                       {formatMoney(detail.extraDonation)}
                     </span>
                   </div>
                   <div className="mt-2 flex justify-between border-t border-border pt-2">
-                    <span className="font-bold">Calculated Income:</span>
+                    <span className="font-bold">Total received:</span>
                     <span className="tabular font-bold text-green-700 dark:text-green-400">
                       {formatMoney(detail.calculatedIncome)}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs italic text-fg-muted">
-                    Note: Payments fulfill plan commitments and are not additional income. Income =
-                    Plan Income + Extra Donation.
+                  <p className="mt-1 text-xs text-fg-muted">
+                    Based on payments recorded for {detail.year} (payment year or payment date).
+                  </p>
+                </div>
+
+                <div className="mt-6 rounded-lg border border-border bg-app-subtle/60 p-4">
+                  <div className="mb-2 flex items-center gap-1.5">
+                    <h4 className="text-sm font-semibold text-fg-muted">
+                      Expected plan dues (reference only)
+                    </h4>
+                    <Tooltip content="Based on today's roster — not a historical snapshot.">
+                      <button
+                        type="button"
+                        className="text-fg-subtle hover:text-fg-muted focus-ring rounded"
+                        aria-label="About expected plan dues"
+                      >
+                        <InformationCircleIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </Tooltip>
+                  </div>
+                  {detail.byPlan.length === 0 ? (
+                    <p className="text-sm italic text-fg-muted">
+                      No families are on a payment plan yet.
+                    </p>
+                  ) : (
+                    <div className="space-y-2 text-sm">
+                      {detail.byPlan.map((p) => (
+                        <div
+                          key={p.planId || `plan-${p.planNumber}-${p.name}`}
+                          className="flex justify-between gap-2"
+                        >
+                          <span className="text-fg-muted">
+                            {p.name}
+                            {' '}
+                            (
+                            {typeof p.familyCount === 'number'
+                              ? `${p.familyCount} ${p.familyCount === 1 ? 'family' : 'families'}`
+                              : `${p.count} ${p.count === 1 ? 'member' : 'members'}`}
+                            )
+                          </span>
+                          <span className="tabular font-medium text-fg">
+                            {formatMoney(p.income || 0)}
+                          </span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between border-t border-border pt-2">
+                        <span>Expected total:</span>
+                        <span className="tabular font-medium">{formatMoney(detail.planIncome)}</span>
+                      </div>
+                    </div>
+                  )}
+                  <p className="mt-2 text-xs italic text-fg-muted">
+                    Uses today&apos;s family roster — not historical. Compare against payments
+                    received above.
                   </p>
                 </div>
               </div>
@@ -585,7 +683,7 @@ export default function CalculationsView({
 
             <div className="mt-6 border-t border-border pt-6">
               <div className="flex items-center justify-between">
-                <span className="text-xl font-semibold">Balance (Income - Expenses):</span>
+                <span className="text-xl font-semibold">Net balance (received − expenses):</span>
                 <span
                   className={`tabular text-2xl font-bold ${
                     detail.balance >= 0
@@ -604,7 +702,7 @@ export default function CalculationsView({
           open={showModal}
           onClose={closeModal}
           title="Calculate Year"
-          description="Recompute income, expenses, and balance for a given year."
+          description="Refresh payments received, expenses, and net balance for a given year."
           dismissible={!submitting}
           footer={
             <>

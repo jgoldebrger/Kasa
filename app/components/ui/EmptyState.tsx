@@ -35,7 +35,7 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div
-      className={`flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-app-subtle px-6 py-10 text-center ${className}`}
+      className={`flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-app-subtle px-6 py-10 text-center ${className}`}
       role="region"
       aria-label={title}
     >
@@ -75,7 +75,7 @@ function CtaButton({
     return (
       <a
         href={href}
-        className={`focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-md px-4 text-sm font-medium ${
+        className={`focus-ring inline-flex min-h-[var(--touch-target)] items-center justify-center gap-2 rounded-md px-4 text-sm font-medium sm:min-h-10 ${
           variant === 'primary'
             ? 'bg-accent text-accent-fg hover:bg-accent-hover'
             : 'border border-border bg-surface text-fg hover:bg-fg/5'

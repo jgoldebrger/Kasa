@@ -407,9 +407,25 @@ describe.sequential('route-logic search/events branch coverage', () => {
       expect(res.status).toBe(400)
     })
 
-    it('computes totals on the fly when no YearlyCalculation exists', async () => {
+    it('computes totals on the fly when no YearlyCalculation exists and compute=1', async () => {
       bindSession(ctx, 'admin')
       const y = year() + 88
+      const { YearlyCalculation } = await import('@/lib/models')
+      await YearlyCalculation.deleteMany({ organizationId: ctx.orgId, year: y })
+      const { GET } = await import('@/lib/route-logic/dashboard-stats')
+      const res = await GET(
+        orgJsonReq('/api/dashboard-stats', 'GET', undefined, { query: `?year=${y}&compute=1` }),
+      )
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.year).toBe(y)
+      expect(typeof body.calculatedIncome).toBe('number')
+      expect(body.financialsPending).toBe(false)
+    })
+
+    it('returns financialsPending without compute when no YearlyCalculation exists', async () => {
+      bindSession(ctx, 'admin')
+      const y = year() + 87
       const { YearlyCalculation } = await import('@/lib/models')
       await YearlyCalculation.deleteMany({ organizationId: ctx.orgId, year: y })
       const { GET } = await import('@/lib/route-logic/dashboard-stats')
@@ -418,8 +434,9 @@ describe.sequential('route-logic search/events branch coverage', () => {
       )
       expect(res.status).toBe(200)
       const body = await res.json()
-      expect(body.year).toBe(y)
-      expect(typeof body.calculatedIncome).toBe('number')
+      expect(body.financialsPending).toBe(true)
+      expect(body.balance).toBe(0)
+      expect(body.calculatedIncome).toBe(0)
     })
 
     it('returns partial payload when live calculation throws', async () => {
@@ -434,7 +451,7 @@ describe.sequential('route-logic search/events branch coverage', () => {
       try {
         const { GET } = await import('@/lib/route-logic/dashboard-stats')
         const res = await GET(
-          orgJsonReq('/api/dashboard-stats', 'GET', undefined, { query: `?year=${y}` }),
+          orgJsonReq('/api/dashboard-stats', 'GET', undefined, { query: `?year=${y}&compute=1` }),
         )
         expect(res.status).toBe(200)
         const body = await res.json()

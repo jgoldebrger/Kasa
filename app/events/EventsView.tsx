@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { CalendarIcon } from '@heroicons/react/24/outline'
+import { CalendarIcon, ExclamationTriangleIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
 import { formatLocaleDate } from '@/lib/date-utils'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
@@ -58,17 +58,19 @@ export interface EventsViewProps {
 export default function EventsView({ initialEvents }: EventsViewProps = {}) {
   const toast = useToast()
   const { format: formatMoney } = useCurrency()
-  const hasInitial = Array.isArray(initialEvents) && initialEvents.length > 0
+  const serverHydrated = initialEvents !== undefined
   const [events, setEvents] = useState<LifecycleEvent[]>(initialEvents ?? [])
-  const [loading, setLoading] = useState(!hasInitial)
+  const [loading, setLoading] = useState(!serverHydrated)
+  const [loadError, setLoadError] = useState(false)
   const [visibleEvents, setVisibleEvents] = useState<LifecycleEvent[]>([])
-  const hasFetchedRef = useRef(hasInitial)
+  const hasFetchedRef = useRef(serverHydrated)
   const { begin, invalidate, isStale } = useRequestGeneration()
 
   const fetchEvents = useCallback(async () => {
     const gen = begin()
     try {
       setLoading(true)
+      setLoadError(false)
       const res = await fetch('/api/events')
       if (isStale(gen)) return
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -77,7 +79,7 @@ export default function EventsView({ initialEvents }: EventsViewProps = {}) {
       setEvents(Array.isArray(data) ? data : [])
     } catch {
       if (isStale(gen)) return
-      setEvents([])
+      setLoadError(true)
       toast.error('Could not load events.')
     } finally {
       if (!isStale(gen)) setLoading(false)
@@ -100,6 +102,7 @@ export default function EventsView({ initialEvents }: EventsViewProps = {}) {
     invalidate()
     hasFetchedRef.current = false
     setEvents([])
+    setLoadError(false)
     fetchEvents()
   }, [fetchEvents, invalidate]))
 
@@ -210,6 +213,17 @@ export default function EventsView({ initialEvents }: EventsViewProps = {}) {
           <div className="surface-card p-6">
             <SkeletonRows count={8} />
           </div>
+        ) : loadError ? (
+          <EmptyState
+            icon={<ExclamationTriangleIcon />}
+            title="Couldn't load events"
+            description="Check your connection and try again."
+            cta={{
+              label: 'Retry',
+              onClick: () => fetchEvents(),
+              icon: <ArrowPathIcon className="h-4 w-4" />,
+            }}
+          />
         ) : (
           <DataView
             tableId="events"

@@ -12,6 +12,7 @@ import { sanitizeStripeErrorMessage } from '@/lib/payments/sanitize'
 import { enforceMemberChargeGate } from '@/lib/billing/feature-gate'
 import { payment as paymentSchemas } from '@/lib/schemas'
 import { ZodError } from 'zod'
+import { scheduleYearlyCalculationRefresh } from '@/lib/calculations'
 import Stripe from 'stripe'
 import https from 'https'
 
@@ -431,6 +432,8 @@ export const POST = handler({
       },
       request,
     })
+
+    scheduleYearlyCalculationRefresh(paymentData.year, ctx!.organizationId)
 
     return {
       data: {

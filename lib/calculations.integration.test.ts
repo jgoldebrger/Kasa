@@ -298,7 +298,7 @@ describe('calculations (integration)', () => {
 
     expect(income.planIncome).toBe(1300)
     expect(income.totalPayments).toBe(175)
-    expect(income.calculatedIncome).toBe(1350)
+    expect(income.calculatedIncome).toBe(225)
     expect(income.extraDonation).toBe(50)
   })
 
@@ -323,7 +323,7 @@ describe('calculations (integration)', () => {
 
     expect(balance.planIncome).toBe(1300)
     expect(balance.totalExpenses).toBe(120)
-    expect(balance.balance).toBe(1180)
+    expect(balance.balance).toBe(55)
   })
 
   it('calculateAndSaveYear upserts a YearlyCalculation snapshot', async () => {
@@ -334,8 +334,8 @@ describe('calculations (integration)', () => {
     const saved = await calculateAndSaveYear(year, orgId.toString())
     const found = await YearlyCalculation.findOne({ organizationId: orgId, year }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
 
-    expect(saved?.balance).toBe(1180)
-    expect(found?.calculatedIncome).toBe(1300)
+    expect(saved?.balance).toBe(55)
+    expect(found?.calculatedIncome).toBe(175)
     expect(found?.calculatedExpenses).toBe(120)
     expect(Array.isArray(found?.byPlan)).toBe(true)
   })
@@ -374,6 +374,31 @@ describe('calculations (integration)', () => {
     errSpy.mockRestore()
   })
 
+  it('refreshing a yearly snapshot picks up newly recorded payments', async () => {
+    const { calculateAndSaveYear, updateYearlyCalculationForEvent } = await import('./calculations')
+    const { Payment, YearlyCalculation } = await import('./models')
+    const { year } = await seedYearlyFixtures()
+
+    await calculateAndSaveYear(year, orgId.toString())
+    const before = await YearlyCalculation.findOne({ organizationId: orgId, year }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+    const beforePayments = Number(before?.totalPayments ?? 0)
+
+    await Payment.create({
+      organizationId: orgId,
+      familyId,
+      amount: 50,
+      paymentDate: new Date(`${year}-06-15`),
+      year,
+      type: 'membership',
+      paymentMethod: 'cash',
+    })
+
+    await updateYearlyCalculationForEvent(year, orgId.toString())
+
+    const after = await YearlyCalculation.findOne({ organizationId: orgId, year }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+    expect(after?.totalPayments).toBe(beforePayments + 50)
+  })
+
   it('updateYearlyCalculationForEvent preserves extra donation and expense overrides', async () => {
     const { updateYearlyCalculationForEvent } = await import('./calculations')
     const { YearlyCalculation } = await import('./models')
@@ -400,7 +425,7 @@ describe('calculations (integration)', () => {
     const saved = await YearlyCalculation.findOne({ organizationId: orgId, year }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
     expect(saved?.extraDonation).toBe(25)
     expect(saved?.extraExpense).toBe(15)
-    expect(saved?.calculatedIncome).toBeGreaterThan(0)
+    expect(saved?.calculatedIncome).toBe(200)
   })
 
   it('calculateFamilyBalance includes withdrawals and cycle charges', async () => {

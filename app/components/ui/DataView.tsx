@@ -396,9 +396,12 @@ export function DataView<T>({
       ? globalSearch.placeholder
       : 'Search…'
 
+  const mobileToolbarTouch =
+    'max-md:[&_button]:inline-flex max-md:[&_button]:min-h-[var(--touch-target)] max-md:[&_button]:min-w-[var(--touch-target)] max-md:[&_button]:items-center max-md:[&_button]:justify-center'
+
   const renderToolbar = () =>
     hasToolbar ? (
-      <div className="mb-2 flex flex-wrap items-center gap-2">
+      <div className={`mb-2 flex flex-wrap items-center gap-2 ${mobileToolbarTouch}`}>
         {toolbarCfg.left}
         {showSearch && (
           <SearchInput
@@ -460,11 +463,13 @@ export function DataView<T>({
 
   const chips =
     filters.activeFilters.length > 0 ? (
-      <FilterChips
-        filters={filters.activeFilters}
-        onClearAll={filters.clearAll}
-        summary={filterSummary}
-      />
+      <div className={mobileToolbarTouch}>
+        <FilterChips
+          filters={filters.activeFilters}
+          onClearAll={filters.clearAll}
+          summary={filterSummary}
+        />
+      </div>
     ) : null
 
   const footer = paginationCfg ? (
@@ -550,7 +555,7 @@ export function DataView<T>({
                 <button
                   type="button"
                   onClick={() => onRowClick(row, i)}
-                  className="focus-ring w-full text-left"
+                  className="focus-ring w-full text-left [&_.surface-card]:transition-colors [&_.surface-card]:hover:bg-fg/[0.02] [&_.surface-card]:active:bg-fg/[0.04]"
                 >
                   {mobileCard(row, i)}
                 </button>
@@ -566,7 +571,7 @@ export function DataView<T>({
       {footer && <div className={`${cardVisible} mt-3`}>{footer}</div>}
 
       {/* Desktop: table */}
-      <div className={`${tableVisible} overflow-x-auto rounded-lg border border-border bg-surface`}>
+      <div className={`${tableVisible} surface-card overflow-x-auto`}>
         {shouldVirtualize ? (
           <VirtualTable
             rows={displayRows}
@@ -578,7 +583,7 @@ export function DataView<T>({
           />
         ) : (
           <table className="w-full text-sm">
-            <thead className="border-b border-border bg-app-subtle text-left text-[11px] uppercase tracking-wider text-fg-muted">
+            <thead className="border-b border-border bg-app-subtle text-left text-[11px] uppercase tracking-wider text-muted-on-subtle">
               <tr>
                 {renderColumns.map((col) => (
                   <th
@@ -680,7 +685,7 @@ function VirtualTable<T>({
       aria-label="Scrollable table"
     >
       <table className="w-full text-sm">
-        <thead className="sticky top-0 z-10 border-b border-border bg-app-subtle text-left text-[11px] uppercase tracking-wider text-fg-muted">
+        <thead className="sticky top-0 z-10 border-b border-border bg-app-subtle text-left text-[11px] uppercase tracking-wider text-muted-on-subtle">
           <tr>
             {columns.map((col) => (
               <th
@@ -1019,7 +1024,7 @@ function SearchInput({
         }}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="focus-ring w-full rounded-md border border-border bg-surface pl-8 pr-2.5 py-1.5 text-sm text-fg placeholder:text-fg-subtle focus:border-accent"
+        className="focus-ring min-h-[var(--touch-target)] w-full rounded-md border border-border bg-surface py-2.5 pl-8 pr-2.5 text-sm text-fg placeholder:text-fg-subtle focus:border-accent md:min-h-0 md:py-1.5"
       />
     </div>
   )

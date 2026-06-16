@@ -1,0 +1,20 @@
+{
+  "nav.dashboard": "ארמאטור",
+  "nav.families": "משפחות",
+  "nav.payments": "תשלומים",
+  "nav.tasks": "אויפגאַבעס",
+  "nav.calculations": "חשבונות",
+  "nav.events": "געשעענישן",
+  "nav.projections": "דמי חבר חשבון",
+  "nav.reports": "באריכטן",
+  "nav.statements": "אַקאַונט בלעטער",
+  "nav.settings": "איינשטעלונגען",
+  "nav.account": "אַקאַונט",
+  "nav.search.placeholder": "זוכן…",
+  "nav.signOut": "אַרויסלאָגן",
+  "auth.welcomeBack": "ברוך הבא צוריק",
+  "auth.signIn": "אַריינלאָגן",
+  "common.save": "אָפּשפּאָרן",
+  "common.cancel": "אַנולירן",
+  "common.delete": "אויסמעקן"
+}

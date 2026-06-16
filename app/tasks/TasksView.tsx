@@ -52,10 +52,10 @@ export default function TasksView({
 }: TasksViewProps = {}) {
   const toast = useToast()
   const confirm = useConfirm()
-  const hasInitialTasks = Array.isArray(initialTasks) && initialTasks.length > 0
-  const hasInitialFamilies = Array.isArray(initialFamilies) && initialFamilies.length > 0
+  const tasksHydrated = initialTasks !== undefined
+  const familiesHydrated = initialFamilies !== undefined
   const [tasks, setTasks] = useState<Task[]>(initialTasks ?? [])
-  const [loadingTasks, setLoadingTasks] = useState(!hasInitialTasks)
+  const [loadingTasks, setLoadingTasks] = useState(!tasksHydrated)
   const [tasksError, setTasksError] = useState(false)
   const [taskFilter, setTaskFilter] = useState<'all' | 'pending' | 'today' | 'overdue'>('all')
   const [showTaskModal, setShowTaskModal] = useState(false)
@@ -65,9 +65,9 @@ export default function TasksView({
   // single bool. Never mutate inside the effect body without also using
   // a value that survives the React 18 dev-mode double-invoke.
   const fetchedTaskFilterRef = useRef<typeof taskFilter | null>(
-    hasInitialTasks ? 'all' : null,
+    tasksHydrated ? 'all' : null,
   )
-  const hasFetchedFamiliesRef = useRef(hasInitialFamilies)
+  const hasFetchedFamiliesRef = useRef(familiesHydrated)
   const { begin, invalidate, isStale } = useRequestGeneration()
 
   const fetchTasks = useCallback(async () => {
