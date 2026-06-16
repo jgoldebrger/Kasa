@@ -19,6 +19,7 @@
 // No churn, no inflation, no compounding — keeps the math honest with the
 // "average from history" framing.
 
+import { unstable_cache } from 'next/cache'
 import { Types } from 'mongoose'
 import connectDB from './database'
 import {
@@ -231,7 +232,10 @@ export function computeDuesRecommendation(
  *     byEvent rows), so a year where the admin never ran "Calculate Year"
  *     doesn't drag averages down.
  */
-export async function loadDuesRecommendation(
+/** Revalidate cached projections after 1 hour (see docs/PERFORMANCE.md). */
+export const DUES_RECOMMENDATION_CACHE_SECONDS = 3600
+
+async function loadDuesRecommendationUncached(
   organizationId: string,
   windowYears = 5,
   forecastYears = DEFAULT_DUES_FORECAST_YEARS,
@@ -387,4 +391,36 @@ function isNonStaleSnapshot(snap: YearlyCalculationLean): boolean {
   const hasPlan = (snap.byPlan?.length ?? 0) > 0
   const hasEvent = (snap.byEvent?.length ?? 0) > 0
   return hasPlan || hasEvent
+}
+
+const getCachedDuesRecommendation = unstable_cache(
+  async (organizationId: string, windowYears: number) =>
+    loadDuesRecommendationUncached(organizationId, windowYears),
+  ['dues-recommendation'],
+  { revalidate: DUES_RECOMMENDATION_CACHE_SECONDS },
+)
+
+/**
+ * Load break-even dues recommendation. Results for the default forecast horizon
+ * are cached per org + history window for {@link DUES_RECOMMENDATION_CACHE_SECONDS}s.
+ * Custom `forecastYears` / `startYearOverride` bypass the cache.
+ */
+export async function loadDuesRecommendation(
+  organizationId: string,
+  windowYears = 5,
+  forecastYears = DEFAULT_DUES_FORECAST_YEARS,
+  startYearOverride?: number,
+): Promise<DuesRecommendation> {
+  if (
+    forecastYears === DEFAULT_DUES_FORECAST_YEARS &&
+    startYearOverride === undefined
+  ) {
+    return getCachedDuesRecommendation(organizationId, windowYears)
+  }
+  return loadDuesRecommendationUncached(
+    organizationId,
+    windowYears,
+    forecastYears,
+    startYearOverride,
+  )
 }

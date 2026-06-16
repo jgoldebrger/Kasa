@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { requireServerOrgContext } from '@/lib/auth-server'
 import connectDB from '@/lib/database'
 import { YearlyCalculation } from '@/lib/models'
+import { serializeForRsc } from '@/lib/serialize-rsc'
 import CalculationsView from './CalculationsView'
 import CalculationsLoading from './loading'
 
@@ -12,12 +13,10 @@ async function fetchInitialCalculations(organizationId: string) {
   await connectDB()
   const rows = await YearlyCalculation.find({ organizationId })
     .sort({ year: -1 })
+    .limit(30)
     .lean<any[]>()
 
-  // JSON round-trip flattens every ObjectId/Date into a plain string so
-  // React's RSC payload serializer accepts the prop without falling back
-  // to its slow path.
-  return rows.map((r) => JSON.parse(JSON.stringify(r)))
+  return rows.map((r) => serializeForRsc(r))
 }
 
 async function CalculationsServer() {

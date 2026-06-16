@@ -135,6 +135,8 @@ export interface DataViewProps<T> {
    * the export then applies the active search / column filters.
    */
   expandExportRows?: () => Promise<T[] | void>
+  /** Disables the export menu while `expandExportRows` is loading more pages. */
+  exportExpanding?: boolean
   /** Toolbar visibility & extras. Set to `false` to disable the toolbar entirely. */
   toolbar?: ToolbarConfig | false
   /**
@@ -194,6 +196,7 @@ export function DataView<T>({
   exportRows,
   exportFileName,
   expandExportRows,
+  exportExpanding,
   toolbar,
   globalSearch,
   onFilteredRowsChange,
@@ -435,6 +438,7 @@ export function DataView<T>({
               rowCount={exportSet.length}
               onExportCsv={handleCsv}
               onExportXlsx={handleXlsx}
+              disabled={exportExpanding}
             />
           )}
           {showImport && importCfg && (

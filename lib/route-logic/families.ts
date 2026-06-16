@@ -9,7 +9,7 @@ import {
   encodeCompoundCursor,
   collectCompoundCursorPages,
 } from '@/lib/pagination'
-import { UNBOUNDED_LIST_CAP, positiveInt } from '@/lib/schemas'
+import { FAMILY_BALANCES_IDS_CAP, objectId, UNBOUNDED_LIST_CAP, positiveInt } from '@/lib/schemas'
 import { family as familySchemas } from '@/lib/schemas'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { enforceFamilyCapGate } from '@/lib/billing/feature-gate'
@@ -21,6 +21,38 @@ export const GET = handler({
   name: 'GET /api/families',
   fn: async ({ ctx, request }) => {
     const { searchParams } = new URL(request.url)
+
+    if (searchParams.get('view') === 'names') {
+      const rawIds = (searchParams.get('familyIds') ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+      if (rawIds.length > FAMILY_BALANCES_IDS_CAP) {
+        return { status: 400, data: { error: 'Too many familyIds' } }
+      }
+      const validIds = rawIds.filter((id) => objectId.safeParse(id).success)
+      if (validIds.length === 0) {
+        return {
+          data: { names: {} },
+          headers: { 'Cache-Control': 'private, max-age=60' },
+        }
+      }
+      const families = await Family.find({
+        _id: { $in: validIds.map((id) => new Types.ObjectId(id)) },
+        organizationId: ctx!.organizationId,
+      })
+        .select('_id name')
+        .lean<Array<{ _id: unknown; name?: string }>>()
+      const names: Record<string, string> = {}
+      for (const f of families) {
+        names[String(f._id)] = typeof f.name === 'string' ? f.name : ''
+      }
+      return {
+        data: { names },
+        headers: { 'Cache-Control': 'private, max-age=60' },
+      }
+    }
+
     const limitParam = searchParams.get('limit')
     const cursorParam = searchParams.get('cursor')
     // `clientLimit` is what the caller asked for (0 = legacy "all rows").

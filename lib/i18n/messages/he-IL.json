@@ -169,6 +169,8 @@
   "families.bulkSelectionCap": "הבחירה מוגבלת ל-{cap} משפחות. הרץ פעולות מרובות בקבוצות כדי לכסות את השאר.",
   "families.error.load": "לא ניתן לטעון משפחות.",
   "families.error.loadMore": "לא ניתן לטעון משפחות נוספות.",
+  "families.export.loading": "טוען את כל המשפחות לייצוא…",
+  "families.export.loaded": "נטענו {count} משפחות לייצוא.",
   "families.error.loadExport": "לא ניתן לטעון את כל המשפחות לייצוא.",
   "families.error.delete": "לא ניתן למחוק משפחה.",
   "families.error.missingPlan": "למשפחה חסרה תוכנית תשלום. עדכן את המשפחה.",

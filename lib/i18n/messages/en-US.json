@@ -169,6 +169,8 @@
   "families.bulkSelectionCap": "Selection capped at {cap} families. Run bulk actions in batches to cover the rest.",
   "families.error.load": "Could not load families.",
   "families.error.loadMore": "Could not load more families.",
+  "families.export.loading": "Loading all families for export…",
+  "families.export.loaded": "Loaded {count} families for export.",
   "families.error.loadExport": "Could not load all families for export.",
   "families.error.delete": "Could not delete family.",
   "families.error.missingPlan": "Family is missing a payment plan. Please update the family.",

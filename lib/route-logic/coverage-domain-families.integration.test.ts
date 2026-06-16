@@ -217,6 +217,46 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
       await Family.deleteOne({ _id: extra._id })
     })
 
+    it('GET /api/families?view=names returns org-scoped family names', async () => {
+      bindSession(ctx)
+      const { Family } = await import('@/lib/models')
+      const extra = await Family.create({
+        organizationId: ctx.orgId,
+        name: `Names Batch ${Date.now()}`,
+        weddingDate: new Date('2019-01-01'),
+      })
+      const { GET } = await import('@/lib/route-logic/families')
+      const res = await GET(
+        orgJsonReq('/api/families', 'GET', undefined, {
+          query: `?view=names&familyIds=${ctx.fixtures.familyId},not-valid,${extra._id}`,
+        }),
+      )
+      expect(res.status).toBe(200)
+      expect(res.headers.get('Cache-Control')).toBe('private, max-age=60')
+      const body = await res.json()
+      expect(body.names[ctx.fixtures.familyId]).toBeTruthy()
+      expect(body.names[String(extra._id)]).toBe(extra.name)
+      expect(body.names['not-valid']).toBeUndefined()
+      await Family.deleteOne({ _id: extra._id })
+    })
+
+    it('GET /api/families?view=names rejects oversized familyIds', async () => {
+      bindSession(ctx)
+      const { GET } = await import('@/lib/route-logic/families')
+      const tooMany = Array.from({ length: 101 }, (_, i) =>
+        String(i).padStart(24, '0'),
+      ).join(',')
+      expect(
+        (
+          await GET(
+            orgJsonReq('/api/families', 'GET', undefined, {
+              query: `?view=names&familyIds=${tooMany}`,
+            }),
+          )
+        ).status,
+      ).toBe(400)
+    })
+
     it('GET /api/families/balances scopes to familyIds when provided', async () => {
       bindSession(ctx)
       const { Family } = await import('@/lib/models')

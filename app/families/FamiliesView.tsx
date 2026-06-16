@@ -178,6 +178,7 @@ export default function FamiliesView({
   // family list refresh so stale ids can't leak into bulk actions.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
+  const [exportExpanding, setExportExpanding] = useState(false)
   const [showBulkPlanModal, setShowBulkPlanModal] = useState(false)
   const [bulkPlanValue, setBulkPlanValue] = useState<string>('')
   // StrictMode-safe gates: track whether each resource was server-prefetched.
@@ -271,6 +272,8 @@ export default function FamiliesView({
   const expandExportRows = useCallback(async () => {
     if (!nextCursor) return
     const gen = begin()
+    setExportExpanding(true)
+    toast.info(t('families.export.loading'))
     try {
       const all = await collectAllFamiliesPages(async (cursor) => {
         const data = await cachedFetch<any>(familiesListUrl(cursor, FAMILIES_LIST_PAGE_SIZE), {
@@ -285,9 +288,12 @@ export default function FamiliesView({
       if (isStale(gen)) return
       setFamilies(merged)
       setNextCursor(null)
+      toast.success(t('families.export.loaded').replace('{count}', String(merged.length)))
       return merged
     } catch {
       if (!isStale(gen)) toast.error(t('families.error.loadExport'))
+    } finally {
+      setExportExpanding(false)
     }
   }, [nextCursor, begin, isStale, mergeAdminBalances, toast, t])
 
@@ -935,6 +941,7 @@ export default function FamiliesView({
               onSortChange={(id, dir) => setSort({ id, dir })}
               globalSearch={{ placeholder: t('families.searchPlaceholder') }}
               expandExportRows={nextCursor ? expandExportRows : undefined}
+              exportExpanding={exportExpanding}
               import={isAdmin ? { type: 'families' as const, onImported: () => fetchFamilies() } : undefined}
               mobileCard={(f) => (
                 <FamilyMobileCard

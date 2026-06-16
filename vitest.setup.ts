@@ -12,7 +12,14 @@ env.NODE_ENV ||= 'test'
 const poolId = env.VITEST_POOL_ID ?? env.VITEST_WORKER_ID ?? '0'
 env.KASA_TEST_DB_NAME = `kasa_vitest_${poolId}`
 
-import { afterAll } from 'vitest'
+import { afterAll, vi } from 'vitest'
+
+// Passthrough so lib/projections unstable_cache does not leak results across tests.
+vi.mock('next/cache', () => ({
+  unstable_cache: <T extends (...args: unknown[]) => unknown>(fn: T) => fn,
+  revalidateTag: vi.fn(),
+  revalidatePath: vi.fn(),
+}))
 
 /** Disconnect mongoose after each worker finishes to avoid Vitest hang on exit. */
 afterAll(async () => {

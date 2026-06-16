@@ -27,7 +27,10 @@ import { sanitizePaymentNotes } from '@/lib/payments/sanitize'
 import { loadByIdsInChunks } from '@/lib/org-pagination'
 import { Family, FamilyMember, Payment } from '@/lib/models'
 
+// Cap each category independently so a broad substring match cannot scan
+// unbounded rows; PER_GROUP is the per-category ceiling (families, members, payments).
 const PER_GROUP = 5
+// Hard ceiling on combined hits returned to the client.
 const MAX_TOTAL = 25
 
 const querySchema = z.object({

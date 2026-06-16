@@ -4,6 +4,7 @@ import connectDB from '@/lib/database'
 import { Task } from '@/lib/models'
 import { TASKS_LIST_PAGE_SIZE } from '@/lib/client/tasks-list'
 import { encodeCompoundCursor } from '@/lib/pagination'
+import { serializeForRsc } from '@/lib/serialize-rsc'
 import TasksView from './TasksView'
 import TasksLoading from './loading'
 
@@ -35,7 +36,7 @@ async function fetchInitialTasks(organizationId: string) {
   }
 
   return {
-    items: items.map((t) => JSON.parse(JSON.stringify(t))),
+    items: items.map((t) => serializeForRsc(t)),
     nextCursor,
   }
 }

@@ -20,6 +20,7 @@ import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { cachedFetch } from '@/lib/client-cache'
+import { FAMILY_BALANCES_IDS_CAP } from '@/lib/schemas'
 import { parseFamiliesListResponse } from '@/lib/client/families-list'
 import {
   Button,
@@ -197,28 +198,35 @@ export default function StatementsView({
       const gen = begin()
       const unique = [...new Set(familyIds.filter(Boolean))]
       if (unique.length === 0) return
-      const entries = await Promise.all(
-        unique.map(async (id) => {
-          try {
-            const data = await cachedFetch<any>(`/api/families/${id}?view=summary`, {
-              ttl: 60_000,
-            })
+      const chunks: string[][] = []
+      for (let i = 0; i < unique.length; i += FAMILY_BALANCES_IDS_CAP) {
+        chunks.push(unique.slice(i, i + FAMILY_BALANCES_IDS_CAP))
+      }
+      try {
+        const results = await Promise.all(
+          chunks.map(async (chunk) => {
+            const data = await cachedFetch<{ names?: Record<string, string> }>(
+              `/api/families?view=names&familyIds=${chunk.join(',')}`,
+              { ttl: 60_000 },
+            )
             if (isStale(gen)) return null
-            const name = data?.family?.name ?? data?.name
-            return name ? ([id, name] as const) : null
-          } catch {
-            return null
+            return data?.names ?? {}
+          }),
+        )
+        if (isStale(gen)) return
+        setFamilyNameById((prev) => {
+          const next = { ...prev }
+          for (const names of results) {
+            if (!names) continue
+            for (const [id, name] of Object.entries(names)) {
+              if (name) next[id] = name
+            }
           }
-        }),
-      )
-      if (isStale(gen)) return
-      setFamilyNameById((prev) => {
-        const next = { ...prev }
-        for (const entry of entries) {
-          if (entry) next[entry[0]] = entry[1]
-        }
-        return next
-      })
+          return next
+        })
+      } catch {
+        /* keep existing names */
+      }
     },
     [begin, isStale],
   )

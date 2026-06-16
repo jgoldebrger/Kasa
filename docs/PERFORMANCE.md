@@ -71,3 +71,15 @@ Source: `lib/models/payment.ts`.
 ## Client-side GET caching
 
 Stable GET endpoints (`/api/payment-plans`, `/api/lifecycle-event-types`, `/api/organizations/branding`) use `cachedFetch` from `lib/client-cache.ts` where appropriate. Mutations use plain `fetch` and call `invalidate()` on the cached URL.
+
+## Bundle analysis
+
+Run `npm run analyze` to build the app with `@next/bundle-analyzer` enabled (`ANALYZE=true next build`). The report opens in the browser and shows which client chunks dominate the Settings, dashboard, and other App Router pages — useful after adding heavy tab panels or chart libraries.
+
+## Settings tab lazy loading
+
+The Settings page (`app/settings/SettingsView.tsx`) code-splits each tab panel with `next/dynamic`. Only the active tab's JavaScript is loaded on first visit; switching tabs fetches the panel chunk on demand. Initial `/settings` load stays lean even though the page defines many configuration sections.
+
+## Projections server cache
+
+`loadDuesRecommendation` in `lib/projections.ts` wraps the default forecast path in Next.js `unstable_cache` keyed by **organization id + history window years**, with **`revalidate: 3600`** (1 hour). The `/projections` RSC prefetch uses this cache; the `/api/dues-recommendation` route bypasses it when the client passes custom `forecastYears` or `startYear`. Re-run **Calculate Year** on [Calculations](/calculations) if admins need fresher numbers before the hour expires.
