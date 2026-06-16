@@ -52,7 +52,7 @@ export function encrypt(plaintext: string): string {
   if (plaintext.startsWith(PREFIX)) return plaintext // already encrypted
   const key = getKey()
   const iv = crypto.randomBytes(12) // GCM standard nonce length
-  const cipher = crypto.createCipheriv(ALGO, key, iv)
+  const cipher = crypto.createCipheriv(ALGO, key, iv, { authTagLength: 16 })
   const ct = Buffer.concat([cipher.update(plaintext, 'utf-8'), cipher.final()])
   const tag = cipher.getAuthTag()
   return `${PREFIX}${iv.toString('base64')}:${tag.toString('base64')}:${ct.toString('base64')}`
@@ -66,7 +66,9 @@ export function decrypt(value: string): string {
     const [ivB64, tagB64, ctB64] = body.split(':')
     if (!ivB64 || !tagB64 || !ctB64) throw new Error('Malformed ciphertext')
     const key = getKey()
-    const decipher = crypto.createDecipheriv(ALGO, key, Buffer.from(ivB64, 'base64'))
+    const decipher = crypto.createDecipheriv(ALGO, key, Buffer.from(ivB64, 'base64'), {
+      authTagLength: 16,
+    })
     decipher.setAuthTag(Buffer.from(tagB64, 'base64'))
     const pt = Buffer.concat([
       decipher.update(Buffer.from(ctB64, 'base64')),

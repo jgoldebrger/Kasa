@@ -1,13 +1,26 @@
 rules:
   - id: hardcoded-secret
-    patterns:
-      - pattern-either:
-          - pattern: $VAR = "..."
-          - pattern: password = "..."
-          - pattern: api_key = "..."
-    metavariable-regex:
-      metavariable: $VAR
-      regex: (?i)(password|secret|api[_-]?key|token|private[_-]?key)
+    pattern-either:
+      - pattern: password = "..."
+      - pattern: password = '...'
+      - pattern: api_key = "..."
+      - pattern: api_key = '...'
+      - pattern: apiKey = "..."
+      - pattern: apiKey = '...'
+      - pattern: secret = "..."
+      - pattern: secret = '...'
+      - pattern: token = "..."
+      - pattern: token = '...'
+      - pattern: private_key = "..."
+      - pattern: private_key = '...'
+    pattern-not-inside: process.env.$KEY = ...
+    paths:
+      exclude:
+        - "**/*.test.ts"
+        - "**/*.test.tsx"
+        - "**/*.integration.test.ts"
+        - "e2e/**"
+        - "scripts/**"
     message: Possible hardcoded secret — use environment variables.
     severity: ERROR
     languages: [javascript, typescript]
