@@ -6,7 +6,7 @@ import { payment as paymentSchemas } from '@/lib/schemas'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { loadAllByIdCursor, familyBatches } from '@/lib/org-pagination'
 
-const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' }
+const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=60' }
 
 // GET - Get all payment plans with family counts
 export const GET = handler({

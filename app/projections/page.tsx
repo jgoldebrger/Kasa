@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import { requireServerOrgContext } from '@/lib/auth-server'
 import { loadDuesRecommendation, type DuesRecommendation } from '@/lib/projections'
+import { serializeForRsc } from '@/lib/serialize-rsc'
 import ProjectionsView from './ProjectionsView'
 import ProjectionsLoading from './loading'
 
@@ -16,7 +17,7 @@ async function ProjectionsServer() {
     // JSON round-trip strips any incidental ObjectId/Date in the payload.
     return (
       <ProjectionsView
-        initialRecommendation={JSON.parse(JSON.stringify(recommendation)) as DuesRecommendation}
+        initialRecommendation={serializeForRsc(recommendation) as DuesRecommendation}
         initialWindowYears={DEFAULT_WINDOW_YEARS}
       />
     )

@@ -6,6 +6,7 @@ import { FAMILIES_LIST_PAGE_SIZE } from '@/lib/client/families-list'
 import connectDB from '@/lib/database'
 import { Family, FamilyMember, PaymentPlan } from '@/lib/models'
 import { encodeCompoundCursor } from '@/lib/pagination'
+import { serializeForRsc } from '@/lib/serialize-rsc'
 import FamiliesView from './FamiliesView'
 import FamiliesLoading from './loading'
 
@@ -57,7 +58,7 @@ async function fetchInitialData(organizationId: string, isAdmin: boolean) {
   }
 
   const initialFamilies = families.map((f) => {
-    const plain = JSON.parse(JSON.stringify(f))
+    const plain = serializeForRsc(f)
     plain.memberCount = countByFamily.get(String(f._id)) || 0
     if (!isAdmin) {
       delete plain.openBalance
@@ -68,7 +69,7 @@ async function fetchInitialData(organizationId: string, isAdmin: boolean) {
     return plain
   })
 
-  const initialPaymentPlans = plans.map((p) => JSON.parse(JSON.stringify(p)))
+  const initialPaymentPlans = plans.map((p) => serializeForRsc(p))
 
   return { initialFamilies, initialPaymentPlans, initialFamiliesNextCursor: nextCursor }
 }

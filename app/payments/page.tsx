@@ -5,6 +5,7 @@ import { Payment } from '@/lib/models'
 import { PAYMENT_PUBLIC_SELECT } from '@/lib/payments/select'
 import { PAYMENTS_LIST_PAGE_SIZE } from '@/lib/client/payments-list'
 import { encodeCompoundCursor } from '@/lib/pagination'
+import { serializeForRsc } from '@/lib/serialize-rsc'
 import PaymentsView from './PaymentsView'
 import PaymentsLoading from './loading'
 
@@ -33,7 +34,7 @@ async function fetchInitialPayments(organizationId: string) {
   }
 
   return {
-    items: items.map((r) => JSON.parse(JSON.stringify(r))),
+    items: items.map((r) => serializeForRsc(r)),
     nextCursor,
   }
 }

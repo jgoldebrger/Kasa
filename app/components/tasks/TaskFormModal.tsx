@@ -5,6 +5,11 @@ import { useToast } from '@/app/components/Toast'
 import { cachedFetch, invalidate as invalidateCache } from '@/lib/client-cache'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import {
+  FAMILIES_LIST_PAGE_SIZE,
+  familiesListUrl,
+  parseFamiliesListResponse,
+} from '@/lib/client/families-list'
+import {
   Button,
   Input,
   Modal,
@@ -68,9 +73,12 @@ export default function TaskFormModal({
   const fetchFamilies = useCallback(async () => {
     const gen = ++fetchGenRef.current
     try {
-      const data = await cachedFetch<any>('/api/families', { ttl: 30_000 })
+      const data = await cachedFetch<any>(familiesListUrl(null, FAMILIES_LIST_PAGE_SIZE), {
+        ttl: 30_000,
+      })
       if (fetchGenRef.current !== gen) return
-      if (data) setFamilies(data)
+      const { items } = parseFamiliesListResponse(data)
+      if (items.length > 0) setFamilies(items)
     } catch {
       // Best-effort.
     }

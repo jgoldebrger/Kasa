@@ -1,4 +1,5 @@
 import 'server-only'
+import { cache } from 'react'
 import connectDB from '@/lib/database'
 import { Organization } from '@/lib/models'
 import type { OrgBranding } from '@/lib/client/useOrgBranding'
@@ -13,7 +14,7 @@ export interface ServerOrgShell {
  * Slim org fields for the app shell (sidebar logo/name, currency, i18n).
  * Avoids 2–3 client round-trips on every navigation.
  */
-export async function loadServerOrgShell(organizationId: string): Promise<ServerOrgShell | null> {
+export const loadServerOrgShell = cache(async (organizationId: string): Promise<ServerOrgShell | null> => {
   await connectDB()
   const org = await Organization.findById(organizationId)
     .select('name slug currency locale branding.logoDataUrl branding.logoUpdatedAt branding.accentColor')
@@ -48,4 +49,4 @@ export async function loadServerOrgShell(organizationId: string): Promise<Server
       accentColor: org.branding?.accentColor || null,
     },
   }
-}
+})

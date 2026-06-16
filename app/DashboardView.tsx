@@ -110,10 +110,15 @@ export default function DashboardView({
     setLoadingTasks(true)
     setTasksError(false)
     try {
-      let url = '/api/tasks'
-      if (taskFilter === 'today') url += '?dueDate=today'
-      else if (taskFilter === 'overdue') url += '?dueDate=overdue'
-      else if (taskFilter === 'pending') url += '?status=pending'
+      const params = new URLSearchParams()
+      if (taskFilter !== 'all') {
+        params.set('limit', '50')
+        if (taskFilter === 'today') params.set('dueDate', 'today')
+        else if (taskFilter === 'overdue') params.set('dueDate', 'overdue')
+        else if (taskFilter === 'pending') params.set('status', 'pending')
+      }
+      const qs = params.toString()
+      const url = qs ? `/api/tasks?${qs}` : '/api/tasks'
 
       const data = await cachedFetch<Task[]>(url, { ttl: 15_000 })
       if (isStale(gen)) return

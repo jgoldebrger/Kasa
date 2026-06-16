@@ -3,14 +3,30 @@ import { Task, Family, FamilyMember, Payment, Organization } from '@/lib/models'
 import { handler } from '@/lib/api/handler'
 import { audit } from '@/lib/audit'
 import { task as taskSchemas } from '@/lib/schemas'
+import { z } from 'zod'
+import { objectId, paginationLimit, UNBOUNDED_LIST_CAP } from '@/lib/schemas'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { calendarDayBoundsInTimeZone } from '@/lib/date-utils'
-import { collectCompoundCursorPages } from '@/lib/pagination'
+import {
+  compoundCursorFilter,
+  decodeCompoundCursor,
+  encodeCompoundCursor,
+  collectCompoundCursorPages,
+} from '@/lib/pagination'
 
 export const dynamic = 'force-dynamic'
 
-const TASK_STATUSES = ['pending', 'in_progress', 'completed', 'cancelled'] as const
-const TASK_PRIORITIES = ['low', 'medium', 'high', 'urgent'] as const
+const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=15' }
+
+const listQuery = z.object({
+  status: z.enum(['pending', 'in_progress', 'completed', 'cancelled']).optional(),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+  dueDate: z.enum(['today', 'overdue', 'upcoming']).optional(),
+  relatedFamilyId: objectId.optional(),
+  relatedMemberId: objectId.optional(),
+  limit: paginationLimit,
+  cursor: z.string().min(1).max(400).optional(),
+})
 
 /**
  * Validate that every related ObjectId on a task belongs to the active
@@ -61,12 +77,57 @@ async function assertRelatedScoped(
 
 export { assertRelatedScoped }
 
+async function buildTaskListFilter(
+  organizationId: string,
+  query: z.infer<typeof listQuery>,
+): Promise<{ ok: true; filter: Record<string, unknown> } | { ok: false; status: number; error: string }> {
+  const filter: Record<string, unknown> = { organizationId }
+
+  if (query.status) filter.status = query.status
+  if (query.priority) filter.priority = query.priority
+
+  if (query.relatedFamilyId) {
+    const scopeCheck = await assertRelatedScoped(organizationId, {
+      relatedFamilyId: query.relatedFamilyId,
+    })
+    if (!scopeCheck.ok) {
+      return { ok: false, status: scopeCheck.status, error: scopeCheck.error }
+    }
+    filter.relatedFamilyId = query.relatedFamilyId
+  }
+  if (query.relatedMemberId) {
+    const scopeCheck = await assertRelatedScoped(organizationId, {
+      relatedMemberId: query.relatedMemberId,
+    })
+    if (!scopeCheck.ok) {
+      return { ok: false, status: scopeCheck.status, error: scopeCheck.error }
+    }
+    filter.relatedMemberId = query.relatedMemberId
+  }
+
+  if (query.dueDate === 'today' || query.dueDate === 'overdue' || query.dueDate === 'upcoming') {
+    const org = await Organization.findById(organizationId).select('timezone').lean<{ timezone?: string }>()
+    const { from, toExclusive } = calendarDayBoundsInTimeZone(org?.timezone)
+    if (query.dueDate === 'today') {
+      filter.dueDate = { $gte: from, $lt: toExclusive }
+    } else if (query.dueDate === 'overdue') {
+      filter.dueDate = { $lt: from }
+      filter.status = { $ne: 'completed' }
+    } else {
+      filter.dueDate = { $gte: from }
+    }
+  }
+
+  return { ok: true, filter }
+}
+
 // GET /api/tasks — list tasks with optional filters.
 export const GET = handler({
   auth: 'org',
   minRole: 'admin',
+  query: listQuery,
   name: 'GET /api/tasks',
-  fn: async ({ ctx, request }) => {
+  fn: async ({ ctx, query, request }) => {
     const rateVerdict = await checkRateLimit(
       request,
       'tasks-list',
@@ -77,86 +138,72 @@ export const GET = handler({
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    const url = new URL(request.url)
-    const status = url.searchParams.get('status')
-    const priority = url.searchParams.get('priority')
-    const dueDate = url.searchParams.get('dueDate')
-    const relatedFamilyId = url.searchParams.get('relatedFamilyId')
-    const relatedMemberId = url.searchParams.get('relatedMemberId')
-
-    const query: Record<string, unknown> = { organizationId: ctx!.organizationId }
-    if (status) {
-      if (!(TASK_STATUSES as readonly string[]).includes(status)) {
-        return { status: 400, data: { error: 'Invalid status filter' } }
-      }
-      query.status = status
-    }
-    if (priority) {
-      if (!(TASK_PRIORITIES as readonly string[]).includes(priority)) {
-        return { status: 400, data: { error: 'Invalid priority filter' } }
-      }
-      query.priority = priority
-    }
-    if (relatedFamilyId) {
-      const scopeCheck = await assertRelatedScoped(ctx!.organizationId, {
-        relatedFamilyId,
-      })
-      if (!scopeCheck.ok) {
-        return { status: scopeCheck.status, data: { error: scopeCheck.error } }
-      }
-      query.relatedFamilyId = relatedFamilyId
-    }
-    if (relatedMemberId) {
-      const scopeCheck = await assertRelatedScoped(ctx!.organizationId, {
-        relatedMemberId,
-      })
-      if (!scopeCheck.ok) {
-        return { status: scopeCheck.status, data: { error: scopeCheck.error } }
-      }
-      query.relatedMemberId = relatedMemberId
+    const built = await buildTaskListFilter(ctx!.organizationId, query)
+    if (!built.ok) {
+      return { status: built.status, data: { error: built.error } }
     }
 
-    if (dueDate === 'today' || dueDate === 'overdue' || dueDate === 'upcoming') {
-      const org = await Organization.findById(ctx!.organizationId).select('timezone').lean<{ timezone?: string }>()
-      const { from, toExclusive } = calendarDayBoundsInTimeZone(org?.timezone)
-      if (dueDate === 'today') {
-        query.dueDate = { $gte: from, $lt: toExclusive }
-      } else if (dueDate === 'overdue') {
-        query.dueDate = { $lt: from }
-        query.status = { $ne: 'completed' }
-      } else {
-        query.dueDate = { $gte: from }
+    const filter = { ...built.filter }
+    if (query.cursor) {
+      const c = decodeCompoundCursor(query.cursor)
+      if (!c) {
+        return { status: 400, data: { error: 'Invalid cursor' } }
       }
+      const cursorDate = c.v === null ? null : new Date(c.v as number)
+      Object.assign(filter, compoundCursorFilter('dueDate', cursorDate, c.id, 1))
     }
 
-    // Populate is org-safe here because every related document is also
-    // org-scoped at write time (validated in POST/PUT); we additionally
-    // filter the populated docs to the active org as defense-in-depth.
-    const tasks = await collectCompoundCursorPages(
-      (pageFilter, limit) =>
-        Task.find(pageFilter)
-          .populate({
-            path: 'relatedFamilyId',
-            select: 'name organizationId',
-            match: { organizationId: ctx!.organizationId },
+    const clientLimit = query.limit ?? 0
+    const effectiveLimit = clientLimit > 0 ? clientLimit : UNBOUNDED_LIST_CAP
+
+    const loadTaskPage = async (pageFilter: Record<string, unknown>, limit: number) =>
+      Task.find(pageFilter)
+        .populate({
+          path: 'relatedFamilyId',
+          select: 'name organizationId',
+          match: { organizationId: ctx!.organizationId },
+        })
+        .populate({
+          path: 'relatedMemberId',
+          select: 'firstName lastName organizationId',
+          match: { organizationId: ctx!.organizationId },
+        })
+        .sort({ dueDate: 1, priority: -1, _id: 1 })
+        .limit(limit)
+        .lean()
+
+    let tasks: any[]
+    let nextCursor: string | null = null
+    if (clientLimit > 0) {
+      const rows = await loadTaskPage(filter, effectiveLimit + 1)
+      tasks = rows
+      if (rows.length > effectiveLimit) {
+        tasks = rows.slice(0, effectiveLimit)
+        const last = tasks[tasks.length - 1]
+        if (last) {
+          nextCursor = encodeCompoundCursor({
+            v: last.dueDate ? new Date(last.dueDate).getTime() : null,
+            id: String(last._id),
           })
-          .populate({
-            path: 'relatedMemberId',
-            select: 'firstName lastName organizationId',
-            match: { organizationId: ctx!.organizationId },
-          })
-          .sort({ dueDate: 1, priority: -1, _id: 1 })
-          .limit(limit).lean(),
-      query,
-      'dueDate',
-      1,
-      (last) => ({
-        v: last.dueDate ? new Date(last.dueDate as string | Date).getTime() : null,
-        id: String(last._id),
-      }),
-    )
+        }
+      }
+    } else {
+      tasks = await collectCompoundCursorPages(
+        loadTaskPage,
+        filter,
+        'dueDate',
+        1,
+        (last) => ({
+          v: last.dueDate ? new Date(last.dueDate as string | Date).getTime() : null,
+          id: String(last._id),
+        }),
+      )
+    }
 
-    return { data: tasks }
+    return {
+      data: clientLimit > 0 ? { items: tasks, nextCursor } : tasks,
+      headers: CACHE_HEADERS,
+    }
   },
 })
 

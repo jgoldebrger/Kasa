@@ -9,12 +9,17 @@ import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { useToast } from '@/app/components/Toast'
 import {
+  Button,
   DataView,
   EmptyState,
   PageHeader,
   SkeletonRows,
   type DataColumn,
 } from '@/app/components/ui'
+import {
+  EVENTS_LIST_PAGE_SIZE,
+  parseEventsListResponse,
+} from '@/lib/client/events-list'
 
 interface LifecycleEvent {
   _id: string
@@ -53,56 +58,81 @@ function eventTypeBadgeClass(eventType: string): string {
 
 export interface EventsViewProps {
   initialEvents?: LifecycleEvent[]
+  initialNextCursor?: string | null
 }
 
-export default function EventsView({ initialEvents }: EventsViewProps = {}) {
+export default function EventsView({
+  initialEvents,
+  initialNextCursor = null,
+}: EventsViewProps = {}) {
   const toast = useToast()
   const { format: formatMoney } = useCurrency()
   const serverHydrated = initialEvents !== undefined
   const [events, setEvents] = useState<LifecycleEvent[]>(initialEvents ?? [])
+  const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor)
   const [loading, setLoading] = useState(!serverHydrated)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const [visibleEvents, setVisibleEvents] = useState<LifecycleEvent[]>([])
   const hasFetchedRef = useRef(serverHydrated)
   const { begin, invalidate, isStale } = useRequestGeneration()
 
-  const fetchEvents = useCallback(async () => {
-    const gen = begin()
-    try {
-      setLoading(true)
-      setLoadError(false)
-      const res = await fetch('/api/events')
-      if (isStale(gen)) return
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json().catch(() => [])
-      if (isStale(gen)) return
-      setEvents(Array.isArray(data) ? data : [])
-    } catch {
-      if (isStale(gen)) return
-      setLoadError(true)
-      toast.error('Could not load events.')
-    } finally {
-      if (!isStale(gen)) setLoading(false)
-    }
-  }, [toast, begin, isStale])
+  const fetchEvents = useCallback(
+    async (opts?: { cursor?: string | null; append?: boolean }) => {
+      const gen = begin()
+      const append = opts?.append ?? false
+      try {
+        if (append) setLoadingMore(true)
+        else {
+          setLoading(true)
+          setLoadError(false)
+        }
+        const params = new URLSearchParams({ limit: String(EVENTS_LIST_PAGE_SIZE) })
+        if (opts?.cursor) params.set('cursor', opts.cursor)
+        const res = await fetch(`/api/events?${params}`)
+        if (isStale(gen)) return
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json().catch(() => null)
+        if (isStale(gen)) return
+        const { items, nextCursor: pageNext } = parseEventsListResponse(data)
+        setEvents((prev) =>
+          append ? [...prev, ...(items as LifecycleEvent[])] : (items as LifecycleEvent[]),
+        )
+        setNextCursor(pageNext)
+      } catch {
+        if (isStale(gen)) return
+        if (!append) {
+          setEvents([])
+          setNextCursor(null)
+          setLoadError(true)
+          toast.error('Could not load events.')
+        } else {
+          toast.error('Could not load more events.')
+        }
+      } finally {
+        if (!isStale(gen)) {
+          setLoading(false)
+          setLoadingMore(false)
+        }
+      }
+    },
+    [toast, begin, isStale],
+  )
 
   useEffect(() => {
     if (hasFetchedRef.current) return
     hasFetchedRef.current = true
-    let cancelled = false
-    void fetchEvents().finally(() => {
-      if (cancelled) setEvents([])
-    })
-    return () => {
-      cancelled = true
-    }
+    void fetchEvents()
   }, [fetchEvents])
 
   useOrgChanged(useCallback(() => {
     invalidate()
     hasFetchedRef.current = false
     setEvents([])
+    setNextCursor(null)
     setLoadError(false)
+    setLoading(true)
+    hasFetchedRef.current = true
     fetchEvents()
   }, [fetchEvents, invalidate]))
 
@@ -232,7 +262,7 @@ export default function EventsView({ initialEvents }: EventsViewProps = {}) {
             rowKey={(e) => e._id}
             globalSearch={{ placeholder: 'Search family, type, notes…' }}
             pageSize={10}
-            import={{ type: 'lifecycle-events', onImported: () => fetchEvents() }}
+            import={{ type: 'lifecycle-events', onImported: () => fetchEvents({}) }}
             onFilteredRowsChange={setVisibleEvents}
             mobileCard={(e) => <EventMobileCard event={e} />}
             empty={
@@ -243,6 +273,18 @@ export default function EventsView({ initialEvents }: EventsViewProps = {}) {
               />
             }
           />
+        )}
+
+        {!loading && !loadError && nextCursor && (
+          <div className="mt-4 flex justify-center">
+            <Button
+              variant="secondary"
+              loading={loadingMore}
+              onClick={() => fetchEvents({ cursor: nextCursor, append: true })}
+            >
+              {loadingMore ? 'Loading…' : 'Load more'}
+            </Button>
+          </div>
         )}
       </div>
     </div>

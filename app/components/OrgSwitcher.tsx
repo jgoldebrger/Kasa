@@ -47,19 +47,27 @@ export default function OrgSwitcher() {
   const [creating, setCreating] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
+  const [loadingOrgs, setLoadingOrgs] = useState(false)
   const ref = useRef<HTMLDivElement | null>(null)
+  const hasLoadedOrgs = useRef(false)
 
   const load = async (force = false) => {
+    setLoadingOrgs(true)
     try {
       const data = await loadOrgs(force)
       setOrgs(data.organizations)
       setActiveId(data.activeOrgId)
-    } catch {}
+    } catch {} finally {
+      setLoadingOrgs(false)
+    }
   }
 
   useEffect(() => {
-    load()
-  }, [])
+    if (open && !hasLoadedOrgs.current) {
+      hasLoadedOrgs.current = true
+      load()
+    }
+  }, [open])
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -155,7 +163,7 @@ export default function OrgSwitcher() {
     }
   }
 
-  if (orgs.length === 0) return null
+  if (hasLoadedOrgs.current && orgs.length === 0) return null
 
 
   // When the user has only one org the dropdown is just visual noise —
@@ -177,13 +185,13 @@ export default function OrgSwitcher() {
         <OrgLogo size={20} fallbackChar={active?.name?.[0]} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-fg truncate">
-            {switching ? 'Switching workspace…' : active?.name || 'Select organization'}
+            {switching ? 'Switching workspace…' : loadingOrgs ? 'Loading…' : active?.name || 'Select organization'}
           </p>
           {!isSolo && active && !switching && (
             <p className="text-[11px] text-fg-muted capitalize">{active.role}</p>
           )}
         </div>
-        {switching ? <InlineSpinner /> : <ChevronUpDownIcon className="h-4 w-4 text-fg-subtle shrink-0" aria-hidden="true" />}
+        {switching || loadingOrgs ? <InlineSpinner /> : <ChevronUpDownIcon className="h-4 w-4 text-fg-subtle shrink-0" aria-hidden="true" />}
       </button>
 
       {open && (

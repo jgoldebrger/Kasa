@@ -146,7 +146,7 @@ export const GET = handler({
     const body = clientLimit > 0 ? { items: out, nextCursor } : out
     return {
       data: body,
-      headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=300' },
+      headers: { 'Cache-Control': 'private, max-age=15' },
     }
   },
 })

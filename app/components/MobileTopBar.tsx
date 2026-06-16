@@ -1,10 +1,12 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
 import { Bars3Icon } from '@heroicons/react/24/outline'
 import OrgLogo from './OrgLogo'
-import GlobalSearch from './GlobalSearch'
-import NotificationsBell from './NotificationsBell'
+
+const GlobalSearch = dynamic(() => import('./GlobalSearch'), { ssr: false })
+const NotificationsBell = dynamic(() => import('./NotificationsBell'), { ssr: false })
 
 /**
  * Map a route prefix to a friendly title shown in the mobile top bar.

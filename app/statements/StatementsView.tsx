@@ -19,6 +19,8 @@ import { formatLocaleDate, isFiniteDate } from '@/lib/date-utils'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { useCurrency } from '@/lib/client/useCurrency'
+import { cachedFetch } from '@/lib/client-cache'
+import { parseFamiliesListResponse } from '@/lib/client/families-list'
 import {
   Button,
   DataView,
@@ -132,12 +134,10 @@ const buildStatementTxColumns = (
 
 export interface StatementsViewProps {
   initialStatements?: Statement[]
-  initialFamilies?: Family[]
 }
 
 export default function StatementsView({
   initialStatements,
-  initialFamilies,
 }: StatementsViewProps = {}) {
   const toast = useToast()
   const confirm = useConfirm()
@@ -145,10 +145,16 @@ export default function StatementsView({
   const statementTxColumns = useMemo(() => buildStatementTxColumns(formatMoney), [formatMoney])
   const statementsHydrated = initialStatements !== undefined
   const [statements, setStatements] = useState<Statement[]>(initialStatements ?? [])
-  const [families, setFamilies] = useState<Family[]>(initialFamilies ?? [])
+  const [familyNameById, setFamilyNameById] = useState<Record<string, string>>({})
+  const [pickerFamilies, setPickerFamilies] = useState<Family[]>([])
+  const [pickerSearch, setPickerSearch] = useState('')
+  const [debouncedPickerSearch, setDebouncedPickerSearch] = useState('')
+  const [pickerLoading, setPickerLoading] = useState(false)
   const [loading, setLoading] = useState(!statementsHydrated)
   const [error, setError] = useState(false)
   const hasFetchedRef = useRef(statementsHydrated)
+  const hasFetchedPickerFamiliesRef = useRef(false)
+  const pickerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mountedRef = useRef(true)
   const pollGenRef = useRef(0)
   const { begin, invalidate, isStale } = useRequestGeneration()
@@ -181,32 +187,77 @@ export default function StatementsView({
   const [emailConfig, setEmailConfig] = useState<any>(null)
   const [saveEmailConfig, setSaveEmailConfig] = useState(false)
 
+  const getFamilyName = useCallback(
+    (familyId: string) => familyNameById[familyId] || 'N/A',
+    [familyNameById],
+  )
+
+  const resolveFamilyNames = useCallback(
+    async (familyIds: string[]) => {
+      const gen = begin()
+      const unique = [...new Set(familyIds.filter(Boolean))]
+      if (unique.length === 0) return
+      const entries = await Promise.all(
+        unique.map(async (id) => {
+          try {
+            const data = await cachedFetch<any>(`/api/families/${id}?view=summary`, {
+              ttl: 60_000,
+            })
+            if (isStale(gen)) return null
+            const name = data?.family?.name ?? data?.name
+            return name ? ([id, name] as const) : null
+          } catch {
+            return null
+          }
+        }),
+      )
+      if (isStale(gen)) return
+      setFamilyNameById((prev) => {
+        const next = { ...prev }
+        for (const entry of entries) {
+          if (entry) next[entry[0]] = entry[1]
+        }
+        return next
+      })
+    },
+    [begin, isStale],
+  )
+
+  const fetchPickerFamilies = useCallback(async () => {
+    const gen = begin()
+    setPickerLoading(true)
+    try {
+      const data = await cachedFetch('/api/families?limit=20', { ttl: 30_000 })
+      if (isStale(gen)) return
+      const { items } = parseFamiliesListResponse<Family>(data)
+      setPickerFamilies(items)
+    } catch {
+      if (!isStale(gen)) setPickerFamilies([])
+    } finally {
+      if (!isStale(gen)) setPickerLoading(false)
+    }
+  }, [begin, isStale])
+
+  const filteredPickerFamilies = useMemo(() => {
+    const q = debouncedPickerSearch.trim().toLowerCase()
+    if (!q) return pickerFamilies
+    return pickerFamilies.filter((f) => f.name.toLowerCase().includes(q))
+  }, [pickerFamilies, debouncedPickerSearch])
+
   const fetchData = useCallback(async () => {
     const gen = begin()
     setError(false)
     try {
-      const [statementsRes, familiesRes] = await Promise.all([
-        fetch('/api/statements'),
-        fetch('/api/families'),
-      ])
+      const statementsRes = await fetch('/api/statements')
       if (isStale(gen)) return
-      if (!statementsRes.ok || !familiesRes.ok) throw new Error()
+      if (!statementsRes.ok) throw new Error()
       const statementsData = await statementsRes.json()
-      const familiesData = await familiesRes.json()
       if (isStale(gen)) return
 
-      // Normalize both responses to flat arrays — if a future caller
-      // passes `?limit=` the endpoint returns `{ items, nextCursor }`
-      // and the page would otherwise show zero rows.
       const statementsList: Statement[] = Array.isArray(statementsData)
         ? statementsData
         : Array.isArray(statementsData?.items)
           ? statementsData.items
-          : []
-      const familiesList: any[] = Array.isArray(familiesData)
-        ? familiesData
-        : Array.isArray(familiesData?.items)
-          ? familiesData.items
           : []
 
       const now = new Date()
@@ -217,13 +268,11 @@ export default function StatementsView({
         const stmtDate = new Date(stmt.fromDate)
         return stmtDate >= lastMonth && stmtDate <= lastMonthEnd
       })
-      // Use a copy — don't mutate the parsed response in place, since
-      // future code may share that reference.
       const sortedStatements = [...lastMonthStatements].sort(
         (a: Statement, b: Statement) => new Date(b.date).getTime() - new Date(a.date).getTime(),
       )
       setStatements(sortedStatements)
-      setFamilies(familiesList)
+      void resolveFamilyNames(sortedStatements.map((s) => s.familyId))
     } catch {
       if (isStale(gen)) return
       setError(true)
@@ -231,7 +280,7 @@ export default function StatementsView({
     } finally {
       if (!isStale(gen)) setLoading(false)
     }
-  }, [toast, begin, isStale])
+  }, [toast, begin, isStale, resolveFamilyNames])
 
   useEffect(() => {
     if (!hasFetchedRef.current) {
@@ -266,12 +315,46 @@ export default function StatementsView({
       .catch(() => {})
   }, [fetchData])
 
+  useEffect(() => {
+    if (statementsHydrated && statements.length > 0) {
+      void resolveFamilyNames(statements.map((s) => s.familyId))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (!showModal) {
+      hasFetchedPickerFamiliesRef.current = false
+      setPickerSearch('')
+      setDebouncedPickerSearch('')
+      return
+    }
+    if (hasFetchedPickerFamiliesRef.current) return
+    hasFetchedPickerFamiliesRef.current = true
+    void fetchPickerFamilies()
+  }, [showModal, fetchPickerFamilies])
+
+  useEffect(() => {
+    if (!showModal) return
+    if (pickerDebounceRef.current) clearTimeout(pickerDebounceRef.current)
+    pickerDebounceRef.current = setTimeout(() => {
+      setDebouncedPickerSearch(pickerSearch)
+    }, 300)
+    return () => {
+      if (pickerDebounceRef.current) clearTimeout(pickerDebounceRef.current)
+    }
+  }, [showModal, pickerSearch])
+
   useOrgChanged(useCallback(() => {
     invalidate()
     pollGenRef.current += 1
     hasFetchedRef.current = false
+    hasFetchedPickerFamiliesRef.current = false
     setStatements([])
-    setFamilies([])
+    setFamilyNameById({})
+    setPickerFamilies([])
+    setPickerSearch('')
+    setDebouncedPickerSearch('')
     setStatementDetails({})
     setExpandedStatement(null)
     // Clear cross-tenant email config + UI state. Without this the
@@ -360,7 +443,7 @@ export default function StatementsView({
   }
 
   const handlePrint = async (statement: Statement) => {
-    const family = families.find((f) => f._id === statement.familyId)
+    const familyName = getFamilyName(statement.familyId)
     const transactions = statementDetails[statement._id] || []
 
     if (transactions.length === 0) {
@@ -432,7 +515,7 @@ export default function StatementsView({
                   <td style="padding: 5px 0; text-align: right;"><strong>Date:</strong> ${escapeHtml(new Date(statement.date).toLocaleDateString())}</td>
                 </tr>
                 <tr>
-                  <td style="padding: 5px 0;"><strong>Family:</strong> ${escapeHtml(family?.name || 'N/A')}</td>
+                  <td style="padding: 5px 0;"><strong>Family:</strong> ${escapeHtml(familyName === 'N/A' ? 'N/A' : familyName)}</td>
                   <td style="padding: 5px 0; text-align: right;"><strong>Period:</strong> ${escapeHtml(new Date(statement.fromDate).toLocaleDateString())} - ${escapeHtml(new Date(statement.toDate).toLocaleDateString())}</td>
                 </tr>
               </table>
@@ -686,8 +769,8 @@ export default function StatementsView({
                 globalSearch={{
                   placeholder: 'Search statement #, family…',
                   getValue: (s) => {
-                    const family = families.find((f) => f._id === s.familyId)
-                    return [s.statementNumber, family?.name].filter(Boolean).join(' ')
+                    const name = getFamilyName(s.familyId)
+                    return [s.statementNumber, name === 'N/A' ? '' : name].filter(Boolean).join(' ')
                   },
                 }}
                 pageSize={10}
@@ -703,12 +786,17 @@ export default function StatementsView({
                     id: 'family',
                     header: 'Family',
                     headerText: 'Family',
-                    cell: (s) => families.find((f) => f._id === s.familyId)?.name || 'N/A',
-                    exportValue: (s) =>
-                      families.find((f) => f._id === s.familyId)?.name || '',
+                    cell: (s) => getFamilyName(s.familyId),
+                    exportValue: (s) => {
+                      const name = getFamilyName(s.familyId)
+                      return name === 'N/A' ? '' : name
+                    },
                     filter: {
                       type: 'select',
-                      getValue: (s) => families.find((f) => f._id === s.familyId)?.name || '',
+                      getValue: (s) => {
+                        const name = getFamilyName(s.familyId)
+                        return name === 'N/A' ? '' : name
+                      },
                     },
                   },
                   {
@@ -770,7 +858,8 @@ export default function StatementsView({
                   },
                 ]}
                 mobileCard={(statement) => {
-                  const family = families.find((f) => f._id === statement.familyId)
+                  const familyName = getFamilyName(statement.familyId)
+                  const familyId = statement.familyId
                   const isExpanded = expandedStatement === statement._id
                   const transactions = statementDetails[statement._id] || []
                   return (
@@ -783,12 +872,12 @@ export default function StatementsView({
                           </div>
                           <div>
                             <div className="text-xs text-fg-muted">Family</div>
-                            {family ? (
+                            {familyName !== 'N/A' ? (
                               <Link
-                                href={`/families/${family._id}`}
+                                href={`/families/${familyId}`}
                                 className="focus-ring font-medium text-accent hover:text-accent-hover hover:underline rounded"
                               >
-                                {family.name}
+                                {familyName}
                               </Link>
                             ) : (
                               <div className="font-medium text-fg-muted">N/A</div>
@@ -936,14 +1025,22 @@ export default function StatementsView({
         {/* Generate Single Statement */}
         <Modal open={showModal} onClose={() => setShowModal(false)} title="Generate Statement" maxWidth="max-w-md">
           <form onSubmit={handleGenerate} className="space-y-4" noValidate>
+            <Input
+              label="Search families"
+              type="search"
+              placeholder="Type to filter…"
+              value={pickerSearch}
+              onChange={(e) => setPickerSearch(e.target.value)}
+            />
             <Select
               label="Family"
               required
               value={formData.familyId}
               onChange={(e) => setFormData({ ...formData, familyId: e.target.value })}
+              disabled={pickerLoading}
             >
-              <option value="">Select a family</option>
-              {families.map((family) => (
+              <option value="">{pickerLoading ? 'Loading families…' : 'Select a family'}</option>
+              {filteredPickerFamilies.map((family) => (
                 <option key={family._id} value={family._id}>
                   {family.name}
                 </option>

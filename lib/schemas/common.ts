@@ -156,6 +156,9 @@ export const paginationLimit = positiveInt.max(500).optional()
  */
 export const UNBOUNDED_LIST_CAP = 1000
 
+/** Max family IDs per scoped GET /api/families/balances request. */
+export const FAMILY_BALANCES_IDS_CAP = 100
+
 export const paginationCursor = z
   .string()
   .regex(/^[a-f0-9]{24}$/i, 'Invalid cursor')

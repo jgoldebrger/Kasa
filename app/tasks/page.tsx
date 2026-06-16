@@ -1,47 +1,50 @@
 import { Suspense } from 'react'
 import { requireServerOrgContext } from '@/lib/auth-server'
 import connectDB from '@/lib/database'
-import { Family, Task } from '@/lib/models'
+import { Task } from '@/lib/models'
+import { TASKS_LIST_PAGE_SIZE } from '@/lib/client/tasks-list'
+import { encodeCompoundCursor } from '@/lib/pagination'
 import TasksView from './TasksView'
 import TasksLoading from './loading'
 
 export const dynamic = 'force-dynamic'
 
-async function fetchInitialTasksData(organizationId: string) {
+async function fetchInitialTasks(organizationId: string) {
   await connectDB()
+  const rows = await Task.find({ organizationId })
+    .select(
+      'title description dueDate email status priority relatedFamilyId relatedMemberId relatedPaymentId organizationId createdAt updatedAt completedAt',
+    )
+    .populate('relatedFamilyId', 'name')
+    .populate('relatedMemberId', 'firstName lastName')
+    .sort({ dueDate: 1, priority: -1, _id: 1 })
+    .limit(TASKS_LIST_PAGE_SIZE + 1)
+    .lean<any[]>()
 
-  // Default filter on the page is "all" — mirror what /api/tasks returns
-  // for an unfiltered request. We only need a slim families list (for the
-  // assignee dropdown), so project just _id + name + hebrewName.
-  const [taskDocs, familyDocs] = await Promise.all([
-    Task.find({ organizationId })
-      .select(
-        'title description dueDate email status priority relatedFamilyId relatedMemberId relatedPaymentId organizationId createdAt updatedAt completedAt',
-      )
-      .populate('relatedFamilyId', 'name')
-      .populate('relatedMemberId', 'firstName lastName')
-      .sort({ dueDate: 1, priority: -1 })
-      .lean<any[]>(),
-    Family.find({ organizationId })
-      .select('_id name hebrewName')
-      .sort({ name: 1 })
-      .lean<any[]>(),
-  ])
+  let nextCursor: string | null = null
+  let items = rows
+  if (rows.length > TASKS_LIST_PAGE_SIZE) {
+    items = rows.slice(0, TASKS_LIST_PAGE_SIZE)
+    const last = items[items.length - 1]
+    if (last) {
+      nextCursor = encodeCompoundCursor({
+        v: last.dueDate ? new Date(last.dueDate).getTime() : null,
+        id: String(last._id),
+      })
+    }
+  }
 
-  // JSON round-trip flattens ObjectId/Date into plain values so the RSC
-  // payload serializer doesn't fall back to its slow path.
-  const initialTasks = taskDocs.map((t) => JSON.parse(JSON.stringify(t)))
-  const initialFamilies = familyDocs.map((f) => JSON.parse(JSON.stringify(f)))
-  return { initialTasks, initialFamilies }
+  return {
+    items: items.map((t) => JSON.parse(JSON.stringify(t))),
+    nextCursor,
+  }
 }
 
 async function TasksServer() {
   const ctx = await requireServerOrgContext({ minRole: 'admin' })
   try {
-    const data = await fetchInitialTasksData(ctx.organizationId)
-    return (
-      <TasksView initialTasks={data.initialTasks} initialFamilies={data.initialFamilies} />
-    )
+    const { items, nextCursor } = await fetchInitialTasks(ctx.organizationId)
+    return <TasksView initialTasks={items} initialNextCursor={nextCursor} />
   } catch (err) {
     console.error('[tasks] server prefetch failed:', err)
     return <TasksView />

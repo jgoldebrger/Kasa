@@ -30,18 +30,12 @@ const stubStatement = {
   closingBalance: 100,
 }
 
-const stubFamily = {
-  _id: 'fam-1',
-  name: 'Smoke Family',
-}
-
 describe('StatementsView smoke', () => {
   it('renders without crashing', () => {
     const { container } = render(
       <ToastProvider>
         <StatementsView
           initialStatements={[stubStatement]}
-          initialFamilies={[stubFamily]}
         />
       </ToastProvider>,
     )

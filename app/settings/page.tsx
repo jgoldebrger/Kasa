@@ -4,7 +4,6 @@ import connectDB from '@/lib/database'
 import {
   CycleConfig,
   EmailConfig,
-  Family,
   LifecycleEvent,
   Organization,
   PaymentPlan,
@@ -28,31 +27,23 @@ const CYCLE_DEFAULTS = {
 async function fetchInitialSettings(organizationId: string) {
   await connectDB()
 
-  // Five parallel reads, identical to what the client's mount useEffect
+  // Four parallel reads, identical to what the client's mount useEffect
   // used to fan out as five sequential /api calls. Doing them on the
   // server eliminates the cold-compile penalty per route in dev mode
   // and one round-trip per call in prod.
-  const [emailDoc, eventTypeDocs, planDocs, cycleDoc, familyDocs, orgDoc] =
-    await Promise.all([
-      EmailConfig.findOne({ isActive: true, organizationId }).lean<any>(),
-      LifecycleEvent.find({ organizationId })
-        .sort({ name: 1 })
-        .lean<any[]>(),
-      // Payment plans + their family rosters, matching /api/payment-plans.
-      // We do plans first, then a single $in join to pull family rosters
-      // (avoids the N+1 the legacy route had to defensively fix).
-      PaymentPlan.find({ organizationId })
-        .sort({ planNumber: 1 })
-        .lean<any[]>(),
-      CycleConfig.findOne({ isActive: true, organizationId }).lean<any>(),
-      Family.find({ organizationId })
-        .select('_id name weddingDate paymentPlanId')
-        .sort({ name: 1 })
-        .lean<any[]>(),
-      Organization.findById(organizationId)
-        .select('planTier subscriptionStatus trialEndsAt currentPeriodEnd stripeCustomerId')
-        .lean<any>(),
-    ])
+  const [emailDoc, eventTypeDocs, planDocs, cycleDoc, orgDoc] = await Promise.all([
+    EmailConfig.findOne({ isActive: true, organizationId }).lean<any>(),
+    LifecycleEvent.find({ organizationId })
+      .sort({ name: 1 })
+      .lean<any[]>(),
+    PaymentPlan.find({ organizationId })
+      .sort({ planNumber: 1 })
+      .lean<any[]>(),
+    CycleConfig.findOne({ isActive: true, organizationId }).lean<any>(),
+    Organization.findById(organizationId)
+      .select('planTier subscriptionStatus trialEndsAt currentPeriodEnd stripeCustomerId')
+      .lean<any>(),
+  ])
 
   // ---- email-config: normalize "no doc" into { configured: false } ----
   const initialEmailConfig = emailDoc
@@ -67,31 +58,17 @@ async function fetchInitialSettings(organizationId: string) {
   // ---- event types ----
   const initialEventTypes = eventTypeDocs.map((e) => JSON.parse(JSON.stringify(e)))
 
-  // ---- payment plans with family rosters (matches /api/payment-plans) ----
-  const byPlan = new Map<string, any[]>()
-  for (const f of familyDocs) {
-    if (!f.paymentPlanId) continue
-    const key = String(f.paymentPlanId)
-    if (!byPlan.has(key)) byPlan.set(key, [])
-    byPlan.get(key)!.push({
-      _id: String(f._id),
-      name: f.name,
-      weddingDate: f.weddingDate,
-    })
-  }
-  const initialPaymentPlans = planDocs.map((p: any) => {
-    const families = byPlan.get(String(p._id)) || []
-    return {
-      _id: String(p._id),
-      name: p.name,
-      yearlyPrice: p.yearlyPrice,
-      planNumber: p.planNumber,
-      createdAt: p.createdAt,
-      updatedAt: p.updatedAt,
-      familyCount: families.length,
-      families,
-    }
-  })
+  // ---- payment plans (family rosters load lazily in PaymentPlansPanel) ----
+  const initialPaymentPlans = planDocs.map((p: any) => ({
+    _id: String(p._id),
+    name: p.name,
+    yearlyPrice: p.yearlyPrice,
+    planNumber: p.planNumber,
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+    familyCount: 0,
+    families: [],
+  }))
 
   // ---- cycle config: matches the API's defaults-on-missing behavior ----
   const initialCycleConfig = cycleDoc

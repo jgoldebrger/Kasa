@@ -5,7 +5,7 @@ import { lifecycle as lifecycleSchemas } from '@/lib/schemas'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { loadAllByIdCursor } from '@/lib/org-pagination'
 
-const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' }
+const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=300' }
 
 // GET - Get all lifecycle event types (admin-only — includes default amounts).
 export const GET = handler({

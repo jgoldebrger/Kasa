@@ -15,6 +15,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useToast, useConfirm } from '@/app/components/Toast'
 import { cachedFetch, invalidate as invalidateCache } from '@/lib/client-cache'
+import { FAMILY_BALANCES_IDS_CAP } from '@/lib/schemas'
 import {
   collectAllFamiliesPages,
   FAMILIES_LIST_PAGE_SIZE,
@@ -196,8 +197,13 @@ export default function FamiliesView({
     async (list: Family[], gen: number) => {
       if (!isAdmin || list.length === 0) return list
       try {
+        const ids = list.map((f) => String(f._id))
+        const balancesUrl =
+          ids.length <= FAMILY_BALANCES_IDS_CAP
+            ? `/api/families/balances?familyIds=${ids.join(',')}`
+            : '/api/families/balances'
         const balances = await cachedFetch<Array<{ familyId: string; balance: number }>>(
-          '/api/families/balances',
+          balancesUrl,
           { ttl: 30_000 },
         )
         if (isStale(gen)) return list

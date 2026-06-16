@@ -1,7 +1,10 @@
 import { Suspense } from 'react'
 import { requireServerOrgContext } from '@/lib/auth-server'
 import connectDB from '@/lib/database'
-import { LifecycleEvent, LifecycleEventPayment } from '@/lib/models'
+import { LifecycleEventPayment } from '@/lib/models'
+import { EVENTS_LIST_PAGE_SIZE } from '@/lib/client/events-list'
+import { encodeCompoundCursor } from '@/lib/pagination'
+import { formatLifecycleEventPayments } from '@/lib/route-logic/events'
 import EventsView from './EventsView'
 import EventsLoading from './loading'
 
@@ -9,53 +12,36 @@ export const dynamic = 'force-dynamic'
 
 async function fetchInitialEvents(organizationId: string) {
   await connectDB()
+  const rows = await LifecycleEventPayment.find({ organizationId })
+    .sort({ eventDate: -1, _id: -1 })
+    .limit(EVENTS_LIST_PAGE_SIZE + 1)
+    .lean<any[]>()
 
-  // Parallel: payments (with populated family) + configured event types
-  // (drives the human label). One $in lookup, no N+1.
-  const [events, configuredTypes] = await Promise.all([
-    LifecycleEventPayment.find({ organizationId })
-      .sort({ eventDate: -1 })
-      .populate('familyId', 'name')
-      .lean<any[]>(),
-    LifecycleEvent.find({ organizationId }).select('type name').lean<any[]>(),
-  ])
-
-  const labelByType = new Map<string, string>(
-    configuredTypes.map((t) => [String(t.type || '').toLowerCase(), t.name || t.type]),
-  )
-
-  return events.map((evt) => {
-    const familyDoc = evt.familyId
-    const familyId =
-      familyDoc && typeof familyDoc === 'object'
-        ? String(familyDoc._id ?? '')
-        : familyDoc
-          ? String(familyDoc)
-          : ''
-    const familyName =
-      familyDoc && typeof familyDoc === 'object' && 'name' in familyDoc
-        ? (familyDoc as any).name
-        : 'Unknown Family'
-    const rawType = String(evt.eventType || '')
-    return {
-      _id: String(evt._id),
-      familyId,
-      familyName,
-      eventType: rawType,
-      eventTypeLabel: labelByType.get(rawType.toLowerCase()) || rawType,
-      eventDate: evt.eventDate ? new Date(evt.eventDate).toISOString() : '',
-      year: evt.year ?? 0,
-      amount: evt.amount ?? 0,
-      notes: evt.notes || '',
+  let nextCursor: string | null = null
+  let pageRows = rows
+  if (rows.length > EVENTS_LIST_PAGE_SIZE) {
+    pageRows = rows.slice(0, EVENTS_LIST_PAGE_SIZE)
+    const last = pageRows[pageRows.length - 1]
+    if (last) {
+      nextCursor = encodeCompoundCursor({
+        v: last.eventDate ? new Date(last.eventDate).getTime() : null,
+        id: String(last._id),
+      })
     }
-  })
+  }
+
+  const items = await formatLifecycleEventPayments(organizationId, pageRows)
+  return {
+    items: items.map((r) => JSON.parse(JSON.stringify(r))),
+    nextCursor,
+  }
 }
 
 async function EventsServer() {
   const ctx = await requireServerOrgContext({ minRole: 'admin' })
   try {
-    const initialEvents = await fetchInitialEvents(ctx.organizationId)
-    return <EventsView initialEvents={initialEvents} />
+    const { items, nextCursor } = await fetchInitialEvents(ctx.organizationId)
+    return <EventsView initialEvents={items} initialNextCursor={nextCursor} />
   } catch (err) {
     console.error('[events] server prefetch failed:', err)
     return <EventsView />
