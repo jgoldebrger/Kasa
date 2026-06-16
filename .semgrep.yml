@@ -26,7 +26,7 @@ rules:
 
   - id: mongoose-find-with-user-input
     patterns:
-      - pattern: $MODEL.find({ $KEY: $VAL })
+      - pattern: '$MODEL.find({ $KEY: $VAL })'
     message: Ensure $VAL is validated/sanitized before Mongo queries.
     severity: WARNING
     languages: [javascript, typescript]
