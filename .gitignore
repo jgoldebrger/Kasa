@@ -10,6 +10,9 @@
 coverage-*/
 coverage-out.txt
 coverage-*.txt
+full-coverage.txt
+npm-*.txt
+vitest-*.txt
 coverage-documents-targets.json
 /e2e/.auth/
 /security/playwright/.auth/
@@ -33,6 +36,7 @@ coverage-documents-targets.json
 # misc
 .DS_Store
 *.pem
+.cursor/
 
 # debug
 npm-debug.log*

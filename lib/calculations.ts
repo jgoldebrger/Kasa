@@ -59,31 +59,6 @@ const NET_PAYMENT_SUM = {
 const AMOUNT_SUM = { $sum: { $ifNull: ['$amount', 0] } } as const
 
 // ---------------------------------------------------------------------------
-// Pure helpers
-// ---------------------------------------------------------------------------
-
-/** Age (in completed years) of `birthDate` as of `referenceDate`. */
-export function calculateAge(birthDate: Date, referenceDate: Date = new Date()): number {
-  const birth = new Date(birthDate)
-  const ref = new Date(referenceDate)
-  if (!Number.isFinite(birth.getTime()) || !Number.isFinite(ref.getTime())) {
-    return NaN
-  }
-  let age = ref.getFullYear() - birth.getFullYear()
-  const monthDiff = ref.getMonth() - birth.getMonth()
-  if (monthDiff < 0 || (monthDiff === 0 && ref.getDate() < birth.getDate())) {
-    age--
-  }
-  return age
-}
-
-/** Age of `birthDate` measured at December 31st of `year`. */
-export function calculateAgeInYear(birthDate: Date, year: number): number {
-  const yearEnd = new Date(year, 11, 31)
-  return calculateAge(birthDate, yearEnd)
-}
-
-// ---------------------------------------------------------------------------
 // Per-organization breakdown types
 // ---------------------------------------------------------------------------
 

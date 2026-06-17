@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildPaymentYearFilter, calculateAge, calculateAgeInYear } from './calculations'
+import { buildPaymentYearFilter } from './calculations'
 import { netPaymentAmount } from './money'
 
 describe('netPaymentAmount', () => {
@@ -9,44 +9,6 @@ describe('netPaymentAmount', () => {
 
   it('never returns a negative contribution when refund exceeds amount', () => {
     expect(netPaymentAmount({ amount: 50, refundedAmount: 60 })).toBe(0)
-  })
-})
-
-describe('calculateAge', () => {
-  it('returns NaN when birth or reference date is invalid', () => {
-    expect(calculateAge(new Date('invalid'), new Date())).toBeNaN()
-    expect(calculateAge(new Date('2000-01-01'), new Date('not-a-date'))).toBeNaN()
-    expect(calculateAge(new Date(Number.NaN), new Date())).toBeNaN()
-  })
-
-  it('returns the correct age before the birthday in the year', () => {
-    const birth = new Date('2000-06-15')
-    const ref = new Date('2024-06-14')
-    expect(calculateAge(birth, ref)).toBe(23)
-  })
-
-  it('returns the correct age on the birthday', () => {
-    const birth = new Date('2000-06-15')
-    const ref = new Date('2024-06-15')
-    expect(calculateAge(birth, ref)).toBe(24)
-  })
-
-  it('returns the correct age in a later month', () => {
-    const birth = new Date('2000-06-15')
-    const ref = new Date('2024-12-31')
-    expect(calculateAge(birth, ref)).toBe(24)
-  })
-})
-
-describe('calculateAgeInYear', () => {
-  it('measures age as of December 31st of the target year', () => {
-    const birth = new Date('2010-03-01')
-    expect(calculateAgeInYear(birth, 2024)).toBe(14)
-  })
-
-  it('handles being born late in the same year as the target', () => {
-    const birth = new Date('2024-11-01')
-    expect(calculateAgeInYear(birth, 2024)).toBe(0)
   })
 })
 
