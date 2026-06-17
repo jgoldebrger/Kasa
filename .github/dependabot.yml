@@ -16,11 +16,13 @@ updates:
         patterns:
           - '*'
         exclude-patterns:
-          # Toolchain majors need coordinated upgrades (Next, PostCSS, ESLint).
+          # Toolchain majors need coordinated upgrades (Next, PostCSS, ESLint, TypeScript).
           - 'tailwindcss'
           - 'eslint'
           - 'eslint-config-next'
           - '@next/bundle-analyzer'
+          - 'typescript'
+          - '@types/node'
     ignore:
       # Tailwind v4 requires @tailwindcss/postcss — stay on v3 until migrated.
       - dependency-name: tailwindcss
@@ -29,6 +31,11 @@ updates:
       - dependency-name: eslint
         update-types: [version-update:semver-major]
       - dependency-name: eslint-config-next
+        update-types: [version-update:semver-major]
+      # TypeScript 6 breaks Next.js CSS import types until Next officially supports it.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      - dependency-name: '@types/node'
         update-types: [version-update:semver-major]
     commit-message:
       prefix: deps
