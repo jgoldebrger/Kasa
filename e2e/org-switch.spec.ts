@@ -13,8 +13,10 @@ test.describe('org switch', () => {
     await expect(familyLink(page, E2E_ORGS.alpha.markerFamily)).toBeVisible({ timeout: 30_000 })
     await expect(familyLink(page, E2E_ORGS.beta.markerFamily)).not.toBeVisible()
 
-    // Open org switcher (shows active org name).
-    await page.getByRole('button', { name: new RegExp(E2E_ORGS.alpha.name) }).click()
+    // Open org switcher (shows active org name once org list has loaded).
+    const switcher = page.getByRole('button', { name: new RegExp(E2E_ORGS.alpha.name) })
+    await expect(switcher).toBeVisible({ timeout: 30_000 })
+    await switcher.click()
     await page.getByRole('button', { name: E2E_ORGS.beta.name }).click()
 
     await expect(page.getByText(`Switched to ${E2E_ORGS.beta.name}`)).toBeVisible()

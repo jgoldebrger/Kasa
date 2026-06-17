@@ -1,6 +1,7 @@
 import type { Page, APIResponse } from '@playwright/test'
 import { expect } from '@playwright/test'
-import { E2E_ORGS } from './seed'
+import { E2E_ORGS, E2E_USER, E2E_TOTP_SECRET } from './seed'
+import { generateTotpCode } from '../lib/totp'
 import { apiMutationHeaders } from './helpers/api-origin'
 
 /** Pre-accept cookie banner so it does not block login clicks in E2E. */
@@ -8,6 +9,21 @@ export async function acceptCookieConsent(page: Page): Promise<void> {
   await page.addInitScript(() => {
     localStorage.setItem('kasa-cookie-consent', 'accepted')
   })
+}
+
+/** Full login flow for the seeded owner (password + TOTP). */
+export async function loginAsE2eUser(page: Page): Promise<void> {
+  await acceptCookieConsent(page)
+  await page.goto('/login')
+  await page.getByLabel('Email').fill(E2E_USER.email)
+  await page.getByLabel('Password').fill(E2E_USER.password)
+  await page.getByRole('button', { name: 'Sign in' }).click()
+
+  const twoFactorInput = page.getByLabel(/two-factor authentication/i)
+  await expect(twoFactorInput).toBeVisible({ timeout: 60_000 })
+  await twoFactorInput.fill(generateTotpCode(E2E_TOTP_SECRET))
+  await page.getByRole('button', { name: /verify and sign in/i }).click()
+  await expect(page).not.toHaveURL(/\/login/, { timeout: 60_000 })
 }
 
 /** Activate an org via API (uses session cookies from the page context). */
@@ -67,9 +83,7 @@ export async function markerFamilyId(page: Page): Promise<string> {
   const body = (await res.json()) as {
     items?: Array<{ type: string; id: string; label: string }>
   }
-  const hit = body.items?.find(
-    (i) => i.type === 'family' && /alpha marker/i.test(i.label),
-  )
+  const hit = body.items?.find((i) => i.type === 'family' && /alpha marker/i.test(i.label))
   if (!hit?.id) throw new Error('Marker family not found via search API')
   return hit.id
 }
@@ -78,10 +92,7 @@ export async function markerFamilyId(page: Page): Promise<string> {
 export async function gotoFamilyDetail(page: Page): Promise<void> {
   const id = await markerFamilyId(page)
   const familyApi = page.waitForResponse(
-    (r) =>
-      r.url().includes(`/api/families/${id}`) &&
-      r.request().method() === 'GET' &&
-      r.ok(),
+    (r) => r.url().includes(`/api/families/${id}`) && r.request().method() === 'GET' && r.ok(),
     { timeout: 180_000 },
   )
   await page.goto(`/families/${id}?tab=info`, {

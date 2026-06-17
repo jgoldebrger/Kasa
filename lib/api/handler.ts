@@ -82,18 +82,27 @@ export interface HandlerOptions<TBody, TQuery> {
   fn: (input: HandlerCtx<TBody, TQuery>) => Promise<HandlerReturn>
 }
 
-type RouteContext = {
-  params: Promise<Record<string, string | string[]>>
+/** Context shape Next.js 15 passes to route handlers (params may be sync in tests). */
+export type NextRouteContext = {
+  params: Promise<Record<string, string | string[]>> | Record<string, string | string[]>
+}
+
+/** Permissive context for direct handler calls in tests and legacy callers. */
+export type RouteContext = {
+  params?: Promise<Record<string, string | string[]>> | Record<string, string | string[]>
+}
+
+export type AppRouteHandler = {
+  (request: NextRequest, context: NextRouteContext): Promise<NextResponse>
+  (request: NextRequest): Promise<NextResponse>
 }
 
 export function handler<TBody = unknown, TQuery = unknown>(opts: HandlerOptions<TBody, TQuery>) {
-  const routeHandler = async (
-    request: NextRequest,
-    context?: RouteContext,
-  ): Promise<NextResponse> => {
+  async function run(request: NextRequest, context: RouteContext = {}): Promise<NextResponse> {
     const startedAt = Date.now()
-    const routeParams: Record<string, string | string[]> = await (context?.params ??
-      Promise.resolve({}))
+    const routeParams: Record<string, string | string[]> = await Promise.resolve(
+      context?.params ?? {},
+    )
     try {
       const csrfBlock = verifyApiCsrf(request)
       if (csrfBlock) return csrfBlock
@@ -219,7 +228,16 @@ export function handler<TBody = unknown, TQuery = unknown>(opts: HandlerOptions<
     }
   }
 
-  return routeHandler as (request: NextRequest, context: RouteContext) => Promise<NextResponse>
+  async function routeHandler(request: NextRequest): Promise<NextResponse>
+  async function routeHandler(request: NextRequest, context?: RouteContext): Promise<NextResponse>
+  async function routeHandler(
+    request: NextRequest,
+    context: RouteContext = {},
+  ): Promise<NextResponse> {
+    return run(request, context)
+  }
+
+  return routeHandler as AppRouteHandler
 }
 
 function validationError(err: ZodError, routeName?: string): NextResponse {

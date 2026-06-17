@@ -23,7 +23,9 @@ function invalidateOrgCache() {
   invalidateUrl(ORGS_URL)
 }
 
-async function loadOrgs(force = false): Promise<{ organizations: Org[]; activeOrgId: string | null }> {
+async function loadOrgs(
+  force = false,
+): Promise<{ organizations: Org[]; activeOrgId: string | null }> {
   try {
     const data = await cachedFetch<any>(ORGS_URL, { ttl: 60_000, bypass: force })
     return {
@@ -57,17 +59,18 @@ export default function OrgSwitcher() {
       const data = await loadOrgs(force)
       setOrgs(data.organizations)
       setActiveId(data.activeOrgId)
-    } catch {} finally {
+    } catch {
+    } finally {
       setLoadingOrgs(false)
     }
   }
 
   useEffect(() => {
-    if (open && !hasLoadedOrgs.current) {
+    if (!hasLoadedOrgs.current) {
       hasLoadedOrgs.current = true
       load()
     }
-  }, [open])
+  }, [])
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -142,29 +145,28 @@ export default function OrgSwitcher() {
     if (newName.trim().length < 2 || creating || switching) return
     setCreating(true)
     try {
-    const res = await fetch('/api/organizations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName.trim() }),
-    })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      toast.error(err.error || 'Could not create organization.')
-      return
-    }
-    const created = await res.json().catch(() => ({}))
-    setNewName('')
-    setShowCreate(false)
-    invalidateOrgCache()
-    await load(true)
-    if (created?.id) await switchTo(created.id)
+      const res = await fetch('/api/organizations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName.trim() }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'Could not create organization.')
+        return
+      }
+      const created = await res.json().catch(() => ({}))
+      setNewName('')
+      setShowCreate(false)
+      invalidateOrgCache()
+      await load(true)
+      if (created?.id) await switchTo(created.id)
     } finally {
       setCreating(false)
     }
   }
 
   if (hasLoadedOrgs.current && orgs.length === 0) return null
-
 
   // When the user has only one org the dropdown is just visual noise —
   // we collapse to a compact static label, but still let them open the
@@ -185,13 +187,21 @@ export default function OrgSwitcher() {
         <OrgLogo size={20} fallbackChar={active?.name?.[0]} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-fg truncate">
-            {switching ? 'Switching workspace…' : loadingOrgs ? 'Loading…' : active?.name || 'Select organization'}
+            {switching
+              ? 'Switching workspace…'
+              : loadingOrgs
+                ? 'Loading…'
+                : active?.name || 'Select organization'}
           </p>
           {!isSolo && active && !switching && (
             <p className="text-[11px] text-fg-muted capitalize">{active.role}</p>
           )}
         </div>
-        {switching || loadingOrgs ? <InlineSpinner /> : <ChevronUpDownIcon className="h-4 w-4 text-fg-subtle shrink-0" aria-hidden="true" />}
+        {switching || loadingOrgs ? (
+          <InlineSpinner />
+        ) : (
+          <ChevronUpDownIcon className="h-4 w-4 text-fg-subtle shrink-0" aria-hidden="true" />
+        )}
       </button>
 
       {open && (
@@ -213,9 +223,7 @@ export default function OrgSwitcher() {
                     <p className="text-sm text-fg truncate">{o.name}</p>
                     <p className="text-[11px] text-fg-muted capitalize">{o.role}</p>
                   </div>
-                  {isActive && (
-                    <span className="text-[11px] font-medium text-accent">Active</span>
-                  )}
+                  {isActive && <span className="text-[11px] font-medium text-accent">Active</span>}
                 </button>
               )
             })}
@@ -251,7 +259,10 @@ export default function OrgSwitcher() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setShowCreate(false); setNewName('') }}
+                    onClick={() => {
+                      setShowCreate(false)
+                      setNewName('')
+                    }}
                     className="flex-1 text-xs bg-fg/5 text-fg px-2 py-1 rounded hover:bg-fg/10"
                   >
                     Cancel

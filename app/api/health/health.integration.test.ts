@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { setupMongo, teardownMongo } from '@/lib/test/mongo-memory'
+import { withRouteParams } from '@/lib/test/api-route-harness'
 
 vi.mock('@/app/auth', () => ({
   auth: vi.fn(),
@@ -30,7 +31,7 @@ describe('GET /api/health (integration)', () => {
 
   it('returns 200 and ok when MongoDB is reachable', async () => {
     const { GET } = await import('@/lib/route-logic/health')
-    const res = await GET(healthReq(), { params: {} })
+    const res = await GET(healthReq(), withRouteParams())
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body).toMatchObject({
@@ -42,7 +43,7 @@ describe('GET /api/health (integration)', () => {
 
   it('route.ts re-export serves the same handler', async () => {
     const { GET } = await import('./route')
-    const res = await GET(healthReq(), { params: {} })
+    const res = await GET(healthReq(), withRouteParams())
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.status).toBe('ok')
@@ -53,7 +54,7 @@ describe('GET /api/health (integration)', () => {
     const spy = vi.spyOn(database, 'default').mockRejectedValueOnce(new Error('connection refused'))
     try {
       const { GET } = await import('@/lib/route-logic/health')
-      const res = await GET(healthReq(), { params: {} })
+      const res = await GET(healthReq(), withRouteParams())
       expect(res.status).toBe(503)
       const body = await res.json()
       expect(body).toMatchObject({

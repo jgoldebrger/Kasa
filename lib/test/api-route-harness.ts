@@ -10,6 +10,26 @@ export type HttpMethod = ApiRouteEntry['method']
 
 const ORIGIN = 'http://localhost:3000'
 
+/** Next.js 15 route context for direct handler calls in tests. */
+export function withRouteParams(params: Record<string, string | string[]> = {}): {
+  params: Promise<Record<string, string | string[]>>
+} {
+  return { params: Promise.resolve(params) }
+}
+
+export async function invokeRouteLogic(
+  handler: (
+    req: NextRequest,
+    ctx?: {
+      params?: Promise<Record<string, string | string[]>> | Record<string, string | string[]>
+    },
+  ) => Promise<NextResponse>,
+  request: NextRequest,
+  params: Record<string, string | string[]> = {},
+): Promise<NextResponse> {
+  return handler(request, withRouteParams(params))
+}
+
 export function probeBody(route: ApiRouteEntry, ctx: ApiTestContext): unknown {
   if (route.method === 'GET' || route.method === 'HEAD' || route.method === 'OPTIONS') {
     return undefined
@@ -180,8 +200,7 @@ export function buildApiRequest(
   }
 
   const body = probeBody(route, ctx)
-  const isStripeWebhook =
-    route.path === '/api/stripe/webhook' && route.method === 'POST'
+  const isStripeWebhook = route.path === '/api/stripe/webhook' && route.method === 'POST'
   const isMultipartProbe =
     (route.path === '/api/import' || route.path === '/api/send-file-email') &&
     route.method === 'POST'
@@ -215,11 +234,7 @@ export function buildApiRequest(
   return new NextRequest(url, {
     method: route.method,
     headers,
-    body: isStripeWebhook
-      ? '{}'
-      : needsBody
-        ? JSON.stringify(body)
-        : undefined,
+    body: isStripeWebhook ? '{}' : needsBody ? JSON.stringify(body) : undefined,
   })
 }
 
@@ -257,13 +272,18 @@ export async function invokeApiRoute(
   const importPath = routeSourceToLogicModule(route.source)
   const mod = (await import(importPath)) as Record<
     string,
-    (req: NextRequest, ctx: { params: Record<string, string> }) => Promise<NextResponse>
+    (
+      req: NextRequest,
+      ctx?: {
+        params?: Promise<Record<string, string | string[]>> | Record<string, string | string[]>
+      },
+    ) => Promise<NextResponse>
   >
   const handler = mod[route.method]
   if (!handler) {
     throw new Error(`No ${route.method} export in ${route.source}`)
   }
-  return handler(request, { params })
+  return handler(request, withRouteParams(params))
 }
 
 export function prepareRouteInvocation(
@@ -280,10 +300,7 @@ export function prepareRouteInvocation(
   return { request, params, path }
 }
 
-export function expectRouteStatus(
-  route: ApiRouteEntry,
-  response: NextResponse,
-): void {
+export function expectRouteStatus(route: ApiRouteEntry, response: NextResponse): void {
   const status = response.status
   if (status >= 500) {
     throw new Error(`${route.method} ${route.path} returned ${status}`)

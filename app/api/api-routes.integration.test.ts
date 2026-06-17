@@ -23,6 +23,7 @@ import {
 import {
   expectRouteStatus,
   invokeApiRoute,
+  invokeRouteLogic,
   prepareRouteInvocation,
 } from '@/lib/test/api-route-harness'
 
@@ -251,7 +252,7 @@ describe.sequential('route-logic extended (integration)', () => {
     const { POST } = await import('@/lib/route-logic/import')
     for (const label of ['members-csv', 'payments-csv', 'lifecycle-events-csv'] as const) {
       const request = await buildImportProbeRequest(label)
-      const res = await POST(request)
+      const res = await invokeRouteLogic(POST, request)
       expect(res.status).toBeLessThan(500)
       expect(res.status).not.toBe(401)
     }
@@ -260,7 +261,7 @@ describe.sequential('route-logic extended (integration)', () => {
   it('imports families from XLSX template', async () => {
     const { POST } = await import('@/lib/route-logic/import')
     const request = await buildImportProbeRequest('families-xlsx')
-    const res = await POST(request)
+    const res = await invokeRouteLogic(POST, request)
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
@@ -269,7 +270,8 @@ describe.sequential('route-logic extended (integration)', () => {
   it('enrolls 2FA with setup + enable', async () => {
     const password = 'ApiRouteTestPass123!'
     const { POST: setupPost } = await import('@/lib/route-logic/user/2fa/setup')
-    const setupRes = await setupPost(
+    const setupRes = await invokeRouteLogic(
+      setupPost,
       new NextRequest('http://localhost:3000/api/user/2fa/setup', {
         method: 'POST',
         headers: {
@@ -288,7 +290,8 @@ describe.sequential('route-logic extended (integration)', () => {
 
     const code = generateTotpCode(secret!)
     const { PATCH } = await import('@/lib/route-logic/user/2fa')
-    const enableRes = await PATCH(
+    const enableRes = await invokeRouteLogic(
+      PATCH,
       new NextRequest('http://localhost:3000/api/user/2fa', {
         method: 'PATCH',
         headers: {
@@ -311,7 +314,8 @@ describe.sequential('route-logic extended (integration)', () => {
 
   it('PATCH /api/org-members promotes a member to admin', async () => {
     const { PATCH } = await import('@/lib/route-logic/org-members')
-    const res = await PATCH(
+    const res = await invokeRouteLogic(
+      PATCH,
       new NextRequest('http://localhost:3000/api/org-members', {
         method: 'PATCH',
         headers: {
@@ -332,7 +336,8 @@ describe.sequential('route-logic extended (integration)', () => {
   it('GET /api/tax-receipts/zip streams a ZIP for the seeded year', async () => {
     const { GET } = await import('@/lib/route-logic/tax-receipts/zip')
     const year = new Date().getFullYear()
-    const res = await GET(
+    const res = await invokeRouteLogic(
+      GET,
       new NextRequest(`http://localhost:3000/api/tax-receipts/zip?year=${year}`, {
         method: 'GET',
         headers: {
@@ -385,7 +390,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
   describe('stripe/confirm-payment', () => {
     it('returns deduplicated payment for existing PaymentIntent', async () => {
       const { POST } = await import('@/lib/route-logic/stripe/confirm-payment')
-      const res = await POST(
+      const res = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/stripe/confirm-payment', 'POST', {
           paymentIntentId: 'pi_apiprobemock',
           familyId: ctx.fixtures.familyId,
@@ -401,24 +407,30 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const { POST } = await import('@/lib/route-logic/stripe/confirm-payment')
       const base = { familyId: ctx.fixtures.familyId }
 
-      expect((await POST(orgJsonReq('/api/stripe/confirm-payment', 'POST', {}))).status).toBe(400)
+      expect(
+        (await invokeRouteLogic(POST, orgJsonReq('/api/stripe/confirm-payment', 'POST', {})))
+          .status,
+      ).toBe(400)
       expect(
         (
-          await POST(
+          await invokeRouteLogic(
+            POST,
             orgJsonReq('/api/stripe/confirm-payment', 'POST', { ...base, paymentIntentId: 'bad' }),
           )
         ).status,
       ).toBe(400)
       expect(
         (
-          await POST(
+          await invokeRouteLogic(
+            POST,
             orgJsonReq('/api/stripe/confirm-payment', 'POST', { paymentIntentId: 'pi_bad_id!' }),
           )
         ).status,
       ).toBe(400)
       expect(
         (
-          await POST(
+          await invokeRouteLogic(
+            POST,
             orgJsonReq('/api/stripe/confirm-payment', 'POST', {
               paymentIntentId: 'pi_unknownfamily',
               familyId: '000000000000000000000099',
@@ -428,7 +440,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       ).toBe(404)
       expect(
         (
-          await POST(
+          await invokeRouteLogic(
+            POST,
             orgJsonReq('/api/stripe/confirm-payment', 'POST', {
               paymentIntentId: 'pi_badyear',
               familyId: ctx.fixtures.familyId,
@@ -449,7 +462,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       } as never)
       expect(
         (
-          await POST(
+          await invokeRouteLogic(
+            POST,
             orgJsonReq('/api/stripe/confirm-payment', 'POST', {
               paymentIntentId: 'pi_orgmismatch99',
               familyId: ctx.fixtures.familyId,
@@ -468,7 +482,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       } as never)
       expect(
         (
-          await POST(
+          await invokeRouteLogic(
+            POST,
             orgJsonReq('/api/stripe/confirm-payment', 'POST', {
               paymentIntentId: 'pi_familymismatch',
               familyId: ctx.fixtures.familyId,
@@ -486,7 +501,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       } as never)
       expect(
         (
-          await POST(
+          await invokeRouteLogic(
+            POST,
             orgJsonReq('/api/stripe/confirm-payment', 'POST', {
               paymentIntentId: 'pi_notsucceeded',
               familyId: ctx.fixtures.familyId,
@@ -514,7 +530,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       } as never)
 
       const { POST } = await import('@/lib/route-logic/stripe/confirm-payment')
-      const res = await POST(
+      const res = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/stripe/confirm-payment', 'POST', {
           paymentIntentId: 'pi_rowcoveragenew',
           familyId: ctx.fixtures.familyId,
@@ -550,7 +567,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       } as never)
 
       const { POST } = await import('@/lib/route-logic/stripe/confirm-payment')
-      const res = await POST(
+      const res = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/stripe/confirm-payment', 'POST', {
           paymentIntentId: 'pi_crossorgblock',
           familyId: ctx.fixtures.familyId,
@@ -563,7 +581,10 @@ describe.sequential('route-logic row coverage (gap order)', () => {
   describe('statements/auto-generate', () => {
     it('POST generates monthly statements', async () => {
       const { POST } = await import('@/lib/route-logic/statements/auto-generate')
-      const res = await POST(orgJsonReq('/api/statements/auto-generate', 'POST', {}))
+      const res = await invokeRouteLogic(
+        POST,
+        orgJsonReq('/api/statements/auto-generate', 'POST', {}),
+      )
       expect(res.status).toBe(201)
     })
 
@@ -571,28 +592,32 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const { GET } = await import('@/lib/route-logic/statements/auto-generate')
       expect(
         (
-          await GET(
+          await invokeRouteLogic(
+            GET,
             orgJsonReq('/api/statements/auto-generate', 'GET', undefined, { query: '?year=1800' }),
           )
         ).status,
       ).toBe(400)
       expect(
         (
-          await GET(
+          await invokeRouteLogic(
+            GET,
             orgJsonReq('/api/statements/auto-generate', 'GET', undefined, { query: '?year=2024' }),
           )
         ).status,
       ).toBe(400)
       expect(
         (
-          await GET(
+          await invokeRouteLogic(
+            GET,
             orgJsonReq('/api/statements/auto-generate', 'GET', undefined, {
               query: '?year=2024&month=13',
             }),
           )
         ).status,
       ).toBe(400)
-      const ok = await GET(
+      const ok = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/statements/auto-generate', 'GET', undefined, {
           query: `?year=${year()}&month=1`,
         }),
@@ -627,7 +652,10 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       } as never)
 
       const { POST } = await import('@/lib/route-logic/recurring-payments/process')
-      const res = await POST(orgJsonReq('/api/recurring-payments/process', 'POST', {}))
+      const res = await invokeRouteLogic(
+        POST,
+        orgJsonReq('/api/recurring-payments/process', 'POST', {}),
+      )
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.processed).toBeGreaterThanOrEqual(0)
@@ -639,7 +667,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const { POST, GET, PUT } = await import('@/lib/route-logic/auth/reset-password')
       const { PasswordResetToken } = await import('@/lib/models')
 
-      const postRes = await POST(
+      const postRes = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/auth/reset-password', 'POST', { email: ctx.email }),
       )
       expect(postRes.status).toBe(200)
@@ -652,7 +681,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
         expiresAt: new Date(Date.now() + 3600_000),
       })
 
-      const getRes = await GET(
+      const getRes = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/auth/reset-password', 'GET', undefined, {
           query: `?token=${encodeURIComponent(plain)}`,
         }),
@@ -660,7 +690,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       expect(getRes.status).toBe(200)
       expect((await getRes.json()).valid).toBe(true)
 
-      const putRes = await PUT(
+      const putRes = await invokeRouteLogic(
+        PUT,
         orgJsonReq('/api/auth/reset-password', 'PUT', {
           token: plain,
           newPassword: 'ApiRouteTestPass123!',
@@ -668,14 +699,16 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
       expect(putRes.status).toBe(200)
 
-      const invalidGet = await GET(
+      const invalidGet = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/auth/reset-password', 'GET', undefined, {
           query: '?token=totally-invalid',
         }),
       )
       expect((await invalidGet.json()).valid).toBe(false)
 
-      const usedPut = await PUT(
+      const usedPut = await invokeRouteLogic(
+        PUT,
         orgJsonReq('/api/auth/reset-password', 'PUT', {
           token: plain,
           newPassword: 'AnotherPass123!',
@@ -688,7 +721,10 @@ describe.sequential('route-logic row coverage (gap order)', () => {
   describe('statements/send-monthly-emails + workers', () => {
     it('queues monthly statement emails', async () => {
       const { POST } = await import('@/lib/route-logic/statements/send-monthly-emails')
-      const res = await POST(orgJsonReq('/api/statements/send-monthly-emails', 'POST', {}))
+      const res = await invokeRouteLogic(
+        POST,
+        orgJsonReq('/api/statements/send-monthly-emails', 'POST', {}),
+      )
       expect([200, 202, 409]).toContain(res.status)
     })
 
@@ -713,7 +749,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       })
 
       const { POST } = await import('@/lib/route-logic/statements/send-emails/worker')
-      const res = await POST(
+      const res = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/statements/send-emails/worker', 'POST', { jobId: job._id.toString() }),
       )
       expect(res.status).toBeLessThan(500)
@@ -732,7 +769,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       })
 
       const { POST } = await import('@/lib/route-logic/tax-receipts/email/worker')
-      const res = await POST(
+      const res = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/tax-receipts/email/worker', 'POST', { jobId: job._id.toString() }),
       )
       expect(res.status).toBeLessThan(500)
@@ -743,14 +781,16 @@ describe.sequential('route-logic row coverage (gap order)', () => {
     it('returns P&L by year and by date range', async () => {
       const { GET } = await import('@/lib/route-logic/reports/pl')
       const y = year()
-      const byYear = await GET(
+      const byYear = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/reports/pl', 'GET', undefined, { query: `?year=${y}` }),
       )
       expect(byYear.status).toBe(200)
       const yearBody = await byYear.json()
       expect(yearBody.summary.paymentCount).toBeGreaterThanOrEqual(1)
 
-      const byRange = await GET(
+      const byRange = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/reports/pl', 'GET', undefined, {
           query: `?startDate=${y}-01-01&endDate=${y}-12-31`,
         }),
@@ -762,17 +802,19 @@ describe.sequential('route-logic row coverage (gap order)', () => {
     it('rejects invalid period combinations', async () => {
       const { GET } = await import('@/lib/route-logic/reports/pl')
       const y = year()
-      expect((await GET(orgJsonReq('/api/reports/pl', 'GET'))).status).toBe(400)
+      expect((await invokeRouteLogic(GET, orgJsonReq('/api/reports/pl', 'GET'))).status).toBe(400)
       expect(
         (
-          await GET(
+          await invokeRouteLogic(
+            GET,
             orgJsonReq('/api/reports/pl', 'GET', undefined, { query: '?startDate=2024-01-01' }),
           )
         ).status,
       ).toBe(400)
       expect(
         (
-          await GET(
+          await invokeRouteLogic(
+            GET,
             orgJsonReq('/api/reports/pl', 'GET', undefined, {
               query: `?year=${y}&startDate=2024-01-01&endDate=2024-12-31`,
             }),
@@ -780,8 +822,12 @@ describe.sequential('route-logic row coverage (gap order)', () => {
         ).status,
       ).toBe(400)
       expect(
-        (await GET(orgJsonReq('/api/reports/pl', 'GET', undefined, { query: '?year=1800' })))
-          .status,
+        (
+          await invokeRouteLogic(
+            GET,
+            orgJsonReq('/api/reports/pl', 'GET', undefined, { query: '?year=1800' }),
+          )
+        ).status,
       ).toBe(400)
     })
   })
@@ -790,12 +836,13 @@ describe.sequential('route-logic row coverage (gap order)', () => {
     it('lists, creates, updates, and deletes saved reports', async () => {
       const y = year()
       const { GET, POST } = await import('@/lib/route-logic/reports/saved')
-      const listRes = await GET(orgJsonReq('/api/reports/saved', 'GET'))
+      const listRes = await invokeRouteLogic(GET, orgJsonReq('/api/reports/saved', 'GET'))
       expect(listRes.status).toBe(200)
       const listBody = await listRes.json()
       expect(Array.isArray(listBody.reports)).toBe(true)
 
-      const createRes = await POST(
+      const createRes = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/reports/saved', 'POST', {
           name: `Row Saved ${Date.now()}`,
           source: 'payments',
@@ -811,7 +858,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const created = await createRes.json()
       const reportId = created._id as string
 
-      const badDates = await POST(
+      const badDates = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/reports/saved', 'POST', {
           name: 'Bad range',
           source: 'payments',
@@ -826,7 +874,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       expect(badDates.status).toBe(400)
 
       const { PUT, DELETE } = await import('@/lib/route-logic/reports/saved/[id]')
-      const updateRes = await PUT(
+      const updateRes = await invokeRouteLogic(
+        PUT,
         orgJsonReq(`/api/reports/saved/${reportId}`, 'PUT', {
           name: 'Row Saved Updated',
           config: {
@@ -836,13 +885,15 @@ describe.sequential('route-logic row coverage (gap order)', () => {
             toDate: `${y}-12-31`,
           },
         }),
-        { params: { id: reportId } },
+        { id: reportId },
       )
       expect(updateRes.status).toBe(200)
 
-      const deleteRes = await DELETE(orgJsonReq(`/api/reports/saved/${reportId}`, 'DELETE'), {
-        params: { id: reportId },
-      })
+      const deleteRes = await invokeRouteLogic(
+        DELETE,
+        orgJsonReq(`/api/reports/saved/${reportId}`, 'DELETE'),
+        { id: reportId },
+      )
       expect(deleteRes.status).toBe(200)
     })
   })
@@ -851,7 +902,10 @@ describe.sequential('route-logic row coverage (gap order)', () => {
     it('enables then disables 2FA with password and TOTP', async () => {
       const password = 'ApiRouteTestPass123!'
       const { POST: setupPost } = await import('@/lib/route-logic/user/2fa/setup')
-      const setupRes = await setupPost(sessionJsonReq('/api/user/2fa/setup', 'POST', { password }))
+      const setupRes = await invokeRouteLogic(
+        setupPost,
+        sessionJsonReq('/api/user/2fa/setup', 'POST', { password }),
+      )
       expect(setupRes.status).toBe(200)
       const setupBody = await setupRes.json()
       const secret = new URL(setupBody.otpauthUrl as string).searchParams.get('secret')
@@ -861,12 +915,14 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
       const enrollCode = generateTotpCode(secret!)
       const { PATCH } = await import('@/lib/route-logic/user/2fa')
-      const badEnable = await PATCH(
+      const badEnable = await invokeRouteLogic(
+        PATCH,
         sessionJsonReq('/api/user/2fa', 'PATCH', { action: 'enable', code: '000000' }),
       )
       expect(badEnable.status).toBe(401)
 
-      const enableRes = await PATCH(
+      const enableRes = await invokeRouteLogic(
+        PATCH,
         sessionJsonReq('/api/user/2fa', 'PATCH', { action: 'enable', code: enrollCode }),
       )
       expect(enableRes.status).toBe(200)
@@ -874,7 +930,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const { User } = await import('@/lib/models')
       await User.findByIdAndUpdate(ctx.userId, { $unset: { twoFactorLastUsedStep: 1 } })
       const disableCode = generateTotpCode(secret!)
-      const disableRes = await PATCH(
+      const disableRes = await invokeRouteLogic(
+        PATCH,
         sessionJsonReq('/api/user/2fa', 'PATCH', {
           action: 'disable',
           password,
@@ -904,13 +961,14 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
       const { POST } =
         await import('@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family')
-      const res = await POST(
+      const res = await invokeRouteLogic(
+        POST,
         orgJsonReq(
           `/api/families/${ctx.fixtures.familyId}/members/${member._id}/convert-to-family`,
           'POST',
           { weddingDate: '2024-08-15', spouseName: 'Alex Partner' },
         ),
-        { params: { id: ctx.fixtures.familyId, memberId: member._id.toString() } },
+        { id: ctx.fixtures.familyId, memberId: member._id.toString() },
       )
       expect(res.status).toBe(201)
       const body = await res.json()
@@ -930,13 +988,14 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       })
       const { POST } =
         await import('@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family')
-      const res = await POST(
+      const res = await invokeRouteLogic(
+        POST,
         orgJsonReq(
           `/api/families/${ctx.fixtures.familyId}/members/${member._id}/convert-to-family`,
           'POST',
           { weddingDate: '2024-08-15' },
         ),
-        { params: { id: ctx.fixtures.familyId, memberId: member._id.toString() } },
+        { id: ctx.fixtures.familyId, memberId: member._id.toString() },
       )
       expect(res.status).toBe(409)
     })
@@ -944,24 +1003,26 @@ describe.sequential('route-logic row coverage (gap order)', () => {
     it('rejects missing wedding date and unknown member', async () => {
       const { POST } =
         await import('@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family')
-      const missingDate = await POST(
+      const missingDate = await invokeRouteLogic(
+        POST,
         orgJsonReq(
           `/api/families/${ctx.fixtures.familyId}/members/${ctx.fixtures.memberId}/convert-to-family`,
           'POST',
           {},
         ),
-        { params: { id: ctx.fixtures.familyId, memberId: ctx.fixtures.memberId } },
+        { id: ctx.fixtures.familyId, memberId: ctx.fixtures.memberId },
       )
       expect(missingDate.status).toBe(400)
 
       const unknownMember = new Types.ObjectId().toString()
-      const notFound = await POST(
+      const notFound = await invokeRouteLogic(
+        POST,
         orgJsonReq(
           `/api/families/${ctx.fixtures.familyId}/members/${unknownMember}/convert-to-family`,
           'POST',
           { weddingDate: '2024-01-01' },
         ),
-        { params: { id: ctx.fixtures.familyId, memberId: unknownMember } },
+        { id: ctx.fixtures.familyId, memberId: unknownMember },
       )
       expect(notFound.status).toBe(404)
     })
@@ -983,7 +1044,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
       const y = year()
       const { GET } = await import('@/lib/route-logic/audit-log')
-      const listRes = await GET(
+      const listRes = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/audit-log', 'GET', undefined, {
           query: `?limit=5&action=payment.create&userId=${ctx.userId}&resourceType=Payment&fromDate=${y}-01-01&toDate=${y}-12-31`,
         }),
@@ -993,7 +1055,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       expect(page.items.length).toBeGreaterThanOrEqual(1)
 
       if (page.nextCursor) {
-        const nextRes = await GET(
+        const nextRes = await invokeRouteLogic(
+          GET,
           orgJsonReq('/api/audit-log', 'GET', undefined, {
             query: `?limit=1&cursor=${page.nextCursor}`,
           }),
@@ -1001,7 +1064,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
         expect(nextRes.status).toBe(200)
       }
 
-      const csvRes = await GET(
+      const csvRes = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/audit-log', 'GET', undefined, {
           query: `?format=csv&fromDate=${y}-01-01&toDate=${y}-12-31`,
         }),
@@ -1014,28 +1078,35 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const { GET } = await import('@/lib/route-logic/audit-log')
       expect(
         (
-          await GET(
+          await invokeRouteLogic(
+            GET,
             orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?fromDate=2024-01-01' }),
           )
         ).status,
       ).toBe(400)
       expect(
         (
-          await GET(
+          await invokeRouteLogic(
+            GET,
             orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?action=bad action!' }),
           )
         ).status,
       ).toBe(400)
       expect(
         (
-          await GET(
+          await invokeRouteLogic(
+            GET,
             orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?userId=not-an-object-id' }),
           )
         ).status,
       ).toBe(400)
       expect(
-        (await GET(orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?cursor=not-valid' })))
-          .status,
+        (
+          await invokeRouteLogic(
+            GET,
+            orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?cursor=not-valid' }),
+          )
+        ).status,
       ).toBe(400)
     })
   })
@@ -1064,30 +1135,36 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       await softDeleteOne('task', task._id.toString(), orgCtx)
 
       const { POST } = await import('@/lib/route-logic/trash/[kind]/[id]/restore')
-      const res = await POST(orgJsonReq(`/api/trash/task/${task._id}/restore`, 'POST', {}), {
-        params: { kind: 'task', id: task._id.toString() },
-      })
+      const res = await invokeRouteLogic(
+        POST,
+        orgJsonReq(`/api/trash/task/${task._id}/restore`, 'POST', {}),
+        { kind: 'task', id: task._id.toString() },
+      )
       expect(res.status).toBe(200)
       expect((await res.json()).message).toBe('Restored')
     })
 
     it('rejects invalid kind and missing bin item', async () => {
       const { POST } = await import('@/lib/route-logic/trash/[kind]/[id]/restore')
-      const badKind = await POST(
+      const badKind = await invokeRouteLogic(
+        POST,
         orgJsonReq(`/api/trash/not-a-kind/${ctx.fixtures.taskId}/restore`, 'POST', {}),
-        { params: { kind: 'not-a-kind', id: ctx.fixtures.taskId } },
+        { kind: 'not-a-kind', id: ctx.fixtures.taskId },
       )
       expect(badKind.status).toBe(400)
 
-      const missing = await POST(
+      const missing = await invokeRouteLogic(
+        POST,
         orgJsonReq(`/api/trash/task/${new Types.ObjectId()}/restore`, 'POST', {}),
-        { params: { kind: 'task', id: new Types.ObjectId().toString() } },
+        { kind: 'task', id: new Types.ObjectId().toString() },
       )
       expect(missing.status).toBe(404)
 
-      const badId = await POST(orgJsonReq('/api/trash/task/not-valid/restore', 'POST', {}), {
-        params: { kind: 'task', id: 'not-valid' },
-      })
+      const badId = await invokeRouteLogic(
+        POST,
+        orgJsonReq('/api/trash/task/not-valid/restore', 'POST', {}),
+        { kind: 'task', id: 'not-valid' },
+      )
       expect(badId.status).toBe(400)
     })
   })
@@ -1118,12 +1195,20 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const params = { kind: 'task', id: task._id.toString() }
       const { GET, DELETE } = await import('@/lib/route-logic/trash/[kind]/[id]')
 
-      const getRes = await GET(orgJsonReq(`/api/trash/task/${task._id}`, 'GET'), { params })
+      const getRes = await invokeRouteLogic(
+        GET,
+        orgJsonReq(`/api/trash/task/${task._id}`, 'GET'),
+        params,
+      )
       expect(getRes.status).toBe(200)
       const getBody = await getRes.json()
       expect(getBody._id ?? getBody.id).toBeTruthy()
 
-      const delRes = await DELETE(orgJsonReq(`/api/trash/task/${task._id}`, 'DELETE'), { params })
+      const delRes = await invokeRouteLogic(
+        DELETE,
+        orgJsonReq(`/api/trash/task/${task._id}`, 'DELETE'),
+        params,
+      )
       expect(delRes.status).toBe(200)
       expect((await delRes.json()).message).toBe('Permanently deleted')
     })
@@ -1134,32 +1219,36 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
       expect(
         (
-          await GET(orgJsonReq(`/api/trash/not-a-kind/${bogusId}`, 'GET'), {
-            params: { kind: 'not-a-kind', id: bogusId },
+          await invokeRouteLogic(GET, orgJsonReq(`/api/trash/not-a-kind/${bogusId}`, 'GET'), {
+            kind: 'not-a-kind',
+            id: bogusId,
           })
         ).status,
       ).toBe(400)
 
       expect(
         (
-          await GET(orgJsonReq(`/api/trash/task/not-valid`, 'GET'), {
-            params: { kind: 'task', id: 'not-valid' },
+          await invokeRouteLogic(GET, orgJsonReq(`/api/trash/task/not-valid`, 'GET'), {
+            kind: 'task',
+            id: 'not-valid',
           })
         ).status,
       ).toBe(400)
 
       expect(
         (
-          await GET(orgJsonReq(`/api/trash/task/${bogusId}`, 'GET'), {
-            params: { kind: 'task', id: bogusId },
+          await invokeRouteLogic(GET, orgJsonReq(`/api/trash/task/${bogusId}`, 'GET'), {
+            kind: 'task',
+            id: bogusId,
           })
         ).status,
       ).toBe(404)
 
       expect(
         (
-          await DELETE(orgJsonReq(`/api/trash/task/${bogusId}`, 'DELETE'), {
-            params: { kind: 'task', id: bogusId },
+          await invokeRouteLogic(DELETE, orgJsonReq(`/api/trash/task/${bogusId}`, 'DELETE'), {
+            kind: 'task',
+            id: bogusId,
           })
         ).status,
       ).toBe(404)
@@ -1171,9 +1260,11 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const params = { id: ctx.fixtures.familyId }
       const { GET } = await import('@/lib/route-logic/families/[id]')
 
-      const adminRes = await GET(orgJsonReq(`/api/families/${ctx.fixtures.familyId}`, 'GET'), {
+      const adminRes = await invokeRouteLogic(
+        GET,
+        orgJsonReq(`/api/families/${ctx.fixtures.familyId}`, 'GET'),
         params,
-      })
+      )
       expect(adminRes.status).toBe(200)
       const adminBody = await adminRes.json()
       expect(adminBody.payments.length).toBeGreaterThan(0)
@@ -1188,9 +1279,11 @@ describe.sequential('route-logic row coverage (gap order)', () => {
         },
       } as never)
 
-      const memberRes = await GET(orgJsonReq(`/api/families/${ctx.fixtures.familyId}`, 'GET'), {
+      const memberRes = await invokeRouteLogic(
+        GET,
+        orgJsonReq(`/api/families/${ctx.fixtures.familyId}`, 'GET'),
         params,
-      })
+      )
       expect(memberRes.status).toBe(200)
       const memberBody = await memberRes.json()
       expect(memberBody.payments).toEqual([])
@@ -1209,41 +1302,48 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const params = { id: disposable._id.toString() }
       const { GET, PUT, DELETE } = await import('@/lib/route-logic/families/[id]')
 
-      const badId = await GET(orgJsonReq('/api/families/not-valid', 'GET'), {
-        params: { id: 'not-valid' },
+      const badId = await invokeRouteLogic(GET, orgJsonReq('/api/families/not-valid', 'GET'), {
+        id: 'not-valid',
       })
       expect(badId.status).toBe(400)
 
-      const putRes = await PUT(
+      const putRes = await invokeRouteLogic(
+        PUT,
         orgJsonReq(`/api/families/${disposable._id}`, 'PUT', { name: 'Row Family Updated' }),
-        { params },
+        params,
       )
       expect(putRes.status).toBe(200)
 
-      const emptyPut = await PUT(orgJsonReq(`/api/families/${disposable._id}`, 'PUT', {}), {
+      const emptyPut = await invokeRouteLogic(
+        PUT,
+        orgJsonReq(`/api/families/${disposable._id}`, 'PUT', {}),
         params,
-      })
+      )
       expect(emptyPut.status).toBe(400)
 
-      const selfParent = await PUT(
+      const selfParent = await invokeRouteLogic(
+        PUT,
         orgJsonReq(`/api/families/${disposable._id}`, 'PUT', {
           parentFamilyId: disposable._id.toString(),
         }),
-        { params },
+        params,
       )
       expect(selfParent.status).toBe(400)
 
-      const badPlan = await PUT(
+      const badPlan = await invokeRouteLogic(
+        PUT,
         orgJsonReq(`/api/families/${disposable._id}`, 'PUT', {
           paymentPlanId: new Types.ObjectId().toString(),
         }),
-        { params },
+        params,
       )
       expect(badPlan.status).toBe(400)
 
-      const delRes = await DELETE(orgJsonReq(`/api/families/${disposable._id}`, 'DELETE'), {
+      const delRes = await invokeRouteLogic(
+        DELETE,
+        orgJsonReq(`/api/families/${disposable._id}`, 'DELETE'),
         params,
-      })
+      )
       expect(delRes.status).toBe(200)
       expect((await delRes.json()).message).toContain('recycle bin')
     })
@@ -1260,7 +1360,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
       const y = year()
       const { POST } = await import('@/lib/route-logic/statements/send-emails')
-      const res = await POST(
+      const res = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/statements/send-emails', 'POST', {
           fromDate: `${y}-01-01`,
           toDate: `${y}-12-31`,
@@ -1276,7 +1377,10 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
     it('rejects invalid date range body', async () => {
       const { POST } = await import('@/lib/route-logic/statements/send-emails')
-      const res = await POST(orgJsonReq('/api/statements/send-emails', 'POST', { fromDate: 'bad' }))
+      const res = await invokeRouteLogic(
+        POST,
+        orgJsonReq('/api/statements/send-emails', 'POST', { fromDate: 'bad' }),
+      )
       expect(res.status).toBe(400)
     })
   })
@@ -1294,22 +1398,24 @@ describe.sequential('route-logic row coverage (gap order)', () => {
         await import('@/lib/route-logic/families/[id]/saved-payment-methods')
       const params = { id: ctx.fixtures.familyId }
 
-      const listRes = await GET(orgJsonReq(familyPath, 'GET'), { params })
+      const listRes = await invokeRouteLogic(GET, orgJsonReq(familyPath, 'GET'), params)
       expect(listRes.status).toBe(200)
       expect(Array.isArray(await listRes.json())).toBe(true)
 
-      const missingPi = await POST(
+      const missingPi = await invokeRouteLogic(
+        POST,
         orgJsonReq(familyPath, 'POST', { paymentMethodId: 'pm_probemock' }),
-        { params },
+        params,
       )
       expect(missingPi.status).toBe(400)
 
-      const missingQuery = await DELETE(orgJsonReq(familyPath, 'DELETE'), { params })
+      const missingQuery = await invokeRouteLogic(DELETE, orgJsonReq(familyPath, 'DELETE'), params)
       expect(missingQuery.status).toBe(400)
 
-      const badFamily = await GET(
+      const badFamily = await invokeRouteLogic(
+        GET,
         orgJsonReq(`/api/families/${new Types.ObjectId()}/saved-payment-methods`, 'GET'),
-        { params: { id: new Types.ObjectId().toString() } },
+        { id: new Types.ObjectId().toString() },
       )
       expect(badFamily.status).toBe(404)
     })
@@ -1340,13 +1446,15 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       })
 
       const { GET, PATCH } = await import('@/lib/route-logic/admin/invite-requests')
-      const listRes = await GET(
+      const listRes = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/admin/invite-requests', 'GET', undefined, { query: '?status=pending' }),
       )
       expect(listRes.status).toBe(200)
       expect((await listRes.json()).requests.length).toBeGreaterThanOrEqual(1)
 
-      const approveRes = await PATCH(
+      const approveRes = await invokeRouteLogic(
+        PATCH,
         orgJsonReq('/api/admin/invite-requests', 'PATCH', {
           id: pending._id.toString(),
           action: 'approve',
@@ -1356,7 +1464,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const approveBody = await approveRes.json()
       expect(approveBody.signupCode).toBeTruthy()
 
-      const rejectRes = await PATCH(
+      const rejectRes = await invokeRouteLogic(
+        PATCH,
         orgJsonReq('/api/admin/invite-requests', 'PATCH', {
           id: toReject._id.toString(),
           action: 'reject',
@@ -1377,13 +1486,14 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
       const path = `/api/families/${ctx.fixtures.familyId}/charge-saved-card`
       const { POST } = await import('@/lib/route-logic/families/[id]/charge-saved-card')
-      const res = await POST(
+      const res = await invokeRouteLogic(
+        POST,
         orgJsonReq(path, 'POST', {
           savedPaymentMethodId: ctx.fixtures.savedPaymentMethodId,
           amount: 25,
           type: 'membership',
         }),
-        { params: { id: ctx.fixtures.familyId } },
+        { id: ctx.fixtures.familyId },
       )
       expect(res.status).toBe(200)
       const body = await res.json()
@@ -1396,26 +1506,28 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const { POST } = await import('@/lib/route-logic/families/[id]/charge-saved-card')
       const params = { id: ctx.fixtures.familyId }
 
-      expect((await POST(orgJsonReq(path, 'POST', {}), { params })).status).toBe(400)
+      expect((await invokeRouteLogic(POST, orgJsonReq(path, 'POST', {}), params)).status).toBe(400)
       expect(
         (
-          await POST(
+          await invokeRouteLogic(
+            POST,
             orgJsonReq(path, 'POST', {
               savedPaymentMethodId: ctx.fixtures.savedPaymentMethodId,
               amount: 200_000,
             }),
-            { params },
+            params,
           )
         ).status,
       ).toBe(400)
       expect(
         (
-          await POST(
+          await invokeRouteLogic(
+            POST,
             orgJsonReq(path, 'POST', {
               savedPaymentMethodId: new Types.ObjectId().toString(),
               amount: 10,
             }),
-            { params },
+            params,
           )
         ).status,
       ).toBe(404)
@@ -1426,13 +1538,14 @@ describe.sequential('route-logic row coverage (gap order)', () => {
     it('lists members and enforces role-change rules', async () => {
       const { GET, PATCH, DELETE } = await import('@/lib/route-logic/org-members')
 
-      const listRes = await GET(orgJsonReq('/api/org-members', 'GET'))
+      const listRes = await invokeRouteLogic(GET, orgJsonReq('/api/org-members', 'GET'))
       expect(listRes.status).toBe(200)
       const list = await listRes.json()
       expect(list.members.length).toBeGreaterThanOrEqual(1)
       expect(list.invites.length).toBeGreaterThanOrEqual(0)
 
-      const selfPatch = await PATCH(
+      const selfPatch = await invokeRouteLogic(
+        PATCH,
         orgJsonReq('/api/org-members', 'PATCH', {
           membershipId: ctx.fixtures.membershipId,
           role: 'admin',
@@ -1440,7 +1553,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
       expect(selfPatch.status).toBe(400)
 
-      const demoteMember = await PATCH(
+      const demoteMember = await invokeRouteLogic(
+        PATCH,
         orgJsonReq('/api/org-members', 'PATCH', {
           membershipId: ctx.fixtures.memberMembershipId,
           role: 'member',
@@ -1448,12 +1562,14 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
       expect(demoteMember.status).toBe(200)
 
-      const deleteSelf = await DELETE(
+      const deleteSelf = await invokeRouteLogic(
+        DELETE,
         orgJsonReq(`/api/org-members?id=${ctx.fixtures.membershipId}`, 'DELETE'),
       )
       expect(deleteSelf.status).toBe(400)
 
-      const deleteMissing = await DELETE(
+      const deleteMissing = await invokeRouteLogic(
+        DELETE,
         orgJsonReq(`/api/org-members?id=${new Types.ObjectId()}`, 'DELETE'),
       )
       expect(deleteMissing.status).toBe(404)
@@ -1484,7 +1600,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       } as never)
 
       const { PATCH } = await import('@/lib/route-logic/org-members')
-      const res = await PATCH(
+      const res = await invokeRouteLogic(
+        PATCH,
         orgJsonReq('/api/org-members', 'PATCH', {
           membershipId: ctx.fixtures.memberMembershipId,
           role: 'owner',
@@ -1510,7 +1627,10 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       })
 
       const { DELETE } = await import('@/lib/route-logic/org-members')
-      const res = await DELETE(orgJsonReq(`/api/org-members?id=${membership._id}`, 'DELETE'))
+      const res = await invokeRouteLogic(
+        DELETE,
+        orgJsonReq(`/api/org-members?id=${membership._id}`, 'DELETE'),
+      )
       expect(res.status).toBe(200)
       expect((await res.json()).ok).toBe(true)
     })
@@ -1526,7 +1646,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
 
       const { POST } = await import('@/lib/route-logic/statements/send-single-email')
-      const res = await POST(
+      const res = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/statements/send-single-email', 'POST', {
           statement: { _id: ctx.fixtures.statementId },
         }),
@@ -1537,7 +1658,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
     it('rejects missing statement', async () => {
       const { POST } = await import('@/lib/route-logic/statements/send-single-email')
-      const res = await POST(
+      const res = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/statements/send-single-email', 'POST', {
           statement: { _id: new Types.ObjectId().toString() },
         }),
@@ -1551,7 +1673,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const email = `row-invite-${Date.now()}@example.com`
       const { POST, GET, DELETE } = await import('@/lib/route-logic/auth/invite')
 
-      const createRes = await POST(
+      const createRes = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/auth/invite', 'POST', { email, role: 'member' }),
       )
       expect(createRes.status).toBe(200)
@@ -1566,7 +1689,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       expect(stored?.token).toBe(hashInviteToken(plainToken))
       expect(stored?.token).not.toBe(plainToken)
 
-      const resolveRes = await GET(
+      const resolveRes = await invokeRouteLogic(
+        GET,
         new NextRequest(`${API_ORIGIN}/api/auth/invite?token=${encodeURIComponent(plainToken)}`, {
           headers: { host: 'localhost:3000', origin: API_ORIGIN },
         }),
@@ -1574,13 +1698,17 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       expect(resolveRes.status).toBe(200)
       expect((await resolveRes.json()).email).toBe(email)
 
-      const cancelRes = await DELETE(orgJsonReq(`/api/auth/invite?id=${created.id}`, 'DELETE'))
+      const cancelRes = await invokeRouteLogic(
+        DELETE,
+        orgJsonReq(`/api/auth/invite?id=${created.id}`, 'DELETE'),
+      )
       expect(cancelRes.status).toBe(200)
     })
 
     it('rejects invalid invite acceptance', async () => {
       const { PUT } = await import('@/lib/route-logic/auth/invite')
-      const res = await PUT(
+      const res = await invokeRouteLogic(
+        PUT,
         orgJsonReq('/api/auth/invite', 'PUT', {
           token: 'invalid-token',
           password: 'ApiRouteTestPass123!',
@@ -1595,11 +1723,12 @@ describe.sequential('route-logic row coverage (gap order)', () => {
     it('reads and updates table preferences', async () => {
       const { GET, PATCH } = await import('@/lib/route-logic/user/preferences')
 
-      const getRes = await GET(sessionJsonReq('/api/user/preferences', 'GET'))
+      const getRes = await invokeRouteLogic(GET, sessionJsonReq('/api/user/preferences', 'GET'))
       expect(getRes.status).toBe(200)
       expect((await getRes.json()).tableColumns).toBeDefined()
 
-      const patchRes = await PATCH(
+      const patchRes = await invokeRouteLogic(
+        PATCH,
         sessionJsonReq('/api/user/preferences', 'PATCH', {
           tableColumns: { families: { name: true, email: false } },
           tableColumnOrder: { families: ['name', 'email'] },
@@ -1609,7 +1738,10 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const patched = await patchRes.json()
       expect(patched.tableColumns.families?.name).toBe(true)
 
-      const emptyPatch = await PATCH(sessionJsonReq('/api/user/preferences', 'PATCH', {}))
+      const emptyPatch = await invokeRouteLogic(
+        PATCH,
+        sessionJsonReq('/api/user/preferences', 'PATCH', {}),
+      )
       expect(emptyPatch.status).toBe(400)
     })
   })
@@ -1619,23 +1751,26 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const today = new Date().toISOString().slice(0, 10)
       const { GET, POST } = await import('@/lib/route-logic/tasks')
 
-      const listRes = await GET(orgJsonReq('/api/tasks', 'GET'))
+      const listRes = await invokeRouteLogic(GET, orgJsonReq('/api/tasks', 'GET'))
       expect(listRes.status).toBe(200)
       expect(Array.isArray(await listRes.json())).toBe(true)
 
-      const filtered = await GET(
+      const filtered = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/tasks', 'GET', undefined, {
           query: `?status=pending&priority=medium&relatedFamilyId=${ctx.fixtures.familyId}&dueDate=today`,
         }),
       )
       expect(filtered.status).toBe(200)
 
-      const badFilter = await GET(
+      const badFilter = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/tasks', 'GET', undefined, { query: '?status=not-a-status' }),
       )
       expect(badFilter.status).toBe(400)
 
-      const createRes = await POST(
+      const createRes = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/tasks', 'POST', {
           title: `Row Task ${Date.now()}`,
           dueDate: today,
@@ -1667,7 +1802,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       })
 
       const { GET } = await import('@/lib/route-logic/statements/send-emails/status')
-      const ok = await GET(
+      const ok = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/statements/send-emails/status', 'GET', undefined, {
           query: `?jobId=${active._id}`,
         }),
@@ -1692,7 +1828,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
         { $set: { status: 'running', updatedAt: staleAt } },
       )
 
-      const staleRes = await GET(
+      const staleRes = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/statements/send-emails/status', 'GET', undefined, {
           query: `?jobId=${stale._id}`,
         }),
@@ -1700,7 +1837,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       expect(staleRes.status).toBe(200)
       expect((await staleRes.json()).status).toBe('failed')
 
-      const bad = await GET(
+      const bad = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/statements/send-emails/status', 'GET', undefined, {
           query: '?jobId=not-valid',
         }),
@@ -1714,7 +1852,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const y = year()
       const { GET } = await import('@/lib/route-logic/payments')
 
-      const listRes = await GET(
+      const listRes = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/payments', 'GET', undefined, {
           query: `?familyId=${ctx.fixtures.familyId}&year=${y}`,
         }),
@@ -1722,7 +1861,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       expect(listRes.status).toBe(200)
       expect(Array.isArray(await listRes.json())).toBe(true)
 
-      const paged = await GET(
+      const paged = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/payments', 'GET', undefined, {
           query: `?limit=2&paymentMethod=check`,
         }),
@@ -1731,12 +1871,14 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const page = await paged.json()
       expect(page.items.length).toBeLessThanOrEqual(2)
 
-      const badCursor = await GET(
+      const badCursor = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/payments', 'GET', undefined, { query: '?cursor=not-valid' }),
       )
       expect(badCursor.status).toBe(400)
 
-      const badFamily = await GET(
+      const badFamily = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/payments', 'GET', undefined, {
           query: `?familyId=${new Types.ObjectId()}`,
         }),
@@ -1760,7 +1902,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
     it('rejects wrong password on setup', async () => {
       const { POST } = await import('@/lib/route-logic/user/2fa/setup')
-      const res = await POST(
+      const res = await invokeRouteLogic(
+        POST,
         sessionJsonReq('/api/user/2fa/setup', 'POST', { password: 'wrong-password' }),
       )
       expect(res.status).toBe(401)
@@ -1772,12 +1915,16 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const { PATCH } = await import('@/lib/route-logic/user/2fa')
       const { User } = await import('@/lib/models')
 
-      const setupRes = await POST(sessionJsonReq('/api/user/2fa/setup', 'POST', { password }))
+      const setupRes = await invokeRouteLogic(
+        POST,
+        sessionJsonReq('/api/user/2fa/setup', 'POST', { password }),
+      )
       expect(setupRes.status).toBe(200)
       const secret = new URL((await setupRes.json()).otpauthUrl as string).searchParams.get(
         'secret',
       )
-      const enableRes = await PATCH(
+      const enableRes = await invokeRouteLogic(
+        PATCH,
         sessionJsonReq('/api/user/2fa', 'PATCH', {
           action: 'enable',
           code: generateTotpCode(secret!),
@@ -1785,7 +1932,10 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
       expect(enableRes.status).toBe(200)
 
-      const reauthRes = await POST(sessionJsonReq('/api/user/2fa/setup', 'POST', { password }))
+      const reauthRes = await invokeRouteLogic(
+        POST,
+        sessionJsonReq('/api/user/2fa/setup', 'POST', { password }),
+      )
       expect(reauthRes.status).toBe(401)
       expect((await reauthRes.json()).requiresReauth).toBe(true)
 
@@ -1801,11 +1951,15 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const { PATCH } = await import('@/lib/route-logic/user/2fa')
       const { User } = await import('@/lib/models')
 
-      const setupRes = await POST(sessionJsonReq('/api/user/2fa/setup', 'POST', { password }))
+      const setupRes = await invokeRouteLogic(
+        POST,
+        sessionJsonReq('/api/user/2fa/setup', 'POST', { password }),
+      )
       const setupBody = await setupRes.json()
       const secret = new URL(setupBody.otpauthUrl as string).searchParams.get('secret')
 
-      await PATCH(
+      await invokeRouteLogic(
+        PATCH,
         sessionJsonReq('/api/user/2fa', 'PATCH', {
           action: 'enable',
           code: generateTotpCode(secret!),
@@ -1813,7 +1967,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
 
       await User.findByIdAndUpdate(ctx.userId, { $unset: { twoFactorLastUsedStep: 1 } })
-      const reenrollRes = await POST(
+      const reenrollRes = await invokeRouteLogic(
+        POST,
         sessionJsonReq('/api/user/2fa/setup', 'POST', {
           password,
           code: generateTotpCode(secret!),
@@ -1833,7 +1988,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
     it('sets payment plan and email opt-out in bulk', async () => {
       const { POST } = await import('@/lib/route-logic/families/bulk')
 
-      const planRes = await POST(
+      const planRes = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/families/bulk', 'POST', {
           action: 'setPaymentPlan',
           ids: [ctx.fixtures.familyId],
@@ -1842,7 +1998,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
       expect(planRes.status).toBe(200)
 
-      const optRes = await POST(
+      const optRes = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/families/bulk', 'POST', {
           action: 'setEmailOptOut',
           ids: [ctx.fixtures.familyId],
@@ -1851,7 +2008,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
       expect(optRes.status).toBe(200)
 
-      const badPlan = await POST(
+      const badPlan = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/families/bulk', 'POST', {
           action: 'setPaymentPlan',
           ids: [ctx.fixtures.familyId],
@@ -1870,7 +2028,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       })
 
       const { POST } = await import('@/lib/route-logic/families/bulk')
-      const res = await POST(
+      const res = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/families/bulk', 'POST', {
           action: 'delete',
           ids: [disposable._id.toString()],
@@ -1886,7 +2045,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const y = year()
       const { GET, POST } = await import('@/lib/route-logic/statements')
 
-      const listRes = await GET(
+      const listRes = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/statements', 'GET', undefined, {
           query: `?familyId=${ctx.fixtures.familyId}&limit=5`,
         }),
@@ -1895,7 +2055,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const listed = await listRes.json()
       expect(listed.items?.length ?? listed.length).toBeGreaterThan(0)
 
-      const genRes = await POST(
+      const genRes = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/statements', 'POST', {
           familyId: ctx.fixtures.familyId,
           fromDate: `${y}-03-01`,
@@ -1904,7 +2065,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
       expect([200, 201]).toContain(genRes.status)
 
-      const dupRes = await POST(
+      const dupRes = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/statements', 'POST', {
           familyId: ctx.fixtures.familyId,
           fromDate: `${y}-03-01`,
@@ -1950,11 +2112,16 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
       const { POST } = await import('@/lib/route-logic/statements/send-emails/worker')
       expect(
-        (await POST(orgJsonReq('/api/statements/send-emails/worker', 'POST', { jobId: 'bad' })))
-          .status,
+        (
+          await invokeRouteLogic(
+            POST,
+            orgJsonReq('/api/statements/send-emails/worker', 'POST', { jobId: 'bad' }),
+          )
+        ).status,
       ).toBe(400)
 
-      const res = await POST(
+      const res = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/statements/send-emails/worker', 'POST', { jobId: job._id.toString() }),
       )
       expect(res.status).toBe(200)
@@ -1980,7 +2147,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       })
 
       const { POST } = await import('@/lib/route-logic/statements/send-emails/worker')
-      const res = await POST(
+      const res = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/statements/send-emails/worker', 'POST', { jobId: job._id.toString() }),
       )
       expect(res.status).toBe(200)
@@ -2039,7 +2207,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       })
 
       const { POST } = await import('@/lib/route-logic/tax-receipts/email/worker')
-      const res = await POST(
+      const res = await invokeRouteLogic(
+        POST,
         orgJsonReq(
           '/api/tax-receipts/email/worker',
           'POST',
@@ -2060,11 +2229,12 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const { GET } = await import('@/lib/route-logic/dues-recommendation')
       const y = year()
 
-      const ok = await GET(orgJsonReq('/api/dues-recommendation', 'GET'))
+      const ok = await invokeRouteLogic(GET, orgJsonReq('/api/dues-recommendation', 'GET'))
       expect(ok.status).toBe(200)
       expect((await ok.json()).multiYear.length).toBeGreaterThan(0)
 
-      const custom = await GET(
+      const custom = await invokeRouteLogic(
+        GET,
         orgJsonReq('/api/dues-recommendation', 'GET', undefined, {
           query: '?windowYears=3&forecastYears=10&startYear=' + y,
         }),
@@ -2073,21 +2243,24 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
       expect(
         (
-          await GET(
+          await invokeRouteLogic(
+            GET,
             orgJsonReq('/api/dues-recommendation', 'GET', undefined, { query: '?windowYears=99' }),
           )
         ).status,
       ).toBe(400)
       expect(
         (
-          await GET(
+          await invokeRouteLogic(
+            GET,
             orgJsonReq('/api/dues-recommendation', 'GET', undefined, { query: '?forecastYears=0' }),
           )
         ).status,
       ).toBe(400)
       expect(
         (
-          await GET(
+          await invokeRouteLogic(
+            GET,
             orgJsonReq('/api/dues-recommendation', 'GET', undefined, {
               query: `?startYear=${y - 100}`,
             }),
@@ -2112,9 +2285,10 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const params = { id: ctx.fixtures.familyId }
       const { GET } = await import('@/lib/route-logic/families/[id]/sub-families')
 
-      const adminRes = await GET(
+      const adminRes = await invokeRouteLogic(
+        GET,
         orgJsonReq(`/api/families/${ctx.fixtures.familyId}/sub-families`, 'GET'),
-        { params },
+        params,
       )
       expect(adminRes.status).toBe(200)
       const adminList = await adminRes.json()
@@ -2132,9 +2306,10 @@ describe.sequential('route-logic row coverage (gap order)', () => {
         },
       } as never)
 
-      const memberRes = await GET(
+      const memberRes = await invokeRouteLogic(
+        GET,
         orgJsonReq(`/api/families/${ctx.fixtures.familyId}/sub-families`, 'GET'),
-        { params },
+        params,
       )
       expect(memberRes.status).toBe(200)
       const memberList = await memberRes.json()
@@ -2142,14 +2317,17 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       expect(row.openBalance).toBeUndefined()
       bindSession(ctx)
 
-      const badId = await GET(orgJsonReq('/api/families/not-valid/sub-families', 'GET'), {
-        params: { id: 'not-valid' },
-      })
+      const badId = await invokeRouteLogic(
+        GET,
+        orgJsonReq('/api/families/not-valid/sub-families', 'GET'),
+        { id: 'not-valid' },
+      )
       expect(badId.status).toBe(400)
 
-      const missing = await GET(
+      const missing = await invokeRouteLogic(
+        GET,
         orgJsonReq(`/api/families/${new Types.ObjectId()}/sub-families`, 'GET'),
-        { params: { id: new Types.ObjectId().toString() } },
+        { id: new Types.ObjectId().toString() },
       )
       expect(missing.status).toBe(404)
     })
@@ -2167,9 +2345,11 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       } as never)
 
       const { GET } = await import('@/lib/route-logic/families/[id]/members')
-      const res = await GET(orgJsonReq(`/api/families/${ctx.fixtures.familyId}/members`, 'GET'), {
-        params: { id: ctx.fixtures.familyId },
-      })
+      const res = await invokeRouteLogic(
+        GET,
+        orgJsonReq(`/api/families/${ctx.fixtures.familyId}/members`, 'GET'),
+        { id: ctx.fixtures.familyId },
+      )
       expect(res.status).toBe(200)
       const list = await res.json()
       expect(list.length).toBeGreaterThan(0)
@@ -2191,18 +2371,22 @@ describe.sequential('route-logic row coverage (gap order)', () => {
         { $set: { 'branding.logoDataUrl': TINY_PNG, 'branding.logoUpdatedAt': new Date() } },
       )
 
-      const ok = await GET(orgJsonReq('/api/organizations/branding/logo', 'GET'))
+      const ok = await invokeRouteLogic(GET, orgJsonReq('/api/organizations/branding/logo', 'GET'))
       expect(ok.status).toBe(200)
       expect(ok.headers.get('content-type')).toContain('image/png')
 
       await Organization.updateOne({ _id: ctx.orgId }, { $unset: { branding: 1 } })
-      expect((await GET(orgJsonReq('/api/organizations/branding/logo', 'GET'))).status).toBe(404)
+      expect(
+        (await invokeRouteLogic(GET, orgJsonReq('/api/organizations/branding/logo', 'GET'))).status,
+      ).toBe(404)
 
       await Organization.updateOne(
         { _id: ctx.orgId },
         { $set: { branding: { logoDataUrl: 'not-a-data-url' } } },
       )
-      expect((await GET(orgJsonReq('/api/organizations/branding/logo', 'GET'))).status).toBe(500)
+      expect(
+        (await invokeRouteLogic(GET, orgJsonReq('/api/organizations/branding/logo', 'GET'))).status,
+      ).toBe(500)
 
       await Organization.updateOne({ _id: ctx.orgId }, { $unset: { branding: 1 } })
     })
@@ -2212,12 +2396,18 @@ describe.sequential('route-logic row coverage (gap order)', () => {
     it('searches families and rejects empty query', async () => {
       const { GET } = await import('@/lib/route-logic/search')
 
-      const res = await GET(orgJsonReq('/api/search', 'GET', undefined, { query: '?q=Marker' }))
+      const res = await invokeRouteLogic(
+        GET,
+        orgJsonReq('/api/search', 'GET', undefined, { query: '?q=Marker' }),
+      )
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.items.some((i: { type: string }) => i.type === 'family')).toBe(true)
 
-      const bad = await GET(orgJsonReq('/api/search', 'GET', undefined, { query: '?q=' }))
+      const bad = await invokeRouteLogic(
+        GET,
+        orgJsonReq('/api/search', 'GET', undefined, { query: '?q=' }),
+      )
       expect(bad.status).toBe(400)
     })
   })
@@ -2229,7 +2419,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       expect(existing).toBeTruthy()
 
       const { POST } = await import('@/lib/route-logic/auth/invite')
-      const dup = await POST(
+      const dup = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/auth/invite', 'POST', { email: ctx.email, role: 'member' }),
       )
       expect(dup.status).toBe(409)
@@ -2255,7 +2446,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
         },
       } as never)
 
-      const ownerInvite = await POST(
+      const ownerInvite = await invokeRouteLogic(
+        POST,
         orgJsonReq('/api/auth/invite', 'POST', {
           email: `row-owner-invite-${Date.now()}@example.com`,
           role: 'owner',
@@ -2269,7 +2461,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
   describe('user/password', () => {
     it('rejects wrong and identical passwords then accepts a change', async () => {
       const { PATCH } = await import('@/lib/route-logic/user/password')
-      const bad = await PATCH(
+      const bad = await invokeRouteLogic(
+        PATCH,
         orgJsonReq('/api/user/password', 'PATCH', {
           currentPassword: 'wrong',
           newPassword: 'ApiRouteTestPass123!',
@@ -2277,7 +2470,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
       expect(bad.status).toBe(401)
 
-      const same = await PATCH(
+      const same = await invokeRouteLogic(
+        PATCH,
         orgJsonReq('/api/user/password', 'PATCH', {
           currentPassword: 'ApiRouteTestPass123!',
           newPassword: 'ApiRouteTestPass123!',
@@ -2285,7 +2479,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
       expect(same.status).toBe(400)
 
-      const ok = await PATCH(
+      const ok = await invokeRouteLogic(
+        PATCH,
         orgJsonReq('/api/user/password', 'PATCH', {
           currentPassword: 'ApiRouteTestPass123!',
           newPassword: 'RowCoveragePass123!',
@@ -2293,7 +2488,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
       expect(ok.status).toBe(200)
 
-      await PATCH(
+      await invokeRouteLogic(
+        PATCH,
         orgJsonReq('/api/user/password', 'PATCH', {
           currentPassword: 'RowCoveragePass123!',
           newPassword: 'ApiRouteTestPass123!',
