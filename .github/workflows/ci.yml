@@ -92,7 +92,7 @@ jobs:
       E2E_BULK_FAMILIES: '0'
       PLATFORM_ADMIN_EMAILS: e2e@kasa.test
       SECURITY_STRICT_RATE_LIMITS: '1'
-      CRON_SECRET: ci-cron-secret-placeholder
+      CRON_SECRET: ci-cron-secret-placeholder-32chars-min
       MONGODB_URI: mongodb://placeholder.invalid/ci-security
       NEXTAUTH_SECRET: ci-security-nextauth-secret-placeholder
       AUTH_SECRET: ci-security-nextauth-secret-placeholder
