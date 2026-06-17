@@ -22,7 +22,15 @@ export const GET = handler({
   auth: 'public',
   query: codeQuery,
   name: 'GET /api/auth/signup',
-  fn: async ({ query }) => {
+  fn: async ({ query, request }) => {
+    const verdict = await checkRateLimit(request, 'signup-code-lookup', {
+      limit: 20,
+      windowMs: 60 * 60_000,
+    })
+    if (!verdict.allowed) {
+      return { status: 429, data: { error: 'Too many requests' } }
+    }
+
     const req = await InviteRequest.findOne({
       signupCode: query.code,
       status: 'approved',

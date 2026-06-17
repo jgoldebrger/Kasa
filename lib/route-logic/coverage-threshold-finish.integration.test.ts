@@ -29,7 +29,11 @@ vi.mock('nodemailer', () => ({
 const API_ORIGIN = 'http://localhost:3000'
 let ctx: ApiTestContext
 
-function bindSession(c: ApiTestContext, role: 'owner' | 'admin' | 'member' = 'owner', orgId?: string) {
+function bindSession(
+  c: ApiTestContext,
+  role: 'owner' | 'admin' | 'member' = 'owner',
+  orgId?: string,
+) {
   mockAuth.mockResolvedValue({
     user: {
       id: c.userId,
@@ -98,8 +102,8 @@ async function withRateLimitBlocked<T>(fn: () => Promise<T>): Promise<T> {
   const rateLimit = await import('@/lib/rate-limit')
   const spy = vi.spyOn(rateLimit, 'checkRateLimit').mockResolvedValue({
     allowed: false,
-        remaining: 0,
-        resetAt: 0,
+    remaining: 0,
+    resetAt: 0,
   })
   try {
     return await fn()
@@ -118,7 +122,7 @@ describe.sequential('route-logic threshold finish coverage', () => {
     process.env.PLATFORM_ADMIN_EMAILS = ''
     ctx = await seedApiRouteFixtures()
     process.env.PLATFORM_ADMIN_EMAILS = ctx.email
-        process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
+    process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
     process.env.KASA_TEST_STRIPE_FAMILY = ctx.fixtures.familyId
     bindSession(ctx)
   })
@@ -137,16 +141,34 @@ describe.sequential('route-logic threshold finish coverage', () => {
       expect((await GET(orgJsonReq('/api/dues-recommendation', 'GET'))).status).toBe(200)
 
       expect(
-        (await GET(orgJsonReq('/api/dues-recommendation', 'GET', undefined, { query: '?windowYears=0' }))).status,
+        (
+          await GET(
+            orgJsonReq('/api/dues-recommendation', 'GET', undefined, { query: '?windowYears=0' }),
+          )
+        ).status,
       ).toBe(400)
       expect(
-        (await GET(orgJsonReq('/api/dues-recommendation', 'GET', undefined, { query: '?windowYears=11' }))).status,
+        (
+          await GET(
+            orgJsonReq('/api/dues-recommendation', 'GET', undefined, { query: '?windowYears=11' }),
+          )
+        ).status,
       ).toBe(400)
       expect(
-        (await GET(orgJsonReq('/api/dues-recommendation', 'GET', undefined, { query: '?forecastYears=0' }))).status,
+        (
+          await GET(
+            orgJsonReq('/api/dues-recommendation', 'GET', undefined, { query: '?forecastYears=0' }),
+          )
+        ).status,
       ).toBe(400)
       expect(
-        (await GET(orgJsonReq('/api/dues-recommendation', 'GET', undefined, { query: '?forecastYears=51' }))).status,
+        (
+          await GET(
+            orgJsonReq('/api/dues-recommendation', 'GET', undefined, {
+              query: '?forecastYears=51',
+            }),
+          )
+        ).status,
       ).toBe(400)
       expect(
         (
@@ -282,11 +304,20 @@ describe.sequential('route-logic threshold finish coverage', () => {
         ).status,
       ).toBe(200)
       expect(
-        (await GET(orgJsonReq('/api/payments', 'GET', undefined, { query: '?familyId=507f1f77bcf86cd799439099' })))
-          .status,
+        (
+          await GET(
+            orgJsonReq('/api/payments', 'GET', undefined, {
+              query: '?familyId=507f1f77bcf86cd799439099',
+            }),
+          )
+        ).status,
       ).toBe(404)
       expect(
-        (await GET(orgJsonReq('/api/payments', 'GET', undefined, { query: '?cursor=not-valid-cursor' }))).status,
+        (
+          await GET(
+            orgJsonReq('/api/payments', 'GET', undefined, { query: '?cursor=not-valid-cursor' }),
+          )
+        ).status,
       ).toBe(400)
 
       const page = await GET(orgJsonReq('/api/payments', 'GET', undefined, { query: '?limit=1' }))
@@ -343,7 +374,9 @@ describe.sequential('route-logic threshold finish coverage', () => {
 
       const { GET } = await import('@/lib/route-logic/audit-log')
       const csv = await GET(
-        orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?format=csv&action=finish.audit.export' }),
+        orgJsonReq('/api/audit-log', 'GET', undefined, {
+          query: '?format=csv&action=finish.audit.export',
+        }),
       )
       expect(csv.status).toBe(200)
       expect(csv.headers.get('content-type')).toMatch(/csv/i)
@@ -359,10 +392,15 @@ describe.sequential('route-logic threshold finish coverage', () => {
       ).toBe(200)
 
       expect(
-        (await GET(orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?action=!!!bad' }))).status,
+        (await GET(orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?action=!!!bad' })))
+          .status,
       ).toBe(400)
       expect(
-        (await GET(orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?fromDate=2020-01-01' }))).status,
+        (
+          await GET(
+            orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?fromDate=2020-01-01' }),
+          )
+        ).status,
       ).toBe(400)
       expect(
         (
@@ -379,14 +417,14 @@ describe.sequential('route-logic threshold finish coverage', () => {
   })
 
   describe('org-members admin view', () => {
-    it('lists members and exposes invite tokens for admins', async () => {
+    it('lists members and pending invites without exposing invite tokens', async () => {
       const { Invite } = await import('@/lib/models')
-      const token = `tok-${Date.now()}`
+      const inviteEmail = `finish-inv-${Date.now()}@example.com`
       await Invite.create({
         organizationId: ctx.orgId,
-        email: `finish-inv-${Date.now()}@example.com`,
+        email: inviteEmail,
         role: 'member',
-        token,
+        token: `tok-${Date.now()}`,
         invitedById: ctx.userId,
         expiresAt: new Date(Date.now() + 86400_000),
       })
@@ -396,8 +434,9 @@ describe.sequential('route-logic threshold finish coverage', () => {
       const res = await GET(orgJsonReq('/api/org-members', 'GET'))
       expect(res.status).toBe(200)
       const body = await res.json()
-      const withToken = (body.invites ?? []).find((i: { token?: string }) => i.token === token)
-      expect(withToken).toBeTruthy()
+      const invite = (body.invites ?? []).find((i: { email?: string }) => i.email === inviteEmail)
+      expect(invite).toBeTruthy()
+      expect(invite).not.toHaveProperty('token')
       bindSession(ctx)
     })
   })
@@ -425,7 +464,7 @@ describe.sequential('route-logic threshold finish coverage', () => {
 
       const form = new FormData()
       form.set('file', new Blob(['%PDF-1.4'], { type: 'application/pdf' }), 'doc.pdf')
-      form.set('to', 'recipient@example.com')
+      form.set('to', ctx.email)
       form.set('subject', 'Test')
       form.set('message', 'Hello')
 
@@ -447,13 +486,21 @@ describe.sequential('route-logic threshold finish coverage', () => {
       const email = `finish-new-${Date.now()}@example.com`
       const { POST } = await import('@/lib/route-logic/auth/request-invite')
       expect(
-        (await POST(publicJsonReq('/api/auth/request-invite', 'POST', { email, name: 'New User' }))).status,
+        (await POST(publicJsonReq('/api/auth/request-invite', 'POST', { email, name: 'New User' })))
+          .status,
       ).toBe(200)
 
       const { User, InviteRequest } = await import('@/lib/models')
-      expect((await POST(publicJsonReq('/api/auth/request-invite', 'POST', { email: ctx.email, name: 'Existing' }))).status).toBe(
-        200,
-      )
+      expect(
+        (
+          await POST(
+            publicJsonReq('/api/auth/request-invite', 'POST', {
+              email: ctx.email,
+              name: 'Existing',
+            }),
+          )
+        ).status,
+      ).toBe(200)
 
       await InviteRequest.deleteMany({ email })
       await User.deleteOne({ email }).catch(() => {})
@@ -472,10 +519,13 @@ describe.sequential('route-logic threshold finish coverage', () => {
 
       const { GET } = await import('@/lib/route-logic/auth/reset-password')
       const valid = await GET(
-        new NextRequest(`${API_ORIGIN}/api/auth/reset-password?token=${encodeURIComponent(token)}`, {
-          method: 'GET',
-          headers: { host: 'localhost:3000', origin: API_ORIGIN },
-        }),
+        new NextRequest(
+          `${API_ORIGIN}/api/auth/reset-password?token=${encodeURIComponent(token)}`,
+          {
+            method: 'GET',
+            headers: { host: 'localhost:3000', origin: API_ORIGIN },
+          },
+        ),
       )
       expect(valid.status).toBe(200)
       expect((await valid.json()).valid).toBe(true)
@@ -486,7 +536,8 @@ describe.sequential('route-logic threshold finish coverage', () => {
 
       const { POST } = await import('@/lib/route-logic/auth/reset-password')
       expect(
-        (await POST(publicJsonReq('/api/auth/reset-password', 'POST', { email: ctx.email }))).status,
+        (await POST(publicJsonReq('/api/auth/reset-password', 'POST', { email: ctx.email })))
+          .status,
       ).toBe(200)
 
       await PasswordResetToken.deleteMany({ userId: ctx.userId })
@@ -545,7 +596,9 @@ describe.sequential('route-logic threshold finish coverage', () => {
 
       const { GET } = await import('@/lib/route-logic/tasks')
       for (const q of ['?dueDate=today', '?dueDate=overdue', '?dueDate=upcoming']) {
-        expect((await GET(orgJsonReq('/api/tasks', 'GET', undefined, { query: q }))).status).toBe(200)
+        expect((await GET(orgJsonReq('/api/tasks', 'GET', undefined, { query: q }))).status).toBe(
+          200,
+        )
       }
       await Task.deleteMany({ organizationId: ctx.orgId, title: 'Finish Overdue' })
     })
@@ -589,7 +642,10 @@ describe.sequential('route-logic threshold finish coverage', () => {
           errors: [],
         }
       })
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 502, text: async () => 'bad gateway' }))
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: false, status: 502, text: async () => 'bad gateway' }),
+      )
       try {
         const { POST } = await import('@/lib/route-logic/jobs/send-monthly-statements')
         const res = await POST(
@@ -599,7 +655,10 @@ describe.sequential('route-logic threshold finish coverage', () => {
       } finally {
         runSpy.mockRestore()
         vi.unstubAllGlobals()
-        await Organization.updateOne({ _id: ctx.orgId }, { $unset: { monthlyStatementAutoEmail: 1 } })
+        await Organization.updateOne(
+          { _id: ctx.orgId },
+          { $unset: { monthlyStatementAutoEmail: 1 } },
+        )
       }
     })
   })
@@ -630,9 +689,10 @@ describe.sequential('route-logic threshold finish coverage', () => {
 
       await withRateLimitBlocked(async () => {
         const { POST: planPost } = await import('@/lib/route-logic/payment-plans')
-        expect((await planPost(orgJsonReq('/api/payment-plans', 'POST', { name: 'X', yearlyPrice: 1 }))).status).toBe(
-          429,
-        )
+        expect(
+          (await planPost(orgJsonReq('/api/payment-plans', 'POST', { name: 'X', yearlyPrice: 1 })))
+            .status,
+        ).toBe(429)
         const { GET: balGet } = await import('@/lib/route-logic/families/balances')
         expect((await balGet(orgJsonReq('/api/families/balances', 'GET'))).status).toBe(429)
         const { POST: runPost } = await import('@/lib/route-logic/reports/run')
@@ -655,7 +715,8 @@ describe.sequential('route-logic threshold finish coverage', () => {
         const { GET, PATCH } = await import('@/lib/route-logic/organizations')
         expect((await GET(sessionJsonReq('/api/organizations', 'GET'))).status).toBe(429)
         expect(
-          (await PATCH(sessionJsonReq('/api/organizations', 'PATCH', { activeOrgId: ctx.orgId }))).status,
+          (await PATCH(sessionJsonReq('/api/organizations', 'PATCH', { activeOrgId: ctx.orgId })))
+            .status,
         ).toBe(429)
       })
 
@@ -713,7 +774,11 @@ describe.sequential('route-logic threshold finish coverage', () => {
       bindSession(ctx, 'admin')
       const { GET: famGet } = await import('@/lib/route-logic/families')
       expect(
-        (await famGet(orgJsonReq('/api/families', 'GET', undefined, { query: '?cursor=bad-cursor' }))).status,
+        (
+          await famGet(
+            orgJsonReq('/api/families', 'GET', undefined, { query: '?cursor=bad-cursor' }),
+          )
+        ).status,
       ).toBe(400)
 
       const { GET: memBal } = await import('@/lib/route-logic/members/[memberId]/balance')
@@ -732,23 +797,28 @@ describe.sequential('route-logic threshold finish coverage', () => {
       await YearlyCalculation.deleteMany({ organizationId: ctx.orgId, year: year() + 2 })
       const { GET: dashGet } = await import('@/lib/route-logic/dashboard-stats')
       expect(
-        (await dashGet(orgJsonReq('/api/dashboard-stats', 'GET', undefined, { query: `?year=${year() + 2}` }))).status,
+        (
+          await dashGet(
+            orgJsonReq('/api/dashboard-stats', 'GET', undefined, { query: `?year=${year() + 2}` }),
+          )
+        ).status,
       ).toBe(200)
 
       const pag = await import('@/lib/pagination')
-      const cursorSpy = vi.spyOn(pag, 'collectCompoundCursorPages').mockImplementation(
-        async (loadPage, baseFilter, _sf, _dir, getCursor, _bs) => {
+      const cursorSpy = vi
+        .spyOn(pag, 'collectCompoundCursorPages')
+        .mockImplementation(async (loadPage, baseFilter, _sf, _dir, getCursor, _bs) => {
           const page = await loadPage(baseFilter, 3)
           if (page[0]) getCursor(page[0] as never)
           return page
-        },
-      )
+        })
       try {
         const { GET: calcGet } = await import('@/lib/route-logic/calculations')
         expect((await calcGet(orgJsonReq('/api/calculations', 'GET'))).status).toBe(200)
 
-        const evSpy = vi.spyOn(pag, 'collectCompoundCursorPages').mockImplementationOnce(
-          async (_loadPage, _filter, _sf, _dir, getCursor, _bs) => {
+        const evSpy = vi
+          .spyOn(pag, 'collectCompoundCursorPages')
+          .mockImplementationOnce(async (_loadPage, _filter, _sf, _dir, getCursor, _bs) => {
             const row = {
               _id: new Types.ObjectId(),
               eventDate: null,
@@ -759,14 +829,14 @@ describe.sequential('route-logic threshold finish coverage', () => {
             }
             getCursor(row as never)
             return [row]
-          },
-        )
+          })
         const { GET: evGet } = await import('@/lib/route-logic/events')
         expect((await evGet(orgJsonReq('/api/events', 'GET'))).status).toBe(200)
         evSpy.mockRestore()
 
-        const subSpy = vi.spyOn(pag, 'collectCompoundCursorPages').mockImplementationOnce(
-          async (_loadPage, _filter, _sf, _dir, getCursor, _bs) => {
+        const subSpy = vi
+          .spyOn(pag, 'collectCompoundCursorPages')
+          .mockImplementationOnce(async (_loadPage, _filter, _sf, _dir, getCursor, _bs) => {
             const row = {
               _id: new Types.ObjectId(),
               weddingDate: null,
@@ -776,8 +846,7 @@ describe.sequential('route-logic threshold finish coverage', () => {
             }
             getCursor(row as never)
             return [row]
-          },
-        )
+          })
         const { GET: subGet } = await import('@/lib/route-logic/families/[id]/sub-families')
         expect(
           (
@@ -840,18 +909,17 @@ describe.sequential('route-logic threshold finish coverage', () => {
     it('member statements GET maps null statement dates in compound cursor', async () => {
       bindSession(ctx, 'admin')
       const pag = await import('@/lib/pagination')
-      const spy = vi.spyOn(pag, 'collectCompoundCursorPages').mockImplementationOnce(
-        async (_loadPage, _filter, _sf, _dir, getCursor, _bs) => {
+      const spy = vi
+        .spyOn(pag, 'collectCompoundCursorPages')
+        .mockImplementationOnce(async (_loadPage, _filter, _sf, _dir, getCursor, _bs) => {
           const row = { _id: new Types.ObjectId(), date: null }
           getCursor(row as never)
           return [row]
-        },
-      )
+        })
       const { GET } = await import('@/lib/route-logic/members/[memberId]/statements')
-      const res = await GET(
-        orgJsonReq(`/api/members/${ctx.fixtures.memberId}/statements`, 'GET'),
-        { params: { memberId: ctx.fixtures.memberId } },
-      )
+      const res = await GET(orgJsonReq(`/api/members/${ctx.fixtures.memberId}/statements`, 'GET'), {
+        params: { memberId: ctx.fixtures.memberId },
+      })
       expect(res.status).toBe(200)
       spy.mockRestore()
     })
@@ -859,13 +927,13 @@ describe.sequential('route-logic threshold finish coverage', () => {
     it('recurring-payments process maps null nextPaymentDate in cursor', async () => {
       bindSession(ctx, 'admin')
       const pag = await import('@/lib/pagination')
-      const spy = vi.spyOn(pag, 'collectCompoundCursorPages').mockImplementationOnce(
-        async (_loadPage, _filter, _sf, _dir, getCursor, _bs) => {
+      const spy = vi
+        .spyOn(pag, 'collectCompoundCursorPages')
+        .mockImplementationOnce(async (_loadPage, _filter, _sf, _dir, getCursor, _bs) => {
           const row = { _id: new Types.ObjectId(), nextPaymentDate: null }
           getCursor(row as never)
           return [row]
-        },
-      )
+        })
       const { GET } = await import('@/lib/route-logic/recurring-payments/process')
       const res = await GET(orgJsonReq('/api/recurring-payments/process', 'GET'))
       expect(res.status).toBe(200)
@@ -887,7 +955,8 @@ describe.sequential('route-logic threshold finish coverage', () => {
         { $set: { weddingConversionDefaultPlanId: ctx.fixtures.paymentPlanId } },
       )
       const planSpy = vi.spyOn(PaymentPlan, 'findOne').mockRejectedValueOnce(new Error('plan fail'))
-      const { POST } = await import('@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family')
+      const { POST } =
+        await import('@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family')
       const res = await POST(
         orgJsonReq(
           `/api/families/${ctx.fixtures.betaFamilyId}/members/${member._id}/convert-to-family`,
@@ -899,22 +968,35 @@ describe.sequential('route-logic threshold finish coverage', () => {
       expect([201, 404, 409]).toContain(res.status)
       planSpy.mockRestore()
       await FamilyMember.deleteOne({ _id: member._id })
-      await Organization.updateOne({ _id: ctx.orgId }, { $unset: { weddingConversionDefaultPlanId: 1 } })
+      await Organization.updateOne(
+        { _id: ctx.orgId },
+        { $unset: { weddingConversionDefaultPlanId: 1 } },
+      )
     })
 
     it('recurring-payments POST skips rows when billing claim loses race', async () => {
       bindSession(ctx, 'admin')
       const { RecurringPayment } = await import('@/lib/models')
       const origUpdate = RecurringPayment.updateOne.bind(RecurringPayment)
-      vi.spyOn(RecurringPayment, 'updateOne').mockImplementation(async (filter: any, update: any) => {
-        if (filter?.nextPaymentDate) {
-          return { acknowledged: true, modifiedCount: 0, matchedCount: 1, upsertedCount: 0, upsertedId: null }
-        }
-        return origUpdate(filter, update)
-      })
+      vi.spyOn(RecurringPayment, 'updateOne').mockImplementation(
+        async (filter: any, update: any) => {
+          if (filter?.nextPaymentDate) {
+            return {
+              acknowledged: true,
+              modifiedCount: 0,
+              matchedCount: 1,
+              upsertedCount: 0,
+              upsertedId: null,
+            }
+          }
+          return origUpdate(filter, update)
+        },
+      )
       try {
         const { POST } = await import('@/lib/route-logic/recurring-payments/process')
-        expect((await POST(orgJsonReq('/api/recurring-payments/process', 'POST', {}))).status).toBe(200)
+        expect((await POST(orgJsonReq('/api/recurring-payments/process', 'POST', {}))).status).toBe(
+          200,
+        )
       } finally {
         vi.restoreAllMocks()
       }

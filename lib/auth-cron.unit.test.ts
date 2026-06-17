@@ -24,9 +24,7 @@ vi.mock('next/server', async (importOriginal) => {
 import { NextResponse } from 'next/server'
 import { isCronRequest, requireOrgOrCron } from './auth-cron'
 
-function cronRequest(
-  init: { secret?: string; bearer?: string; url?: string } = {},
-): Request {
+function cronRequest(init: { secret?: string; bearer?: string; url?: string } = {}): Request {
   const headers = new Headers()
   if (init.secret) headers.set('x-cron-secret', init.secret)
   if (init.bearer) headers.set('authorization', `Bearer ${init.bearer}`)
@@ -67,11 +65,7 @@ describe('isCronRequest', () => {
     expect(isCronRequest(cronRequest({ secret: '' }))).toBe(false)
     expect(isCronRequest(cronRequest({ bearer: '' }))).toBe(false)
     const headers = new Headers({ authorization: 'Bearer ' })
-    expect(
-      isCronRequest(
-        new Request('https://app.test/api/jobs/run', { headers }),
-      ),
-    ).toBe(false)
+    expect(isCronRequest(new Request('https://app.test/api/jobs/run', { headers }))).toBe(false)
   })
 
   it('prefers valid header when both signals are present but one is wrong', () => {
@@ -79,19 +73,11 @@ describe('isCronRequest', () => {
       'x-cron-secret': 'test-cron-secret',
       authorization: 'Bearer wrong',
     })
-    expect(
-      isCronRequest(
-        new Request('https://app.test/api/jobs/run', { headers }),
-      ),
-    ).toBe(true)
+    expect(isCronRequest(new Request('https://app.test/api/jobs/run', { headers }))).toBe(true)
 
     headers.set('x-cron-secret', 'wrong')
     headers.set('authorization', 'Bearer test-cron-secret')
-    expect(
-      isCronRequest(
-        new Request('https://app.test/api/jobs/run', { headers }),
-      ),
-    ).toBe(true)
+    expect(isCronRequest(new Request('https://app.test/api/jobs/run', { headers }))).toBe(true)
   })
 
   it('rejects when both cron signals are present but invalid', () => {
@@ -99,11 +85,7 @@ describe('isCronRequest', () => {
       'x-cron-secret': 'wrong',
       authorization: 'Bearer also-wrong',
     })
-    expect(
-      isCronRequest(
-        new Request('https://app.test/api/jobs/run', { headers }),
-      ),
-    ).toBe(false)
+    expect(isCronRequest(new Request('https://app.test/api/jobs/run', { headers }))).toBe(false)
   })
 })
 
@@ -128,7 +110,7 @@ describe('requireOrgOrCron', () => {
     else process.env.CRON_SECRET = prevSecret
   })
 
-  it('returns synthetic owner context for valid cron + organizationId', async () => {
+  it('returns synthetic cron context for valid cron + organizationId', async () => {
     const req = cronRequest({ secret: 'test-cron-secret' }) as import('next/server').NextRequest
 
     const ctx = await requireOrgOrCron(req)
@@ -144,7 +126,8 @@ describe('requireOrgOrCron', () => {
       },
       userId: 'cron',
       organizationId: validOrgId,
-      role: 'owner',
+      role: 'member',
+      isCron: true,
     })
     expect(mocks.requireOrg).not.toHaveBeenCalled()
   })

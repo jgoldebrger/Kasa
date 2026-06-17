@@ -12,11 +12,32 @@
 
 import crypto from 'crypto'
 
-const PREFIX = 'enc:v1:'
+export const ENCRYPTION_PREFIX = 'enc:v1:'
+const PREFIX = ENCRYPTION_PREFIX
 const ALGO = 'aes-256-gcm'
 
-// Cached fallback warning flag — keeps dev logs quiet on every call.
+/** True when a non-empty value is stored without the `enc:v1:` envelope. */
+export function isLegacyPlaintextSecret(value: string | null | undefined): boolean {
+  if (value == null || value === '') return false
+  return !value.startsWith(PREFIX)
+}
+
+function rejectLegacyPlaintext2FAEnabled(): boolean {
+  return process.env.NODE_ENV === 'production' && process.env.REJECT_LEGACY_PLAINTEXT_2FA === 'true'
+}
+
+// Cached fallback warning flags — keeps logs quiet on every call.
 let warnedFallback = false
+let warnedLegacyPlaintext = false
+
+function warnLegacyPlaintextOnce(): void {
+  if (process.env.NODE_ENV !== 'production' || warnedLegacyPlaintext) return
+  warnedLegacyPlaintext = true
+  console.warn(
+    '[encryption] Legacy plaintext secret detected at rest. Re-save affected records ' +
+      '(email settings, 2FA) or see docs/SECURITY.md — "Encrypting legacy plaintext secrets".',
+  )
+}
 
 function getKey(): Buffer {
   const encKey = process.env.ENCRYPTION_KEY
@@ -58,9 +79,22 @@ export function encrypt(plaintext: string): string {
   return `${PREFIX}${iv.toString('base64')}:${tag.toString('base64')}:${ct.toString('base64')}`
 }
 
-export function decrypt(value: string): string {
+export type DecryptOptions = {
+  /** When true, refuse legacy plaintext instead of pass-through (2FA hardening). */
+  rejectLegacyPlaintext?: boolean
+}
+
+export function decrypt(value: string, options?: DecryptOptions): string {
   if (value == null || value === '') return value
-  if (!value.startsWith(PREFIX)) return value // legacy plaintext
+  if (!value.startsWith(PREFIX)) {
+    if (options?.rejectLegacyPlaintext) {
+      throw new Error(
+        'Legacy plaintext secret rejected. Run `npx tsx scripts/encrypt-legacy-secrets.ts` — see docs/SECURITY.md.',
+      )
+    }
+    warnLegacyPlaintextOnce()
+    return value // legacy plaintext
+  }
   try {
     const body = value.slice(PREFIX.length)
     const [ivB64, tagB64, ctB64] = body.split(':')
@@ -70,15 +104,17 @@ export function decrypt(value: string): string {
       authTagLength: 16,
     })
     decipher.setAuthTag(Buffer.from(tagB64, 'base64'))
-    const pt = Buffer.concat([
-      decipher.update(Buffer.from(ctB64, 'base64')),
-      decipher.final(),
-    ])
+    const pt = Buffer.concat([decipher.update(Buffer.from(ctB64, 'base64')), decipher.final()])
     return pt.toString('utf-8')
   } catch (err) {
     console.error('[encryption] decrypt failed:', err)
     throw err
   }
+}
+
+/** Decrypt a User.twoFactorSecret; optionally hard-fails on legacy plaintext in production. */
+export function decryptTwoFactorSecret(value: string): string {
+  return decrypt(value, { rejectLegacyPlaintext: rejectLegacyPlaintext2FAEnabled() })
 }
 
 export type SafeDecryptFailure = 'key_missing' | 'decrypt_failed'
@@ -96,7 +132,10 @@ export type SafeDecryptResult =
  */
 export function safeDecrypt(value: string): SafeDecryptResult {
   if (value == null || value === '') return { ok: true, value: '' }
-  if (!value.startsWith(PREFIX)) return { ok: true, value }
+  if (!value.startsWith(PREFIX)) {
+    warnLegacyPlaintextOnce()
+    return { ok: true, value }
+  }
   try {
     return { ok: true, value: decrypt(value) }
   } catch (err: any) {

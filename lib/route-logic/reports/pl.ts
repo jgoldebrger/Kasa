@@ -2,6 +2,7 @@ import { handler } from '@/lib/api/handler'
 import { Payment, LifecycleEventPayment } from '@/lib/models'
 import { yearParam } from '@/lib/schemas'
 import { PAYMENT_PUBLIC_SELECT } from '@/lib/payments/select'
+import { sanitizePaymentNotes } from '@/lib/payments/sanitize'
 import { netPaymentAmount } from '@/lib/money'
 import { collectCompoundCursorPages } from '@/lib/pagination'
 import { validateDateRange } from '@/lib/validate-date-range'
@@ -128,7 +129,7 @@ export const GET = handler({
       family: payment.familyId?.name || 'Unknown Family',
       description: `Payment - ${payment.type || 'membership'}`,
       amount: netPaymentAmount(payment),
-      notes: payment.notes || '',
+      notes: sanitizePaymentNotes(payment.notes),
     }))
 
     // Format events for CSV

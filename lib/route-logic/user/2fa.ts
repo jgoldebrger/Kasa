@@ -15,7 +15,7 @@ import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { handler } from '@/lib/api/handler'
 import { User } from '@/lib/models'
-import { decrypt } from '@/lib/encryption'
+import { decryptTwoFactorSecret } from '@/lib/encryption'
 import { verifyTotpStep } from '@/lib/totp'
 import { audit } from '@/lib/audit'
 import { checkRateLimit } from '@/lib/rate-limit'
@@ -23,7 +23,10 @@ import { checkRateLimit } from '@/lib/rate-limit'
 const body = z.union([
   z.object({
     action: z.literal('enable'),
-    code: z.string().trim().regex(/^\d{6}$/, '6-digit code required'),
+    code: z
+      .string()
+      .trim()
+      .regex(/^\d{6}$/, '6-digit code required'),
   }),
   z.object({
     action: z.literal('disable'),
@@ -66,7 +69,7 @@ export const PATCH = handler({
       }
       let secret: string
       try {
-        secret = decrypt(user.twoFactorSecret)
+        secret = decryptTwoFactorSecret(user.twoFactorSecret)
       } catch {
         return { status: 500, data: { error: 'Could not read enrollment secret.' } }
       }
@@ -146,7 +149,7 @@ export const PATCH = handler({
     let factorOk = false
     if (/^\d{6}$/.test(trimmed) && user.twoFactorSecret) {
       try {
-        const secret = decrypt(user.twoFactorSecret)
+        const secret = decryptTwoFactorSecret(user.twoFactorSecret)
         const step = verifyTotpStep(secret, trimmed)
         if (step !== null) {
           const claim = await User.updateOne(
@@ -170,18 +173,18 @@ export const PATCH = handler({
       const normalized = body.code.toUpperCase().replace(/[^A-Z0-9-]/g, '')
       // Atomic consume-on-match (same race-safety pattern as login).
       if (normalized.length >= 9) {
-      for (const hash of user.twoFactorBackupCodes) {
-        // eslint-disable-next-line no-await-in-loop
-        if (await bcrypt.compare(normalized, hash)) {
+        for (const hash of user.twoFactorBackupCodes) {
           // eslint-disable-next-line no-await-in-loop
-          const res = await User.updateOne(
-            { _id: user._id, twoFactorBackupCodes: hash },
-            { $pull: { twoFactorBackupCodes: hash } },
-          )
-          if (res.modifiedCount === 1) factorOk = true
-          break
+          if (await bcrypt.compare(normalized, hash)) {
+            // eslint-disable-next-line no-await-in-loop
+            const res = await User.updateOne(
+              { _id: user._id, twoFactorBackupCodes: hash },
+              { $pull: { twoFactorBackupCodes: hash } },
+            )
+            if (res.modifiedCount === 1) factorOk = true
+            break
+          }
         }
-      }
       }
     }
     if (!factorOk) {

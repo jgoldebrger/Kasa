@@ -12,6 +12,7 @@ import { notifyAdmins } from '@/lib/notify'
 import { password as passwordSchema } from '@/lib/schemas/common'
 import { auth as authSchemas } from '@/lib/schemas'
 import { handler } from '@/lib/api/handler'
+import { hashInviteToken, findInviteByToken, findInviteByTokenLean } from '@/lib/invite-token'
 
 const INVITE_TTL_DAYS = 7
 
@@ -60,7 +61,7 @@ export const POST = handler({
       organizationId: ctx!.organizationId,
       email,
       role,
-      token,
+      token: hashInviteToken(token),
       invitedById: ctx!.userId,
       expiresAt,
     })
@@ -114,7 +115,6 @@ export const POST = handler({
         id: invite._id.toString(),
         email,
         role,
-        token,
         inviteUrl,
         expiresAt,
         email_result: emailResult,
@@ -138,13 +138,13 @@ export const GET = handler({
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    const invite = await Invite.findOne({ token }).lean<{
+    const invite = await findInviteByTokenLean<{
       organizationId: any
       email: string
       role: string
       acceptedAt?: Date
       expiresAt: Date
-    }>()
+    }>(token)
     if (!invite) return { status: 404, data: { error: 'Invite not found' } }
     if (invite.acceptedAt) return { status: 410, data: { error: 'Invite already accepted' } }
     if (invite.expiresAt < new Date()) return { status: 410, data: { error: 'Invite expired' } }
@@ -166,7 +166,10 @@ export const PUT = handler({
   auth: 'public',
   name: 'PUT /api/auth/invite',
   fn: async ({ request }) => {
-    const verdict = await checkRateLimit(request, 'invite-accept', { limit: 10, windowMs: 15 * 60_000 })
+    const verdict = await checkRateLimit(request, 'invite-accept', {
+      limit: 10,
+      windowMs: 15 * 60_000,
+    })
     if (!verdict.allowed) {
       return {
         status: 429,
@@ -190,7 +193,7 @@ export const PUT = handler({
     }
     const { token, name: parsedName, password: parsedPassword } = parsed.data
 
-    const invite = await Invite.findOne({ token })
+    const invite = await findInviteByToken(token)
     if (!invite) return { status: 404, data: { error: 'Invite not found' } }
     if (invite.acceptedAt) return { status: 410, data: { error: 'Invite already accepted' } }
     if (invite.expiresAt < new Date()) return { status: 410, data: { error: 'Invite expired' } }

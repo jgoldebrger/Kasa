@@ -1,6 +1,14 @@
 import { Types } from 'mongoose'
 import { z } from 'zod'
-import { Family, FamilyMember, Payment, Withdrawal, LifecycleEventPayment, PaymentPlan, CycleCharge } from '@/lib/models'
+import {
+  Family,
+  FamilyMember,
+  Payment,
+  Withdrawal,
+  LifecycleEventPayment,
+  PaymentPlan,
+  CycleCharge,
+} from '@/lib/models'
 // Withdrawal is still imported above because the GET handler reads it; only the
 // DELETE handler used to hard-delete it (now replaced by the cascade).
 import { calculateFamilyBalance } from '@/lib/calculations'
@@ -9,7 +17,7 @@ import { audit } from '@/lib/audit'
 import { handler } from '@/lib/api/handler'
 import { family as familySchemas } from '@/lib/schemas'
 import { softDeleteFamilyCascade } from '@/lib/recycle-bin'
-import { PAYMENT_PUBLIC_SELECT } from '@/lib/payments/select'
+import { PAYMENT_PUBLIC_SELECT, serializePaymentsPublic } from '@/lib/payments/select'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { loadAllByIdCursor } from '@/lib/org-pagination'
 import { collectCompoundCursorPages } from '@/lib/pagination'
@@ -67,8 +75,7 @@ export const GET = handler({
 
     if (!isAdmin) {
       const members = await loadAllByIdCursor<any>(
-        (filter, limit) =>
-          FamilyMember.find(filter).sort({ _id: 1 }).limit(limit).lean<any[]>(),
+        (filter, limit) => FamilyMember.find(filter).sort({ _id: 1 }).limit(limit).lean<any[]>(),
         memberFilter,
       )
       const sanitizedMembers = members.map((m) => {
@@ -109,78 +116,74 @@ export const GET = handler({
 
     const [members, payments, withdrawals, lifecycleEvents, cycleCharges, balance] =
       await Promise.all([
-      loadAllByIdCursor<any>(
-        (filter, limit) =>
-          FamilyMember.find(filter).sort({ _id: 1 }).limit(limit).lean<any[]>(),
-        memberFilter,
-      ),
-      collectCompoundCursorPages(
-        (filter, limit) =>
-          Payment.find(filter)
-            .select(PAYMENT_PUBLIC_SELECT)
-            .sort({ paymentDate: -1, _id: -1 })
-            .limit(limit)
-            .lean<any[]>(),
-        { familyId, organizationId: orgId },
-        'paymentDate',
-        -1,
-        (last) => ({
-          v: last.paymentDate ? new Date(last.paymentDate as string | Date).getTime() : null,
-          id: String(last._id),
-        }),
-      ),
-      collectCompoundCursorPages(
-        (filter, limit) =>
-          Withdrawal.find(filter)
-            .sort({ withdrawalDate: -1, _id: -1 })
-            .limit(limit)
-            .lean<any[]>(),
-        { familyId, organizationId: orgId },
-        'withdrawalDate',
-        -1,
-        (last) => ({
-          v: last.withdrawalDate
-            ? new Date(last.withdrawalDate as string | Date).getTime()
-            : null,
-          id: String(last._id),
-        }),
-      ),
-      collectCompoundCursorPages(
-        (filter, limit) =>
-          LifecycleEventPayment.find(filter)
-            .sort({ eventDate: -1, _id: -1 })
-            .limit(limit)
-            .lean<any[]>(),
-        { familyId, organizationId: orgId },
-        'eventDate',
-        -1,
-        (last) => ({
-          v: last.eventDate ? new Date(last.eventDate as string | Date).getTime() : null,
-          id: String(last._id),
-        }),
-      ),
-      collectCompoundCursorPages(
-        (filter, limit) =>
-          CycleCharge.find(filter)
-            .sort({ chargeDate: -1, _id: -1 })
-            .limit(limit)
-            .lean<any[]>(),
-        { familyId, organizationId: orgId },
-        'chargeDate',
-        -1,
-        (last) => ({
-          v: last.chargeDate ? new Date(last.chargeDate as string | Date).getTime() : null,
-          id: String(last._id),
-        }),
-      ),
-      calculateFamilyBalance(fam._id.toString(), orgId),
-    ])
+        loadAllByIdCursor<any>(
+          (filter, limit) => FamilyMember.find(filter).sort({ _id: 1 }).limit(limit).lean<any[]>(),
+          memberFilter,
+        ),
+        collectCompoundCursorPages(
+          (filter, limit) =>
+            Payment.find(filter)
+              .select(PAYMENT_PUBLIC_SELECT)
+              .sort({ paymentDate: -1, _id: -1 })
+              .limit(limit)
+              .lean<any[]>(),
+          { familyId, organizationId: orgId },
+          'paymentDate',
+          -1,
+          (last) => ({
+            v: last.paymentDate ? new Date(last.paymentDate as string | Date).getTime() : null,
+            id: String(last._id),
+          }),
+        ),
+        collectCompoundCursorPages(
+          (filter, limit) =>
+            Withdrawal.find(filter)
+              .sort({ withdrawalDate: -1, _id: -1 })
+              .limit(limit)
+              .lean<any[]>(),
+          { familyId, organizationId: orgId },
+          'withdrawalDate',
+          -1,
+          (last) => ({
+            v: last.withdrawalDate
+              ? new Date(last.withdrawalDate as string | Date).getTime()
+              : null,
+            id: String(last._id),
+          }),
+        ),
+        collectCompoundCursorPages(
+          (filter, limit) =>
+            LifecycleEventPayment.find(filter)
+              .sort({ eventDate: -1, _id: -1 })
+              .limit(limit)
+              .lean<any[]>(),
+          { familyId, organizationId: orgId },
+          'eventDate',
+          -1,
+          (last) => ({
+            v: last.eventDate ? new Date(last.eventDate as string | Date).getTime() : null,
+            id: String(last._id),
+          }),
+        ),
+        collectCompoundCursorPages(
+          (filter, limit) =>
+            CycleCharge.find(filter).sort({ chargeDate: -1, _id: -1 }).limit(limit).lean<any[]>(),
+          { familyId, organizationId: orgId },
+          'chargeDate',
+          -1,
+          (last) => ({
+            v: last.chargeDate ? new Date(last.chargeDate as string | Date).getTime() : null,
+            id: String(last._id),
+          }),
+        ),
+        calculateFamilyBalance(fam._id.toString(), orgId),
+      ])
 
     return {
       data: {
         family: fam.toObject(),
         members,
-        payments,
+        payments: serializePaymentsPublic(payments),
         withdrawals,
         lifecycleEvents,
         cycleCharges,
@@ -227,7 +230,8 @@ export const PUT = handler({
         _id: body.paymentPlanId,
         organizationId: ctx!.organizationId,
       })
-      if (!plan) return { status: 400, data: { error: `Payment plan ${body.paymentPlanId} not found` } }
+      if (!plan)
+        return { status: 400, data: { error: `Payment plan ${body.paymentPlanId} not found` } }
     }
 
     // Tenant guard for `parentFamilyId`: must point at a family in the

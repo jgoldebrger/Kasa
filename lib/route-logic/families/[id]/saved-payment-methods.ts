@@ -4,6 +4,7 @@ import { SavedPaymentMethod, Family } from '@/lib/models'
 import { audit } from '@/lib/audit'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { loadAllByIdCursor } from '@/lib/org-pagination'
+import { payment as paymentSchemas } from '@/lib/schemas'
 import Stripe from 'stripe'
 import https from 'https'
 
@@ -13,7 +14,9 @@ const httpsAgent = new https.Agent({
 })
 
 // Initialize Stripe only when API key is available (lazy initialization)
-function publicSavedPaymentMethod(doc: { toObject?: () => Record<string, unknown> } & Record<string, unknown>) {
+function publicSavedPaymentMethod(
+  doc: { toObject?: () => Record<string, unknown> } & Record<string, unknown>,
+) {
   const obj = typeof doc.toObject === 'function' ? doc.toObject() : { ...doc }
   delete obj.stripePaymentMethodId
   delete obj.organizationId
@@ -77,9 +80,11 @@ export const POST = handler({
   auth: 'org',
   minRole: 'admin',
   idParams: ['id'],
+  body: paymentSchemas.savePaymentMethodBody,
   name: 'POST /api/families/[id]/saved-payment-methods',
-  fn: async ({ params, ctx, request }) => {
+  fn: async ({ params, ctx, body, request }) => {
     const id = params.id as string
+    const { paymentMethodId, setAsDefault, paymentIntentId } = body
 
     const rateVerdict = await checkRateLimit(
       request,
@@ -91,19 +96,6 @@ export const POST = handler({
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    const body = await request.json().catch(() => null)
-    if (!body || typeof body !== 'object' || Array.isArray(body)) {
-      return { status: 400, data: { error: 'Request body required' } }
-    }
-    const { paymentMethodId, setAsDefault, paymentIntentId } = body
-
-    if (!paymentMethodId) {
-      return { status: 400, data: { error: 'Payment method ID is required' } }
-    }
-    if (!/^pm_[a-zA-Z0-9]+$/.test(paymentMethodId)) {
-      return { status: 400, data: { error: 'Invalid payment method ID format' } }
-    }
-
     const fam = await Family.findOne({ _id: id, organizationId: ctx!.organizationId }).select('_id')
     if (!fam) {
       return { status: 404, data: { error: 'Family not found' } }
@@ -111,12 +103,6 @@ export const POST = handler({
 
     const stripe = getStripe()
 
-    if (!paymentIntentId || typeof paymentIntentId !== 'string') {
-      return {
-        status: 400,
-        data: { error: 'paymentIntentId is required to save a payment method' },
-      }
-    }
     let piMetadataOk = false
     try {
       const intent = await stripe.paymentIntents.retrieve(paymentIntentId)
@@ -270,4 +256,3 @@ export const DELETE = handler({
     return { data: { success: true } }
   },
 })
-

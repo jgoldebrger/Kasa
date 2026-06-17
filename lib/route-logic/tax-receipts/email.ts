@@ -9,14 +9,16 @@ import { familyBatches } from '@/lib/org-pagination'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { membershipDuesYearFilter } from '@/lib/tax-receipts/queries'
 import { handler } from '@/lib/api/handler'
+import { report as reportSchemas } from '@/lib/schemas'
 
 export const dynamic = 'force-dynamic'
 
 export const POST = handler({
   auth: 'org',
   minRole: 'admin',
+  body: reportSchemas.taxReceiptEmailBody,
   name: 'POST /api/tax-receipts/email',
-  fn: async ({ ctx, request }) => {
+  fn: async ({ ctx, body, request }) => {
     const rateVerdict = await checkRateLimit(
       request,
       'tax-receipt-email',
@@ -27,18 +29,7 @@ export const POST = handler({
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    const raw = await request.json().catch(() => null)
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-      return { status: 400, data: { error: 'Request body required' } }
-    }
-    const { year, familyIds } = raw as { year?: unknown; familyIds?: unknown }
-    const yearNum = Number(year)
-    if (!Number.isFinite(yearNum) || yearNum < 1900 || yearNum > 2999) {
-      return { status: 400, data: { error: 'Valid year is required' } }
-    }
-    if (familyIds !== undefined && !Array.isArray(familyIds)) {
-      return { status: 400, data: { error: 'familyIds must be an array' } }
-    }
+    const { year: yearNum, familyIds } = body
 
     await sweepStaleEmailJobs({
       organizationId: ctx!.organizationId,
@@ -88,10 +79,7 @@ export const POST = handler({
               $max: [
                 0,
                 {
-                  $subtract: [
-                    { $ifNull: ['$amount', 0] },
-                    { $ifNull: ['$refundedAmount', 0] },
-                  ],
+                  $subtract: [{ $ifNull: ['$amount', 0] }, { $ifNull: ['$refundedAmount', 0] }],
                 },
               ],
             },
@@ -105,19 +93,10 @@ export const POST = handler({
     const baseFilter: Record<string, unknown> = {
       organizationId: orgId,
       emailOptOut: { $ne: true },
-      $and: [
-        { email: { $exists: true } },
-        { email: { $ne: null } },
-        { email: { $ne: '' } },
-      ],
+      $and: [{ email: { $exists: true } }, { email: { $ne: null } }, { email: { $ne: '' } }],
     }
     if (Array.isArray(familyIds) && familyIds.length > 0) {
-      const validIds = familyIds
-        .filter((id: any) => typeof id === 'string' && Types.ObjectId.isValid(id))
-        .map((id: string) => new Types.ObjectId(id))
-      if (validIds.length === 0) {
-        return { status: 400, data: { error: 'No valid familyIds provided' } }
-      }
+      const validIds = familyIds.map((id: string) => new Types.ObjectId(id))
       baseFilter._id = { $in: validIds }
     }
 

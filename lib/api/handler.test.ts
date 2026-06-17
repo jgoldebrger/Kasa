@@ -102,9 +102,7 @@ describe('handler', () => {
       fn: async () => ({ ok: true }),
     })
 
-    const res = await route(
-      sameOriginRequest('http://localhost/api/reports?year=abc'),
-    )
+    const res = await route(sameOriginRequest('http://localhost/api/reports?year=abc'))
     expect(res.status).toBe(400)
     await expect(res.json()).resolves.toMatchObject({ error: 'Validation failed' })
   })
@@ -128,7 +126,12 @@ describe('handler', () => {
 
   it('passes org context into the handler function', async () => {
     const { requireOrg } = await import('@/lib/auth-helpers')
-    const ctx = mockOrgContext({ organizationId: '507f1f77bcf86cd799439011', userId: 'u1', role: 'admin', email: 'a@b.com' })
+    const ctx = mockOrgContext({
+      organizationId: '507f1f77bcf86cd799439011',
+      userId: 'u1',
+      role: 'admin',
+      email: 'a@b.com',
+    })
     vi.mocked(requireOrg).mockResolvedValue(ctx)
 
     const { handler } = await import('./handler')
@@ -140,6 +143,22 @@ describe('handler', () => {
 
     const res = await route(sameOriginRequest('http://localhost/api/families'))
     await expect(res.json()).resolves.toEqual({ orgId: ctx.organizationId })
+  })
+
+  it('rejects cron requests on org-only routes', async () => {
+    const { isCronRequest } = await import('@/lib/auth-cron')
+    vi.mocked(isCronRequest).mockReturnValue(true)
+
+    const { handler } = await import('./handler')
+    const route = handler({
+      auth: 'org',
+      minRole: 'admin',
+      noDb: true,
+      fn: async () => ({ ok: true }),
+    })
+
+    const res = await route(sameOriginRequest('http://localhost/api/families'))
+    expect(res.status).toBe(401)
   })
 
   it('rejects cron requests without a valid secret', async () => {
@@ -238,9 +257,8 @@ describe('handler', () => {
 
   it('allows platform admin routes for admin emails with 2FA enabled', async () => {
     const { requireSession } = await import('@/lib/auth-helpers')
-    const { isPlatformAdminEmail, assertPlatformAdminTwoFactor } = await import(
-      '@/lib/platform-admin'
-    )
+    const { isPlatformAdminEmail, assertPlatformAdminTwoFactor } =
+      await import('@/lib/platform-admin')
     vi.mocked(requireSession).mockResolvedValue({
       user: { id: 'u1', email: 'admin@example.com' },
     } as any)
@@ -260,9 +278,8 @@ describe('handler', () => {
 
   it('returns 403 for platform admin routes when 2FA is not enabled', async () => {
     const { requireSession } = await import('@/lib/auth-helpers')
-    const { isPlatformAdminEmail, assertPlatformAdminTwoFactor } = await import(
-      '@/lib/platform-admin'
-    )
+    const { isPlatformAdminEmail, assertPlatformAdminTwoFactor } =
+      await import('@/lib/platform-admin')
     vi.mocked(requireSession).mockResolvedValue({
       user: { id: 'u1', email: 'admin@example.com' },
     } as any)
@@ -293,7 +310,12 @@ describe('handler', () => {
 
   it('passes org-or-cron context when cron+org auth succeeds', async () => {
     const { requireOrgOrCron } = await import('@/lib/auth-cron')
-    const ctx = mockOrgContext({ organizationId: '507f1f77bcf86cd799439011', userId: 'u1', role: 'admin', email: 'a@b.com' })
+    const ctx = mockOrgContext({
+      organizationId: '507f1f77bcf86cd799439011',
+      userId: 'u1',
+      role: 'admin',
+      email: 'a@b.com',
+    })
     vi.mocked(requireOrgOrCron).mockResolvedValue(ctx)
 
     const { handler } = await import('./handler')

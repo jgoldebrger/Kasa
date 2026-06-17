@@ -7,7 +7,7 @@ import { User, OrgMembership } from '@/lib/models'
 import authConfig from './auth.config'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
-import { decrypt } from '@/lib/encryption'
+import { decryptTwoFactorSecret } from '@/lib/encryption'
 import { verifyTotpStep } from '@/lib/totp'
 import type { Role } from '@/types/auth'
 
@@ -41,14 +41,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // The per-email cap blunts credential-stuffing attacks that rotate
         // through proxy IPs to bypass the IP cap.
         if (request) {
-          const ipVerdict = await checkRateLimit(request, 'login', { limit: 5, windowMs: 15 * 60_000 })
+          const ipVerdict = await checkRateLimit(request, 'login', {
+            limit: 5,
+            windowMs: 15 * 60_000,
+          })
           if (!ipVerdict.allowed) {
             // PII scrubbing: never log the attempted email at INFO/WARN
             // level. It's still captured in the audit row below.
             console.warn('[auth] login rate limit hit')
             return null
           }
-          const emailVerdict = await checkRateLimit(request, 'login-email', { limit: 10, windowMs: 60 * 60_000 }, email)
+          const emailVerdict = await checkRateLimit(
+            request,
+            'login-email',
+            { limit: 10, windowMs: 60 * 60_000 },
+            email,
+          )
           if (!emailVerdict.allowed) {
             console.warn('[auth] login per-email rate limit hit')
             return null
@@ -175,9 +183,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       try {
         await connectDB()
-        const u = await User.findById(next.id as string).select('passwordChangedAt').lean<{
-          passwordChangedAt?: Date
-        }>()
+        const u = await User.findById(next.id as string)
+          .select('passwordChangedAt')
+          .lean<{
+            passwordChangedAt?: Date
+          }>()
         if (!u) {
           // User no longer exists (deleted, etc.) — kill the token.
           delete next.id
@@ -245,7 +255,7 @@ async function verifyTwoFactor(
   const digitsOnly = code.replace(/\D/g, '')
   if (digitsOnly.length === 6 && user.twoFactorSecret) {
     try {
-      const secret = decrypt(user.twoFactorSecret)
+      const secret = decryptTwoFactorSecret(user.twoFactorSecret)
       const step = verifyTotpStep(secret, digitsOnly)
       if (step !== null) {
         // Atomic replay guard: only accept the code if its HOTP step is

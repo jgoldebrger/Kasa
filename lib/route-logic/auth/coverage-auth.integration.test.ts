@@ -21,7 +21,11 @@ vi.mock('next/headers', () => ({
 const API_ORIGIN = 'http://localhost:3000'
 let ctx: ApiTestContext
 
-function bindSession(c: ApiTestContext, role: 'owner' | 'admin' | 'member' = 'owner', orgId?: string) {
+function bindSession(
+  c: ApiTestContext,
+  role: 'owner' | 'admin' | 'member' = 'owner',
+  orgId?: string,
+) {
   mockAuth.mockResolvedValue({
     user: {
       id: c.userId,
@@ -68,10 +72,7 @@ function publicJsonReq(path: string, method: string, body?: unknown, query = '')
   })
 }
 
-async function withRateLimitKeyBlocked<T>(
-  key: string,
-  fn: () => Promise<T>,
-): Promise<T> {
+async function withRateLimitKeyBlocked<T>(key: string, fn: () => Promise<T>): Promise<T> {
   const rateLimit = await import('@/lib/rate-limit')
   const spy = vi.spyOn(rateLimit, 'checkRateLimit').mockImplementation(async (_req, k) => {
     if (k === key) return { allowed: false, remaining: 0, resetAt: 0 }
@@ -180,7 +181,11 @@ describe.sequential('auth route-logic coverage', () => {
       const badBody = await POST(
         new NextRequest(`${API_ORIGIN}/api/auth/request-invite`, {
           method: 'POST',
-          headers: { host: 'localhost:3000', origin: API_ORIGIN, 'content-type': 'application/json' },
+          headers: {
+            host: 'localhost:3000',
+            origin: API_ORIGIN,
+            'content-type': 'application/json',
+          },
           body: 'not-json',
         }),
       )
@@ -316,10 +321,13 @@ describe.sequential('auth route-logic coverage', () => {
 
       const { GET, PUT } = await import('@/lib/route-logic/auth/reset-password')
       const preflight = await GET(
-        new NextRequest(`${API_ORIGIN}/api/auth/reset-password?token=${encodeURIComponent(token)}`, {
-          method: 'GET',
-          headers: { host: 'localhost:3000', origin: API_ORIGIN },
-        }),
+        new NextRequest(
+          `${API_ORIGIN}/api/auth/reset-password?token=${encodeURIComponent(token)}`,
+          {
+            method: 'GET',
+            headers: { host: 'localhost:3000', origin: API_ORIGIN },
+          },
+        ),
       )
       expect((await preflight.json()).valid).toBe(true)
 
@@ -410,7 +418,30 @@ describe.sequential('auth route-logic coverage', () => {
     })
 
     it('POST rejects owner invite from non-owner admin', async () => {
-      bindSession(ctx, 'admin')
+      const bcrypt = await import('bcryptjs')
+      const { User, OrgMembership } = await import('@/lib/models')
+      const adminUser = await User.create({
+        email: `auth-admin-${Date.now()}@example.com`,
+        hashedPassword: await bcrypt.hash('ApiRouteTestPass123!', 10),
+        name: 'Auth Admin',
+      })
+      await OrgMembership.create({
+        userId: adminUser._id,
+        organizationId: ctx.orgId,
+        role: 'admin',
+      })
+      mockAuth.mockResolvedValueOnce({
+        user: {
+          id: adminUser._id.toString(),
+          email: adminUser.email,
+          name: adminUser.name,
+          memberships: [{ o: ctx.orgId, r: 'admin' }],
+        },
+      } as never)
+      mockCookieGet.mockImplementation((name: string) =>
+        name === 'kasa_active_org' ? { value: ctx.orgId } : undefined,
+      )
+
       const { POST } = await import('@/lib/route-logic/auth/invite')
       const res = await POST(
         orgJsonReq('/api/auth/invite', 'POST', {

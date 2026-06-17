@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
-export default function ResetPasswordTokenPage({ params }: { params: { token: string } }) {
+export default function ResetPasswordTokenPage() {
   const router = useRouter()
+  const params = useParams<{ token: string }>()
+  const token = params.token ?? ''
   const [valid, setValid] = useState<boolean | null>(null)
   const [reason, setReason] = useState<string | null>(null)
   const [password, setPassword] = useState('')
@@ -16,7 +18,7 @@ export default function ResetPasswordTokenPage({ params }: { params: { token: st
 
   useEffect(() => {
     ;(async () => {
-      const res = await fetch(`/api/auth/reset-password?token=${encodeURIComponent(params.token)}`)
+      const res = await fetch(`/api/auth/reset-password?token=${encodeURIComponent(token)}`)
       if (!res.ok) {
         setValid(false)
         setReason('invalid')
@@ -26,7 +28,7 @@ export default function ResetPasswordTokenPage({ params }: { params: { token: st
       setValid(!!data.valid)
       setReason(data.reason || null)
     })()
-  }, [params.token])
+  }, [token])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,7 +46,7 @@ export default function ResetPasswordTokenPage({ params }: { params: { token: st
       const res = await fetch('/api/auth/reset-password', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: params.token, newPassword: password }),
+        body: JSON.stringify({ token, newPassword: password }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -70,12 +72,17 @@ export default function ResetPasswordTokenPage({ params }: { params: { token: st
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-app">
         <div className="surface-card p-6 max-w-sm w-full text-center space-y-4">
-          <h1 className="text-base font-semibold text-red-600 dark:text-red-400">Invalid or expired link</h1>
+          <h1 className="text-base font-semibold text-red-600 dark:text-red-400">
+            Invalid or expired link
+          </h1>
           <p className="text-sm text-fg-muted">
             This password reset link is no longer valid ({reason || 'unknown'}). Please request a
             new one.
           </p>
-          <Link href="/reset-password" className="inline-block text-accent hover:text-accent-hover font-medium text-sm">
+          <Link
+            href="/reset-password"
+            className="inline-block text-accent hover:text-accent-hover font-medium text-sm"
+          >
             Request a new reset link
           </Link>
         </div>
@@ -98,10 +105,7 @@ export default function ResetPasswordTokenPage({ params }: { params: { token: st
             Password updated. Redirecting to sign-in...
           </div>
         ) : (
-          <form
-            onSubmit={submit}
-            className="surface-card p-6 space-y-5"
-          >
+          <form onSubmit={submit} className="surface-card p-6 space-y-5">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-300 px-4 py-3 rounded-md text-sm">
                 {error}

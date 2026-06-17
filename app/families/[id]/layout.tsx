@@ -11,13 +11,14 @@ export default async function FamilyDetailLayout({
   params,
 }: {
   children: React.ReactNode
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
+  const { id } = await params
   let initialSummary = null
   try {
     const ctx = await requireServerOrgContext()
     await connectDB()
-    const summary = await fetchFamilySummary(ctx.organizationId, params.id, ctx.role)
+    const summary = await fetchFamilySummary(ctx.organizationId, id, ctx.role)
     if (summary) {
       initialSummary = serializeForRsc(summary)
     }
@@ -26,8 +27,6 @@ export default async function FamilyDetailLayout({
   }
 
   return (
-    <FamilyDetailLayoutClient initialSummary={initialSummary}>
-      {children}
-    </FamilyDetailLayoutClient>
+    <FamilyDetailLayoutClient initialSummary={initialSummary}>{children}</FamilyDetailLayoutClient>
   )
 }

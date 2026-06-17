@@ -16,11 +16,11 @@ rules:
     pattern-not-inside: process.env.$KEY = ...
     paths:
       exclude:
-        - "**/*.test.ts"
-        - "**/*.test.tsx"
-        - "**/*.integration.test.ts"
-        - "**/e2e/**"
-        - "**/scripts/**"
+        - '**/*.test.ts'
+        - '**/*.test.tsx'
+        - '**/*.integration.test.ts'
+        - '**/e2e/**'
+        - '**/scripts/**'
     message: Possible hardcoded secret — use environment variables.
     severity: ERROR
     languages: [javascript, typescript]
@@ -59,4 +59,68 @@ rules:
         - app/api/
     message: Legacy mutating API route may be missing verifyApiCsrf().
     severity: INFO
+    languages: [typescript]
+
+  - id: route-logic-legacy-route-handler
+    pattern: 'export async function $METHOD(request: NextRequest)'
+    paths:
+      include:
+        - lib/route-logic/**
+      exclude:
+        - '**/*.test.ts'
+        - '**/*.test.tsx'
+        - '**/*.integration.test.ts'
+    message: >-
+      Route uses legacy `export async function` instead of handler({ auth: ... }).
+      Migrate to lib/api/handler for centralized auth, CSRF, and validation.
+    severity: WARNING
+    languages: [typescript]
+
+  - id: route-logic-missing-handler-auth
+    patterns:
+      - pattern: export const $METHOD = $HANDLER(...)
+      - pattern-not: export const $METHOD = handler({ ... })
+      - metavariable-regex:
+          metavariable: $METHOD
+          regex: (GET|POST|PUT|PATCH|DELETE)
+    paths:
+      include:
+        - lib/route-logic/**
+      exclude:
+        - '**/*.test.ts'
+        - '**/*.test.tsx'
+        - '**/*.integration.test.ts'
+    message: >-
+      Route export does not use handler({ auth: ... }). Prefer the shared handler
+      HOF for auth, CSRF, and zod validation.
+    severity: INFO
+    languages: [typescript]
+
+  - id: route-logic-request-json-without-body-schema
+    patterns:
+      - pattern: await request.json(...)
+      - pattern-inside: |
+          export const $METHOD = handler({
+            ...
+            fn: async (...) => {
+              ...
+            },
+          })
+      - pattern-not-inside: |
+          export const $METHOD = handler({
+            ...
+            body: $SCHEMA,
+            ...
+          })
+    paths:
+      include:
+        - lib/route-logic/**
+      exclude:
+        - '**/*.test.ts'
+        - '**/*.test.tsx'
+        - '**/*.integration.test.ts'
+    message: >-
+      request.json() in a handler() route without a body zod schema. Prefer
+      handler({ body: schema }) so validation runs before fn.
+    severity: WARNING
     languages: [typescript]

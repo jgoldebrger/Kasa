@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import authConfig from './auth.config'
+import authConfig, { CRON_API_PREFIXES } from './auth.config'
 
 const authorized = authConfig.callbacks!.authorized!
 
@@ -50,19 +50,30 @@ describe('auth.config authorized — cron secret middleware gate', () => {
     expect((result as Response).status).toBe(401)
   })
 
-  it('allows protected API when cron secret is valid (x-cron-secret)', () => {
+  it('returns 401 for non-cron API routes even when cron secret is valid', () => {
     const result = authorized({
       auth: null,
       request: apiRequest('/api/admin/reports', { 'x-cron-secret': 'test-cron-secret' }),
     })
 
+    expect(result).not.toBe(true)
+    expect(result).toBeInstanceOf(Response)
+    expect((result as Response).status).toBe(401)
+  })
+
+  it('allows cron API routes when cron secret is valid (x-cron-secret)', () => {
+    const result = authorized({
+      auth: null,
+      request: apiRequest('/api/jobs/cycle-rollover', { 'x-cron-secret': 'test-cron-secret' }),
+    })
+
     expect(result).toBe(true)
   })
 
-  it('allows protected API when cron secret is valid (Bearer)', () => {
+  it('allows cron API routes when cron secret is valid (Bearer)', () => {
     const result = authorized({
       auth: null,
-      request: apiRequest('/api/admin/reports', {
+      request: apiRequest('/api/jobs/cycle-rollover', {
         authorization: 'Bearer test-cron-secret',
       }),
     })
@@ -70,10 +81,21 @@ describe('auth.config authorized — cron secret middleware gate', () => {
     expect(result).toBe(true)
   })
 
+  it('returns 401 for cron API routes without a valid secret', () => {
+    const result = authorized({
+      auth: null,
+      request: apiRequest('/api/jobs/cycle-rollover'),
+    })
+
+    expect(result).not.toBe(true)
+    expect(result).toBeInstanceOf(Response)
+    expect((result as Response).status).toBe(401)
+  })
+
   it('does not treat bare Bearer prefix as cron auth', () => {
     const result = authorized({
       auth: null,
-      request: apiRequest('/api/admin/reports', { authorization: 'Bearer ' }),
+      request: apiRequest('/api/jobs/cycle-rollover', { authorization: 'Bearer ' }),
     })
 
     expect(result).not.toBe(true)
@@ -83,10 +105,21 @@ describe('auth.config authorized — cron secret middleware gate', () => {
   it('does not treat empty x-cron-secret as valid cron auth', () => {
     const result = authorized({
       auth: null,
-      request: apiRequest('/api/admin/reports', { 'x-cron-secret': '' }),
+      request: apiRequest('/api/jobs/cycle-rollover', { 'x-cron-secret': '' }),
     })
 
     expect(result).not.toBe(true)
     expect((result as Response).status).toBe(401)
+  })
+
+  it('exports CRON_API_PREFIXES covering job and org-or-cron worker routes', () => {
+    expect(CRON_API_PREFIXES).toEqual(
+      expect.arrayContaining([
+        '/api/jobs',
+        '/api/statements/auto-generate',
+        '/api/recurring-payments/process',
+        '/api/statements/send-emails/worker',
+      ]),
+    )
   })
 })

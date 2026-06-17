@@ -94,8 +94,8 @@ async function withRateLimitBlocked<T>(fn: () => Promise<T>): Promise<T> {
   const rateLimit = await import('@/lib/rate-limit')
   const spy = vi.spyOn(rateLimit, 'checkRateLimit').mockResolvedValue({
     allowed: false,
-        remaining: 0,
-        resetAt: 0,
+    remaining: 0,
+    resetAt: 0,
   })
   try {
     return await fn()
@@ -106,13 +106,13 @@ async function withRateLimitBlocked<T>(fn: () => Promise<T>): Promise<T> {
 
 async function withCompoundCursorSpy(fn: () => Promise<void>) {
   const pag = await import('@/lib/pagination')
-  const spy = vi.spyOn(pag, 'collectCompoundCursorPages').mockImplementation(
-    async (loadPage, baseFilter, _sf, _dir, getCursor, _bs) => {
+  const spy = vi
+    .spyOn(pag, 'collectCompoundCursorPages')
+    .mockImplementation(async (loadPage, baseFilter, _sf, _dir, getCursor, _bs) => {
       const page = await loadPage(baseFilter, 3)
       if (page[0]) getCursor(page[0] as never)
       return page
-    },
-  )
+    })
   try {
     await fn()
   } finally {
@@ -130,7 +130,7 @@ describe.sequential('route-logic auth/org/misc domain coverage', () => {
     process.env.PLATFORM_ADMIN_EMAILS = ''
     ctx = await seedApiRouteFixtures()
     process.env.PLATFORM_ADMIN_EMAILS = ctx.email
-        process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
+    process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
     process.env.KASA_TEST_STRIPE_FAMILY = ctx.fixtures.familyId
     bindSession(ctx)
   })
@@ -181,7 +181,9 @@ describe.sequential('route-logic auth/org/misc domain coverage', () => {
       const { Organization } = await import('@/lib/models')
       await Organization.updateOne(
         { _id: ctx.orgId },
-        { $set: { 'branding.logoDataUrl': TINY_PNG_DATA_URL, 'branding.logoUpdatedAt': new Date() } },
+        {
+          $set: { 'branding.logoDataUrl': TINY_PNG_DATA_URL, 'branding.logoUpdatedAt': new Date() },
+        },
       )
       const { PUT, DELETE } = await import('@/lib/route-logic/organizations/branding')
       expect(
@@ -279,21 +281,25 @@ describe.sequential('route-logic auth/org/misc domain coverage', () => {
       bindSession(ctx)
       const { PUT, DELETE } = await import('@/lib/route-logic/lifecycle-event-types/[id]')
       const id = ctx.fixtures.lifecycleEventTypeId
-      expect((await PUT(orgJsonReq(`/api/lifecycle-event-types/${id}`, 'PUT', {}), { params: { id } })).status).toBe(
-        400,
-      )
+      expect(
+        (await PUT(orgJsonReq(`/api/lifecycle-event-types/${id}`, 'PUT', {}), { params: { id } }))
+          .status,
+      ).toBe(400)
 
       const missing = new Types.ObjectId().toString()
       expect(
-        (await PUT(orgJsonReq(`/api/lifecycle-event-types/${missing}`, 'PUT', { name: 'Ghost' }), {
-          params: { id: missing },
-        })).status,
+        (
+          await PUT(orgJsonReq(`/api/lifecycle-event-types/${missing}`, 'PUT', { name: 'Ghost' }), {
+            params: { id: missing },
+          })
+        ).status,
       ).toBe(404)
 
       const recycle = await import('@/lib/recycle-bin')
       const spy = vi.spyOn(recycle, 'softDeleteOne').mockResolvedValueOnce(null as never)
       expect(
-        (await DELETE(orgJsonReq(`/api/lifecycle-event-types/${id}`, 'DELETE'), { params: { id } })).status,
+        (await DELETE(orgJsonReq(`/api/lifecycle-event-types/${id}`, 'DELETE'), { params: { id } }))
+          .status,
       ).toBe(404)
       spy.mockRestore()
     })
@@ -304,9 +310,13 @@ describe.sequential('route-logic auth/org/misc domain coverage', () => {
       bindSession(ctx)
       const missing = new Types.ObjectId().toString()
       const { DELETE } = await import('@/lib/route-logic/payment-plans/[id]')
-      expect((await DELETE(orgJsonReq(`/api/payment-plans/${missing}`, 'DELETE'), { params: { id: missing } })).status).toBe(
-        404,
-      )
+      expect(
+        (
+          await DELETE(orgJsonReq(`/api/payment-plans/${missing}`, 'DELETE'), {
+            params: { id: missing },
+          })
+        ).status,
+      ).toBe(404)
 
       const { PaymentPlan } = await import('@/lib/models')
       const plan = await PaymentPlan.create({
@@ -318,9 +328,11 @@ describe.sequential('route-logic auth/org/misc domain coverage', () => {
       const recycle = await import('@/lib/recycle-bin')
       const spy = vi.spyOn(recycle, 'softDeleteOne').mockResolvedValueOnce(null as never)
       expect(
-        (await DELETE(orgJsonReq(`/api/payment-plans/${plan._id}`, 'DELETE'), {
-          params: { id: plan._id.toString() },
-        })).status,
+        (
+          await DELETE(orgJsonReq(`/api/payment-plans/${plan._id}`, 'DELETE'), {
+            params: { id: plan._id.toString() },
+          })
+        ).status,
       ).toBe(404)
       spy.mockRestore()
       await PaymentPlan.deleteOne({ _id: plan._id })
@@ -341,7 +353,9 @@ describe.sequential('route-logic auth/org/misc domain coverage', () => {
         expect((await GET(orgJsonReq('/api/admin/invite-requests', 'GET'))).status).toBe(200)
       })
       const { PATCH } = await import('@/lib/route-logic/admin/invite-requests')
-      const bad = await PATCH(orgJsonReq('/api/admin/invite-requests', 'PATCH', [] as unknown as object))
+      const bad = await PATCH(
+        orgJsonReq('/api/admin/invite-requests', 'PATCH', [] as unknown as object),
+      )
       expect(bad.status).toBe(400)
     })
   })
@@ -426,7 +440,7 @@ describe.sequential('route-logic auth/org/misc domain coverage', () => {
       bindSession(ctx)
 
       const { PATCH } = await import('@/lib/route-logic/user/2fa')
-      const decryptSpy = vi.spyOn(enc, 'decrypt').mockImplementationOnce(() => {
+      const decryptSpy = vi.spyOn(enc, 'decryptTwoFactorSecret').mockImplementationOnce(() => {
         throw new Error('decrypt fail')
       })
       const badTotp = await PATCH(
@@ -480,16 +494,25 @@ describe.sequential('route-logic auth/org/misc domain coverage', () => {
       )
       bindSession(ctx)
 
-      const { POST } = await import('@/lib/route-logic/user/2fa/setup')
+      let { POST } = await import('@/lib/route-logic/user/2fa/setup')
       const needsCode = await POST(
         sessionJsonReq('/api/user/2fa/setup', 'POST', { password: 'ApiRouteTestPass123!' }),
       )
       expect(needsCode.status).toBe(401)
       expect((await needsCode.json()).requiresReauth).toBe(true)
 
-      const decryptSpy = vi.spyOn(enc, 'decrypt').mockImplementationOnce(() => {
+      const decryptSpy = vi.spyOn(enc, 'decryptTwoFactorSecret').mockImplementationOnce(() => {
         throw new Error('decrypt fail')
       })
+      vi.resetModules()
+      decryptSpy.mockRestore()
+      const encFresh = await import('@/lib/encryption')
+      const decryptSpyFresh = vi
+        .spyOn(encFresh, 'decryptTwoFactorSecret')
+        .mockImplementationOnce(() => {
+          throw new Error('decrypt fail')
+        })
+      ;({ POST } = await import('@/lib/route-logic/user/2fa/setup'))
       const decryptFail = await POST(
         sessionJsonReq('/api/user/2fa/setup', 'POST', {
           password: 'ApiRouteTestPass123!',
@@ -497,7 +520,7 @@ describe.sequential('route-logic auth/org/misc domain coverage', () => {
         }),
       )
       expect(decryptFail.status).toBe(401)
-      decryptSpy.mockRestore()
+      decryptSpyFresh.mockRestore()
 
       const badCode = await POST(
         sessionJsonReq('/api/user/2fa/setup', 'POST', {

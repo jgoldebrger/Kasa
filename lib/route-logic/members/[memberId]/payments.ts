@@ -1,6 +1,6 @@
 import { handler } from '@/lib/api/handler'
 import { Payment } from '@/lib/models'
-import { PAYMENT_PUBLIC_SELECT } from '@/lib/payments/select'
+import { PAYMENT_PUBLIC_SELECT, serializePaymentsPublic } from '@/lib/payments/select'
 import { yearParam } from '@/lib/schemas'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { collectCompoundCursorPages } from '@/lib/pagination'
@@ -49,7 +49,8 @@ export const GET = handler({
         Payment.find(filter)
           .select(PAYMENT_PUBLIC_SELECT)
           .sort({ paymentDate: -1, _id: -1 })
-          .limit(limit).lean(),
+          .limit(limit)
+          .lean(),
       query,
       'paymentDate',
       -1,
@@ -59,6 +60,6 @@ export const GET = handler({
       }),
     )
 
-    return { data: payments }
+    return { data: serializePaymentsPublic(payments) }
   },
 })

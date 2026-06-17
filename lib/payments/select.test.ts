@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { PAYMENT_PUBLIC_SELECT } from './select'
+import { PAYMENT_PUBLIC_SELECT, serializePaymentPublic, serializePaymentsPublic } from './select'
+import { sanitizePaymentNotes } from './sanitize'
 
 describe('PAYMENT_PUBLIC_SELECT', () => {
   const expectedFields = [
@@ -31,5 +32,21 @@ describe('PAYMENT_PUBLIC_SELECT', () => {
     expect(fields).not.toContain('stripePaymentIntentId')
     expect(fields).not.toContain('idempotencyKey')
     expect(fields).not.toContain('__v')
+  })
+})
+
+describe('serializePaymentPublic', () => {
+  it('redacts stripe ids in notes', () => {
+    const payment = {
+      _id: '507f1f77bcf86cd799439011',
+      notes: 'Stripe PaymentIntent pi_abc123',
+    }
+    expect(serializePaymentPublic(payment).notes).toBe(sanitizePaymentNotes(payment.notes))
+  })
+
+  it('maps arrays via serializePaymentsPublic', () => {
+    const rows = [{ notes: 'pm_xyz' }, { notes: null }]
+    expect(serializePaymentsPublic(rows)[0].notes).toBe('[card]')
+    expect(serializePaymentsPublic(rows)[1].notes).toBeNull()
   })
 })

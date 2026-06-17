@@ -2,6 +2,7 @@ import { Payment, LifecycleEventPayment, Organization } from '@/lib/models'
 import { buildPaymentYearFilter } from '@/lib/calculations'
 import { netPaymentAmount } from '@/lib/money'
 import { PAYMENT_PUBLIC_SELECT } from '@/lib/payments/select'
+import { sanitizePaymentNotes } from '@/lib/payments/sanitize'
 import { collectCompoundCursorPages } from '@/lib/pagination'
 
 export interface PlReportTransaction {
@@ -92,7 +93,7 @@ export async function buildPlReportForYear(
     family: payment.familyId?.name || 'Unknown Family',
     description: `Payment - ${payment.type || 'membership'}`,
     amount: netPaymentAmount(payment),
-    notes: payment.notes || '',
+    notes: sanitizePaymentNotes(payment.notes),
   }))
 
   const eventRows: PlReportTransaction[] = events.map((event: any) => ({

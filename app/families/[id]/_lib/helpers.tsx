@@ -1,6 +1,7 @@
 import type React from 'react'
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { calculateHebrewAge, convertToHebrewDate } from '@/lib/hebrew-date'
+import { handleHebrewInput, qwertyToHebrew } from '@/lib/client/hebrew-input'
 import { netPaymentAmount } from '@/lib/money'
 import { formatLocaleDate } from '@/lib/date-utils'
 import { sanitizePaymentNotes } from '@/lib/payments/sanitize'
@@ -29,7 +30,10 @@ export function formatPaymentAmount(
   return fmt(net)
 }
 
-export function paymentColumnsFor(tableHint: string, fmt: (n: number) => string): DataColumn<any>[] {
+export function paymentColumnsFor(
+  tableHint: string,
+  fmt: (n: number) => string,
+): DataColumn<any>[] {
   return [
     {
       id: 'date',
@@ -128,13 +132,13 @@ export function paymentMobileCard(p: any, fmt: (n: number) => string) {
           <div className="text-xs text-fg-muted capitalize">{p.type}</div>
         </div>
         <div className="text-right text-xs">
-          <div className="text-fg-muted tabular">{new Date(p.paymentDate).toLocaleDateString()}</div>
+          <div className="text-fg-muted tabular">
+            {new Date(p.paymentDate).toLocaleDateString()}
+          </div>
           <div className="text-fg">{formatPaymentMethod(p)}</div>
         </div>
       </div>
-      {p.notes && (
-        <div className="mt-2 text-xs text-fg-muted">{sanitizePaymentNotes(p.notes)}</div>
-      )}
+      {p.notes && <div className="mt-2 text-xs text-fg-muted">{sanitizePaymentNotes(p.notes)}</div>}
     </div>
   )
 }
@@ -238,9 +242,7 @@ export function buildMemberColumns({
       headerText: 'Name',
       cell: (m) => (
         <button
-          onClick={() =>
-            setViewingMemberId(viewingMemberId === m._id ? null : m._id)
-          }
+          onClick={() => setViewingMemberId(viewingMemberId === m._id ? null : m._id)}
           className="focus-ring font-medium text-accent hover:text-accent-hover hover:underline text-left rounded"
         >
           {m.firstName} {m.lastName}
@@ -252,7 +254,9 @@ export function buildMemberColumns({
       id: 'birthDate',
       header: 'Birth Date',
       headerText: 'Birth Date',
-      cell: (m) => <span className="tabular text-fg-muted">{new Date(m.birthDate).toLocaleDateString()}</span>,
+      cell: (m) => (
+        <span className="tabular text-fg-muted">{new Date(m.birthDate).toLocaleDateString()}</span>
+      ),
       exportValue: (m) => (m.birthDate ? new Date(m.birthDate) : ''),
     },
     {
@@ -261,7 +265,12 @@ export function buildMemberColumns({
       headerText: 'Hebrew Date',
       hideBelow: 'md',
       cell: (m) => {
-        const { displayHebrewDate } = computeMemberDisplay(m, paymentPlans, getPlanName, formatMoney)
+        const { displayHebrewDate } = computeMemberDisplay(
+          m,
+          paymentPlans,
+          getPlanName,
+          formatMoney,
+        )
         return displayHebrewDate ? (
           <div className="text-fg-muted">
             <div className="font-medium">{displayHebrewDate}</div>
@@ -275,7 +284,8 @@ export function buildMemberColumns({
           <span className="text-fg-subtle">Calculating...</span>
         )
       },
-      exportValue: (m) => computeMemberDisplay(m, paymentPlans, getPlanName, formatMoney).displayHebrewDate || '',
+      exportValue: (m) =>
+        computeMemberDisplay(m, paymentPlans, getPlanName, formatMoney).displayHebrewDate || '',
     },
     {
       id: 'age',
@@ -299,7 +309,12 @@ export function buildMemberColumns({
       headerText: 'Payment Plan',
       hideBelow: 'lg',
       cell: (m) => {
-        const { planText, planColor } = computeMemberDisplay(m, paymentPlans, getPlanName, formatMoney)
+        const { planText, planColor } = computeMemberDisplay(
+          m,
+          paymentPlans,
+          getPlanName,
+          formatMoney,
+        )
         return <span className={`font-medium ${planColor}`}>{planText}</span>
       },
       exportValue: (m) => computeMemberDisplay(m, paymentPlans, getPlanName, formatMoney).planText,
@@ -345,47 +360,14 @@ export function buildMemberColumns({
   return columns
 }
 
-// QWERTY to Hebrew keyboard mapping
-export const qwertyToHebrew: { [key: string]: string } = {
-  // Lowercase letters
-  'q': '/', 'w': "'", 'e': 'ק', 'r': 'ר', 't': 'א', 'y': 'ט', 'u': 'ו', 'i': 'ן', 'o': 'ם', 'p': 'פ',
-  'a': 'ש', 's': 'ד', 'd': 'ג', 'f': 'כ', 'g': 'ע', 'h': 'י', 'j': 'ח', 'k': 'ל', 'l': 'ך',
-  'z': 'ז', 'x': 'ס', 'c': 'ב', 'v': 'ה', 'b': 'נ', 'n': 'מ', 'm': 'צ',
-  // Uppercase letters (with Shift)
-  'Q': '/', 'W': "'", 'E': 'ק', 'R': 'ר', 'T': 'א', 'Y': 'ט', 'U': 'ו', 'I': 'ן', 'O': 'ם', 'P': 'פ',
-  'A': 'ש', 'S': 'ד', 'D': 'ג', 'F': 'כ', 'G': 'ע', 'H': 'י', 'J': 'ח', 'K': 'ל', 'L': 'ך',
-  'Z': 'ז', 'X': 'ס', 'C': 'ב', 'V': 'ה', 'B': 'נ', 'N': 'מ', 'M': 'צ',
-  // Numbers and special characters
-  '1': '1', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8', '9': '9', '0': '0',
-  '-': '-', '=': '=', '[': ']', ']': '[', '\\': '\\', ';': 'ף', "'": ',', ',': 'ת', '.': 'ץ', '/': '.',
-  ' ': ' ' // Space
-}
-
-// Handler for Hebrew input fields
-export const handleHebrewInput = (e: React.KeyboardEvent<HTMLInputElement>, currentValue: string, setValue: (value: string) => void) => {
-  const input = e.currentTarget
-  const cursorPosition = input.selectionStart || 0
-  
-  // Only convert if typing a regular character (not special keys like Backspace, Delete, Arrow keys, etc.)
-  if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    e.preventDefault()
-    const hebrewChar = qwertyToHebrew[e.key] || e.key
-    const newValue = currentValue.slice(0, cursorPosition) + hebrewChar + currentValue.slice(cursorPosition)
-    setValue(newValue)
-    
-    // Set cursor position after the inserted character
-    setTimeout(() => {
-      input.setSelectionRange(cursorPosition + 1, cursorPosition + 1)
-    }, 0)
-  }
-}
+export { handleHebrewInput, qwertyToHebrew }
 
 // Helper function to capitalize first letter of each word
 export const capitalizeName = (text: string): string => {
   if (!text) return text
   return text
     .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ')
 }
 

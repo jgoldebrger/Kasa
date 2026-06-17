@@ -41,7 +41,7 @@ export const getServerOrgContext = cache(async (): Promise<ServerOrgContext | nu
   // Try the cookie first — set by OrgSwitcher on the client.
   let orgId: string | null = null
   try {
-    orgId = cookies().get(ACTIVE_ORG_COOKIE)?.value || null
+    orgId = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value || null
   } catch {
     // cookies() throws if called outside a request scope — fall through.
   }

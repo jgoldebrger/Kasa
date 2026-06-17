@@ -25,7 +25,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ZodError, ZodSchema } from 'zod'
 import { Types } from 'mongoose'
 import connectDB from '@/lib/database'
-import { requireSession, requireOrg, type AuthedSession, type OrgContext, type Role } from '@/lib/auth-helpers'
+import {
+  requireSession,
+  requireOrg,
+  hasMinRole,
+  type AuthedSession,
+  type OrgContext,
+  type Role,
+} from '@/lib/auth-helpers'
 import { assertPlatformAdminTwoFactor, isPlatformAdminEmail } from '@/lib/platform-admin'
 import { isCronRequest, requireOrgOrCron } from '@/lib/auth-cron'
 import { logError } from '@/lib/log'
@@ -72,19 +79,18 @@ export interface HandlerOptions<TBody, TQuery> {
   fn: (input: HandlerCtx<TBody, TQuery>) => Promise<HandlerReturn>
 }
 
-type Params = {
-  params: Record<string, string | string[]> | Promise<Record<string, string | string[]>>
+type RouteContext = {
+  params: Promise<Record<string, string | string[]>>
 }
 
-export function handler<TBody = unknown, TQuery = unknown>(
-  opts: HandlerOptions<TBody, TQuery>,
-) {
-  return async function routeHandler(
+export function handler<TBody = unknown, TQuery = unknown>(opts: HandlerOptions<TBody, TQuery>) {
+  const routeHandler = async (
     request: NextRequest,
-    context: Params = { params: {} },
-  ): Promise<NextResponse> {
+    context?: RouteContext,
+  ): Promise<NextResponse> => {
     const startedAt = Date.now()
-    const routeParams = await Promise.resolve(context.params || {})
+    const routeParams: Record<string, string | string[]> = await (context?.params ??
+      Promise.resolve({}))
     try {
       const csrfBlock = verifyApiCsrf(request)
       if (csrfBlock) return csrfBlock
@@ -108,6 +114,9 @@ export function handler<TBody = unknown, TQuery = unknown>(
           break
         }
         case 'org': {
+          if (isCronRequest(request)) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+          }
           const r = await requireOrg(request, { minRole: opts.minRole })
           if (r instanceof NextResponse) return r
           ctx = r
@@ -117,6 +126,9 @@ export function handler<TBody = unknown, TQuery = unknown>(
         case 'org-or-cron': {
           const r = await requireOrgOrCron(request, { minRole: opts.minRole })
           if (r instanceof NextResponse) return r
+          if (!r.isCron && opts.minRole && !hasMinRole(r.role, opts.minRole)) {
+            return NextResponse.json({ error: `Requires ${opts.minRole} role` }, { status: 403 })
+          }
           ctx = r
           session = r.session
           break
@@ -141,10 +153,7 @@ export function handler<TBody = unknown, TQuery = unknown>(
           const raw = routeParams[name]
           const value = Array.isArray(raw) ? raw[0] : raw
           if (typeof value !== 'string' || !Types.ObjectId.isValid(value)) {
-            return NextResponse.json(
-              { error: `Invalid ${name}` },
-              { status: 400 },
-            )
+            return NextResponse.json({ error: `Invalid ${name}` }, { status: 400 })
           }
         }
       }
@@ -202,6 +211,8 @@ export function handler<TBody = unknown, TQuery = unknown>(
       )
     }
   }
+
+  return routeHandler as (request: NextRequest, context: RouteContext) => Promise<NextResponse>
 }
 
 function validationError(err: ZodError, routeName?: string): NextResponse {
@@ -219,10 +230,7 @@ function validationError(err: ZodError, routeName?: string): NextResponse {
       issues.map((i) => `${i.path || '(root)'}: ${i.message}`).join('; '),
     )
   }
-  return NextResponse.json(
-    { error: 'Validation failed', issues },
-    { status: 400 },
-  )
+  return NextResponse.json({ error: 'Validation failed', issues }, { status: 400 })
 }
 
 function toResponse(result: HandlerReturn): NextResponse {

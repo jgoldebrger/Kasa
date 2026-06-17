@@ -9,7 +9,7 @@ import {
   encodeCompoundCursor,
   collectCompoundCursorPages,
 } from '@/lib/pagination'
-import { PAYMENT_PUBLIC_SELECT } from '@/lib/payments/select'
+import { PAYMENT_PUBLIC_SELECT, serializePaymentsPublic } from '@/lib/payments/select'
 import { checkRateLimit } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
@@ -91,7 +91,8 @@ export const GET = handler({
           match: { organizationId: ctx!.organizationId },
         })
         .sort({ paymentDate: -1, _id: -1 })
-        .limit(limit).lean()) as any[]
+        .limit(limit)
+        .lean()) as any[]
 
     let nextCursor: string | null = null
     let data: any[]
@@ -125,6 +126,7 @@ export const GET = handler({
     // to a paginated envelope when the client opts in via `?limit=`. In
     // the legacy path the `nextCursor` is intentionally dropped because
     // the response type is `Payment[]`, not `{ items, nextCursor }`.
-    return { data: clientLimit > 0 ? { items: data, nextCursor } : data }
+    const serialized = serializePaymentsPublic(data)
+    return { data: clientLimit > 0 ? { items: serialized, nextCursor } : serialized }
   },
 })

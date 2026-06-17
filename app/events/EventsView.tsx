@@ -16,10 +16,7 @@ import {
   SkeletonRows,
   type DataColumn,
 } from '@/app/components/ui'
-import {
-  EVENTS_LIST_PAGE_SIZE,
-  parseEventsListResponse,
-} from '@/lib/client/events-list'
+import { eventsListUrl, parseEventsListResponse } from '@/lib/client/events-list'
 
 interface LifecycleEvent {
   _id: string
@@ -87,9 +84,7 @@ export default function EventsView({
           setLoading(true)
           setLoadError(false)
         }
-        const params = new URLSearchParams({ limit: String(EVENTS_LIST_PAGE_SIZE) })
-        if (opts?.cursor) params.set('cursor', opts.cursor)
-        const res = await fetch(`/api/events?${params}`)
+        const res = await fetch(eventsListUrl(opts?.cursor))
         if (isStale(gen)) return
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const data = await res.json().catch(() => null)
@@ -125,16 +120,18 @@ export default function EventsView({
     void fetchEvents()
   }, [fetchEvents])
 
-  useOrgChanged(useCallback(() => {
-    invalidate()
-    hasFetchedRef.current = false
-    setEvents([])
-    setNextCursor(null)
-    setLoadError(false)
-    setLoading(true)
-    hasFetchedRef.current = true
-    fetchEvents()
-  }, [fetchEvents, invalidate]))
+  useOrgChanged(
+    useCallback(() => {
+      invalidate()
+      hasFetchedRef.current = false
+      setEvents([])
+      setNextCursor(null)
+      setLoadError(false)
+      setLoading(true)
+      hasFetchedRef.current = true
+      fetchEvents()
+    }, [fetchEvents, invalidate]),
+  )
 
   const totalAmount = useMemo(
     () => visibleEvents.reduce((sum, e) => sum + e.amount, 0),

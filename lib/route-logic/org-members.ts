@@ -34,10 +34,7 @@ export const GET = handler({
       ),
       loadAllByIdCursor<any>(
         (filter, limit) =>
-          Invite.find(filter)
-            .sort({ createdAt: -1, _id: -1 })
-            .limit(limit)
-            .lean<any[]>(),
+          Invite.find(filter).sort({ createdAt: -1, _id: -1 }).limit(limit).lean<any[]>(),
         {
           organizationId: ctx!.organizationId,
           acceptedAt: null,
@@ -45,9 +42,6 @@ export const GET = handler({
         },
       ),
     ])
-
-    // Only admins+ get to see invite tokens — they're bearer credentials.
-    const canSeeTokens = ctx!.role === 'admin' || ctx!.role === 'owner'
 
     return {
       data: {
@@ -63,7 +57,6 @@ export const GET = handler({
           id: i._id.toString(),
           email: i.email,
           role: i.role,
-          ...(canSeeTokens ? { token: i.token } : {}),
           invitedAt: i.createdAt,
           expiresAt: i.expiresAt,
         })),

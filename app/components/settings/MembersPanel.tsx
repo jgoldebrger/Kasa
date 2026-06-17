@@ -36,13 +36,13 @@ interface PendingInvite {
   id: string
   email: string
   role: 'owner' | 'admin' | 'member'
-  token: string
   invitedAt: string
   expiresAt: string
 }
 
 const ROLE_BADGE: Record<string, string> = {
-  owner: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/30',
+  owner:
+    'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/30',
   admin: 'bg-accent/10 text-accent border-accent/20',
   member: 'bg-fg/5 text-fg border-border',
 }
@@ -118,13 +118,15 @@ export default function MembersPanel({ onRoleResolved }: MembersPanelProps = {})
     }
   }, [refresh])
 
-  useOrgChanged(useCallback(() => {
-    invalidate()
-    setMembers([])
-    setInvites([])
-    setLastInviteUrl(null)
-    void refresh()
-  }, [refresh, invalidate]))
+  useOrgChanged(
+    useCallback(() => {
+      invalidate()
+      setMembers([])
+      setInvites([])
+      setLastInviteUrl(null)
+      void refresh()
+    }, [refresh, invalidate]),
+  )
 
   const invite = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -220,7 +222,9 @@ export default function MembersPanel({ onRoleResolved }: MembersPanelProps = {})
     })
     if (!ok) return
     try {
-      const res = await fetch(`/api/auth/invite?id=${encodeURIComponent(i.id)}`, { method: 'DELETE' })
+      const res = await fetch(`/api/auth/invite?id=${encodeURIComponent(i.id)}`, {
+        method: 'DELETE',
+      })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         toast.error(data.error || 'Failed to cancel invite.')
@@ -251,7 +255,11 @@ export default function MembersPanel({ onRoleResolved }: MembersPanelProps = {})
           <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-fg">
             <UserPlusIcon className="h-5 w-5" aria-hidden="true" /> Invite a new member
           </h2>
-          <form onSubmit={invite} className="flex flex-col gap-3 sm:flex-row sm:items-end" noValidate>
+          <form
+            onSubmit={invite}
+            className="flex flex-col gap-3 sm:flex-row sm:items-end"
+            noValidate
+          >
             <div className="flex-1">
               <Input
                 label="Email"
@@ -322,14 +330,7 @@ export default function MembersPanel({ onRoleResolved }: MembersPanelProps = {})
       />
 
       {invites.length > 0 && (
-        <InvitesTable
-          invites={invites}
-          canManage={canManage}
-          copiedKey={copiedKey}
-          copied={copied}
-          onCopy={handleCopy}
-          onCancel={cancelInvite}
-        />
+        <InvitesTable invites={invites} canManage={canManage} onCancel={cancelInvite} />
       )}
     </div>
   )
@@ -440,9 +441,7 @@ function MembersTable({
           )
         }
         return (
-          <span className={`rounded border px-2 py-1 text-xs ${ROLE_BADGE[m.role]}`}>
-            {m.role}
-          </span>
+          <span className={`rounded border px-2 py-1 text-xs ${ROLE_BADGE[m.role]}`}>{m.role}</span>
         )
       },
       exportValue: (m) => m.role,
@@ -486,9 +485,7 @@ function MembersTable({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-fg">
-          Active members ({members.length})
-        </h2>
+        <h2 className="text-base font-semibold text-fg">Active members ({members.length})</h2>
       </div>
       <DataView
         tableId="org-members"
@@ -531,7 +528,9 @@ function MembersTable({
           <EmptyState
             icon={<UserGroupIcon />}
             title="No members"
-            description={canManage ? 'Invite a member to give them access.' : 'Contact an admin to be added.'}
+            description={
+              canManage ? 'Invite a member to give them access.' : 'Contact an admin to be added.'
+            }
             cta={null}
           />
         }
@@ -545,16 +544,10 @@ function MembersTable({
 function InvitesTable({
   invites,
   canManage,
-  copiedKey,
-  copied,
-  onCopy,
   onCancel,
 }: {
   invites: PendingInvite[]
   canManage: boolean
-  copiedKey: string | null
-  copied: boolean
-  onCopy: (key: string, url: string) => void
   onCancel: (i: PendingInvite) => void
 }) {
   const columns: DataColumn<PendingInvite>[] = [
@@ -601,37 +594,19 @@ function InvitesTable({
       header: <span className="sr-only">Actions</span>,
       headerText: 'Actions',
       align: 'right',
-      cell: (i) => {
-        const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/invite/${i.token}`
-        const key = `inv-${i.id}`
-        return (
+      cell: (i) =>
+        canManage ? (
           <div className="inline-flex items-center gap-1">
             <button
-              onClick={() => onCopy(key, url)}
-              className="focus-ring inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-accent hover:text-accent-hover"
-              aria-label={`Copy invite link for ${i.email}`}
-              title="Copy invite link"
+              onClick={() => onCancel(i)}
+              aria-label={`Cancel invite for ${i.email}`}
+              title="Cancel invite"
+              className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-full text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
             >
-              {copiedKey === key && copied ? (
-                <CheckIcon className="h-4 w-4" aria-hidden="true" />
-              ) : (
-                <ClipboardIcon className="h-4 w-4" aria-hidden="true" />
-              )}
-              {copiedKey === key && copied ? 'Copied' : 'Copy link'}
+              <TrashIcon className="h-4 w-4" aria-hidden="true" />
             </button>
-            {canManage && (
-              <button
-                onClick={() => onCancel(i)}
-                aria-label={`Cancel invite for ${i.email}`}
-                title="Cancel invite"
-                className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-full text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
-              >
-                <TrashIcon className="h-4 w-4" aria-hidden="true" />
-              </button>
-            )}
           </div>
-        )
-      },
+        ) : null,
       exportValue: () => '',
     },
   ]
@@ -646,46 +621,31 @@ function InvitesTable({
         rowKey={(i) => i.id}
         globalSearch={{ placeholder: 'Search invites…' }}
         pageSize={10}
-        mobileCard={(i) => {
-          const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/invite/${i.token}`
-          const key = `inv-${i.id}`
-          return (
-            <div className="surface-card p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="font-medium text-fg truncate">{i.email}</div>
-                  <div className="text-xs text-fg-muted tabular">
-                    Expires {new Date(i.expiresAt).toLocaleDateString()}
-                  </div>
+        mobileCard={(i) => (
+          <div className="surface-card p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-medium text-fg truncate">{i.email}</div>
+                <div className="text-xs text-fg-muted tabular">
+                  Expires {new Date(i.expiresAt).toLocaleDateString()}
                 </div>
-                <span className={`shrink-0 rounded border px-2 py-1 text-xs ${ROLE_BADGE[i.role]}`}>
-                  {i.role}
-                </span>
               </div>
+              <span className={`shrink-0 rounded border px-2 py-1 text-xs ${ROLE_BADGE[i.role]}`}>
+                {i.role}
+              </span>
+            </div>
+            {canManage && (
               <div className="mt-3 flex justify-end gap-2">
                 <button
-                  onClick={() => onCopy(key, url)}
-                  className="focus-ring inline-flex items-center gap-1 text-xs text-accent hover:text-accent-hover"
+                  onClick={() => onCancel(i)}
+                  className="focus-ring inline-flex items-center gap-1 text-xs text-red-700 hover:text-red-800 dark:text-red-400"
                 >
-                  {copiedKey === key && copied ? (
-                    <CheckIcon className="h-4 w-4" aria-hidden="true" />
-                  ) : (
-                    <ClipboardIcon className="h-4 w-4" aria-hidden="true" />
-                  )}
-                  {copiedKey === key && copied ? 'Copied' : 'Copy link'}
+                  <TrashIcon className="h-4 w-4" aria-hidden="true" /> Cancel
                 </button>
-                {canManage && (
-                  <button
-                    onClick={() => onCancel(i)}
-                    className="focus-ring inline-flex items-center gap-1 text-xs text-red-700 hover:text-red-800 dark:text-red-400"
-                  >
-                    <TrashIcon className="h-4 w-4" aria-hidden="true" /> Cancel
-                  </button>
-                )}
               </div>
-            </div>
-          )
-        }}
+            )}
+          </div>
+        )}
       />
     </div>
   )

@@ -79,6 +79,13 @@ describe('auth-helpers (integration)', () => {
       expect(hasMinRole('admin', 'admin')).toBe(true)
       expect(hasMinRole('member', 'admin')).toBe(false)
     })
+
+    it('contextHasMinRole returns false for cron context', async () => {
+      const { contextHasMinRole } = await import('./auth-helpers')
+      expect(contextHasMinRole({ role: 'member', isCron: true }, 'member')).toBe(false)
+      expect(contextHasMinRole({ role: 'owner', isCron: true }, 'admin')).toBe(false)
+      expect(contextHasMinRole({ role: 'admin', isCron: false }, 'admin')).toBe(true)
+    })
   })
 
   describe('requireSession', () => {
@@ -238,7 +245,7 @@ describe('auth-helpers (integration)', () => {
       expect(body).toEqual({ error: 'Invalid organization id' })
     })
 
-    it('resolves role from JWT memberships without a DB lookup', async () => {
+    it('resolves role from JWT memberships without a DB lookup for member routes', async () => {
       const { user, org } = await seedUserWithOrg({ role: 'admin' })
       const { auth } = await import('@/app/auth')
       vi.mocked(auth).mockResolvedValue({
@@ -264,6 +271,52 @@ describe('auth-helpers (integration)', () => {
       })
       expect(findSpy).not.toHaveBeenCalled()
       findSpy.mockRestore()
+    })
+
+    it('always verifies OrgMembership from DB when minRole is admin', async () => {
+      const { user, org } = await seedUserWithOrg({ role: 'admin' })
+      const { auth } = await import('@/app/auth')
+      vi.mocked(auth).mockResolvedValue({
+        user: {
+          id: user._id.toString(),
+          email: user.email,
+          name: user.name,
+          memberships: [{ o: org._id.toString(), r: 'admin' }],
+        },
+      } as any)
+
+      const { OrgMembership } = await import('./models')
+      const findSpy = vi.spyOn(OrgMembership, 'findOne')
+
+      const { requireOrg } = await import('./auth-helpers')
+      const result = await requireOrg(nextRequestWithOrg(org._id.toString()), {
+        minRole: 'admin',
+      })
+
+      expect(result).not.toBeInstanceOf(NextResponse)
+      expect(findSpy).toHaveBeenCalled()
+      findSpy.mockRestore()
+    })
+
+    it('uses DB role over stale JWT when minRole is admin', async () => {
+      const { user, org } = await seedUserWithOrg({ role: 'member' })
+      const { auth } = await import('@/app/auth')
+      vi.mocked(auth).mockResolvedValue({
+        user: {
+          id: user._id.toString(),
+          email: user.email,
+          name: user.name,
+          memberships: [{ o: org._id.toString(), r: 'admin' }],
+        },
+      } as any)
+
+      const { requireOrg } = await import('./auth-helpers')
+      const result = await requireOrg(nextRequestWithOrg(org._id.toString()), {
+        minRole: 'admin',
+      })
+
+      expect(result).toBeInstanceOf(NextResponse)
+      expect((result as NextResponse).status).toBe(403)
     })
 
     it('falls back to OrgMembership when JWT memberships are empty', async () => {
@@ -364,22 +417,21 @@ describe('auth-helpers (integration)', () => {
       })
 
       const { createPersonalOrganization } = await import('./auth-helpers')
-      const org = await createPersonalOrganization(
-        user._id.toString(),
-        'Alice Smith',
-      )
+      const org = await createPersonalOrganization(user._id.toString(), 'Alice Smith')
 
       expect(org.name).toBe('Personal workspace')
       expect(org.slug).toMatch(/^alice-smith/)
       expect(String(org.ownerId)).toBe(user._id.toString())
 
-      const membership = await OrgMembership.findOne({
+      const membership = (await OrgMembership.findOne({
         userId: user._id,
         organizationId: org._id,
-      }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+      }).lean()) as import('@/lib/test/type-helpers').LeanDoc | null
       expect(membership?.role).toBe('owner')
 
-      const refreshed = await User.findById(user._id).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+      const refreshed = (await User.findById(user._id).lean()) as
+        | import('@/lib/test/type-helpers').LeanDoc
+        | null
       expect(String(refreshed?.lastActiveOrganizationId)).toBe(org._id.toString())
     })
 
@@ -398,10 +450,7 @@ describe('auth-helpers (integration)', () => {
       })
 
       const { createPersonalOrganization } = await import('./auth-helpers')
-      const org = await createPersonalOrganization(
-        user._id.toString(),
-        'Bob Jones',
-      )
+      const org = await createPersonalOrganization(user._id.toString(), 'Bob Jones')
 
       expect(org.slug).toBe('bob-jones-1')
     })

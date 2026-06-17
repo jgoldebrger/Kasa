@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import { validateProductionEnv } from './env-validation'
 
 function resolveMongoUri(): string {
   const raw = process.env.MONGODB_URI
@@ -49,6 +50,8 @@ if (!global.mongoose) {
 }
 
 async function connectDB() {
+  validateProductionEnv()
+
   if (cached.conn && mongoose.connection.readyState === 1) {
     return cached.conn
   }
@@ -82,31 +85,34 @@ async function connectDB() {
 
     const uri = resolveMongoUri()
 
-    cached.promise = mongoose.connect(uri, opts).then((mongoose) => {
-      console.log('MongoDB connected successfully')
-      // Tear down the cached promise on any subsequent disconnect/error
-      // so the next `connectDB()` call rebuilds it instead of returning
-      // a stale, broken connection. Without these listeners the module
-      // would keep handing back the same dead connection forever after
-      // a transient network blip, and every operation would fail until
-      // the process restarted.
-      const conn = mongoose.connection
-      conn.on('disconnected', () => {
-        console.warn('[database] MongoDB disconnected; will reconnect on next use.')
-        cached.conn = null
-        cached.promise = null
+    cached.promise = mongoose
+      .connect(uri, opts)
+      .then((mongoose) => {
+        console.log('MongoDB connected successfully')
+        // Tear down the cached promise on any subsequent disconnect/error
+        // so the next `connectDB()` call rebuilds it instead of returning
+        // a stale, broken connection. Without these listeners the module
+        // would keep handing back the same dead connection forever after
+        // a transient network blip, and every operation would fail until
+        // the process restarted.
+        const conn = mongoose.connection
+        conn.on('disconnected', () => {
+          console.warn('[database] MongoDB disconnected; will reconnect on next use.')
+          cached.conn = null
+          cached.promise = null
+        })
+        conn.on('error', (err) => {
+          console.error('[database] MongoDB connection error:', err?.message || err)
+          cached.conn = null
+          cached.promise = null
+        })
+        return mongoose
       })
-      conn.on('error', (err) => {
-        console.error('[database] MongoDB connection error:', err?.message || err)
-        cached.conn = null
+      .catch((error) => {
+        console.error('MongoDB connection error:', error)
         cached.promise = null
+        throw error
       })
-      return mongoose
-    }).catch((error) => {
-      console.error('MongoDB connection error:', error)
-      cached.promise = null
-      throw error
-    })
   }
 
   try {

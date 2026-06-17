@@ -4,11 +4,11 @@
     "total": 151,
     "byAuth": {
       "admin": 2,
-      "org": 109,
+      "org": 110,
       "public": 12,
       "cron": 12,
       "session": 10,
-      "org-or-cron": 5,
+      "org-or-cron": 4,
       "webhook": 1
     },
     "mutating": 79,
@@ -50,9 +50,7 @@
       "minRole": "member",
       "csrf": false,
       "tenantScoped": true,
-      "dynamicParams": [
-        "...nextauth"
-      ],
+      "dynamicParams": ["...nextauth"],
       "source": "app/api/auth/[...nextauth]/route.ts"
     },
     {
@@ -62,9 +60,7 @@
       "minRole": "member",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "...nextauth"
-      ],
+      "dynamicParams": ["...nextauth"],
       "source": "app/api/auth/[...nextauth]/route.ts"
     },
     {
@@ -323,9 +319,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/families/[id]/route.ts"
     },
     {
@@ -335,9 +329,7 @@
       "minRole": "member",
       "csrf": false,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/families/[id]/route.ts"
     },
     {
@@ -347,9 +339,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/families/[id]/route.ts"
     },
     {
@@ -359,9 +349,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/families/[id]/charge-saved-card/route.ts"
     },
     {
@@ -371,9 +359,7 @@
       "minRole": "admin",
       "csrf": false,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/families/[id]/lifecycle-events/route.ts"
     },
     {
@@ -383,9 +369,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/families/[id]/lifecycle-events/route.ts"
     },
     {
@@ -395,9 +379,7 @@
       "minRole": "member",
       "csrf": false,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/families/[id]/members/route.ts"
     },
     {
@@ -407,9 +389,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/families/[id]/members/route.ts"
     },
     {
@@ -419,10 +399,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id",
-        "memberId"
-      ],
+      "dynamicParams": ["id", "memberId"],
       "source": "app/api/families/[id]/members/[memberId]/route.ts"
     },
     {
@@ -432,10 +409,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id",
-        "memberId"
-      ],
+      "dynamicParams": ["id", "memberId"],
       "source": "app/api/families/[id]/members/[memberId]/route.ts"
     },
     {
@@ -445,10 +419,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id",
-        "memberId"
-      ],
+      "dynamicParams": ["id", "memberId"],
       "source": "app/api/families/[id]/members/[memberId]/convert-to-family/route.ts"
     },
     {
@@ -458,9 +429,7 @@
       "minRole": "admin",
       "csrf": false,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/families/[id]/payments/route.ts"
     },
     {
@@ -470,9 +439,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/families/[id]/payments/route.ts"
     },
     {
@@ -482,9 +449,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/families/[id]/saved-payment-methods/route.ts"
     },
     {
@@ -494,9 +459,7 @@
       "minRole": "admin",
       "csrf": false,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/families/[id]/saved-payment-methods/route.ts"
     },
     {
@@ -506,9 +469,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/families/[id]/saved-payment-methods/route.ts"
     },
     {
@@ -518,9 +479,7 @@
       "minRole": "member",
       "csrf": false,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/families/[id]/sub-families/route.ts"
     },
     {
@@ -530,9 +489,7 @@
       "minRole": "admin",
       "csrf": false,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/families/[id]/withdrawals/route.ts"
     },
     {
@@ -542,9 +499,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/families/[id]/withdrawals/route.ts"
     },
     {
@@ -554,10 +509,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id",
-        "withdrawalId"
-      ],
+      "dynamicParams": ["id", "withdrawalId"],
       "source": "app/api/families/[id]/withdrawals/[withdrawalId]/route.ts"
     },
     {
@@ -567,10 +519,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id",
-        "withdrawalId"
-      ],
+      "dynamicParams": ["id", "withdrawalId"],
       "source": "app/api/families/[id]/withdrawals/[withdrawalId]/route.ts"
     },
     {
@@ -757,9 +706,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/lifecycle-event-types/[id]/route.ts"
     },
     {
@@ -769,9 +716,7 @@
       "minRole": "admin",
       "csrf": false,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/lifecycle-event-types/[id]/route.ts"
     },
     {
@@ -781,9 +726,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/lifecycle-event-types/[id]/route.ts"
     },
     {
@@ -793,9 +736,7 @@
       "minRole": "admin",
       "csrf": false,
       "tenantScoped": true,
-      "dynamicParams": [
-        "memberId"
-      ],
+      "dynamicParams": ["memberId"],
       "source": "app/api/members/[memberId]/balance/route.ts"
     },
     {
@@ -805,9 +746,7 @@
       "minRole": "admin",
       "csrf": false,
       "tenantScoped": true,
-      "dynamicParams": [
-        "memberId"
-      ],
+      "dynamicParams": ["memberId"],
       "source": "app/api/members/[memberId]/payments/route.ts"
     },
     {
@@ -817,9 +756,7 @@
       "minRole": "admin",
       "csrf": false,
       "tenantScoped": true,
-      "dynamicParams": [
-        "memberId"
-      ],
+      "dynamicParams": ["memberId"],
       "source": "app/api/members/[memberId]/statements/route.ts"
     },
     {
@@ -829,9 +766,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "memberId"
-      ],
+      "dynamicParams": ["memberId"],
       "source": "app/api/members/[memberId]/statements/route.ts"
     },
     {
@@ -1038,9 +973,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/payment-plans/[id]/route.ts"
     },
     {
@@ -1050,9 +983,7 @@
       "minRole": "admin",
       "csrf": false,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/payment-plans/[id]/route.ts"
     },
     {
@@ -1062,9 +993,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/payment-plans/[id]/route.ts"
     },
     {
@@ -1080,7 +1009,7 @@
     {
       "path": "/api/recurring-payments/process",
       "method": "GET",
-      "auth": "org-or-cron",
+      "auth": "org",
       "minRole": "admin",
       "csrf": false,
       "tenantScoped": true,
@@ -1154,9 +1083,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/reports/saved/[id]/route.ts"
     },
     {
@@ -1166,9 +1093,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/reports/saved/[id]/route.ts"
     },
     {
@@ -1218,9 +1143,7 @@
       "minRole": "admin",
       "csrf": false,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/statements/[id]/route.ts"
     },
     {
@@ -1369,9 +1292,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/tasks/[id]/route.ts"
     },
     {
@@ -1381,9 +1302,7 @@
       "minRole": "admin",
       "csrf": false,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/tasks/[id]/route.ts"
     },
     {
@@ -1393,9 +1312,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "id"
-      ],
+      "dynamicParams": ["id"],
       "source": "app/api/tasks/[id]/route.ts"
     },
     {
@@ -1425,9 +1342,7 @@
       "minRole": "admin",
       "csrf": false,
       "tenantScoped": true,
-      "dynamicParams": [
-        "familyId"
-      ],
+      "dynamicParams": ["familyId"],
       "source": "app/api/tax-receipts/[familyId]/pdf/route.ts"
     },
     {
@@ -1477,10 +1392,7 @@
       "minRole": "owner",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "kind",
-        "id"
-      ],
+      "dynamicParams": ["kind", "id"],
       "source": "app/api/trash/[kind]/[id]/route.ts"
     },
     {
@@ -1490,10 +1402,7 @@
       "minRole": "admin",
       "csrf": false,
       "tenantScoped": true,
-      "dynamicParams": [
-        "kind",
-        "id"
-      ],
+      "dynamicParams": ["kind", "id"],
       "source": "app/api/trash/[kind]/[id]/route.ts"
     },
     {
@@ -1503,10 +1412,7 @@
       "minRole": "admin",
       "csrf": true,
       "tenantScoped": true,
-      "dynamicParams": [
-        "kind",
-        "id"
-      ],
+      "dynamicParams": ["kind", "id"],
       "source": "app/api/trash/[kind]/[id]/restore/route.ts"
     },
     {

@@ -1,16 +1,23 @@
 import { NextResponse } from 'next/server'
-import { Types } from 'mongoose'
 import { handler } from '@/lib/api/handler'
-import { Payment, SavedPaymentMethod, RecurringPayment, Family, FamilyMember, Organization } from '@/lib/models'
+import {
+  Payment,
+  SavedPaymentMethod,
+  RecurringPayment,
+  Family,
+  FamilyMember,
+  Organization,
+} from '@/lib/models'
 import { createPaymentDeclinedTask } from '@/lib/task-helpers'
 import { audit } from '@/lib/audit'
 import { fromMinorUnits } from '@/lib/money'
-import { PAYMENT_PUBLIC_SELECT } from '@/lib/payments/select'
+import { PAYMENT_PUBLIC_SELECT, serializePaymentPublic } from '@/lib/payments/select'
 import { sanitizeStripeErrorMessage } from '@/lib/payments/sanitize'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { enforceMemberChargeGate } from '@/lib/billing/feature-gate'
 import { addMonthsClamped, getYearInTimeZone } from '@/lib/date-utils'
 import { scheduleYearlyCalculationRefresh } from '@/lib/calculations'
+import { payment as paymentSchemas } from '@/lib/schemas'
 import Stripe from 'stripe'
 import https from 'https'
 
@@ -22,15 +29,18 @@ const httpsAgent = new https.Agent({
   rejectUnauthorized: process.env.NODE_ENV === 'production',
 })
 
-const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, {
-  httpAgent: httpsAgent,
-}) : null
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      httpAgent: httpsAgent,
+    })
+  : null
 
 export const POST = handler({
   auth: 'org',
   minRole: 'admin',
+  body: paymentSchemas.confirmPaymentBody,
   name: 'POST /api/stripe/confirm-payment',
-  fn: async ({ ctx, request }) => {
+  fn: async ({ ctx, body, request }) => {
     if (!stripe) {
       return {
         status: 500,
@@ -38,26 +48,27 @@ export const POST = handler({
       }
     }
 
-    const body = await request.json().catch(() => null)
-    if (!body || typeof body !== 'object' || Array.isArray(body)) {
-      return { status: 400, data: { error: 'Request body required' } }
-    }
-    const { paymentIntentId, familyId, paymentDate, year, type, notes, paymentFrequency, savedPaymentMethodId, memberId } = body
+    const {
+      paymentIntentId,
+      familyId,
+      paymentDate,
+      year,
+      type,
+      notes,
+      paymentFrequency,
+      savedPaymentMethodId,
+      memberId,
+    } = body
 
-    if (!paymentIntentId) {
-      return NextResponse.json(
-        { error: 'Payment intent ID is required' },
-        { status: 400 }
-      )
-    }
-    if (!/^pi_[a-zA-Z0-9]+$/.test(paymentIntentId)) {
-      return NextResponse.json({ error: 'Invalid payment intent ID format' }, { status: 400 })
-    }
-
-    const rateVerdict = await checkRateLimit(request, 'stripe-confirm', {
-      limit: 30,
-      windowMs: 60_000,
-    }, ctx!.organizationId)
+    const rateVerdict = await checkRateLimit(
+      request,
+      'stripe-confirm',
+      {
+        limit: 30,
+        windowMs: 60_000,
+      },
+      ctx!.organizationId,
+    )
     if (!rateVerdict.allowed) {
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
     }
@@ -67,36 +78,11 @@ export const POST = handler({
       return NextResponse.json({ error: billingGate.error }, { status: billingGate.status })
     }
 
-    if (!familyId) {
-      return NextResponse.json({ error: 'familyId is required' }, { status: 400 })
-    }
-    if (!Types.ObjectId.isValid(familyId)) {
-      return NextResponse.json({ error: 'Invalid familyId' }, { status: 400 })
-    }
-
-    const fam = await Family.findOne({ _id: familyId, organizationId: ctx!.organizationId }).select('_id')
+    const fam = await Family.findOne({ _id: familyId, organizationId: ctx!.organizationId }).select(
+      '_id',
+    )
     if (!fam) {
       return NextResponse.json({ error: 'Family not found' }, { status: 404 })
-    }
-
-    if (year !== undefined && year !== null && year !== '') {
-      const yearNum = Number(year)
-      if (!Number.isFinite(yearNum) || yearNum < 1900 || yearNum > 2200) {
-        return NextResponse.json({ error: 'Invalid year' }, { status: 400 })
-      }
-    }
-    if (paymentDate) {
-      const parsedPaymentDate = new Date(paymentDate)
-      if (Number.isNaN(parsedPaymentDate.getTime())) {
-        return NextResponse.json({ error: 'Invalid paymentDate' }, { status: 400 })
-      }
-    }
-    if (
-      savedPaymentMethodId &&
-      savedPaymentMethodId !== 'will_be_saved' &&
-      !Types.ObjectId.isValid(savedPaymentMethodId)
-    ) {
-      return NextResponse.json({ error: 'Invalid savedPaymentMethodId' }, { status: 400 })
     }
 
     // Tenant guard for memberId: when supplied, the member must belong
@@ -104,9 +90,6 @@ export const POST = handler({
     // a caller could attribute a Stripe payment to a member of a
     // completely different family/tenant just by guessing an ObjectId.
     if (memberId) {
-      if (!Types.ObjectId.isValid(memberId)) {
-        return NextResponse.json({ error: 'Invalid memberId' }, { status: 400 })
-      }
       const mem = await FamilyMember.findOne({
         _id: memberId,
         familyId,
@@ -140,10 +123,11 @@ export const POST = handler({
         _id: existing._id,
         organizationId: ctx!.organizationId,
       })
-        .select(PAYMENT_PUBLIC_SELECT).lean()
+        .select(PAYMENT_PUBLIC_SELECT)
+        .lean()
       return NextResponse.json({
         success: true,
-        payment: pub ?? { _id: existing._id },
+        payment: pub ? serializePaymentPublic(pub) : { _id: existing._id },
         recurringPaymentId: existing.recurringPaymentId?.toString(),
         deduplicated: true,
       })
@@ -164,10 +148,10 @@ export const POST = handler({
       { includeDeleted: true },
     ).select('_id organizationId')
     if (otherOrgPayment) {
-      console.warn(
-        '[stripe.confirm] cross-org PI reuse blocked',
-        { paymentIntentId, attemptingOrg: String(ctx!.organizationId) },
-      )
+      console.warn('[stripe.confirm] cross-org PI reuse blocked', {
+        paymentIntentId,
+        attemptingOrg: String(ctx!.organizationId),
+      })
       return NextResponse.json(
         { error: 'Payment intent is already associated with a different organization' },
         { status: 409 },
@@ -184,10 +168,11 @@ export const POST = handler({
     // (when applicable) `metadata.familyId`.
     const piOrgId = paymentIntent.metadata?.organizationId
     if (!piOrgId || piOrgId !== String(ctx!.organizationId)) {
-      console.warn(
-        '[stripe.confirm] PI metadata org missing or mismatch',
-        { paymentIntentId, piOrgId, callerOrg: String(ctx!.organizationId) },
-      )
+      console.warn('[stripe.confirm] PI metadata org missing or mismatch', {
+        paymentIntentId,
+        piOrgId,
+        callerOrg: String(ctx!.organizationId),
+      })
       return NextResponse.json(
         { error: 'Payment intent does not belong to this organization' },
         { status: 403 },
@@ -195,10 +180,11 @@ export const POST = handler({
     }
     if (familyId && paymentIntent.metadata?.familyId) {
       if (paymentIntent.metadata.familyId !== String(familyId)) {
-        console.warn(
-          '[stripe.confirm] PI metadata family mismatch',
-          { paymentIntentId, piFamilyId: paymentIntent.metadata.familyId, requestedFamilyId: String(familyId) },
-        )
+        console.warn('[stripe.confirm] PI metadata family mismatch', {
+          paymentIntentId,
+          piFamilyId: paymentIntent.metadata.familyId,
+          requestedFamilyId: String(familyId),
+        })
         return NextResponse.json(
           { error: 'Payment intent does not belong to this family' },
           { status: 403 },
@@ -219,10 +205,7 @@ export const POST = handler({
       )
       return NextResponse.json(
         {
-          error:
-            process.env.NODE_ENV === 'production'
-              ? 'Payment was not completed'
-              : internalMsg,
+          error: process.env.NODE_ENV === 'production' ? 'Payment was not completed' : internalMsg,
         },
         { status: 400 },
       )
@@ -233,7 +216,7 @@ export const POST = handler({
 
     if (paymentIntent.payment_method) {
       const paymentMethod = await stripe.paymentMethods.retrieve(
-        paymentIntent.payment_method as string
+        paymentIntent.payment_method as string,
       )
 
       if (paymentMethod.card) {
@@ -249,7 +232,7 @@ export const POST = handler({
           try {
             await SavedPaymentMethod.updateMany(
               { familyId: familyId, organizationId: ctx!.organizationId },
-              { isDefault: false }
+              { isDefault: false },
             )
 
             const saved = await SavedPaymentMethod.create({
@@ -272,10 +255,7 @@ export const POST = handler({
       }
     }
 
-    if (
-      actualSavedPaymentMethodId &&
-      actualSavedPaymentMethodId !== 'will_be_saved'
-    ) {
+    if (actualSavedPaymentMethodId && actualSavedPaymentMethodId !== 'will_be_saved') {
       const spm = await SavedPaymentMethod.findOne({
         _id: actualSavedPaymentMethodId,
         familyId,
@@ -312,7 +292,7 @@ export const POST = handler({
       amount: fromMinorUnits(paymentIntent.amount, paymentIntent.currency),
       paymentDate: effectivePaymentDate,
       year:
-        year !== undefined && year !== null && year !== ''
+        year !== undefined && year !== null
           ? Number(year)
           : getYearInTimeZone(orgTz, effectivePaymentDate),
       type: type || 'membership',
@@ -432,7 +412,7 @@ export const POST = handler({
 
     return NextResponse.json({
       success: true,
-      payment: paymentObj,
+      payment: serializePaymentPublic(paymentObj),
       recurringPaymentId: recurringPaymentId,
     })
   },

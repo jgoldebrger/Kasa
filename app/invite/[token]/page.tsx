@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { signIn, useSession } from 'next-auth/react'
 import Link from 'next/link'
 
@@ -12,8 +12,10 @@ interface InviteInfo {
   organizationId: string
 }
 
-export default function InviteAcceptPage({ params }: { params: { token: string } }) {
+export default function InviteAcceptPage() {
   const router = useRouter()
+  const params = useParams<{ token: string }>()
+  const token = params.token ?? ''
   const { data: session, status: sessionStatus } = useSession()
 
   const [info, setInfo] = useState<InviteInfo | null>(null)
@@ -29,7 +31,7 @@ export default function InviteAcceptPage({ params }: { params: { token: string }
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch(`/api/auth/invite?token=${encodeURIComponent(params.token)}`)
+        const res = await fetch(`/api/auth/invite?token=${encodeURIComponent(token)}`)
         const data = await res.json().catch(() => ({}))
         if (cancelled) return
         if (!res.ok) {
@@ -46,14 +48,14 @@ export default function InviteAcceptPage({ params }: { params: { token: string }
     return () => {
       cancelled = true
     }
-  }, [params.token])
+  }, [token])
 
   const accept = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitError(null)
     setSubmitting(true)
     try {
-      const body: any = { token: params.token }
+      const body: any = { token }
       const isLoggedIn = !!session?.user
       if (!isLoggedIn) {
         if (!name.trim() || password.length < 8) {
@@ -107,9 +109,14 @@ export default function InviteAcceptPage({ params }: { params: { token: string }
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-app">
         <div className="surface-card p-6 max-w-sm w-full text-center space-y-4">
-          <h1 className="text-base font-semibold text-red-600 dark:text-red-400">Invite Unavailable</h1>
+          <h1 className="text-base font-semibold text-red-600 dark:text-red-400">
+            Invite Unavailable
+          </h1>
           <p className="text-sm text-fg-muted">{loadError}</p>
-          <Link href="/login" className="inline-block text-accent hover:text-accent-hover font-medium text-sm">
+          <Link
+            href="/login"
+            className="inline-block text-accent hover:text-accent-hover font-medium text-sm"
+          >
             Go to sign in
           </Link>
         </div>
@@ -136,10 +143,7 @@ export default function InviteAcceptPage({ params }: { params: { token: string }
           </p>
         </div>
 
-        <form
-          onSubmit={accept}
-          className="surface-card p-6 space-y-5"
-        >
+        <form onSubmit={accept} className="surface-card p-6 space-y-5">
           {submitError && (
             <div className="bg-red-50 border border-red-200 text-red-700 dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-300 px-4 py-3 rounded-md text-sm">
               {submitError}
@@ -156,7 +160,10 @@ export default function InviteAcceptPage({ params }: { params: { token: string }
                 You&apos;re signed in as <strong>{session?.user?.email}</strong> but this invite is
                 for <strong>{info.email}</strong>. Please sign out and use the correct account.
               </p>
-              <Link href="/api/auth/signout" className="block text-center text-accent hover:text-accent-hover font-medium text-sm">
+              <Link
+                href="/api/auth/signout"
+                className="block text-center text-accent hover:text-accent-hover font-medium text-sm"
+              >
                 Sign out
               </Link>
             </div>
@@ -203,7 +210,10 @@ export default function InviteAcceptPage({ params }: { params: { token: string }
               </button>
               <p className="text-sm text-fg-muted text-center">
                 Already have an account?{' '}
-                <Link href={`/login?callbackUrl=/invite/${params.token}`} className="text-accent hover:text-accent-hover font-medium">
+                <Link
+                  href={`/login?callbackUrl=/invite/${token}`}
+                  className="text-accent hover:text-accent-hover font-medium"
+                >
                   Sign in
                 </Link>
               </p>

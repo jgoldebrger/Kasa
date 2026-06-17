@@ -29,6 +29,17 @@ export interface OrgContext {
   userId: string
   organizationId: string
   role: Role
+  /** True for CRON_SECRET-authenticated synthetic context — not a real org role. */
+  isCron?: boolean
+}
+
+/** Role check for handler/route logic. Cron context never satisfies admin/owner gates. */
+export function contextHasMinRole(
+  ctx: Pick<OrgContext, 'role' | 'isCron'>,
+  minRole: Role,
+): boolean {
+  if (ctx.isCron) return false
+  return hasMinRole(ctx.role, minRole)
 }
 
 function unauthorized(message = 'Not authenticated') {
@@ -63,7 +74,10 @@ export async function requireSession(): Promise<AuthedSession | NextResponse> {
  * Priority: x-organization-id header → cookie → user's lastActiveOrganizationId → first membership.
  * Returns the orgId or null if the user has no orgs.
  */
-export async function getCurrentOrgId(request?: NextRequest, userId?: string): Promise<string | null> {
+export async function getCurrentOrgId(
+  request?: NextRequest,
+  userId?: string,
+): Promise<string | null> {
   let candidate: string | null = null
 
   if (request) {
@@ -75,7 +89,7 @@ export async function getCurrentOrgId(request?: NextRequest, userId?: string): P
 
   if (!candidate) {
     try {
-      const cookieStore = cookies()
+      const cookieStore = await cookies()
       candidate = cookieStore.get(ACTIVE_ORG_COOKIE)?.value || null
     } catch {
       // cookies() not available outside request context
@@ -113,7 +127,7 @@ export async function getCurrentOrgId(request?: NextRequest, userId?: string): P
  */
 export async function requireOrg(
   request?: NextRequest,
-  options: { minRole?: Role; orgId?: string } = {}
+  options: { minRole?: Role; orgId?: string } = {},
 ): Promise<OrgContext | NextResponse> {
   const sessionOrErr = await requireSession()
   if (sessionOrErr instanceof NextResponse) return sessionOrErr
@@ -129,18 +143,20 @@ export async function requireOrg(
     return NextResponse.json({ error: 'Invalid organization id' }, { status: 400 })
   }
 
-  // Fast path: the JWT carries a compact memberships list refreshed every
-  // 30s by the auth.ts jwt callback. This skips the per-request
-  // OrgMembership.findOne DB hit for the vast majority of API calls.
+  // Fast path: JWT memberships (refreshed ~30s). Skipped for admin/owner
+  // gates so demotions and role changes take effect immediately.
+  const requireFreshMembership = options.minRole === 'admin' || options.minRole === 'owner'
+
   let role: Role | null = null
-  const tokenMemberships = session.user.memberships
-  if (tokenMemberships && tokenMemberships.length > 0) {
-    const found = tokenMemberships.find((m: SessionMembership) => m.o === orgId)
-    if (found) role = found.r
+  if (!requireFreshMembership) {
+    const tokenMemberships = session.user.memberships
+    if (tokenMemberships && tokenMemberships.length > 0) {
+      const found = tokenMemberships.find((m: SessionMembership) => m.o === orgId)
+      if (found) role = found.r
+    }
   }
 
-  // Fallback: token didn't have the membership (newly-added since token
-  // issuance, or empty memberships list). Hit Mongo as a backup.
+  // DB lookup: required for elevated roles, or when JWT lacked the membership.
   if (role === null) {
     const membership = await OrgMembership.findOne({
       userId: session.user.id,
@@ -171,11 +187,12 @@ export async function requireOrg(
 export async function createPersonalOrganization(userId: string, userName: string) {
   await connectDB()
 
-  const baseSlug = userName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 30) || 'org'
+  const baseSlug =
+    userName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 30) || 'org'
 
   let slug = baseSlug
   let suffix = 0

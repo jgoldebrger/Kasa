@@ -15,23 +15,15 @@ import { getCatalogRoutes } from '@/security/catalog'
 import type { ApiRouteEntry } from '@/security/catalog/types'
 
 import {
-
   seedApiRouteFixtures,
-
   teardownApiRouteFixtures,
-
   type ApiTestContext,
-
 } from '@/lib/test/api-route-fixtures'
 
 import {
-
   expectRouteStatus,
-
   invokeApiRoute,
-
   prepareRouteInvocation,
-
 } from '@/lib/test/api-route-harness'
 
 import { getDeepProbes } from '@/lib/test/api-route-deep-probes'
@@ -41,16 +33,11 @@ import { buildImportProbeRequest } from '@/lib/test/import-route-probes'
 import { generateTotpCode } from '@/lib/totp'
 import { NextRequest } from 'next/server'
 
-
-
 const mockAuth = vi.hoisted(() => vi.fn())
 
 const mockCookieGet = vi.hoisted(() => vi.fn())
 
-
-
 vi.mock('@/app/auth', () => ({
-
   auth: mockAuth,
 
   handlers: { GET: vi.fn(), POST: vi.fn() },
@@ -58,22 +45,13 @@ vi.mock('@/app/auth', () => ({
   signIn: vi.fn(),
 
   signOut: vi.fn(),
-
 }))
-
-
 
 vi.mock('next/headers', () => ({
-
   cookies: vi.fn(() => ({
-
     get: mockCookieGet,
-
   })),
-
 }))
-
-
 
 const API_ORIGIN = 'http://localhost:3000'
 
@@ -81,12 +59,7 @@ function hashResetToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex')
 }
 
-function sessionJsonReq(
-  path: string,
-  method: string,
-  body?: unknown,
-  query = '',
-): NextRequest {
+function sessionJsonReq(path: string, method: string, body?: unknown, query = ''): NextRequest {
   const headers: Record<string, string> = {
     host: 'localhost:3000',
     origin: API_ORIGIN,
@@ -135,11 +108,8 @@ async function stripeTestClient() {
 }
 
 function bindSession(ctx: ApiTestContext) {
-
   mockAuth.mockResolvedValue({
-
     user: {
-
       id: ctx.userId,
 
       email: ctx.email,
@@ -147,31 +117,21 @@ function bindSession(ctx: ApiTestContext) {
       name: ctx.userName,
 
       memberships: [
-
         { o: ctx.orgId, r: 'owner' },
 
         { o: ctx.betaOrgId, r: 'owner' },
-
       ],
-
     },
-
   } as never)
 
   mockCookieGet.mockImplementation((name: string) => {
-
     if (name === 'kasa_active_org') return { value: ctx.orgId }
 
     return undefined
-
   })
-
 }
 
-
-
 const METHOD_ORDER: Record<string, number> = {
-
   GET: 0,
 
   HEAD: 1,
@@ -185,101 +145,63 @@ const METHOD_ORDER: Record<string, number> = {
   PATCH: 5,
 
   DELETE: 6,
-
 }
 
-
-
 function sortRoutes(routes: ApiRouteEntry[]): ApiRouteEntry[] {
-
   return [...routes].sort((a, b) => {
-
     const mo = (METHOD_ORDER[a.method] ?? 99) - (METHOD_ORDER[b.method] ?? 99)
 
     if (mo !== 0) return mo
 
     return a.path.localeCompare(b.path)
-
   })
-
 }
 
-
-
-const catalogRoutes = sortRoutes(getCatalogRoutes((r) => r.auth !== 'nextauth' && !r.path.includes('nextauth')))
-
-
-
-const deepProbeSpecs = catalogRoutes.flatMap((route) =>
-
-  getDeepProbes(route).map(
-
-    (probe) =>
-
-      [`${route.method} ${route.path} [${probe.label}]`, route, probe.label] as const,
-
-  ),
-
+const catalogRoutes = sortRoutes(
+  getCatalogRoutes((r) => r.auth !== 'nextauth' && !r.path.includes('nextauth')),
 )
 
-
+const deepProbeSpecs = catalogRoutes.flatMap((route) =>
+  getDeepProbes(route).map(
+    (probe) => [`${route.method} ${route.path} [${probe.label}]`, route, probe.label] as const,
+  ),
+)
 
 let ctx: ApiTestContext
 
-
-
 beforeAll(async () => {
-
   process.env.CRON_SECRET = process.env.CRON_SECRET || 'test-cron-secret'
 
-  process.env.STRIPE_SECRET_KEY =
+  process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'sk_test_api_route_probe'
 
-    process.env.STRIPE_SECRET_KEY || 'sk_test_api_route_probe'
-
-  process.env.STRIPE_WEBHOOK_SECRET =
-
-    process.env.STRIPE_WEBHOOK_SECRET || 'whsec_api_route_probe'
+  process.env.STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_api_route_probe'
 
   process.env.PLATFORM_ADMIN_EMAILS = ''
 
   ctx = await seedApiRouteFixtures()
   process.env.PLATFORM_ADMIN_EMAILS = ctx.email
 
-    process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
+  process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
   process.env.KASA_TEST_STRIPE_FAMILY = ctx.fixtures.familyId
 
   bindSession(ctx)
-
 })
 
-
-
 afterAll(async () => {
-
   await teardownApiRouteFixtures()
 
   vi.restoreAllMocks()
-
 })
 
-
-
 describe.concurrent('API route catalog (integration)', () => {
-
   it('catalog lists routes to exercise', () => {
-
     expect(catalogRoutes.length).toBeGreaterThan(100)
-
   })
 
-
-
   it.concurrent.each(catalogRoutes.map((r) => [`${r.method} ${r.path}`, r] as const))(
-
     '%s',
 
     async (_label, route) => {
-
       const { request, params } = prepareRouteInvocation(route, ctx)
 
       const response = await invokeApiRoute(route, request, params)
@@ -287,35 +209,24 @@ describe.concurrent('API route catalog (integration)', () => {
       expectRouteStatus(route, response)
 
       expect(response.status).toBeLessThan(500)
-
     },
 
     120_000,
-
   )
-
 })
 
-
-
 describe.concurrent('API route deep probes (integration)', () => {
-
   beforeEach(() => bindSession(ctx))
-
 
   it('deep probe matrix covers every catalog route', () => {
     expect(deepProbeSpecs.length).toBeGreaterThan(catalogRoutes.length)
     expect(deepProbeSpecs.length).toBeGreaterThan(100)
   })
 
-
-
   it.concurrent.each(deepProbeSpecs)(
-
     '%s',
 
     async (_label, route, probeLabel) => {
-
       const probe = getDeepProbes(route, ctx).find((p) => p.label === probeLabel)
 
       if (!probe) throw new Error(`Missing deep probe ${probeLabel} for ${route.path}`)
@@ -325,21 +236,14 @@ describe.concurrent('API route deep probes (integration)', () => {
       expect(response.status).toBeLessThan(500)
 
       if (route.auth === 'org' || route.auth === 'platform-admin' || route.auth === 'org-or-cron') {
-
         expect(response.status).not.toBe(401)
-
       } else {
-
         expectRouteStatus(route, response)
-
       }
-
     },
 
     120_000,
-
   )
-
 })
 
 describe.sequential('route-logic extended (integration)', () => {
@@ -499,12 +403,18 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
       expect((await POST(orgJsonReq('/api/stripe/confirm-payment', 'POST', {}))).status).toBe(400)
       expect(
-        (await POST(orgJsonReq('/api/stripe/confirm-payment', 'POST', { ...base, paymentIntentId: 'bad' })))
-          .status,
+        (
+          await POST(
+            orgJsonReq('/api/stripe/confirm-payment', 'POST', { ...base, paymentIntentId: 'bad' }),
+          )
+        ).status,
       ).toBe(400)
       expect(
-        (await POST(orgJsonReq('/api/stripe/confirm-payment', 'POST', { paymentIntentId: 'pi_bad_id!' })))
-          .status,
+        (
+          await POST(
+            orgJsonReq('/api/stripe/confirm-payment', 'POST', { paymentIntentId: 'pi_bad_id!' }),
+          )
+        ).status,
       ).toBe(400)
       expect(
         (
@@ -659,14 +569,33 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
     it('GET validates period params and generates for a month', async () => {
       const { GET } = await import('@/lib/route-logic/statements/auto-generate')
-      expect((await GET(orgJsonReq('/api/statements/auto-generate', 'GET', undefined, { query: '?year=1800' }))).status).toBe(400)
-      expect((await GET(orgJsonReq('/api/statements/auto-generate', 'GET', undefined, { query: '?year=2024' }))).status).toBe(400)
       expect(
-        (await GET(orgJsonReq('/api/statements/auto-generate', 'GET', undefined, { query: '?year=2024&month=13' })))
-          .status,
+        (
+          await GET(
+            orgJsonReq('/api/statements/auto-generate', 'GET', undefined, { query: '?year=1800' }),
+          )
+        ).status,
+      ).toBe(400)
+      expect(
+        (
+          await GET(
+            orgJsonReq('/api/statements/auto-generate', 'GET', undefined, { query: '?year=2024' }),
+          )
+        ).status,
+      ).toBe(400)
+      expect(
+        (
+          await GET(
+            orgJsonReq('/api/statements/auto-generate', 'GET', undefined, {
+              query: '?year=2024&month=13',
+            }),
+          )
+        ).status,
       ).toBe(400)
       const ok = await GET(
-        orgJsonReq('/api/statements/auto-generate', 'GET', undefined, { query: `?year=${year()}&month=1` }),
+        orgJsonReq('/api/statements/auto-generate', 'GET', undefined, {
+          query: `?year=${year()}&month=1`,
+        }),
       )
       expect(ok.status).toBe(200)
     })
@@ -740,7 +669,9 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       expect(putRes.status).toBe(200)
 
       const invalidGet = await GET(
-        orgJsonReq('/api/auth/reset-password', 'GET', undefined, { query: '?token=totally-invalid' }),
+        orgJsonReq('/api/auth/reset-password', 'GET', undefined, {
+          query: '?token=totally-invalid',
+        }),
       )
       expect((await invalidGet.json()).valid).toBe(false)
 
@@ -833,8 +764,11 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const y = year()
       expect((await GET(orgJsonReq('/api/reports/pl', 'GET'))).status).toBe(400)
       expect(
-        (await GET(orgJsonReq('/api/reports/pl', 'GET', undefined, { query: '?startDate=2024-01-01' })))
-          .status,
+        (
+          await GET(
+            orgJsonReq('/api/reports/pl', 'GET', undefined, { query: '?startDate=2024-01-01' }),
+          )
+        ).status,
       ).toBe(400)
       expect(
         (
@@ -845,9 +779,10 @@ describe.sequential('route-logic row coverage (gap order)', () => {
           )
         ).status,
       ).toBe(400)
-      expect((await GET(orgJsonReq('/api/reports/pl', 'GET', undefined, { query: '?year=1800' }))).status).toBe(
-        400,
-      )
+      expect(
+        (await GET(orgJsonReq('/api/reports/pl', 'GET', undefined, { query: '?year=1800' })))
+          .status,
+      ).toBe(400)
     })
   })
 
@@ -880,7 +815,12 @@ describe.sequential('route-logic row coverage (gap order)', () => {
         orgJsonReq('/api/reports/saved', 'POST', {
           name: 'Bad range',
           source: 'payments',
-          config: { source: 'payments', aggregate: 'count', fromDate: `${y}-12-31`, toDate: `${y}-01-01` },
+          config: {
+            source: 'payments',
+            aggregate: 'count',
+            fromDate: `${y}-12-31`,
+            toDate: `${y}-01-01`,
+          },
         }),
       )
       expect(badDates.status).toBe(400)
@@ -900,10 +840,9 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
       expect(updateRes.status).toBe(200)
 
-      const deleteRes = await DELETE(
-        orgJsonReq(`/api/reports/saved/${reportId}`, 'DELETE'),
-        { params: { id: reportId } },
-      )
+      const deleteRes = await DELETE(orgJsonReq(`/api/reports/saved/${reportId}`, 'DELETE'), {
+        params: { id: reportId },
+      })
       expect(deleteRes.status).toBe(200)
     })
   })
@@ -912,9 +851,7 @@ describe.sequential('route-logic row coverage (gap order)', () => {
     it('enables then disables 2FA with password and TOTP', async () => {
       const password = 'ApiRouteTestPass123!'
       const { POST: setupPost } = await import('@/lib/route-logic/user/2fa/setup')
-      const setupRes = await setupPost(
-        sessionJsonReq('/api/user/2fa/setup', 'POST', { password }),
-      )
+      const setupRes = await setupPost(sessionJsonReq('/api/user/2fa/setup', 'POST', { password }))
       expect(setupRes.status).toBe(200)
       const setupBody = await setupRes.json()
       const secret = new URL(setupBody.otpauthUrl as string).searchParams.get('secret')
@@ -965,9 +902,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
         birthDate: new Date('2002-05-10'),
       })
 
-      const { POST } = await import(
-        '@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family'
-      )
+      const { POST } =
+        await import('@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family')
       const res = await POST(
         orgJsonReq(
           `/api/families/${ctx.fixtures.familyId}/members/${member._id}/convert-to-family`,
@@ -992,9 +928,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
         birthDate: new Date('2001-01-01'),
         convertedToFamily: true,
       })
-      const { POST } = await import(
-        '@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family'
-      )
+      const { POST } =
+        await import('@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family')
       const res = await POST(
         orgJsonReq(
           `/api/families/${ctx.fixtures.familyId}/members/${member._id}/convert-to-family`,
@@ -1007,9 +942,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
     })
 
     it('rejects missing wedding date and unknown member', async () => {
-      const { POST } = await import(
-        '@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family'
-      )
+      const { POST } =
+        await import('@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family')
       const missingDate = await POST(
         orgJsonReq(
           `/api/families/${ctx.fixtures.familyId}/members/${ctx.fixtures.memberId}/convert-to-family`,
@@ -1060,7 +994,9 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
       if (page.nextCursor) {
         const nextRes = await GET(
-          orgJsonReq('/api/audit-log', 'GET', undefined, { query: `?limit=1&cursor=${page.nextCursor}` }),
+          orgJsonReq('/api/audit-log', 'GET', undefined, {
+            query: `?limit=1&cursor=${page.nextCursor}`,
+          }),
         )
         expect(nextRes.status).toBe(200)
       }
@@ -1076,15 +1012,30 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
     it('rejects invalid filters', async () => {
       const { GET } = await import('@/lib/route-logic/audit-log')
-      expect((await GET(orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?fromDate=2024-01-01' }))).status).toBe(400)
       expect(
-        (await GET(orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?action=bad action!' }))).status,
+        (
+          await GET(
+            orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?fromDate=2024-01-01' }),
+          )
+        ).status,
       ).toBe(400)
       expect(
-        (await GET(orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?userId=not-an-object-id' }))).status,
+        (
+          await GET(
+            orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?action=bad action!' }),
+          )
+        ).status,
       ).toBe(400)
       expect(
-        (await GET(orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?cursor=not-valid' }))).status,
+        (
+          await GET(
+            orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?userId=not-an-object-id' }),
+          )
+        ).status,
+      ).toBe(400)
+      expect(
+        (await GET(orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?cursor=not-valid' })))
+          .status,
       ).toBe(400)
     })
   })
@@ -1113,10 +1064,9 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       await softDeleteOne('task', task._id.toString(), orgCtx)
 
       const { POST } = await import('@/lib/route-logic/trash/[kind]/[id]/restore')
-      const res = await POST(
-        orgJsonReq(`/api/trash/task/${task._id}/restore`, 'POST', {}),
-        { params: { kind: 'task', id: task._id.toString() } },
-      )
+      const res = await POST(orgJsonReq(`/api/trash/task/${task._id}/restore`, 'POST', {}), {
+        params: { kind: 'task', id: task._id.toString() },
+      })
       expect(res.status).toBe(200)
       expect((await res.json()).message).toBe('Restored')
     })
@@ -1135,10 +1085,9 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
       expect(missing.status).toBe(404)
 
-      const badId = await POST(
-        orgJsonReq('/api/trash/task/not-valid/restore', 'POST', {}),
-        { params: { kind: 'task', id: 'not-valid' } },
-      )
+      const badId = await POST(orgJsonReq('/api/trash/task/not-valid/restore', 'POST', {}), {
+        params: { kind: 'task', id: 'not-valid' },
+      })
       expect(badId.status).toBe(400)
     })
   })
@@ -1169,18 +1118,12 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const params = { kind: 'task', id: task._id.toString() }
       const { GET, DELETE } = await import('@/lib/route-logic/trash/[kind]/[id]')
 
-      const getRes = await GET(
-        orgJsonReq(`/api/trash/task/${task._id}`, 'GET'),
-        { params },
-      )
+      const getRes = await GET(orgJsonReq(`/api/trash/task/${task._id}`, 'GET'), { params })
       expect(getRes.status).toBe(200)
       const getBody = await getRes.json()
       expect(getBody._id ?? getBody.id).toBeTruthy()
 
-      const delRes = await DELETE(
-        orgJsonReq(`/api/trash/task/${task._id}`, 'DELETE'),
-        { params },
-      )
+      const delRes = await DELETE(orgJsonReq(`/api/trash/task/${task._id}`, 'DELETE'), { params })
       expect(delRes.status).toBe(200)
       expect((await delRes.json()).message).toBe('Permanently deleted')
     })
@@ -1190,27 +1133,35 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       const bogusId = new Types.ObjectId().toString()
 
       expect(
-        (await GET(orgJsonReq(`/api/trash/not-a-kind/${bogusId}`, 'GET'), {
-          params: { kind: 'not-a-kind', id: bogusId },
-        })).status,
+        (
+          await GET(orgJsonReq(`/api/trash/not-a-kind/${bogusId}`, 'GET'), {
+            params: { kind: 'not-a-kind', id: bogusId },
+          })
+        ).status,
       ).toBe(400)
 
       expect(
-        (await GET(orgJsonReq(`/api/trash/task/not-valid`, 'GET'), {
-          params: { kind: 'task', id: 'not-valid' },
-        })).status,
+        (
+          await GET(orgJsonReq(`/api/trash/task/not-valid`, 'GET'), {
+            params: { kind: 'task', id: 'not-valid' },
+          })
+        ).status,
       ).toBe(400)
 
       expect(
-        (await GET(orgJsonReq(`/api/trash/task/${bogusId}`, 'GET'), {
-          params: { kind: 'task', id: bogusId },
-        })).status,
+        (
+          await GET(orgJsonReq(`/api/trash/task/${bogusId}`, 'GET'), {
+            params: { kind: 'task', id: bogusId },
+          })
+        ).status,
       ).toBe(404)
 
       expect(
-        (await DELETE(orgJsonReq(`/api/trash/task/${bogusId}`, 'DELETE'), {
-          params: { kind: 'task', id: bogusId },
-        })).status,
+        (
+          await DELETE(orgJsonReq(`/api/trash/task/${bogusId}`, 'DELETE'), {
+            params: { kind: 'task', id: bogusId },
+          })
+        ).status,
       ).toBe(404)
     })
   })
@@ -1269,10 +1220,9 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
       expect(putRes.status).toBe(200)
 
-      const emptyPut = await PUT(
-        orgJsonReq(`/api/families/${disposable._id}`, 'PUT', {}),
-        { params },
-      )
+      const emptyPut = await PUT(orgJsonReq(`/api/families/${disposable._id}`, 'PUT', {}), {
+        params,
+      })
       expect(emptyPut.status).toBe(400)
 
       const selfParent = await PUT(
@@ -1291,10 +1241,9 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
       expect(badPlan.status).toBe(400)
 
-      const delRes = await DELETE(
-        orgJsonReq(`/api/families/${disposable._id}`, 'DELETE'),
-        { params },
-      )
+      const delRes = await DELETE(orgJsonReq(`/api/families/${disposable._id}`, 'DELETE'), {
+        params,
+      })
       expect(delRes.status).toBe(200)
       expect((await delRes.json()).message).toContain('recycle bin')
     })
@@ -1341,7 +1290,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
 
       const familyPath = `/api/families/${ctx.fixtures.familyId}/saved-payment-methods`
-      const { GET, POST, DELETE } = await import('@/lib/route-logic/families/[id]/saved-payment-methods')
+      const { GET, POST, DELETE } =
+        await import('@/lib/route-logic/families/[id]/saved-payment-methods')
       const params = { id: ctx.fixtures.familyId }
 
       const listRes = await GET(orgJsonReq(familyPath, 'GET'), { params })
@@ -1560,9 +1510,7 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       })
 
       const { DELETE } = await import('@/lib/route-logic/org-members')
-      const res = await DELETE(
-        orgJsonReq(`/api/org-members?id=${membership._id}`, 'DELETE'),
-      )
+      const res = await DELETE(orgJsonReq(`/api/org-members?id=${membership._id}`, 'DELETE'))
       expect(res.status).toBe(200)
       expect((await res.json()).ok).toBe(true)
     })
@@ -1608,20 +1556,25 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
       expect(createRes.status).toBe(200)
       const created = await createRes.json()
-      expect(created.token).toBeTruthy()
+      expect(created.inviteUrl).toMatch(/\/invite\//)
+      expect(created.token).toBeUndefined()
+
+      const { Invite } = await import('@/lib/models')
+      const { hashInviteToken, inviteTokenFromUrl } = await import('@/lib/invite-token')
+      const plainToken = inviteTokenFromUrl(created.inviteUrl)
+      const stored = await Invite.findById(created.id).lean<{ token: string }>()
+      expect(stored?.token).toBe(hashInviteToken(plainToken))
+      expect(stored?.token).not.toBe(plainToken)
 
       const resolveRes = await GET(
-        new NextRequest(
-          `${API_ORIGIN}/api/auth/invite?token=${encodeURIComponent(created.token)}`,
-          { headers: { host: 'localhost:3000', origin: API_ORIGIN } },
-        ),
+        new NextRequest(`${API_ORIGIN}/api/auth/invite?token=${encodeURIComponent(plainToken)}`, {
+          headers: { host: 'localhost:3000', origin: API_ORIGIN },
+        }),
       )
       expect(resolveRes.status).toBe(200)
       expect((await resolveRes.json()).email).toBe(email)
 
-      const cancelRes = await DELETE(
-        orgJsonReq(`/api/auth/invite?id=${created.id}`, 'DELETE'),
-      )
+      const cancelRes = await DELETE(orgJsonReq(`/api/auth/invite?id=${created.id}`, 'DELETE'))
       expect(cancelRes.status).toBe(200)
     })
 
@@ -1821,7 +1774,9 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
       const setupRes = await POST(sessionJsonReq('/api/user/2fa/setup', 'POST', { password }))
       expect(setupRes.status).toBe(200)
-      const secret = new URL((await setupRes.json()).otpauthUrl as string).searchParams.get('secret')
+      const secret = new URL((await setupRes.json()).otpauthUrl as string).searchParams.get(
+        'secret',
+      )
       const enableRes = await PATCH(
         sessionJsonReq('/api/user/2fa', 'PATCH', {
           action: 'enable',
@@ -1995,7 +1950,8 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
       const { POST } = await import('@/lib/route-logic/statements/send-emails/worker')
       expect(
-        (await POST(orgJsonReq('/api/statements/send-emails/worker', 'POST', { jobId: 'bad' }))).status,
+        (await POST(orgJsonReq('/api/statements/send-emails/worker', 'POST', { jobId: 'bad' })))
+          .status,
       ).toBe(400)
 
       const res = await POST(
@@ -2084,10 +2040,15 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
       const { POST } = await import('@/lib/route-logic/tax-receipts/email/worker')
       const res = await POST(
-        orgJsonReq('/api/tax-receipts/email/worker', 'POST', {
-          jobId: job._id.toString(),
-          organizationId: ctx.orgId,
-        }, { cron: true }),
+        orgJsonReq(
+          '/api/tax-receipts/email/worker',
+          'POST',
+          {
+            jobId: job._id.toString(),
+            organizationId: ctx.orgId,
+          },
+          { cron: true },
+        ),
       )
       expect(res.status).toBe(200)
       expect((await res.json()).done).toBe(true)
@@ -2111,19 +2072,27 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       expect(custom.status).toBe(200)
 
       expect(
-        (await GET(orgJsonReq('/api/dues-recommendation', 'GET', undefined, { query: '?windowYears=99' })))
-          .status,
+        (
+          await GET(
+            orgJsonReq('/api/dues-recommendation', 'GET', undefined, { query: '?windowYears=99' }),
+          )
+        ).status,
       ).toBe(400)
       expect(
-        (await GET(orgJsonReq('/api/dues-recommendation', 'GET', undefined, { query: '?forecastYears=0' })))
-          .status,
+        (
+          await GET(
+            orgJsonReq('/api/dues-recommendation', 'GET', undefined, { query: '?forecastYears=0' }),
+          )
+        ).status,
       ).toBe(400)
       expect(
-        (await GET(
-          orgJsonReq('/api/dues-recommendation', 'GET', undefined, {
-            query: `?startYear=${y - 100}`,
-          }),
-        )).status,
+        (
+          await GET(
+            orgJsonReq('/api/dues-recommendation', 'GET', undefined, {
+              query: `?startYear=${y - 100}`,
+            }),
+          )
+        ).status,
       ).toBe(400)
     })
   })
@@ -2198,10 +2167,9 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       } as never)
 
       const { GET } = await import('@/lib/route-logic/families/[id]/members')
-      const res = await GET(
-        orgJsonReq(`/api/families/${ctx.fixtures.familyId}/members`, 'GET'),
-        { params: { id: ctx.fixtures.familyId } },
-      )
+      const res = await GET(orgJsonReq(`/api/families/${ctx.fixtures.familyId}/members`, 'GET'), {
+        params: { id: ctx.fixtures.familyId },
+      })
       expect(res.status).toBe(200)
       const list = await res.json()
       expect(list.length).toBeGreaterThan(0)
@@ -2244,9 +2212,7 @@ describe.sequential('route-logic row coverage (gap order)', () => {
     it('searches families and rejects empty query', async () => {
       const { GET } = await import('@/lib/route-logic/search')
 
-      const res = await GET(
-        orgJsonReq('/api/search', 'GET', undefined, { query: '?q=Marker' }),
-      )
+      const res = await GET(orgJsonReq('/api/search', 'GET', undefined, { query: '?q=Marker' }))
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.items.some((i: { type: string }) => i.type === 'family')).toBe(true)
@@ -2336,5 +2302,3 @@ describe.sequential('route-logic row coverage (gap order)', () => {
     })
   })
 })
-
-

@@ -23,6 +23,38 @@
 
 import { AuditLog } from './models'
 
+/** Metadata keys that carry email addresses — redacted before persist. */
+const EMAIL_METADATA_KEYS =
+  /^(email|attemptedEmail|userEmail|fromEmail|toEmail|recipientEmail|senderEmail)$/i
+
+function maskEmail(email: string): string {
+  const at = email.indexOf('@')
+  if (at <= 0) return '[redacted-email]'
+  const local = email.slice(0, at)
+  const domain = email.slice(at + 1)
+  const visible = local.length <= 1 ? '*' : `${local[0]}***`
+  return `${visible}@${domain}`
+}
+
+function redactAuditMetadata(metadata: unknown): unknown {
+  if (metadata == null) return metadata
+  if (typeof metadata === 'string') return metadata
+  if (Array.isArray(metadata)) return metadata.map(redactAuditMetadata)
+  if (typeof metadata !== 'object') return metadata
+
+  const out: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(metadata as Record<string, unknown>)) {
+    if (EMAIL_METADATA_KEYS.test(key) && typeof value === 'string') {
+      out[key] = maskEmail(value)
+    } else if (value != null && typeof value === 'object') {
+      out[key] = redactAuditMetadata(value)
+    } else {
+      out[key] = value
+    }
+  }
+  return out
+}
+
 export interface AuditEvent {
   /** Optional for platform-level events (login, signup, password reset). */
   organizationId?: string | null
@@ -70,7 +102,7 @@ export async function audit(event: AuditEvent): Promise<void> {
       action: event.action,
       resourceType: event.resourceType,
       resourceId: event.resourceId,
-      metadata: event.metadata,
+      metadata: event.metadata ? redactAuditMetadata(event.metadata) : undefined,
       ip,
       userAgent,
     })

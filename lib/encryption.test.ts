@@ -12,8 +12,7 @@ describe('encryption', () => {
     else process.env.ENCRYPTION_KEY = prevEnc
     if (prevAuth === undefined) delete process.env.NEXTAUTH_SECRET
     else process.env.NEXTAUTH_SECRET = prevAuth
-    setNodeEnv(prevNode
-)
+    setNodeEnv(prevNode)
   })
 
   it('round-trips plaintext', () => {
@@ -29,6 +28,46 @@ describe('encryption', () => {
     const once = encryption.encrypt('x')
     expect(encryption.encrypt(once)).toBe(once)
     expect(encryption.decrypt('legacy-plain')).toBe('legacy-plain')
+    expect(encryption.isLegacyPlaintextSecret('legacy-plain')).toBe(true)
+    expect(encryption.isLegacyPlaintextSecret('enc:v1:iv:tag:ct')).toBe(false)
+  })
+
+  it('rejects legacy plaintext 2FA when REJECT_LEGACY_PLAINTEXT_2FA is set in production', async () => {
+    vi.resetModules()
+    setNodeEnv('production')
+    process.env.ENCRYPTION_KEY = 'prod-test-encryption-key-32chars!!'
+    process.env.REJECT_LEGACY_PLAINTEXT_2FA = 'true'
+
+    const { decryptTwoFactorSecret } = await import('./encryption')
+    expect(() => decryptTwoFactorSecret('legacy-plain')).toThrow(/Legacy plaintext secret rejected/)
+    expect(() => decryptTwoFactorSecret('legacy-plain')).toThrow(/encrypt-legacy-secrets/)
+
+    delete process.env.REJECT_LEGACY_PLAINTEXT_2FA
+    vi.resetModules()
+  })
+
+  it('decrypt rejectLegacyPlaintext option throws without logging pass-through', () => {
+    process.env.ENCRYPTION_KEY = 'test-key'
+    expect(() => encryption.decrypt('legacy-plain', { rejectLegacyPlaintext: true })).toThrow(
+      /Legacy plaintext secret rejected/,
+    )
+  })
+
+  it('warns once in production when decrypting legacy plaintext', async () => {
+    vi.resetModules()
+    setNodeEnv('production')
+    process.env.ENCRYPTION_KEY = 'prod-test-encryption-key-32chars!!'
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { decrypt: dec } = await import('./encryption')
+
+    expect(dec('legacy-plain')).toBe('legacy-plain')
+    expect(dec('another-plain')).toBe('another-plain')
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0]?.[0]).toMatch(/Legacy plaintext secret/)
+
+    warn.mockRestore()
+    vi.resetModules()
   })
 
   it('safeDecrypt surfaces operator-facing errors', () => {
@@ -44,23 +83,20 @@ describe('encryption', () => {
   it('safeDecrypt returns key_missing when decrypt cites ENCRYPTION_KEY', () => {
     const prevNode = process.env.NODE_ENV
     const prevEnc = process.env.ENCRYPTION_KEY
-    setNodeEnv('production'
-)
+    setNodeEnv('production')
     delete process.env.ENCRYPTION_KEY
 
     const res = encryption.safeDecrypt('enc:v1:aaaa:bbbb:cccc')
     expect(res).toEqual({ ok: false, reason: 'key_missing' })
     expect(encryption.decryptFailureMessage('key_missing')).toContain('ENCRYPTION_KEY')
 
-    setNodeEnv(prevNode
-)
+    setNodeEnv(prevNode)
     if (prevEnc === undefined) delete process.env.ENCRYPTION_KEY
     else process.env.ENCRYPTION_KEY = prevEnc
   })
 
   it('requires ENCRYPTION_KEY in production', () => {
-    setNodeEnv('production'
-)
+    setNodeEnv('production')
     delete process.env.ENCRYPTION_KEY
     expect(() => encryption.encrypt('x')).toThrow(/ENCRYPTION_KEY/)
   })
@@ -68,8 +104,7 @@ describe('encryption', () => {
   it('falls back to NEXTAUTH_SECRET in development when ENCRYPTION_KEY is unset', async () => {
     vi.resetModules()
     delete process.env.ENCRYPTION_KEY
-    setNodeEnv('development'
-)
+    setNodeEnv('development')
     process.env.NEXTAUTH_SECRET = 'dev-only-nextauth-fallback-key'
 
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -91,8 +126,7 @@ describe('encryption', () => {
     vi.resetModules()
     delete process.env.ENCRYPTION_KEY
     delete process.env.NEXTAUTH_SECRET
-    setNodeEnv('development'
-)
+    setNodeEnv('development')
 
     const { encrypt: enc } = await import('./encryption')
     expect(() => enc('x')).toThrow(/ENCRYPTION_KEY \(or NEXTAUTH_SECRET fallback in dev\)/)

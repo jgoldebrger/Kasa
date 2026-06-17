@@ -27,6 +27,10 @@ jobs:
       - name: Install
         run: npm ci
 
+      # Production deps first; fails CI on high/critical in runtime tree.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Type check
         run: npx tsc --noEmit
 

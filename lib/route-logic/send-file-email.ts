@@ -2,6 +2,7 @@ import { EmailConfig } from '@/lib/models'
 import { safeDecrypt, decryptFailureMessage } from '@/lib/encryption'
 import { escapeHtml } from '@/lib/html-escape'
 import { sanitizeFromName } from '@/lib/email-from-name'
+import { isAllowedOutboundRecipient } from '@/lib/email-recipients'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { handler } from '@/lib/api/handler'
 import nodemailer from 'nodemailer'
@@ -74,7 +75,21 @@ export const POST = handler({
       return { status: 400, data: { error: 'Valid recipient email address is required' } }
     }
 
-    const emailConfigDoc = await EmailConfig.findOne({ isActive: true, organizationId: ctx!.organizationId })
+    const recipientAllowed = await isAllowedOutboundRecipient(ctx!.organizationId, to)
+    if (!recipientAllowed) {
+      return {
+        status: 400,
+        data: {
+          error:
+            'Recipient must be an organization member or a family contact email on file in this organization.',
+        },
+      }
+    }
+
+    const emailConfigDoc = await EmailConfig.findOne({
+      isActive: true,
+      organizationId: ctx!.organizationId,
+    })
 
     if (!emailConfigDoc) {
       return {

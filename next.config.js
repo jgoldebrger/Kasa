@@ -1,9 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // SWC minifier is already the default in Next 14, but stating it
-  // explicitly catches accidental regressions if someone bumps versions.
-  swcMinify: true,
   compress: true,
   // Produce a self-contained build output so the production server only
   // needs Node + the .next/standalone directory. Smaller cold-start
@@ -24,7 +21,7 @@ const nextConfig = {
     '@heroicons/react/20/solid': {
       transform: '@heroicons/react/20/solid/{{member}}',
     },
-    'lodash': {
+    lodash: {
       transform: 'lodash/{{member}}',
     },
   },
@@ -44,10 +41,10 @@ const nextConfig = {
     // 1 year — let edge / CDN serve cached image variants forever.
     minimumCacheTTL: 60 * 60 * 24 * 365,
   },
+  // Keep the server bundle small — heavy Node-only deps don't need to
+  // be traced for the edge runtime.
+  serverExternalPackages: ['mongoose', 'bcryptjs', 'nodemailer', 'pino', 'pino-pretty'],
   experimental: {
-    // Keep the server bundle small — heavy Node-only deps don't need to
-    // be traced for the edge runtime.
-    serverComponentsExternalPackages: ['mongoose', 'bcryptjs', 'nodemailer', 'pino', 'pino-pretty'],
     // Modern, more granular than `modularizeImports`. Next traces the
     // package and only includes the actually-used named exports. Stacks
     // on top of the heroicons/lodash rules above.
@@ -85,7 +82,10 @@ const nextConfig = {
           // when users click outbound links.
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           // Lock down powerful APIs we don't use.
-          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()' },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+          },
           // Old IE legacy; harmless. Most browsers ignore but a few security
           // scanners still flag its absence.
           { key: 'X-DNS-Prefetch-Control', value: 'on' },
@@ -121,4 +121,3 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 })
 
 module.exports = withBundleAnalyzer(withSentryIfConfigured(nextConfig))
-

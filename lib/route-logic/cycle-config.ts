@@ -2,6 +2,7 @@ import { handler } from '@/lib/api/handler'
 import { CycleConfig } from '@/lib/models'
 import { audit } from '@/lib/audit'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { cycleConfig as cycleConfigSchemas } from '@/lib/schemas'
 
 type CalendarKind = 'gregorian' | 'hebrew'
 
@@ -27,7 +28,10 @@ export const GET = handler({
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    const config = await CycleConfig.findOne({ isActive: true, organizationId: ctx!.organizationId }).lean<any>()
+    const config = await CycleConfig.findOne({
+      isActive: true,
+      organizationId: ctx!.organizationId,
+    }).lean<any>()
 
     if (!config) {
       return {
@@ -67,8 +71,9 @@ export const GET = handler({
 export const POST = handler({
   auth: 'org',
   minRole: 'admin',
+  body: cycleConfigSchemas.cycleConfigBody,
   name: 'POST /api/cycle-config',
-  fn: async ({ ctx, request }) => {
+  fn: async ({ ctx, body, request }) => {
     const rateVerdict = await checkRateLimit(
       request,
       'cycle-config-save',
@@ -79,10 +84,6 @@ export const POST = handler({
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    const body = await request.json().catch(() => null)
-    if (!body || typeof body !== 'object' || Object.keys(body).length === 0) {
-      return { status: 400, data: { error: 'Nothing to update.' } }
-    }
     const {
       cycleCalendar: rawCalendar,
       cycleStartMonth,
@@ -94,66 +95,13 @@ export const POST = handler({
     } = body
 
     const cycleCalendar = normalizeCalendar(rawCalendar)
-    // Only persist `cycleAutoRollover` when the client explicitly sent
-    // a boolean; an undefined value preserves whatever's on the doc.
-    const cycleAutoRollover =
-      typeof rawAutoRollover === 'boolean' ? rawAutoRollover : undefined
-
-    // Always require BOTH Gregorian fields — even when the active calendar
-    // is 'hebrew', we keep a Gregorian value on the doc as a fallback for
-    // any consumer that doesn't yet understand the Hebrew branch. The UI
-    // sends sensible defaults; here we just validate whatever arrives.
-    if (!cycleStartMonth || !cycleStartDay) {
-      return {
-        status: 400,
-        data: { error: 'Cycle start month and day are required' },
-      }
-    }
-    if (cycleStartMonth < 1 || cycleStartMonth > 12) {
-      return {
-        status: 400,
-        data: { error: 'Cycle start month must be between 1 and 12' },
-      }
-    }
-    if (cycleStartDay < 1 || cycleStartDay > 31) {
-      return {
-        status: 400,
-        data: { error: 'Cycle start day must be between 1 and 31' },
-      }
-    }
-
-    // Hebrew fields are required when calendar === 'hebrew'; otherwise
-    // they're optional (and we still persist whatever was sent so the
-    // user's last Hebrew pick survives a calendar toggle).
-    if (cycleCalendar === 'hebrew') {
-      if (!cycleStartHebrewMonth || !cycleStartHebrewDay) {
-        return {
-          status: 400,
-          data: { error: 'Hebrew month and day are required when using the Hebrew calendar' },
-        }
-      }
-    }
-    if (cycleStartHebrewMonth !== undefined && cycleStartHebrewMonth !== null) {
-      const m = Number(cycleStartHebrewMonth)
-      if (!Number.isInteger(m) || m < 1 || m > 13) {
-        return {
-          status: 400,
-          data: { error: 'Hebrew month must be between 1 and 13' },
-        }
-      }
-    }
-    if (cycleStartHebrewDay !== undefined && cycleStartHebrewDay !== null) {
-      const d = Number(cycleStartHebrewDay)
-      if (!Number.isInteger(d) || d < 1 || d > 30) {
-        return {
-          status: 400,
-          data: { error: 'Hebrew day must be between 1 and 30' },
-        }
-      }
-    }
+    const cycleAutoRollover = typeof rawAutoRollover === 'boolean' ? rawAutoRollover : undefined
 
     // Check if config already exists
-    const existingConfig = await CycleConfig.findOne({ isActive: true, organizationId: ctx!.organizationId })
+    const existingConfig = await CycleConfig.findOne({
+      isActive: true,
+      organizationId: ctx!.organizationId,
+    })
 
     const updateDoc: Record<string, unknown> = {
       cycleCalendar,

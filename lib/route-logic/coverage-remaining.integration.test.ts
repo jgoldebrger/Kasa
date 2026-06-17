@@ -89,8 +89,8 @@ async function withRateLimitBlocked<T>(fn: () => Promise<T>): Promise<T> {
   const rateLimit = await import('@/lib/rate-limit')
   const spy = vi.spyOn(rateLimit, 'checkRateLimit').mockResolvedValue({
     allowed: false,
-        remaining: 0,
-        resetAt: 0,
+    remaining: 0,
+    resetAt: 0,
   })
   try {
     return await fn()
@@ -99,7 +99,12 @@ async function withRateLimitBlocked<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-function importForm(type: string, csv: string, filename: string, extra?: Record<string, string>): FormData {
+function importForm(
+  type: string,
+  csv: string,
+  filename: string,
+  extra?: Record<string, string>,
+): FormData {
   const form = new FormData()
   form.set('type', type)
   form.set('file', new Blob([csv], { type: 'text/csv' }), filename)
@@ -132,7 +137,7 @@ describe.sequential('route-logic remaining coverage', () => {
     process.env.PLATFORM_ADMIN_EMAILS = ''
     ctx = await seedApiRouteFixtures()
     process.env.PLATFORM_ADMIN_EMAILS = ctx.email
-        process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
+    process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
     process.env.KASA_TEST_STRIPE_FAMILY = ctx.fixtures.familyId
     bindSession(ctx)
   })
@@ -148,7 +153,9 @@ describe.sequential('route-logic remaining coverage', () => {
         name: 'payment-plans POST',
         run: async () => {
           const { POST } = await import('@/lib/route-logic/payment-plans')
-          return POST(orgJsonReq('/api/payment-plans', 'POST', { name: 'RL Plan', yearlyPrice: 100 }))
+          return POST(
+            orgJsonReq('/api/payment-plans', 'POST', { name: 'RL Plan', yearlyPrice: 100 }),
+          )
         },
       },
       {
@@ -237,7 +244,9 @@ describe.sequential('route-logic remaining coverage', () => {
         name: 'tax-receipts/zip GET',
         run: async () => {
           const { GET } = await import('@/lib/route-logic/tax-receipts/zip')
-          return GET(orgJsonReq('/api/tax-receipts/zip', 'GET', undefined, { query: `?year=${year()}` }))
+          return GET(
+            orgJsonReq('/api/tax-receipts/zip', 'GET', undefined, { query: `?year=${year()}` }),
+          )
         },
       },
       {
@@ -303,9 +312,12 @@ describe.sequential('route-logic remaining coverage', () => {
         name: 'families/[id]/saved-payment-methods GET',
         run: async () => {
           const { GET } = await import('@/lib/route-logic/families/[id]/saved-payment-methods')
-          return GET(orgJsonReq(`/api/families/${ctx.fixtures.familyId}/saved-payment-methods`, 'GET'), {
-            params: { id: ctx.fixtures.familyId },
-          })
+          return GET(
+            orgJsonReq(`/api/families/${ctx.fixtures.familyId}/saved-payment-methods`, 'GET'),
+            {
+              params: { id: ctx.fixtures.familyId },
+            },
+          )
         },
       },
       {
@@ -339,7 +351,9 @@ describe.sequential('route-logic remaining coverage', () => {
         name: 'cycle-config POST',
         run: async () => {
           const { POST } = await import('@/lib/route-logic/cycle-config')
-          return POST(orgJsonReq('/api/cycle-config', 'POST', { cycleStartMonth: 1 }))
+          return POST(
+            orgJsonReq('/api/cycle-config', 'POST', { cycleStartMonth: 9, cycleStartDay: 1 }),
+          )
         },
       },
       {
@@ -509,7 +523,7 @@ describe.sequential('route-logic remaining coverage', () => {
         name: 'tasks/send-due-date-emails POST',
         run: async () => {
           const { POST } = await import('@/lib/route-logic/tasks/send-due-date-emails')
-          return POST(orgJsonReq('/api/tasks/send-due-date-emails', 'POST', {}, { cron: true }))
+          return POST(orgJsonReq('/api/tasks/send-due-date-emails', 'POST', {}))
         },
       },
       {
@@ -530,7 +544,9 @@ describe.sequential('route-logic remaining coverage', () => {
         name: 'jobs/process-recurring-payments POST',
         run: async () => {
           const { POST } = await import('@/lib/route-logic/jobs/process-recurring-payments')
-          return POST(orgJsonReq('/api/jobs/process-recurring-payments', 'POST', {}, { cron: true }))
+          return POST(
+            orgJsonReq('/api/jobs/process-recurring-payments', 'POST', {}, { cron: true }),
+          )
         },
       },
       {
@@ -651,9 +667,7 @@ describe.sequential('route-logic remaining coverage', () => {
         { organizationId: ctx.orgId, name: `${stamp} C`, weddingDate: new Date('2012-01-01') },
       ])
       const { GET } = await import('@/lib/route-logic/families')
-      const first = await GET(
-        orgJsonReq('/api/families', 'GET', undefined, { query: '?limit=1' }),
-      )
+      const first = await GET(orgJsonReq('/api/families', 'GET', undefined, { query: '?limit=1' }))
       expect(first.status).toBe(200)
       const page = await first.json()
       expect(page.items.length).toBe(1)
@@ -722,10 +736,12 @@ describe.sequential('route-logic remaining coverage', () => {
         ipSpy.mockRestore()
       }
 
-      const emailSpy = vi.spyOn(rateLimit, 'checkRateLimit').mockImplementation(async (_req, key) => {
-        if (key === 'precheck-2fa-email') return { allowed: false, remaining: 0, resetAt: 0 }
-        return { allowed: true, remaining: 999, resetAt: 0 }
-      })
+      const emailSpy = vi
+        .spyOn(rateLimit, 'checkRateLimit')
+        .mockImplementation(async (_req, key) => {
+          if (key === 'precheck-2fa-email') return { allowed: false, remaining: 0, resetAt: 0 }
+          return { allowed: true, remaining: 999, resetAt: 0 }
+        })
       try {
         const emailBlocked = await POST(
           publicJsonReq('/api/auth/precheck-2fa', 'POST', {
@@ -755,12 +771,14 @@ describe.sequential('route-logic remaining coverage', () => {
         convertedToFamily: false,
       })
       const wedding = await import('@/lib/wedding-converter')
-      const spy = vi.spyOn(wedding, 'convertMembersOnWeddingDate').mockRejectedValueOnce(
-        new Error('pi_secret123 failed'),
-      )
+      const spy = vi
+        .spyOn(wedding, 'convertMembersOnWeddingDate')
+        .mockRejectedValueOnce(new Error('pi_secret123 failed'))
       try {
         const { POST } = await import('@/lib/route-logic/jobs/wedding-converter')
-        const res = await POST(orgJsonReq('/api/jobs/wedding-converter', 'POST', {}, { cron: true }))
+        const res = await POST(
+          orgJsonReq('/api/jobs/wedding-converter', 'POST', {}, { cron: true }),
+        )
         const body = await res.json()
         expect(body.failed).toBeGreaterThanOrEqual(1)
         expect(body.errors?.[0]?.orgId).toBeTruthy()
@@ -787,19 +805,13 @@ describe.sequential('route-logic remaining coverage', () => {
 
       const badFamilyId = await POST(
         importReq(
-          importForm(
-            'members',
-            'familyId,firstName,lastName\nnot-valid,John,Doe',
-            'bad-fid.csv',
-          ),
+          importForm('members', 'familyId,firstName,lastName\nnot-valid,John,Doe', 'bad-fid.csv'),
         ),
       )
       expect((await badFamilyId.json()).failed).toBeGreaterThanOrEqual(1)
 
       const noFamily = await POST(
-        importReq(
-          importForm('members', 'firstName,lastName\nOnly,Name', 'no-family.csv'),
-        ),
+        importReq(importForm('members', 'firstName,lastName\nOnly,Name', 'no-family.csv')),
       )
       expect((await noFamily.json()).failed).toBeGreaterThanOrEqual(1)
     })
@@ -829,7 +841,10 @@ describe.sequential('route-logic remaining coverage', () => {
         { _id: ctx.fixtures.savedPaymentMethodId },
         { $set: { isActive: true, stripePaymentMethodId: 'pm_probemock' } },
       )
-      await Payment.deleteMany({ organizationId: ctx.orgId, stripePaymentIntentId: 'pi_dupnoledger' })
+      await Payment.deleteMany({
+        organizationId: ctx.orgId,
+        stripePaymentIntentId: 'pi_dupnoledger',
+      })
 
       const Stripe = (await import('stripe')).default
       const client = new Stripe('sk_test') as unknown as {
@@ -898,7 +913,9 @@ describe.sequential('route-logic remaining coverage', () => {
       expect(oversize.status).toBe(413)
 
       const lifecycleCsv = `familyName,eventType,eventDate,memberId\n${familyName},bar_mitzvah,2024-08-01,not-valid`
-      const leRes = await POST(importReq(importForm('lifecycle-events', lifecycleCsv, 'le-mem.csv')))
+      const leRes = await POST(
+        importReq(importForm('lifecycle-events', lifecycleCsv, 'le-mem.csv')),
+      )
       expect((await leRes.json()).failed).toBeGreaterThanOrEqual(1)
     })
 
@@ -979,7 +996,9 @@ describe.sequential('route-logic remaining coverage', () => {
         },
       ])
       const { GET } = await import('@/lib/route-logic/tax-receipts')
-      const res = await GET(orgJsonReq('/api/tax-receipts', 'GET', undefined, { query: `?year=${y}` }))
+      const res = await GET(
+        orgJsonReq('/api/tax-receipts', 'GET', undefined, { query: `?year=${y}` }),
+      )
       const items = await res.json()
       const names = items.map((i: { familyName: string }) => i.familyName)
       const subset = names.filter((n: string) => n.includes('Receipt'))
@@ -994,13 +1013,15 @@ describe.sequential('route-logic remaining coverage', () => {
       bindSession(ctx)
       const pag = await import('@/lib/pagination')
       const orig = pag.collectCompoundCursorPages
-      const spy = vi.spyOn(pag, 'collectCompoundCursorPages').mockImplementation(
-        async (loadPage, baseFilter, sortField, direction, getCursor, batchSize) => {
-          const page = await loadPage(baseFilter, 3)
-          if (page[0]) getCursor(page[0] as never)
-          return orig(loadPage, baseFilter, sortField, direction, getCursor, batchSize)
-        },
-      )
+      const spy = vi
+        .spyOn(pag, 'collectCompoundCursorPages')
+        .mockImplementation(
+          async (loadPage, baseFilter, sortField, direction, getCursor, batchSize) => {
+            const page = await loadPage(baseFilter, 3)
+            if (page[0]) getCursor(page[0] as never)
+            return orig(loadPage, baseFilter, sortField, direction, getCursor, batchSize)
+          },
+        )
       try {
         const { YearlyCalculation, LifecycleEventPayment, Family } = await import('@/lib/models')
         const y = year() + 46
@@ -1025,8 +1046,17 @@ describe.sequential('route-logic remaining coverage', () => {
           parentFamilyId: ctx.fixtures.familyId,
         })
 
-        expect((await (await import('@/lib/route-logic/calculations')).GET(orgJsonReq('/api/calculations', 'GET'))).status).toBe(200)
-        expect((await (await import('@/lib/route-logic/events')).GET(orgJsonReq('/api/events', 'GET'))).status).toBe(200)
+        expect(
+          (
+            await (
+              await import('@/lib/route-logic/calculations')
+            ).GET(orgJsonReq('/api/calculations', 'GET'))
+          ).status,
+        ).toBe(200)
+        expect(
+          (await (await import('@/lib/route-logic/events')).GET(orgJsonReq('/api/events', 'GET')))
+            .status,
+        ).toBe(200)
         expect(
           (
             await (
@@ -1061,11 +1091,8 @@ describe.sequential('route-logic remaining coverage', () => {
       const { PATCH } = await import('@/lib/route-logic/organizations')
       await withRateLimitBlocked(async () => {
         expect(
-          (
-            await PATCH(
-              sessionJsonReq('/api/organizations', 'PATCH', { activeOrgId: ctx.orgId }),
-            )
-          ).status,
+          (await PATCH(sessionJsonReq('/api/organizations', 'PATCH', { activeOrgId: ctx.orgId })))
+            .status,
         ).toBe(429)
       })
 
@@ -1209,9 +1236,12 @@ describe.sequential('route-logic remaining coverage', () => {
         name: 'lifecycle-event-types/[id] GET',
         run: async () => {
           const { GET } = await import('@/lib/route-logic/lifecycle-event-types/[id]')
-          return GET(orgJsonReq(`/api/lifecycle-event-types/${ctx.fixtures.lifecycleEventTypeId}`, 'GET'), {
-            params: { id: ctx.fixtures.lifecycleEventTypeId },
-          })
+          return GET(
+            orgJsonReq(`/api/lifecycle-event-types/${ctx.fixtures.lifecycleEventTypeId}`, 'GET'),
+            {
+              params: { id: ctx.fixtures.lifecycleEventTypeId },
+            },
+          )
         },
       },
       {
@@ -1246,10 +1276,9 @@ describe.sequential('route-logic remaining coverage', () => {
         name: 'trash restore POST',
         run: async () => {
           const { POST } = await import('@/lib/route-logic/trash/[kind]/[id]/restore')
-          return POST(
-            orgJsonReq(`/api/trash/task/${ctx.fixtures.taskId}/restore`, 'POST', {}),
-            { params: { kind: 'task', id: ctx.fixtures.taskId } },
-          )
+          return POST(orgJsonReq(`/api/trash/task/${ctx.fixtures.taskId}/restore`, 'POST', {}), {
+            params: { kind: 'task', id: ctx.fixtures.taskId },
+          })
         },
       },
       {
@@ -1290,12 +1319,16 @@ describe.sequential('route-logic remaining coverage', () => {
         run: async () => {
           const { PUT } = await import('@/lib/route-logic/families/[id]/members/[memberId]')
           return PUT(
-            orgJsonReq(`/api/families/${ctx.fixtures.familyId}/members/${ctx.fixtures.memberId}`, 'PUT', {
-              firstName: 'RL',
-              lastName: 'Member',
-              birthDate: '2010-01-01',
-              gender: 'male',
-            }),
+            orgJsonReq(
+              `/api/families/${ctx.fixtures.familyId}/members/${ctx.fixtures.memberId}`,
+              'PUT',
+              {
+                firstName: 'RL',
+                lastName: 'Member',
+                birthDate: '2010-01-01',
+                gender: 'male',
+              },
+            ),
             { params: { id: ctx.fixtures.familyId, memberId: ctx.fixtures.memberId } },
           )
         },
@@ -1303,9 +1336,8 @@ describe.sequential('route-logic remaining coverage', () => {
       {
         name: 'convert-to-family POST',
         run: async () => {
-          const { POST } = await import(
-            '@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family'
-          )
+          const { POST } =
+            await import('@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family')
           return POST(
             orgJsonReq(
               `/api/families/${ctx.fixtures.familyId}/members/${ctx.fixtures.memberId}/convert-to-family`,
@@ -1318,11 +1350,14 @@ describe.sequential('route-logic remaining coverage', () => {
       },
     ]
 
-    it.each(moreCases.map((c) => [c.name, c.run] as const))('%s returns 429', async (_name, run) => {
-      bindSession(ctx)
-      await withRateLimitBlocked(async () => {
-        expect((await run()).status).toBe(429)
-      })
-    })
+    it.each(moreCases.map((c) => [c.name, c.run] as const))(
+      '%s returns 429',
+      async (_name, run) => {
+        bindSession(ctx)
+        await withRateLimitBlocked(async () => {
+          expect((await run()).status).toBe(429)
+        })
+      },
+    )
   })
 })

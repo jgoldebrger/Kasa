@@ -4,10 +4,16 @@ import { handler } from '@/lib/api/handler'
 import { task as taskSchemas } from '@/lib/schemas'
 import { softDeleteOne } from '@/lib/recycle-bin'
 import { assertRelatedScoped } from '@/lib/route-logic/tasks'
-import { PAYMENT_PUBLIC_SELECT } from '@/lib/payments/select'
+import { PAYMENT_PUBLIC_SELECT, serializePaymentPublic } from '@/lib/payments/select'
 import { checkRateLimit } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
+
+function sanitizeTaskPayment<T>(task: T): T {
+  const payment = (task as { relatedPaymentId?: unknown }).relatedPaymentId
+  if (!payment || typeof payment !== 'object' || Array.isArray(payment)) return task
+  return { ...task, relatedPaymentId: serializePaymentPublic(payment) }
+}
 
 // GET /api/tasks/[id]
 export const GET = handler({
@@ -46,9 +52,10 @@ export const GET = handler({
         path: 'relatedPaymentId',
         select: PAYMENT_PUBLIC_SELECT,
         match: { organizationId: ctx!.organizationId },
-      }).lean()
+      })
+      .lean()
     if (!task) return { status: 404, data: { error: 'Task not found' } }
-    return { data: task }
+    return { data: sanitizeTaskPayment(task) }
   },
 })
 
@@ -136,7 +143,7 @@ export const PUT = handler({
       .lean()
 
     if (!task) return { status: 404, data: { error: 'Task not found' } }
-    return { data: task }
+    return { data: sanitizeTaskPayment(task) }
   },
 })
 

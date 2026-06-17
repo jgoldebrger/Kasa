@@ -12,6 +12,7 @@
 
 import pino from 'pino'
 import * as Sentry from '@sentry/nextjs'
+import { scrubSentryData } from './sentry-scrub'
 
 const isProd = process.env.NODE_ENV === 'production'
 const isTest = process.env.NODE_ENV === 'test'
@@ -60,6 +61,6 @@ export function logError(
   const { tags, ...rest } = context || {}
   base.error({ err, ...rest }, (err as Error)?.message || 'error')
   if (isProd && process.env.SENTRY_DSN) {
-    Sentry.captureException(err, { tags, extra: rest })
+    Sentry.captureException(err, { tags, extra: scrubSentryData(rest) as Bindings })
   }
 }

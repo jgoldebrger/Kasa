@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   chargeSavedCardBody,
+  confirmPaymentBody,
+  createPaymentIntentBody,
   paymentBody,
   paymentPlanBody,
   paymentPlanUpdateBody,
   paymentUpdateBody,
+  savePaymentMethodBody,
   withdrawalBody,
 } from './payment'
 
@@ -157,6 +160,56 @@ describe('payment schemas', () => {
         paymentDate: '2025-03-01',
         memberId: VALID_OID,
         paymentFrequency: 'one-time',
+      })
+      expect(result.success).toBe(true)
+    })
+  })
+
+  describe('savePaymentMethodBody', () => {
+    it('accepts valid stripe ids', () => {
+      const result = savePaymentMethodBody.safeParse({
+        paymentMethodId: 'pm_abc123',
+        paymentIntentId: 'pi_xyz789',
+        setAsDefault: true,
+      })
+      expect(result.success).toBe(true)
+    })
+
+    it('rejects invalid payment method id', () => {
+      expect(
+        savePaymentMethodBody.safeParse({
+          paymentMethodId: 'bad',
+          paymentIntentId: 'pi_xyz789',
+        }).success,
+      ).toBe(false)
+    })
+  })
+
+  describe('createPaymentIntentBody', () => {
+    it('accepts a valid payload', () => {
+      const result = createPaymentIntentBody.safeParse({
+        familyId: VALID_OID,
+        amount: 100,
+      })
+      expect(result.success).toBe(true)
+    })
+
+    it('rejects amounts above the cap', () => {
+      expect(
+        createPaymentIntentBody.safeParse({
+          familyId: VALID_OID,
+          amount: 100_001,
+        }).success,
+      ).toBe(false)
+    })
+  })
+
+  describe('confirmPaymentBody', () => {
+    it('accepts will_be_saved sentinel', () => {
+      const result = confirmPaymentBody.safeParse({
+        paymentIntentId: 'pi_abc123',
+        familyId: VALID_OID,
+        savedPaymentMethodId: 'will_be_saved',
       })
       expect(result.success).toBe(true)
     })

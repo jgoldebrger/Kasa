@@ -18,7 +18,7 @@ import { handler } from '@/lib/api/handler'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { User, Organization } from '@/lib/models'
-import { encrypt, decrypt } from '@/lib/encryption'
+import { encrypt, decryptTwoFactorSecret } from '@/lib/encryption'
 import { audit } from '@/lib/audit'
 import { checkRateLimit } from '@/lib/rate-limit'
 import {
@@ -28,18 +28,17 @@ import {
   verifyTotpStep,
 } from '@/lib/totp'
 
-const body = z
-  .object({
-    // Always required: confirms the current account password before any
-    // 2FA secret is minted. Without this, a stolen session cookie could
-    // start a 2FA enrollment that locks the real user out of their
-    // account.
-    password: z.string().min(1).max(200),
-    // Required only when 2FA is already enabled (re-enrollment must
-    // prove possession of the *current* second factor). Ignored on the
-    // first-time enrollment path.
-    code: z.string().trim().min(6).max(20).optional(),
-  })
+const body = z.object({
+  // Always required: confirms the current account password before any
+  // 2FA secret is minted. Without this, a stolen session cookie could
+  // start a 2FA enrollment that locks the real user out of their
+  // account.
+  password: z.string().min(1).max(200),
+  // Required only when 2FA is already enabled (re-enrollment must
+  // prove possession of the *current* second factor). Ignored on the
+  // first-time enrollment path.
+  code: z.string().trim().min(6).max(20).optional(),
+})
 
 export const POST = handler({
   auth: 'session',
@@ -115,7 +114,7 @@ export const POST = handler({
       let factorOk = false
       if (/^\d{6}$/.test(trimmed) && user.twoFactorSecret) {
         try {
-          const secret = decrypt(user.twoFactorSecret)
+          const secret = decryptTwoFactorSecret(user.twoFactorSecret)
           const step = verifyTotpStep(secret, trimmed)
           if (step !== null) {
             const claim = await User.updateOne(
@@ -145,20 +144,20 @@ export const POST = handler({
         // *this* request is the one that removed it). Two concurrent
         // re-enroll attempts can't both consume the same backup code.
         if (normalized.length >= 9) {
-        for (const hash of user.twoFactorBackupCodes) {
-          // eslint-disable-next-line no-await-in-loop
-          if (await bcrypt.compare(normalized, hash)) {
+          for (const hash of user.twoFactorBackupCodes) {
             // eslint-disable-next-line no-await-in-loop
-            const res = await User.updateOne(
-              { _id: user._id, twoFactorBackupCodes: hash },
-              { $pull: { twoFactorBackupCodes: hash } },
-            )
-            if (res.modifiedCount === 1) {
-              factorOk = true
+            if (await bcrypt.compare(normalized, hash)) {
+              // eslint-disable-next-line no-await-in-loop
+              const res = await User.updateOne(
+                { _id: user._id, twoFactorBackupCodes: hash },
+                { $pull: { twoFactorBackupCodes: hash } },
+              )
+              if (res.modifiedCount === 1) {
+                factorOk = true
+              }
+              break
             }
-            break
           }
-        }
         }
       }
       if (!factorOk) {
@@ -198,8 +197,7 @@ export const POST = handler({
       // longer belongs to.
       const memberships = (session as any)?.user?.memberships
       const isMember =
-        Array.isArray(memberships) &&
-        memberships.some((m: any) => String(m.o) === orgIdForLabel)
+        Array.isArray(memberships) && memberships.some((m: any) => String(m.o) === orgIdForLabel)
       if (isMember) {
         const org = await Organization.findById(orgIdForLabel)
           .select('name')

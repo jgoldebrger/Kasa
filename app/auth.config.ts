@@ -18,9 +18,6 @@ const PUBLIC_API_PREFIXES = [
   '/api/health',
   '/api/auth',
   '/api/auth/request-invite',
-  // Cron-triggered chunked job routes. Handlers also verify via
-  // `isCronRequest()`; this prefix skips session auth so cron can reach them.
-  '/api/jobs',
   // Stripe webhook is authenticated by HMAC signature (`stripe-signature`
   // header verified against `STRIPE_WEBHOOK_SECRET` inside the handler).
   // Stripe will never carry a session cookie; without this allow-list
@@ -28,6 +25,20 @@ const PUBLIC_API_PREFIXES = [
   // never reach the handler.
   '/api/stripe/webhook',
 ]
+
+/** API routes that may bypass session auth when `CRON_SECRET` matches. Handlers re-verify. */
+export const CRON_API_PREFIXES = [
+  '/api/jobs',
+  '/api/statements/auto-generate',
+  '/api/statements/send-monthly-emails',
+  '/api/statements/send-emails/worker',
+  '/api/recurring-payments/process',
+  '/api/tax-receipts/email/worker',
+]
+
+function isCronApiPath(path: string): boolean {
+  return CRON_API_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))
+}
 
 /**
  * Edge-safe NextAuth config used by middleware. Providers that require
@@ -62,16 +73,21 @@ export default {
         return true
       }
 
-      // Valid cron secret bypasses session auth for cron-callable routes
-      // (e.g. those using `requireOrgOrCron`). Invalid secrets fall through
-      // to the unauthenticated 401 below — no header-presence bypass.
-      if (path.startsWith('/api/') && isCronRequest(request)) {
+      // Cron secret only bypasses session auth on explicitly allow-listed routes.
+      // Invalid secrets fall through to the unauthenticated 401 below.
+      if (isCronApiPath(path) && isCronRequest(request)) {
         return true
       }
 
       // Public pages
       if (PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`))) {
-        if (isLoggedIn && (path === '/login' || path === '/signup' || path === '/welcome' || path === '/request-invite')) {
+        if (
+          isLoggedIn &&
+          (path === '/login' ||
+            path === '/signup' ||
+            path === '/welcome' ||
+            path === '/request-invite')
+        ) {
           return Response.redirect(new URL('/', nextUrl))
         }
         return true
@@ -90,10 +106,10 @@ export default {
       // can handle it cleanly. For pages, let NextAuth do its default
       // redirect to the signIn page.
       if (path.startsWith('/api/')) {
-        return new Response(
-          JSON.stringify({ error: 'Authentication required' }),
-          { status: 401, headers: { 'content-type': 'application/json' } }
-        )
+        return new Response(JSON.stringify({ error: 'Authentication required' }), {
+          status: 401,
+          headers: { 'content-type': 'application/json' },
+        })
       }
 
       return false

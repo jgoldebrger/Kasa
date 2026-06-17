@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { Types } from 'mongoose'
 import { handler } from '@/lib/api/handler'
 import { Family, RecurringPayment } from '@/lib/models'
 import { buildIdempotencyKey, resolveStripeCurrency, toMinorUnits } from '@/lib/money'
@@ -8,6 +7,7 @@ import { sanitizeStripeErrorMessage } from '@/lib/payments/sanitize'
 import { enforceMemberChargeGate } from '@/lib/billing/feature-gate'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
+import { payment as paymentSchemas } from '@/lib/schemas'
 import Stripe from 'stripe'
 import https from 'https'
 
@@ -34,26 +34,31 @@ if (process.env.STRIPE_SECRET_KEY) {
   }
 }
 
-// Upper bound on chargeable amount to bound the blast radius of a runaway
-// request. Per-currency cap; KASA does not do FX conversions.
-const MAX_CHARGE = 100_000
-
 export const POST = handler({
   auth: 'org',
   minRole: 'admin',
+  body: paymentSchemas.createPaymentIntentBody,
   name: 'POST /api/stripe/create-payment-intent',
-  fn: async ({ ctx, request }) => {
+  fn: async ({ ctx, body, request }) => {
     if (!stripe) {
       return NextResponse.json(
-        { error: 'Stripe is not configured. Please check server environment variables and restart the server.' },
-        { status: 500 }
+        {
+          error:
+            'Stripe is not configured. Please check server environment variables and restart the server.',
+        },
+        { status: 500 },
       )
     }
 
-    const rateVerdict = await checkRateLimit(request, 'stripe-create-pi', {
-      limit: 30,
-      windowMs: 60_000,
-    }, ctx!.organizationId)
+    const rateVerdict = await checkRateLimit(
+      request,
+      'stripe-create-pi',
+      {
+        limit: 30,
+        windowMs: 60_000,
+      },
+      ctx!.organizationId,
+    )
     if (!rateVerdict.allowed) {
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
     }
@@ -63,30 +68,11 @@ export const POST = handler({
       return NextResponse.json({ error: billingGate.error }, { status: billingGate.status })
     }
 
-    const body = await request.json().catch(() => null)
-    if (!body || typeof body !== 'object' || Array.isArray(body)) {
-      return NextResponse.json({ error: 'Request body required' }, { status: 400 })
-    }
     const { amount, familyId, description, idempotencyHint } = body
 
-    if (!familyId) {
-      return NextResponse.json({ error: 'familyId is required' }, { status: 400 })
-    }
-    if (!Types.ObjectId.isValid(familyId)) {
-      return NextResponse.json({ error: 'Invalid familyId' }, { status: 400 })
-    }
-
-    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
-      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 })
-    }
-    if (amount > MAX_CHARGE) {
-      return NextResponse.json(
-        { error: `Amount exceeds maximum of ${MAX_CHARGE.toLocaleString()}` },
-        { status: 400 }
-      )
-    }
-
-    const fam = await Family.findOne({ _id: familyId, organizationId: ctx!.organizationId }).select('_id')
+    const fam = await Family.findOne({ _id: familyId, organizationId: ctx!.organizationId }).select(
+      '_id',
+    )
     if (!fam) {
       return NextResponse.json({ error: 'Family not found' }, { status: 404 })
     }

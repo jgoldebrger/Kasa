@@ -60,11 +60,7 @@ const themeBootstrapScript = `
 })();
 `
 
-export default async function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Memoized via React cache(): if any nested server component also resolves
   // the session this request, both calls share a single NextAuth invocation.
   const session = await getCachedAuth()
@@ -76,7 +72,7 @@ export default async function RootLayout({
   // CSP (script-src 'self' 'nonce-<x>' 'strict-dynamic') doesn't block
   // it. In dev / API routes the middleware skips CSP and the header is
   // absent — the script just runs without a nonce, which is fine.
-  const nonce = headers().get('x-nonce') ?? undefined
+  const nonce = (await headers()).get('x-nonce') ?? undefined
 
   // Derive the initial <html lang/dir> server-side so SSR matches the
   // first client render (and crawlers / screen readers see the right
@@ -89,8 +85,8 @@ export default async function RootLayout({
   // misleading lang tag doesn't show up.
   const SUPPORTED_LOCALES_SERVER = ['en-US', 'en-GB', 'he-IL', 'yi', 'fr-FR', 'es-MX']
   const RTL_LOCALES_SERVER = ['he-IL', 'yi']
-  const cookieLocale = cookies().get('kasa-locale')?.value
-  const acceptLang = headers().get('accept-language') || ''
+  const cookieLocale = (await cookies()).get('kasa-locale')?.value
+  const acceptLang = (await headers()).get('accept-language') || ''
   const headerLocale = acceptLang.split(',')[0]?.trim()
   const initialLocale =
     (cookieLocale && SUPPORTED_LOCALES_SERVER.includes(cookieLocale) && cookieLocale) ||
@@ -99,12 +95,7 @@ export default async function RootLayout({
   const initialDir = RTL_LOCALES_SERVER.includes(initialLocale) ? 'rtl' : 'ltr'
 
   return (
-    <html
-      lang={initialLocale}
-      dir={initialDir}
-      className={inter.variable}
-      suppressHydrationWarning
-    >
+    <html lang={initialLocale} dir={initialDir} className={inter.variable} suppressHydrationWarning>
       <head>
         {/*
           Preconnect to Stripe origins. The payment form is dynamically

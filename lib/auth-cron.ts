@@ -8,17 +8,14 @@ export { isCronRequest } from '@/lib/auth-cron-verify'
 /**
  * Variant of `requireOrg` that also accepts a trusted cron call.
  *
- * - If the request carries a valid cron secret AND an `organizationId`
- *   query param, we synthesize a minimal OrgContext for that org (no
- *   user, role implicitly 'owner' for authorization purposes).
- * - Otherwise we fall back to the normal `requireOrg` session check.
- *
- * This lets the same endpoint serve both a logged-in admin clicking
- * a button AND a scheduled cron POST.
+ * - Cron callers get a synthetic OrgContext (`isCron: true`, `role: 'member'`)
+ *   scoped to `?organizationId=<id>`. This is NOT owner/admin — only routes
+ *   with `auth: 'org-or-cron'` or `auth: 'cron'` may accept cron auth.
+ * - Session callers use normal `requireOrg` (including minRole + DB checks).
  */
 export async function requireOrgOrCron(
   request: NextRequest,
-  options: { minRole?: Role } = {}
+  options: { minRole?: Role } = {},
 ): Promise<OrgContext | NextResponse> {
   if (isCronRequest(request)) {
     const url = new URL(request.url)
@@ -26,7 +23,7 @@ export async function requireOrgOrCron(
     if (!orgId || !Types.ObjectId.isValid(orgId)) {
       return NextResponse.json(
         { error: 'Cron call requires ?organizationId=<id>' },
-        { status: 400 }
+        { status: 400 },
       )
     }
     return {
@@ -35,7 +32,8 @@ export async function requireOrgOrCron(
       },
       userId: 'cron',
       organizationId: orgId,
-      role: 'owner',
+      role: 'member',
+      isCron: true,
     }
   }
 

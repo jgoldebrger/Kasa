@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { requireServerOrgContext } from '@/lib/auth-server'
 import connectDB from '@/lib/database'
 import { Payment } from '@/lib/models'
-import { PAYMENT_PUBLIC_SELECT } from '@/lib/payments/select'
+import { PAYMENT_PUBLIC_SELECT, serializePaymentsPublic } from '@/lib/payments/select'
 import { PAYMENTS_LIST_PAGE_SIZE } from '@/lib/client/payments-list'
 import { encodeCompoundCursor } from '@/lib/pagination'
 import { serializeForRsc } from '@/lib/serialize-rsc'
@@ -34,7 +34,7 @@ async function fetchInitialPayments(organizationId: string) {
   }
 
   return {
-    items: items.map((r) => serializeForRsc(r)),
+    items: serializePaymentsPublic(items).map((r) => serializeForRsc(r)),
     nextCursor,
   }
 }

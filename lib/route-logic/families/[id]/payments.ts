@@ -5,13 +5,14 @@ import { handler } from '@/lib/api/handler'
 import { z } from 'zod'
 import { isoDate, moneyAmount, objectId, optionalString, yearParam } from '@/lib/schemas'
 import { getYearInTimeZone } from '@/lib/date-utils'
-import { PAYMENT_PUBLIC_SELECT } from '@/lib/payments/select'
+import {
+  PAYMENT_PUBLIC_SELECT,
+  serializePaymentPublic,
+  serializePaymentsPublic,
+} from '@/lib/payments/select'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { scheduleYearlyCalculationRefresh } from '@/lib/calculations'
-import {
-  familyLedgerListQuery,
-  listFamilyLedger,
-} from '@/lib/family-ledger-list'
+import { familyLedgerListQuery, listFamilyLedger } from '@/lib/family-ledger-list'
 
 const LEDGER_CACHE_HEADERS = {
   'Cache-Control': 'private, max-age=15, stale-while-revalidate=60',
@@ -68,7 +69,7 @@ export const GET = handler({
         }),
         effectiveQuery,
       )
-      return { data, headers: LEDGER_CACHE_HEADERS }
+      return { data: serializePaymentsPublic(data as any[]), headers: LEDGER_CACHE_HEADERS }
     } catch (err) {
       if (err instanceof Error && err.message === 'Invalid cursor') {
         return { status: 400, data: { error: 'Invalid cursor' } }
@@ -86,7 +87,10 @@ const createBody = z.object({
   paymentMethod: z.enum(['cash', 'credit_card', 'check', 'quick_pay']).optional(),
   ccInfo: z
     .object({
-      last4: z.string().regex(/^\d{4}$/).optional(),
+      last4: z
+        .string()
+        .regex(/^\d{4}$/)
+        .optional(),
       cardType: optionalString(40),
       expiryMonth: optionalString(2),
       expiryYear: optionalString(4),
@@ -200,9 +204,16 @@ export const POST = handler({
 
     scheduleYearlyCalculationRefresh(body.year, ctx!.organizationId)
 
-    return { status: 201, data: await Payment.findOne({
-      _id: payment._id,
-      organizationId: ctx!.organizationId,
-    }).select(PAYMENT_PUBLIC_SELECT).lean() }
+    return {
+      status: 201,
+      data: serializePaymentPublic(
+        (await Payment.findOne({
+          _id: payment._id,
+          organizationId: ctx!.organizationId,
+        })
+          .select(PAYMENT_PUBLIC_SELECT)
+          .lean())!,
+      ),
+    }
   },
 })

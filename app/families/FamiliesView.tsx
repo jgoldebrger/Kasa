@@ -40,33 +40,7 @@ import {
   type SortDir,
 } from '@/app/components/ui'
 import TaskFormModal from '@/app/components/tasks/TaskFormModal'
-
-// QWERTY to Hebrew keyboard mapping
-const qwertyToHebrew: { [key: string]: string } = {
-  q: '/', w: "'", e: 'ק', r: 'ר', t: 'א', y: 'ט', u: 'ו', i: 'ן', o: 'ם', p: 'פ',
-  a: 'ש', s: 'ד', d: 'ג', f: 'כ', g: 'ע', h: 'י', j: 'ח', k: 'ל', l: 'ך',
-  z: 'ז', x: 'ס', c: 'ב', v: 'ה', b: 'נ', n: 'מ', m: 'צ',
-  Q: '/', W: "'", E: 'ק', R: 'ר', T: 'א', Y: 'ט', U: 'ו', I: 'ן', O: 'ם', P: 'פ',
-  A: 'ש', S: 'ד', D: 'ג', F: 'כ', G: 'ע', H: 'י', J: 'ח', K: 'ל', L: 'ך',
-  Z: 'ז', X: 'ס', C: 'ב', V: 'ה', B: 'נ', N: 'מ', M: 'צ',
-  '1': '1', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8', '9': '9', '0': '0',
-  '-': '-', '=': '=', '[': ']', ']': '[', '\\': '\\', ';': 'ף', "'": ',', ',': 'ת', '.': 'ץ', '/': '.',
-  ' ': ' ',
-}
-
-const handleHebrewInput = (e: React.KeyboardEvent<HTMLInputElement>, currentValue: string, setValue: (value: string) => void) => {
-  const input = e.currentTarget
-  const cursorPosition = input.selectionStart || 0
-  if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    e.preventDefault()
-    const hebrewChar = qwertyToHebrew[e.key] || e.key
-    const newValue = currentValue.slice(0, cursorPosition) + hebrewChar + currentValue.slice(cursorPosition)
-    setValue(newValue)
-    setTimeout(() => {
-      input.setSelectionRange(cursorPosition + 1, cursorPosition + 1)
-    }, 0)
-  }
-}
+import { handleHebrewInput } from '@/lib/client/hebrew-input'
 
 const capitalizeName = (text: string): string => {
   if (!text) return text
@@ -297,26 +271,29 @@ export default function FamiliesView({
     }
   }, [nextCursor, begin, isStale, mergeAdminBalances, toast, t])
 
-  const fetchPaymentPlans = useCallback(async (opts?: { force?: boolean }) => {
-    const gen = begin()
-    try {
-      const data = await cachedFetch<any>('/api/payment-plans', {
-        ttl: 60_000,
-        bypass: opts?.force,
-        ...(opts?.force ? { cache: 'no-store' as RequestCache } : {}),
-      })
-      if (isStale(gen)) return
-      if (Array.isArray(data)) setPaymentPlans(data)
-    } catch {
-      // Don't toast on transient failures here — payment plans are
-      // referenced read-mostly across the page, and a temporary blip
-      // already manifests as "Unknown Plan" cells. We deliberately
-      // don't clear the existing list either: if we had plans last
-      // render, keep them visible until the next successful refresh.
-      // The mutation paths (Add/Edit Family) re-fetch explicitly via
-      // `{ force: true }` so they'll surface failures there.
-    }
-  }, [begin, isStale])
+  const fetchPaymentPlans = useCallback(
+    async (opts?: { force?: boolean }) => {
+      const gen = begin()
+      try {
+        const data = await cachedFetch<any>('/api/payment-plans', {
+          ttl: 60_000,
+          bypass: opts?.force,
+          ...(opts?.force ? { cache: 'no-store' as RequestCache } : {}),
+        })
+        if (isStale(gen)) return
+        if (Array.isArray(data)) setPaymentPlans(data)
+      } catch {
+        // Don't toast on transient failures here — payment plans are
+        // referenced read-mostly across the page, and a temporary blip
+        // already manifests as "Unknown Plan" cells. We deliberately
+        // don't clear the existing list either: if we had plans last
+        // render, keep them visible until the next successful refresh.
+        // The mutation paths (Add/Edit Family) re-fetch explicitly via
+        // `{ force: true }` so they'll surface failures there.
+      }
+    },
+    [begin, isStale],
+  )
 
   useEffect(() => {
     if (hasFetchedFamiliesRef.current) return
@@ -330,19 +307,21 @@ export default function FamiliesView({
     fetchPaymentPlans()
   }, [fetchPaymentPlans])
 
-  useOrgChanged(useCallback(() => {
-    invalidate()
-    hasFetchedFamiliesRef.current = false
-    hasFetchedPlansRef.current = false
-    setFamilies([])
-    setNextCursor(null)
-    setPaymentPlans([])
-    setSelectedIds(new Set())
-    setLoadError(false)
-    setLoading(true)
-    fetchFamilies()
-    fetchPaymentPlans({ force: true })
-  }, [fetchFamilies, fetchPaymentPlans, invalidate]))
+  useOrgChanged(
+    useCallback(() => {
+      invalidate()
+      hasFetchedFamiliesRef.current = false
+      hasFetchedPlansRef.current = false
+      setFamilies([])
+      setNextCursor(null)
+      setPaymentPlans([])
+      setSelectedIds(new Set())
+      setLoadError(false)
+      setLoading(true)
+      fetchFamilies()
+      fetchPaymentPlans({ force: true })
+    }, [fetchFamilies, fetchPaymentPlans, invalidate]),
+  )
 
   const getPlanNameById = useCallback(
     (planId?: string, currentPlan?: number): string => {
@@ -575,7 +554,10 @@ export default function FamiliesView({
     const ok = await confirm({
       title: t('families.bulkDeleteTitle')
         .replace('{count}', String(ids.length))
-        .replace('{unit}', ids.length === 1 ? t('families.familyUnit') : t('families.familiesUnit')),
+        .replace(
+          '{unit}',
+          ids.length === 1 ? t('families.familyUnit') : t('families.familiesUnit'),
+        ),
       message: t('families.bulkDeleteMessage'),
       confirmLabel: t('common.delete'),
       destructive: true,
@@ -594,7 +576,9 @@ export default function FamiliesView({
         toast.error(data.error || t('families.error.bulkDelete'))
         return
       }
-      toast.success(t('families.success.bulkDeleted').replace('{count}', String(data.modified || ids.length)))
+      toast.success(
+        t('families.success.bulkDeleted').replace('{count}', String(data.modified || ids.length)),
+      )
       clearSelection()
       invalidateCache(/^\/api\/families/)
       fetchFamilies()
@@ -625,7 +609,9 @@ export default function FamiliesView({
         toast.error(data.error || t('families.error.bulkPlan'))
         return
       }
-      toast.success(t('families.success.bulkUpdated').replace('{count}', String(data.modified || ids.length)))
+      toast.success(
+        t('families.success.bulkUpdated').replace('{count}', String(data.modified || ids.length)),
+      )
       setShowBulkPlanModal(false)
       setBulkPlanValue('')
       clearSelection()
@@ -653,7 +639,9 @@ export default function FamiliesView({
         toast.error(data.error || t('families.error.bulkUpdate'))
         return
       }
-      toast.success(t('families.success.bulkUpdated').replace('{count}', String(data.modified || ids.length)))
+      toast.success(
+        t('families.success.bulkUpdated').replace('{count}', String(data.modified || ids.length)),
+      )
       clearSelection()
       invalidateCache(/^\/api\/families/)
       fetchFamilies()
@@ -673,16 +661,12 @@ export default function FamiliesView({
           aria-label={t('families.selectAll')}
           title={t('families.selectAll')}
           className="cursor-pointer"
-          checked={
-            sortedFamilies.length > 0 &&
-            sortedFamilies.every((f) => selectedIds.has(f._id))
-          }
+          checked={sortedFamilies.length > 0 && sortedFamilies.every((f) => selectedIds.has(f._id))}
           ref={(el) => {
             if (el) {
               const someSelected = sortedFamilies.some((f) => selectedIds.has(f._id))
               const allSelected =
-                sortedFamilies.length > 0 &&
-                sortedFamilies.every((f) => selectedIds.has(f._id))
+                sortedFamilies.length > 0 && sortedFamilies.every((f) => selectedIds.has(f._id))
               el.indeterminate = someSelected && !allSelected
             }
           }}
@@ -709,7 +693,10 @@ export default function FamiliesView({
       headerText: t('common.name'),
       sortable: true,
       cell: (f) => (
-        <Link href={`/families/${f._id}`} className="font-medium text-accent hover:text-accent-hover hover:underline focus-ring rounded">
+        <Link
+          href={`/families/${f._id}`}
+          className="font-medium text-accent hover:text-accent-hover hover:underline focus-ring rounded"
+        >
           {f.name}
         </Link>
       ),
@@ -755,7 +742,9 @@ export default function FamiliesView({
       headerText: t('family.plan'),
       sortable: true,
       hideBelow: 'lg',
-      cell: (f) => <span className="text-fg-muted">{getPlanNameById(f.paymentPlanId, f.currentPlan)}</span>,
+      cell: (f) => (
+        <span className="text-fg-muted">{getPlanNameById(f.paymentPlanId, f.currentPlan)}</span>
+      ),
       exportValue: (f) => getPlanNameById(f.paymentPlanId, f.currentPlan),
       filter: { type: 'select', getValue: (f) => getPlanNameById(f.paymentPlanId, f.currentPlan) },
     },
@@ -772,7 +761,11 @@ export default function FamiliesView({
       header: t('common.phone'),
       headerText: t('common.phone'),
       defaultHidden: true,
-      cell: (f) => <span className="text-fg-muted tabular">{f.phone || f.husbandCellPhone || f.wifeCellPhone || '—'}</span>,
+      cell: (f) => (
+        <span className="text-fg-muted tabular">
+          {f.phone || f.husbandCellPhone || f.wifeCellPhone || '—'}
+        </span>
+      ),
       exportValue: (f) => f.phone || f.husbandCellPhone || f.wifeCellPhone || '',
     },
     {
@@ -847,19 +840,19 @@ export default function FamiliesView({
           subtitle={t('families.subtitle')}
           actions={
             isAdmin ? (
-            <Button
-              leftIcon={<PlusIcon className="h-5 w-5" />}
-              onClick={() => {
-                setFormData(initialForm)
-                setEditingFamily(null)
-                setShowModal(true)
-                // Re-fetch plans on open in case a plan was created in
-                // another tab / on the Settings page after this page mounted.
-                void fetchPaymentPlans({ force: true })
-              }}
-            >
-              {t('families.addFamily')}
-            </Button>
+              <Button
+                leftIcon={<PlusIcon className="h-5 w-5" />}
+                onClick={() => {
+                  setFormData(initialForm)
+                  setEditingFamily(null)
+                  setShowModal(true)
+                  // Re-fetch plans on open in case a plan was created in
+                  // another tab / on the Settings page after this page mounted.
+                  void fetchPaymentPlans({ force: true })
+                }}
+              >
+                {t('families.addFamily')}
+              </Button>
             ) : undefined
           }
         />
@@ -904,12 +897,7 @@ export default function FamiliesView({
             >
               {t('families.optInEmail')}
             </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              disabled={bulkBusy}
-              onClick={handleBulkDelete}
-            >
+            <Button size="sm" variant="destructive" disabled={bulkBusy} onClick={handleBulkDelete}>
               {t('common.delete')}
             </Button>
           </div>
@@ -942,7 +930,11 @@ export default function FamiliesView({
               globalSearch={{ placeholder: t('families.searchPlaceholder') }}
               expandExportRows={nextCursor ? expandExportRows : undefined}
               exportExpanding={exportExpanding}
-              import={isAdmin ? { type: 'families' as const, onImported: () => fetchFamilies() } : undefined}
+              import={
+                isAdmin
+                  ? { type: 'families' as const, onImported: () => fetchFamilies() }
+                  : undefined
+              }
               mobileCard={(f) => (
                 <FamilyMobileCard
                   family={f}
@@ -988,7 +980,9 @@ export default function FamiliesView({
         <Modal
           open={showModal}
           onClose={resetFamilyModal}
-          title={editingFamily ? `${t('common.edit')} ${editingFamily.name}` : t('families.addFamily')}
+          title={
+            editingFamily ? `${t('common.edit')} ${editingFamily.name}` : t('families.addFamily')
+          }
           maxWidth="max-w-3xl"
         >
           <FamilyModalBody
@@ -1028,9 +1022,7 @@ export default function FamiliesView({
           maxWidth="max-w-md"
         >
           <div className="p-4 space-y-4">
-            <p className="text-sm text-fg-muted">
-              {t('families.bulkPlanDesc')}
-            </p>
+            <p className="text-sm text-fg-muted">{t('families.bulkPlanDesc')}</p>
             <select
               value={bulkPlanValue}
               onChange={(e) => setBulkPlanValue(e.target.value)}
@@ -1093,32 +1085,32 @@ function FamilyMobileCard({
           {family.name}
         </Link>
         {canMutate && (
-        <ActionMenu
-          ariaLabel={t('families.actionsFor').replace('{name}', family.name)}
-          items={[
-            {
-              label: t('families.addChild'),
-              icon: <UserPlusIcon className="h-4 w-4" />,
-              onClick: onAddChild,
-            },
-            {
-              label: t('families.addTask'),
-              icon: <ClipboardDocumentListIcon className="h-4 w-4" />,
-              onClick: onAddTask,
-            },
-            {
-              label: t('families.editFamily'),
-              icon: <PencilIcon className="h-4 w-4" />,
-              onClick: onEdit,
-            },
-            {
-              label: t('families.deleteFamily'),
-              icon: <TrashIcon className="h-4 w-4" />,
-              destructive: true,
-              onClick: onDelete,
-            },
-          ]}
-        />
+          <ActionMenu
+            ariaLabel={t('families.actionsFor').replace('{name}', family.name)}
+            items={[
+              {
+                label: t('families.addChild'),
+                icon: <UserPlusIcon className="h-4 w-4" />,
+                onClick: onAddChild,
+              },
+              {
+                label: t('families.addTask'),
+                icon: <ClipboardDocumentListIcon className="h-4 w-4" />,
+                onClick: onAddTask,
+              },
+              {
+                label: t('families.editFamily'),
+                icon: <PencilIcon className="h-4 w-4" />,
+                onClick: onEdit,
+              },
+              {
+                label: t('families.deleteFamily'),
+                icon: <TrashIcon className="h-4 w-4" />,
+                destructive: true,
+                onClick: onDelete,
+              },
+            ]}
+          />
         )}
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-fg">
@@ -1132,14 +1124,14 @@ function FamilyMobileCard({
         </div>
         {canMutate && (
           <>
-        <div>
-          <dt className="text-fg-muted">{t('family.plan')}</dt>
-          <dd className="truncate">{planName}</dd>
-        </div>
-        <div className="text-end">
-          <dt className="text-fg-muted">{t('family.balance')}</dt>
-          <dd className="font-semibold text-fg tabular">{formatMoney(family.openBalance)}</dd>
-        </div>
+            <div>
+              <dt className="text-fg-muted">{t('family.plan')}</dt>
+              <dd className="truncate">{planName}</dd>
+            </div>
+            <div className="text-end">
+              <dt className="text-fg-muted">{t('family.balance')}</dt>
+              <dd className="font-semibold text-fg tabular">{formatMoney(family.openBalance)}</dd>
+            </div>
           </>
         )}
       </dl>
@@ -1171,7 +1163,9 @@ function FamilyModalBody({
     <form onSubmit={onSubmit} className="space-y-4" noValidate>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.familyName')}</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">
+            {t('families.form.familyName')}
+          </label>
           <input
             type="text"
             required
@@ -1185,7 +1179,9 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.familyNameHebrew')}</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">
+            {t('families.form.familyNameHebrew')}
+          </label>
           <input
             type="text"
             required
@@ -1194,27 +1190,36 @@ function FamilyModalBody({
             inputMode="text"
             value={formData.hebrewName}
             onChange={(e) => setFormData({ ...formData, hebrewName: e.target.value })}
-            onKeyDown={(e) => handleHebrewInput(e, formData.hebrewName, (value) => setFormData({ ...formData, hebrewName: value }))}
+            onKeyDown={(e) =>
+              handleHebrewInput(e, formData.hebrewName, (value) =>
+                setFormData({ ...formData, hebrewName: value }),
+              )
+            }
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle text-right outline-none"
             placeholder="שם משפחה בעברית"
             style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.husbandFirstName')}</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">
+            {t('families.form.husbandFirstName')}
+          </label>
           <input
             type="text"
             autoComplete="given-name"
             value={formData.husbandFirstName}
             onChange={(e) => setFormData({ ...formData, husbandFirstName: e.target.value })}
             onBlur={(e) => {
-              if (e.target.value) setFormData({ ...formData, husbandFirstName: capitalizeName(e.target.value) })
+              if (e.target.value)
+                setFormData({ ...formData, husbandFirstName: capitalizeName(e.target.value) })
             }}
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.husbandFirstNameHebrew')}</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">
+            {t('families.form.husbandFirstNameHebrew')}
+          </label>
           <input
             type="text"
             required
@@ -1223,14 +1228,20 @@ function FamilyModalBody({
             inputMode="text"
             value={formData.husbandHebrewName}
             onChange={(e) => setFormData({ ...formData, husbandHebrewName: e.target.value })}
-            onKeyDown={(e) => handleHebrewInput(e, formData.husbandHebrewName, (value) => setFormData({ ...formData, husbandHebrewName: value }))}
+            onKeyDown={(e) =>
+              handleHebrewInput(e, formData.husbandHebrewName, (value) =>
+                setFormData({ ...formData, husbandHebrewName: value }),
+              )
+            }
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle text-right outline-none"
             placeholder="שם פרטי בעברית"
             style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.husbandFatherHebrew')}</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">
+            {t('families.form.husbandFatherHebrew')}
+          </label>
           <input
             type="text"
             dir="rtl"
@@ -1238,27 +1249,36 @@ function FamilyModalBody({
             inputMode="text"
             value={formData.husbandFatherHebrewName}
             onChange={(e) => setFormData({ ...formData, husbandFatherHebrewName: e.target.value })}
-            onKeyDown={(e) => handleHebrewInput(e, formData.husbandFatherHebrewName, (value) => setFormData({ ...formData, husbandFatherHebrewName: value }))}
+            onKeyDown={(e) =>
+              handleHebrewInput(e, formData.husbandFatherHebrewName, (value) =>
+                setFormData({ ...formData, husbandFatherHebrewName: value }),
+              )
+            }
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle text-right outline-none"
             placeholder="שם פרטי של האב בעברית"
             style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.wifeFirstName')}</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">
+            {t('families.form.wifeFirstName')}
+          </label>
           <input
             type="text"
             autoComplete="given-name"
             value={formData.wifeFirstName}
             onChange={(e) => setFormData({ ...formData, wifeFirstName: e.target.value })}
             onBlur={(e) => {
-              if (e.target.value) setFormData({ ...formData, wifeFirstName: capitalizeName(e.target.value) })
+              if (e.target.value)
+                setFormData({ ...formData, wifeFirstName: capitalizeName(e.target.value) })
             }}
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.wifeFirstNameHebrew')}</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">
+            {t('families.form.wifeFirstNameHebrew')}
+          </label>
           <input
             type="text"
             required
@@ -1267,14 +1287,20 @@ function FamilyModalBody({
             inputMode="text"
             value={formData.wifeHebrewName}
             onChange={(e) => setFormData({ ...formData, wifeHebrewName: e.target.value })}
-            onKeyDown={(e) => handleHebrewInput(e, formData.wifeHebrewName, (value) => setFormData({ ...formData, wifeHebrewName: value }))}
+            onKeyDown={(e) =>
+              handleHebrewInput(e, formData.wifeHebrewName, (value) =>
+                setFormData({ ...formData, wifeHebrewName: value }),
+              )
+            }
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle text-right outline-none"
             placeholder="שם פרטי בעברית"
             style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.wifeFatherHebrew')}</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">
+            {t('families.form.wifeFatherHebrew')}
+          </label>
           <input
             type="text"
             dir="rtl"
@@ -1282,38 +1308,52 @@ function FamilyModalBody({
             inputMode="text"
             value={formData.wifeFatherHebrewName}
             onChange={(e) => setFormData({ ...formData, wifeFatherHebrewName: e.target.value })}
-            onKeyDown={(e) => handleHebrewInput(e, formData.wifeFatherHebrewName, (value) => setFormData({ ...formData, wifeFatherHebrewName: value }))}
+            onKeyDown={(e) =>
+              handleHebrewInput(e, formData.wifeFatherHebrewName, (value) =>
+                setFormData({ ...formData, wifeFatherHebrewName: value }),
+              )
+            }
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle text-right outline-none"
             placeholder="שם פרטי של האב בעברית"
             style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.husbandCell')}</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">
+            {t('families.form.husbandCell')}
+          </label>
           <input
             type="tel"
             autoComplete="tel"
             value={formData.husbandCellPhone}
-            onChange={(e) => setFormData({ ...formData, husbandCellPhone: formatPhone(e.target.value) })}
+            onChange={(e) =>
+              setFormData({ ...formData, husbandCellPhone: formatPhone(e.target.value) })
+            }
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none"
             placeholder="1234567890"
             pattern="[0-9]*"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.wifeCell')}</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">
+            {t('families.form.wifeCell')}
+          </label>
           <input
             type="tel"
             autoComplete="tel"
             value={formData.wifeCellPhone}
-            onChange={(e) => setFormData({ ...formData, wifeCellPhone: formatPhone(e.target.value) })}
+            onChange={(e) =>
+              setFormData({ ...formData, wifeCellPhone: formatPhone(e.target.value) })
+            }
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none"
             placeholder="1234567890"
             pattern="[0-9]*"
           />
         </div>
         <div className="sm:col-span-2">
-          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.street')}</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">
+            {t('families.form.street')}
+          </label>
           <input
             type="text"
             autoComplete="street-address"
@@ -1323,7 +1363,9 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.city')}</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">
+            {t('families.form.city')}
+          </label>
           <input
             type="text"
             autoComplete="address-level2"
@@ -1333,7 +1375,9 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.state')}</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">
+            {t('families.form.state')}
+          </label>
           <input
             type="text"
             autoComplete="address-level1"
@@ -1343,7 +1387,9 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.zip')}</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">
+            {t('families.form.zip')}
+          </label>
           <input
             type="text"
             autoComplete="postal-code"
@@ -1394,7 +1440,9 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.weddingDate')}</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">
+            {t('families.form.weddingDate')}
+          </label>
           <input
             type="date"
             required
@@ -1404,7 +1452,9 @@ function FamilyModalBody({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">{t('families.form.paymentPlan')}</label>
+          <label className="block text-sm font-medium text-fg mb-1.5">
+            {t('families.form.paymentPlan')}
+          </label>
           <select
             required
             value={formData.paymentPlanId || ''}
@@ -1414,7 +1464,8 @@ function FamilyModalBody({
             <option value="">{t('families.form.selectPlan')}</option>
             {paymentPlans.map((plan) => (
               <option key={plan._id} value={plan._id}>
-                {plan.name} — {t('families.form.planYearly').replace('{price}', formatMoney(plan.yearlyPrice))}
+                {plan.name} —{' '}
+                {t('families.form.planYearly').replace('{price}', formatMoney(plan.yearlyPrice))}
               </option>
             ))}
           </select>

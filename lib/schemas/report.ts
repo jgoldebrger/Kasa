@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { isoDate, optionalString, trimmedName } from './common'
+import { isoDate, optionalString, trimmedName, objectId } from './common'
 
 const aggregate = z.enum(['count', 'sum', 'avg', 'min', 'max'])
 const source = z.enum(['payments', 'events', 'members', 'families'])
@@ -38,3 +38,8 @@ export const statementDateRangeBody = z
   .refine((d) => d.fromDate.getTime() <= d.toDate.getTime(), {
     message: 'fromDate must be on or before toDate',
   })
+
+export const taxReceiptEmailBody = z.object({
+  year: z.coerce.number().int().min(1900).max(2999),
+  familyIds: z.array(objectId).optional(),
+})

@@ -34,7 +34,7 @@ describe('audit (integration)', () => {
     expect(rows[0].resourceType).toBe('Invite')
     expect(String(rows[0].organizationId)).toBe('507f1f77bcf86cd799439011')
     expect(String(rows[0].userId)).toBe('507f1f77bcf86cd799439012')
-    expect(rows[0].metadata).toEqual({ email: 'member@example.com', role: 'admin' })
+    expect(rows[0].metadata).toEqual({ email: 'm***@example.com', role: 'admin' })
   })
 
   it('captures client IP from x-forwarded-for when TRUST_PROXY_HEADERS is true', async () => {
@@ -61,7 +61,9 @@ describe('audit (integration)', () => {
         request,
       })
 
-      const row = await AuditLog.findOne({ action: 'auth.login.failed' }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+      const row = (await AuditLog.findOne({ action: 'auth.login.failed' }).lean()) as
+        | import('@/lib/test/type-helpers').LeanDoc
+        | null
       expect(row).toBeTruthy()
       expect(row!.ip).toBe('203.0.113.50')
       expect(row!.userAgent).toBe('IntegrationTest/1.0')
@@ -96,7 +98,9 @@ describe('audit (integration)', () => {
         request,
       })
 
-      const row = await AuditLog.findOne({ action: 'auth.login.xff-empty' }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+      const row = (await AuditLog.findOne({ action: 'auth.login.xff-empty' }).lean()) as
+        | import('@/lib/test/type-helpers').LeanDoc
+        | null
       expect(row!.ip).toBe('198.51.100.20')
     } finally {
       if (prevTrust === undefined) delete process.env.TRUST_PROXY_HEADERS
@@ -126,7 +130,9 @@ describe('audit (integration)', () => {
         request,
       })
 
-      const row = await AuditLog.findOne({ action: 'auth.login.realip' }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+      const row = (await AuditLog.findOne({ action: 'auth.login.realip' }).lean()) as
+        | import('@/lib/test/type-helpers').LeanDoc
+        | null
       expect(row!.ip).toBe('198.51.100.10')
     } finally {
       if (prevTrust === undefined) delete process.env.TRUST_PROXY_HEADERS
@@ -156,7 +162,9 @@ describe('audit (integration)', () => {
         request,
       })
 
-      const row = await AuditLog.findOne({ action: 'auth.login.cf' }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+      const row = (await AuditLog.findOne({ action: 'auth.login.cf' }).lean()) as
+        | import('@/lib/test/type-helpers').LeanDoc
+        | null
       expect(row!.ip).toBe('203.0.113.77')
     } finally {
       if (prevTrust === undefined) delete process.env.TRUST_PROXY_HEADERS
@@ -186,7 +194,9 @@ describe('audit (integration)', () => {
         request,
       })
 
-      const row = await AuditLog.findOne({ action: 'auth.login.vercel' }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+      const row = (await AuditLog.findOne({ action: 'auth.login.vercel' }).lean()) as
+        | import('@/lib/test/type-helpers').LeanDoc
+        | null
       expect(row!.ip).toBe('203.0.113.88')
     } finally {
       if (prevTrust === undefined) delete process.env.TRUST_PROXY_HEADERS
@@ -199,7 +209,9 @@ describe('audit (integration)', () => {
   it('logs audit failures without throwing', async () => {
     const { audit } = await import('./audit')
     const models = await import('./models')
-    const createSpy = vi.spyOn(models.AuditLog, 'create').mockRejectedValueOnce(new Error('db down'))
+    const createSpy = vi
+      .spyOn(models.AuditLog, 'create')
+      .mockRejectedValueOnce(new Error('db down'))
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     await expect(
@@ -235,7 +247,9 @@ describe('audit (integration)', () => {
         request: new Request('https://example.com/api/login'),
       })
 
-      const row = await AuditLog.findOne({ action: 'auth.login.no-proxy-headers' }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+      const row = (await AuditLog.findOne({ action: 'auth.login.no-proxy-headers' }).lean()) as
+        | import('@/lib/test/type-helpers').LeanDoc
+        | null
       expect(row).toBeTruthy()
       expect(row!.ip).toBeUndefined()
     } finally {
@@ -266,7 +280,9 @@ describe('audit (integration)', () => {
         request,
       })
 
-      const row = await AuditLog.findOne({ action: 'auth.login.attempt' }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+      const row = (await AuditLog.findOne({ action: 'auth.login.attempt' }).lean()) as
+        | import('@/lib/test/type-helpers').LeanDoc
+        | null
       expect(row).toBeTruthy()
       expect(row!.ip).toBeUndefined()
     } finally {
