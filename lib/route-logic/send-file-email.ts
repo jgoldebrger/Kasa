@@ -44,7 +44,17 @@ export const POST = handler({
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    const formData = await request.formData()
+    const contentLength = Number(request.headers.get('content-length') || 0)
+    if (Number.isFinite(contentLength) && contentLength > MAX_ATTACHMENT_BYTES) {
+      return { status: 413, data: { error: 'Attachment exceeds 10 MB limit' } }
+    }
+
+    let formData: FormData
+    try {
+      formData = await request.formData()
+    } catch {
+      return { status: 413, data: { error: 'Attachment exceeds 10 MB limit' } }
+    }
     const file = formData.get('file') as File
     const to = ((formData.get('to') as string) || '').trim()
     const rawSubject = (formData.get('subject') as string) || 'File from Kasa Family Management'

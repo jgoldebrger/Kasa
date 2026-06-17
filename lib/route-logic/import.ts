@@ -1,5 +1,13 @@
 import { Types } from 'mongoose'
-import { Family, FamilyMember, Payment, LifecycleEventPayment, PaymentPlan, Organization, LifecycleEvent } from '@/lib/models'
+import {
+  Family,
+  FamilyMember,
+  Payment,
+  LifecycleEventPayment,
+  PaymentPlan,
+  Organization,
+  LifecycleEvent,
+} from '@/lib/models'
 import { audit } from '@/lib/audit'
 import { roundMoney } from '@/lib/money'
 import { getYearInTimeZone } from '@/lib/date-utils'
@@ -112,9 +120,7 @@ export function parseCSV(csvText: string): { headers: string[]; rows: string[][]
 // Helper function to parse XLSX. Reads the first worksheet, takes row 1 as
 // headers, and coerces every cell to a string so downstream importers work
 // against the same `{ headers, rows }` shape as `parseCSV`.
-async function parseXlsx(
-  buf: ArrayBuffer,
-): Promise<{ headers: string[]; rows: string[][] }> {
+async function parseXlsx(buf: ArrayBuffer): Promise<{ headers: string[]; rows: string[][] }> {
   const ExcelJS = (await import('exceljs')).default || (await import('exceljs'))
   /* v8 ignore start — Workbook()/load() lines are mis-attributed to the dynamic import above in merged v8 coverage */
   const wb = new ExcelJS.Workbook()
@@ -243,20 +249,49 @@ async function findFamilyByNameOrEmail(organizationId: string, name?: string, em
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024 // 10 MB (CSV or XLSX)
 const MAX_UPLOAD_ROWS = 20_000
 
+function uploadTooLargeResponse(maxBytes: number) {
+  return {
+    status: 413 as const,
+    data: { error: `File exceeds ${(maxBytes / 1024 / 1024).toFixed(0)} MB limit` },
+  }
+}
+
+function requestContentLength(request: Request): number | null {
+  const raw = request.headers.get('content-length')
+  if (!raw) return null
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
+}
+
 export const POST = handler({
   auth: 'org',
   minRole: 'admin',
   name: 'POST /api/import',
   fn: async ({ ctx, request }) => {
-    const rateVerdict = await checkRateLimit(request, 'import', {
-      limit: 10,
-      windowMs: 60 * 60_000,
-    }, ctx!.organizationId)
+    const rateVerdict = await checkRateLimit(
+      request,
+      'import',
+      {
+        limit: 10,
+        windowMs: 60 * 60_000,
+      },
+      ctx!.organizationId,
+    )
     if (!rateVerdict.allowed) {
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    const formData = await request.formData()
+    const contentLength = requestContentLength(request)
+    if (contentLength != null && contentLength > MAX_UPLOAD_BYTES) {
+      return uploadTooLargeResponse(MAX_UPLOAD_BYTES)
+    }
+
+    let formData: FormData
+    try {
+      formData = await request.formData()
+    } catch {
+      return uploadTooLargeResponse(MAX_UPLOAD_BYTES)
+    }
     const file = formData.get('file') as File
     const importType = formData.get('type') as string
     // Optional family/member binding: when present, every imported row is
@@ -271,10 +306,7 @@ export const POST = handler({
     }
 
     if (file.size > MAX_UPLOAD_BYTES) {
-      return {
-        status: 413,
-        data: { error: `File exceeds ${(MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(0)} MB limit` },
-      }
+      return uploadTooLargeResponse(MAX_UPLOAD_BYTES)
     }
 
     const fileCheck = validateImportFile(file)
@@ -299,9 +331,17 @@ export const POST = handler({
       filename.endsWith('.xlsx') ||
       file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
-    const { headers, rows } = isXlsx
-      ? await parseXlsx(await file.arrayBuffer())
-      : parseCSV(await file.text())
+    let headers: string[]
+    let rows: string[][]
+    try {
+      const parsed = isXlsx
+        ? await parseXlsx(await file.arrayBuffer())
+        : parseCSV(await file.text())
+      headers = parsed.headers
+      rows = parsed.rows
+    } catch {
+      return uploadTooLargeResponse(MAX_UPLOAD_BYTES)
+    }
 
     if (rows.length > MAX_UPLOAD_ROWS) {
       return {
@@ -315,7 +355,7 @@ export const POST = handler({
     }
 
     // Normalize headers
-    const normalizedHeaders = headers.map(h => normalizeColumnName(h))
+    const normalizedHeaders = headers.map((h) => normalizeColumnName(h))
     const headerMap: { [key: string]: number } = {}
     normalizedHeaders.forEach((h, i) => {
       headerMap[h] = i
@@ -335,7 +375,10 @@ export const POST = handler({
           data: { error: 'familyId binding is not supported for the families import type' },
         }
       }
-      const fam = await Family.findOne({ _id: boundFamilyId, organizationId: ctx!.organizationId }).select('_id')
+      const fam = await Family.findOne({
+        _id: boundFamilyId,
+        organizationId: ctx!.organizationId,
+      }).select('_id')
       if (!fam) {
         return { status: 404, data: { error: 'Bound family not found or not accessible' } }
       }
@@ -371,7 +414,14 @@ export const POST = handler({
         await importFamilies(ctx!.organizationId, rows, headerMap, imported, errors, warnings)
         break
       case 'members':
-        await importMembers(ctx!.organizationId, rows, headerMap, imported, errors, boundFamilyId || undefined)
+        await importMembers(
+          ctx!.organizationId,
+          rows,
+          headerMap,
+          imported,
+          errors,
+          boundFamilyId || undefined,
+        )
         break
       case 'payments':
         await importPayments(
@@ -437,7 +487,7 @@ async function importFamilies(
   headerMap: { [key: string]: number },
   imported: number[],
   errors: string[],
-  warnings: string[]
+  warnings: string[],
 ) {
   const getValue = (row: string[], field: string): string => {
     const index = headerMap[normalizeColumnName(field)]
@@ -487,7 +537,7 @@ async function importFamilies(
       let paymentPlanId = null
       const planIdStr = getValue(row, 'paymentPlanId')
       const planNumber = getValue(row, 'paymentPlanNumber') || getValue(row, 'planNumber')
-      
+
       if (planIdStr) {
         if (!Types.ObjectId.isValid(planIdStr)) {
           warnings.push(`Row ${i + 2}: Invalid paymentPlanId '${planIdStr}', ignoring`)
@@ -552,16 +602,16 @@ async function importFamilies(
         wifeCellPhone: getValue(row, 'wifeCellPhone') || undefined,
         paymentPlanId: paymentPlanId || undefined,
         currentPlan:
-          planNumber && Number.isFinite(parseInt(planNumber, 10))
-            ? parseInt(planNumber, 10)
-            : 1,
+          planNumber && Number.isFinite(parseInt(planNumber, 10)) ? parseInt(planNumber, 10) : 1,
         openBalance: 0,
       })
 
       familyCount += 1
       imported.push(i)
     } catch (error: any) {
-      errors.push(`Row ${i + 2}: ${sanitizeStripeErrorMessage(error.message) || 'Failed to import family'}`)
+      errors.push(
+        `Row ${i + 2}: ${sanitizeStripeErrorMessage(error.message) || 'Failed to import family'}`,
+      )
     }
   }
 }
@@ -605,7 +655,9 @@ async function importMembers(
           if (family) {
             resolvedId = family._id.toString()
           } else {
-            errors.push(`Row ${i + 2}: Family not found (name: ${familyName}, email: ${familyEmail})`)
+            errors.push(
+              `Row ${i + 2}: Family not found (name: ${familyName}, email: ${familyEmail})`,
+            )
             continue
           }
         } else if (resolvedId) {
@@ -641,7 +693,9 @@ async function importMembers(
 
       imported.push(i)
     } catch (error: any) {
-      errors.push(`Row ${i + 2}: ${sanitizeStripeErrorMessage(error.message) || 'Failed to import member'}`)
+      errors.push(
+        `Row ${i + 2}: ${sanitizeStripeErrorMessage(error.message) || 'Failed to import member'}`,
+      )
     }
   }
 }
@@ -691,7 +745,9 @@ async function importPayments(
           if (family) {
             resolvedId = family._id.toString()
           } else {
-            errors.push(`Row ${i + 2}: Family not found (name: ${familyName}, email: ${familyEmail})`)
+            errors.push(
+              `Row ${i + 2}: Family not found (name: ${familyName}, email: ${familyEmail})`,
+            )
             continue
           }
         } else if (resolvedId) {
@@ -753,7 +809,9 @@ async function importPayments(
         }
         refundedAmount = roundMoney(parsed)
         if (refundedAmount > amount) {
-          errors.push(`Row ${i + 2}: refundedAmount (${refundedRaw}) cannot exceed amount (${amountStr})`)
+          errors.push(
+            `Row ${i + 2}: refundedAmount (${refundedRaw}) cannot exceed amount (${amountStr})`,
+          )
           continue
         }
       }
@@ -774,7 +832,9 @@ async function importPayments(
       yearsToRefresh.add(year)
       imported.push(i)
     } catch (error: any) {
-      errors.push(`Row ${i + 2}: ${sanitizeStripeErrorMessage(error.message) || 'Failed to import payment'}`)
+      errors.push(
+        `Row ${i + 2}: ${sanitizeStripeErrorMessage(error.message) || 'Failed to import payment'}`,
+      )
     }
   }
 
@@ -854,7 +914,9 @@ async function importLifecycleEvents(
           if (family) {
             resolvedId = family._id.toString()
           } else {
-            errors.push(`Row ${i + 2}: Family not found (name: ${familyName}, email: ${familyEmail})`)
+            errors.push(
+              `Row ${i + 2}: Family not found (name: ${familyName}, email: ${familyEmail})`,
+            )
             continue
           }
         } else if (resolvedId) {
@@ -918,8 +980,9 @@ async function importLifecycleEvents(
 
       imported.push(i)
     } catch (error: any) {
-      errors.push(`Row ${i + 2}: ${sanitizeStripeErrorMessage(error.message) || 'Failed to import lifecycle event'}`)
+      errors.push(
+        `Row ${i + 2}: ${sanitizeStripeErrorMessage(error.message) || 'Failed to import lifecycle event'}`,
+      )
     }
   }
 }
-

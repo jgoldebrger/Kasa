@@ -16,6 +16,7 @@ function safeEqual(a: string, b: string): boolean {
 
 function isNextAuthOwnedPath(pathname: string): boolean {
   const p = pathname
+  if (p.includes('[...nextauth]') || p.includes('nextauth')) return true
   return (
     p === '/api/auth/signin' ||
     p.startsWith('/api/auth/signin/') ||

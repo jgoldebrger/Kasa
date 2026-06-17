@@ -33,8 +33,7 @@ export interface ApiRouteEntry {
 const METHOD_RE =
   /export\s+(?:async\s+function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)|const\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*=)/g
 
-const HANDLER_AUTH_RE =
-  /auth:\s*['"](public|session|org|admin|cron|org-or-cron)['"]/g
+const HANDLER_AUTH_RE = /auth:\s*['"](public|session|org|admin|cron|org-or-cron)['"]/g
 const HANDLER_MIN_ROLE_RE = /minRole:\s*['"](member|admin|owner)['"]/
 
 function fileToApiPath(file: string): string {
@@ -42,9 +41,7 @@ function fileToApiPath(file: string): string {
   const segments = rel.replace(/\/route\.ts$/, '').split('/')
   const apiPath =
     '/api/' +
-    segments
-      .map((s) => (s.startsWith('[') && s.endsWith(']') ? `:${s.slice(1, -1)}` : s))
-      .join('/')
+    segments.map((s) => (s.startsWith('[') && s.endsWith(']') ? `:${s.slice(1, -1)}` : s)).join('/')
   return apiPath.replace(/\/+/g, '/')
 }
 
@@ -59,6 +56,7 @@ function extractDynamicParams(apiPath: string): string[] {
 function isCsrfExempt(apiPath: string, method: HttpMethod, auth: AuthMode): boolean {
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return true
   if (auth === 'webhook' || auth === 'nextauth' || auth === 'public') return true
+  if (apiPath.includes(':...nextauth') || apiPath.includes('[...nextauth]')) return true
   if (apiPath === '/api/stripe/webhook') return true
   const p = apiPath
   const nextAuthOwned =
@@ -152,11 +150,14 @@ function extractExportedMethods(content: string): Set<HttpMethod> {
   return methods
 }
 
-function classifyAuth(fileContent: string, apiPath: string): {
+function classifyAuth(
+  fileContent: string,
+  apiPath: string,
+): {
   auth: AuthMode
   minRole?: 'member' | 'admin' | 'owner'
 } {
-  if (apiPath.includes('/api/auth/[...nextauth]')) {
+  if (apiPath.includes(':...nextauth') || apiPath.includes('[...nextauth]')) {
     return { auth: 'nextauth' }
   }
   if (apiPath === '/api/stripe/webhook') {
@@ -198,7 +199,8 @@ function classifyAuth(fileContent: string, apiPath: string): {
     return { auth: 'cron' }
   }
   if (fileContent.includes('requireOrgOrCron')) {
-    const admin = fileContent.includes("minRole: 'admin'") || fileContent.includes('minRole: "admin"')
+    const admin =
+      fileContent.includes("minRole: 'admin'") || fileContent.includes('minRole: "admin"')
     return { auth: 'org-or-cron', minRole: admin ? 'admin' : 'member' }
   }
   if (fileContent.includes('requireOrg')) {
@@ -243,15 +245,14 @@ function scanFile(file: string): ApiRouteEntry[] {
     const effectiveAuth = auth === 'org' && fileAuth.auth !== 'org' ? fileAuth.auth : auth
     const effectiveMinRole =
       effectiveAuth === 'org' || effectiveAuth === 'org-or-cron'
-        ? minRole ?? fileAuth.minRole ?? 'member'
+        ? (minRole ?? fileAuth.minRole ?? 'member')
         : undefined
     const tenantScoped =
       effectiveAuth === 'org' ||
       effectiveAuth === 'org-or-cron' ||
       effectiveAuth === 'admin' ||
       effectiveAuth === 'platform-admin'
-    const csrf =
-      effectiveAuth !== 'public' && !isCsrfExempt(apiPath, method, effectiveAuth)
+    const csrf = effectiveAuth !== 'public' && !isCsrfExempt(apiPath, method, effectiveAuth)
     entries.push({
       path: apiPath,
       method,

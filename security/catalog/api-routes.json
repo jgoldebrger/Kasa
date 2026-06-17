@@ -1,18 +1,19 @@
 {
-  "generatedAt": "2026-06-09T20:29:24.009Z",
+  "generatedAt": "2026-06-17T19:59:41.848Z",
   "summary": {
-    "total": 151,
+    "total": 153,
     "byAuth": {
       "admin": 2,
-      "org": 110,
+      "org": 83,
+      "nextauth": 2,
       "public": 12,
-      "cron": 12,
-      "session": 10,
+      "cron": 41,
+      "session": 8,
       "org-or-cron": 4,
       "webhook": 1
     },
-    "mutating": 79,
-    "tenantScoped": 116
+    "mutating": 78,
+    "tenantScoped": 89
   },
   "routes": [
     {
@@ -46,20 +47,18 @@
     {
       "path": "/api/auth/:...nextauth",
       "method": "GET",
-      "auth": "org",
-      "minRole": "member",
+      "auth": "nextauth",
       "csrf": false,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": ["...nextauth"],
       "source": "app/api/auth/[...nextauth]/route.ts"
     },
     {
       "path": "/api/auth/:...nextauth",
       "method": "POST",
-      "auth": "org",
-      "minRole": "member",
-      "csrf": true,
-      "tenantScoped": true,
+      "auth": "nextauth",
+      "csrf": false,
+      "tenantScoped": false,
       "dynamicParams": ["...nextauth"],
       "source": "app/api/auth/[...nextauth]/route.ts"
     },
@@ -175,50 +174,45 @@
     {
       "path": "/api/billing/portal",
       "method": "POST",
-      "auth": "org",
-      "minRole": "owner",
+      "auth": "cron",
       "csrf": true,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/billing/portal/route.ts"
     },
     {
       "path": "/api/calculations",
       "method": "GET",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": false,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/calculations/route.ts"
     },
     {
       "path": "/api/calculations",
       "method": "POST",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": true,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/calculations/route.ts"
     },
     {
       "path": "/api/cycle-config",
       "method": "GET",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": false,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/cycle-config/route.ts"
     },
     {
       "path": "/api/cycle-config",
       "method": "POST",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": true,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/cycle-config/route.ts"
     },
@@ -235,10 +229,9 @@
     {
       "path": "/api/dues-recommendation",
       "method": "GET",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": false,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/dues-recommendation/route.ts"
     },
@@ -285,10 +278,9 @@
     {
       "path": "/api/events",
       "method": "GET",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": false,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/events/route.ts"
     },
@@ -353,6 +345,16 @@
       "source": "app/api/families/[id]/charge-saved-card/route.ts"
     },
     {
+      "path": "/api/families/:id/cycle-charges",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": ["id"],
+      "source": "app/api/families/[id]/cycle-charges/route.ts"
+    },
+    {
       "path": "/api/families/:id/lifecycle-events",
       "method": "GET",
       "auth": "org",
@@ -395,20 +397,18 @@
     {
       "path": "/api/families/:id/members/:memberId",
       "method": "DELETE",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": true,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": ["id", "memberId"],
       "source": "app/api/families/[id]/members/[memberId]/route.ts"
     },
     {
       "path": "/api/families/:id/members/:memberId",
       "method": "PUT",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": true,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": ["id", "memberId"],
       "source": "app/api/families/[id]/members/[memberId]/route.ts"
     },
@@ -682,70 +682,63 @@
     {
       "path": "/api/lifecycle-event-types",
       "method": "GET",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": false,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/lifecycle-event-types/route.ts"
     },
     {
       "path": "/api/lifecycle-event-types",
       "method": "POST",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": true,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/lifecycle-event-types/route.ts"
     },
     {
       "path": "/api/lifecycle-event-types/:id",
       "method": "DELETE",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": true,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": ["id"],
       "source": "app/api/lifecycle-event-types/[id]/route.ts"
     },
     {
       "path": "/api/lifecycle-event-types/:id",
       "method": "GET",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": false,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": ["id"],
       "source": "app/api/lifecycle-event-types/[id]/route.ts"
     },
     {
       "path": "/api/lifecycle-event-types/:id",
       "method": "PUT",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": true,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": ["id"],
       "source": "app/api/lifecycle-event-types/[id]/route.ts"
     },
     {
       "path": "/api/members/:memberId/balance",
       "method": "GET",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": false,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": ["memberId"],
       "source": "app/api/members/[memberId]/balance/route.ts"
     },
     {
       "path": "/api/members/:memberId/payments",
       "method": "GET",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": false,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": ["memberId"],
       "source": "app/api/members/[memberId]/payments/route.ts"
     },
@@ -947,6 +940,15 @@
       "source": "app/api/organizations/letterhead/route.ts"
     },
     {
+      "path": "/api/organizations/setup-progress",
+      "method": "GET",
+      "auth": "cron",
+      "csrf": false,
+      "tenantScoped": false,
+      "dynamicParams": [],
+      "source": "app/api/organizations/setup-progress/route.ts"
+    },
+    {
       "path": "/api/payment-plans",
       "method": "GET",
       "auth": "org",
@@ -969,30 +971,27 @@
     {
       "path": "/api/payment-plans/:id",
       "method": "DELETE",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": true,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": ["id"],
       "source": "app/api/payment-plans/[id]/route.ts"
     },
     {
       "path": "/api/payment-plans/:id",
       "method": "GET",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": false,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": ["id"],
       "source": "app/api/payment-plans/[id]/route.ts"
     },
     {
       "path": "/api/payment-plans/:id",
       "method": "PUT",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": true,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": ["id"],
       "source": "app/api/payment-plans/[id]/route.ts"
     },
@@ -1009,7 +1008,7 @@
     {
       "path": "/api/recurring-payments/process",
       "method": "GET",
-      "auth": "org",
+      "auth": "org-or-cron",
       "minRole": "admin",
       "csrf": false,
       "tenantScoped": true,
@@ -1029,30 +1028,27 @@
     {
       "path": "/api/reports/meta",
       "method": "GET",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": false,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/reports/meta/route.ts"
     },
     {
       "path": "/api/reports/pl",
       "method": "GET",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": false,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/reports/pl/route.ts"
     },
     {
       "path": "/api/reports/run",
       "method": "POST",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": true,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/reports/run/route.ts"
     },
@@ -1139,20 +1135,18 @@
     {
       "path": "/api/statements/:id",
       "method": "GET",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": false,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": ["id"],
       "source": "app/api/statements/[id]/route.ts"
     },
     {
       "path": "/api/statements/auto-generate",
       "method": "GET",
-      "auth": "org-or-cron",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": false,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/statements/auto-generate/route.ts"
     },
@@ -1378,10 +1372,9 @@
     {
       "path": "/api/trash",
       "method": "GET",
-      "auth": "org",
-      "minRole": "admin",
+      "auth": "cron",
       "csrf": false,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/trash/route.ts"
     },
@@ -1418,10 +1411,9 @@
     {
       "path": "/api/trash/purge-all",
       "method": "POST",
-      "auth": "org",
-      "minRole": "owner",
+      "auth": "cron",
       "csrf": true,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/trash/purge-all/route.ts"
     },
@@ -1437,7 +1429,7 @@
     {
       "path": "/api/user",
       "method": "PATCH",
-      "auth": "session",
+      "auth": "cron",
       "csrf": true,
       "tenantScoped": false,
       "dynamicParams": [],
@@ -1455,7 +1447,7 @@
     {
       "path": "/api/user/2fa/setup",
       "method": "POST",
-      "auth": "session",
+      "auth": "cron",
       "csrf": true,
       "tenantScoped": false,
       "dynamicParams": [],

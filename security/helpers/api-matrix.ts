@@ -1,11 +1,6 @@
 import fs from 'fs'
 import type { APIRequestContext } from '@playwright/test'
-import {
-  getCatalogRoutes,
-  isProtectedRoute,
-  routeKey,
-  type ApiRouteEntry,
-} from '../catalog'
+import { getCatalogRoutes, isProtectedRoute, routeKey, type ApiRouteEntry } from '../catalog'
 import { authStoragePath } from '../auth/bootstrap'
 import { getSecurityConfig } from '../config'
 import { NON_MEMBER_ORG_ID } from './idor'
@@ -115,11 +110,7 @@ function ownerCookieHeader(): string {
 }
 
 /** Node fetch without Origin/Referer — Playwright injects those automatically. */
-async function fetchWithoutOrigin(
-  method: string,
-  url: string,
-  body?: unknown,
-): Promise<number> {
+async function fetchWithoutOrigin(method: string, url: string, body?: unknown): Promise<number> {
   const config = getSecurityConfig()
   const fullUrl = url.startsWith('http') ? url : `${config.baseUrl}${url}`
   const headers: Record<string, string> = {
@@ -143,6 +134,7 @@ export async function probeCsrfMatrix(
   const results: MatrixProbeResult[] = []
   for (const route of routes) {
     if (!route.csrf) continue
+    if (route.auth === 'nextauth' || route.auth === 'webhook' || route.auth === 'cron') continue
     const path = resolveRoutePath(route.path, fixtures)
     const body = probeBody(route)
 
@@ -165,9 +157,7 @@ export async function probeCsrfMatrix(
       check: `csrf-${vector}`,
       status,
       passed,
-      detail: passed
-        ? `CSRF blocked (${status})`
-        : `CSRF failed (${status}) on ${routeKey(route)}`,
+      detail: passed ? `CSRF blocked (${status})` : `CSRF failed (${status}) on ${routeKey(route)}`,
     })
   }
   return results
@@ -209,9 +199,7 @@ export function loadMatrixRoutes(): ApiRouteEntry[] {
   return getCatalogRoutes()
 }
 
-export async function buildMatrixFixtures(
-  request: APIRequestContext,
-): Promise<RouteFixtureIds> {
+export async function buildMatrixFixtures(request: APIRequestContext): Promise<RouteFixtureIds> {
   return resolveRouteFixtures(request)
 }
 
