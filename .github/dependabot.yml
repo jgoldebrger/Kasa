@@ -18,6 +18,8 @@ updates:
         exclude-patterns:
           # Toolchain majors need coordinated upgrades (Next, PostCSS, ESLint, TypeScript).
           - 'tailwindcss'
+          - 'postcss'
+          - 'autoprefixer'
           - 'eslint'
           - 'eslint-config-next'
           - '@next/bundle-analyzer'
@@ -36,6 +38,9 @@ updates:
       - dependency-name: typescript
         update-types: [version-update:semver-major]
       - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
+      # @next/bundle-analyzer major must match the installed Next major.
+      - dependency-name: '@next/bundle-analyzer'
         update-types: [version-update:semver-major]
     commit-message:
       prefix: deps

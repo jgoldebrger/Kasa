@@ -84,7 +84,19 @@ describe('jobs runChunked (integration)', () => {
     expect(url).toContain('cursor=')
     expect(url).toContain(orgs[1]._id.toString())
     expect(init.method).toBe('POST')
-    expect((init.headers as Record<string, string>)['x-cron-secret']).toBe('test-secret')
+    const headers = init.headers as Record<string, string>
+    expect(headers['x-cron-secret']).toBeUndefined()
+    expect(headers['x-cron-job-token']).toBeTruthy()
+    const { verifyCronJob } = await import('./auth-cron-job')
+    expect(
+      verifyCronJob(
+        new Request(url, {
+          method: 'POST',
+          headers: { 'x-cron-job-token': headers['x-cron-job-token'] },
+        }),
+        'test-chunk-paginated',
+      ),
+    ).toBe(true)
   })
 
   it('records per-org failures without aborting the batch', async () => {
@@ -168,7 +180,10 @@ describe('jobs runChunked (integration)', () => {
     )
 
     process.env.CRON_SECRET = 'test-secret'
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 500 })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('nope', { status: 500 })),
+    )
     const result = await runChunked({
       name: 'test-chunk-bad-fetch',
       batchSize: 2,
@@ -252,7 +267,9 @@ describe('jobs runChunkedFamilies (integration)', () => {
     const { Family } = await import('./models')
     const { runChunkedFamilies } = await import('./jobs')
 
-    const families = await Family.find({ organizationId }).sort({ _id: 1 }).lean() as import('@/lib/test/type-helpers').LeanDoc[]
+    const families = (await Family.find({ organizationId })
+      .sort({ _id: 1 })
+      .lean()) as import('@/lib/test/type-helpers').LeanDoc[]
     const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
     process.env.CRON_SECRET = 'test-secret'
@@ -276,7 +293,19 @@ describe('jobs runChunkedFamilies (integration)', () => {
     expect(url).toContain('organizationId=')
     expect(url).toContain(organizationId)
     expect(init.method).toBe('POST')
-    expect((init.headers as Record<string, string>)['x-cron-secret']).toBe('test-secret')
+    const headers = init.headers as Record<string, string>
+    expect(headers['x-cron-secret']).toBeUndefined()
+    expect(headers['x-cron-job-token']).toBeTruthy()
+    const { verifyCronJob } = await import('./auth-cron-job')
+    expect(
+      verifyCronJob(
+        new Request(url, {
+          method: 'POST',
+          headers: { 'x-cron-job-token': headers['x-cron-job-token'] },
+        }),
+        'test-family-chunk-paginated',
+      ),
+    ).toBe(true)
   })
 
   it('resumes after familyCursor skipping already-processed families', async () => {
@@ -284,7 +313,9 @@ describe('jobs runChunkedFamilies (integration)', () => {
     const { Family } = await import('./models')
     const { runChunkedFamilies } = await import('./jobs')
 
-    const families = await Family.find({ organizationId }).sort({ _id: 1 }).lean() as import('@/lib/test/type-helpers').LeanDoc[]
+    const families = (await Family.find({ organizationId })
+      .sort({ _id: 1 })
+      .lean()) as import('@/lib/test/type-helpers').LeanDoc[]
     const perFamily = vi.fn(async () => undefined)
     const result = await runChunkedFamilies({
       name: 'test-family-chunk-resume',

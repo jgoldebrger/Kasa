@@ -1,5 +1,10 @@
 import { handler } from '@/lib/api/handler'
-import { runChunked, selfUrl, orgMatchesMonthlyStatementSchedule, type MonthlyStatementOrgFields } from '@/lib/jobs'
+import {
+  runChunked,
+  selfUrl,
+  orgMatchesMonthlyStatementSchedule,
+  type MonthlyStatementOrgFields,
+} from '@/lib/jobs'
 import { acquireCronLock } from '@/lib/cron-lock'
 import { JobLock, Organization } from '@/lib/models'
 import { logError } from '@/lib/log'
@@ -26,6 +31,7 @@ const JOB_PATH = '/api/jobs/send-monthly-statements'
  */
 export const POST = handler({
   auth: 'cron',
+  cronJobName: JOB_NAME,
   name: 'POST /api/jobs/send-monthly-statements',
   fn: async ({ request }) => {
     const rateVerdict = await checkRateLimit(request, 'cron-send-monthly-statements', {

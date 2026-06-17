@@ -17,7 +17,7 @@ type AnyEvent = Record<string, any>
 
 /** Field names that should never reach Sentry, case-insensitive. */
 const SENSITIVE_KEY =
-  /^(password|hashedpassword|newpassword|currentpassword|token|access[_-]?token|refresh[_-]?token|client_secret|clientSecret|stripe-?signature|authorization|cookie|set-cookie|x-csrf-token|x-cron-secret|ccinfo|cc[_-]?number|cvv|cvc|secret|encryptionkey|nextauth_secret|cron_secret|smtp.*password|reset[_-]?url|two[_-]?factor[_-]?secret|backup[_-]?codes?)$/i
+  /^(password|hashedpassword|newpassword|currentpassword|token|access[_-]?token|refresh[_-]?token|client_secret|clientSecret|stripe-?signature|authorization|cookie|set-cookie|x-csrf-token|x-cron-secret|x-cron-job-token|jobtoken|ccinfo|cc[_-]?number|cvv|cvc|secret|encryptionkey|nextauth_secret|cron_secret|smtp.*password|reset[_-]?url|two[_-]?factor[_-]?secret|backup[_-]?codes?)$/i
 
 /** Patterns we redact inside free-form strings (messages, URLs). */
 const VALUE_PATTERNS: Array<{ re: RegExp; replace: string }> = [

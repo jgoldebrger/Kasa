@@ -6,6 +6,7 @@ import SessionProviderWrapper from './components/SessionProviderWrapper'
 import AppShell from './components/AppShell'
 import { ToastProvider } from './components/Toast'
 import WebVitals from './components/WebVitals'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import PwaInit from './components/PwaInit'
 import CookieNotice from './components/CookieNotice'
 import OrgShellProviders from './components/OrgShellProviders'
@@ -126,6 +127,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <PwaInit />
         <CookieNotice />
         <WebVitals />
+        <SpeedInsights />
       </body>
     </html>
   )

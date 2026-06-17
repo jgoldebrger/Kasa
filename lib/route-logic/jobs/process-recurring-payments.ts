@@ -18,6 +18,7 @@ const JOB_PATH = '/api/jobs/process-recurring-payments'
  */
 export const POST = handler({
   auth: 'cron',
+  cronJobName: JOB_NAME,
   name: 'POST /api/jobs/process-recurring-payments',
   fn: async ({ request }) => {
     const rateVerdict = await checkRateLimit(request, 'cron-process-recurring-payments', {

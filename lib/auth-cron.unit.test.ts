@@ -23,6 +23,7 @@ vi.mock('next/server', async (importOriginal) => {
 
 import { NextResponse } from 'next/server'
 import { isCronRequest, requireOrgOrCron } from './auth-cron'
+import { signCronJob, verifyCronJob } from './auth-cron-job'
 
 function cronRequest(init: { secret?: string; bearer?: string; url?: string } = {}): Request {
   const headers = new Headers()
@@ -163,5 +164,103 @@ describe('requireOrgOrCron', () => {
 
     expect(mocks.requireOrg).toHaveBeenCalledWith(req, { minRole: 'admin' })
     expect(ctx).toBe(sessionCtx)
+  })
+})
+
+describe('signCronJob / verifyCronJob', () => {
+  const prevSecret = process.env.CRON_SECRET
+  const validOrgId = '507f1f77bcf86cd799439011'
+  const jobName = 'process-recurring-payments'
+
+  beforeEach(() => {
+    process.env.CRON_SECRET = 'test-cron-secret'
+  })
+
+  afterEach(() => {
+    if (prevSecret === undefined) delete process.env.CRON_SECRET
+    else process.env.CRON_SECRET = prevSecret
+  })
+
+  function jobRequest(
+    init: {
+      jobToken?: string
+      jobTokenQuery?: string
+      organizationId?: string
+      secret?: string
+    } = {},
+  ): Request {
+    const headers = new Headers()
+    if (init.jobToken) headers.set('x-cron-job-token', init.jobToken)
+    if (init.secret) headers.set('x-cron-secret', init.secret)
+    const qs = new URLSearchParams()
+    if (init.organizationId) qs.set('organizationId', init.organizationId)
+    if (init.jobTokenQuery) qs.set('jobToken', init.jobTokenQuery)
+    const query = qs.toString()
+    return new Request(`https://app.test/api/jobs/${jobName}${query ? `?${query}` : ''}`, {
+      headers,
+    })
+  }
+
+  it('signs and verifies a job token via header', () => {
+    const token = signCronJob({
+      jobName,
+      expiresAt: Date.now() + 60_000,
+    })
+    expect(verifyCronJob(jobRequest({ jobToken: token }), jobName)).toBe(true)
+  })
+
+  it('accepts job token via jobToken query param', () => {
+    const token = signCronJob({
+      jobName,
+      expiresAt: Date.now() + 60_000,
+    })
+    expect(verifyCronJob(jobRequest({ jobTokenQuery: token }), jobName)).toBe(true)
+  })
+
+  it('requires organizationId in token when URL has organizationId', () => {
+    const tokenWithoutOrg = signCronJob({
+      jobName,
+      expiresAt: Date.now() + 60_000,
+    })
+    expect(
+      verifyCronJob(jobRequest({ jobToken: tokenWithoutOrg, organizationId: validOrgId }), jobName),
+    ).toBe(false)
+
+    const tokenWithOrg = signCronJob({
+      jobName,
+      organizationId: validOrgId,
+      expiresAt: Date.now() + 60_000,
+    })
+    expect(
+      verifyCronJob(jobRequest({ jobToken: tokenWithOrg, organizationId: validOrgId }), jobName),
+    ).toBe(true)
+  })
+
+  it('rejects expired, wrong job name, and tampered tokens', () => {
+    const expired = signCronJob({
+      jobName,
+      expiresAt: Date.now() - 1000,
+    })
+    expect(verifyCronJob(jobRequest({ jobToken: expired }), jobName)).toBe(false)
+
+    const otherJob = signCronJob({
+      jobName: 'cycle-rollover',
+      expiresAt: Date.now() + 60_000,
+    })
+    expect(verifyCronJob(jobRequest({ jobToken: otherJob }), jobName)).toBe(false)
+
+    const valid = signCronJob({ jobName, expiresAt: Date.now() + 60_000 })
+    const tampered = `${valid}x`
+    expect(verifyCronJob(jobRequest({ jobToken: tampered }), jobName)).toBe(false)
+  })
+
+  it('still accepts global cron secret for backward compatibility', () => {
+    expect(verifyCronJob(jobRequest({ secret: 'test-cron-secret' }), jobName)).toBe(true)
+  })
+
+  it('returns false when neither global secret nor job token is valid', () => {
+    const token = signCronJob({ jobName, expiresAt: Date.now() + 60_000 })
+    expect(verifyCronJob(jobRequest({ jobToken: token, secret: 'wrong' }), 'other-job')).toBe(false)
+    expect(verifyCronJob(jobRequest(), jobName)).toBe(false)
   })
 })

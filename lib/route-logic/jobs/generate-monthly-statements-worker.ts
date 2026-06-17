@@ -4,6 +4,7 @@ import { generateMonthlyStatements } from '@/lib/scheduler'
 import { logError } from '@/lib/log'
 import { checkRateLimit } from '@/lib/rate-limit'
 
+const WORKER_JOB_NAME = 'generate-monthly-statements-worker'
 const WORKER_PATH = '/api/jobs/generate-monthly-statements/worker'
 
 /**
@@ -18,6 +19,7 @@ const WORKER_PATH = '/api/jobs/generate-monthly-statements/worker'
  */
 export const POST = handler({
   auth: 'cron',
+  cronJobName: WORKER_JOB_NAME,
   name: 'POST /api/jobs/generate-monthly-statements/worker',
   fn: async ({ request }) => {
     const rateVerdict = await checkRateLimit(request, 'cron-generate-monthly-statements-worker', {

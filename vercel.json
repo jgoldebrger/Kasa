@@ -7,6 +7,13 @@
   "installCommand": "npm install",
   "framework": "nextjs",
   "regions": ["iad1"],
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "dependabot/*": false,
+      "*": false
+    }
+  },
   "env": {
     "NODE_ENV": "production"
   },
@@ -38,4 +45,3 @@
     }
   ]
 }
-

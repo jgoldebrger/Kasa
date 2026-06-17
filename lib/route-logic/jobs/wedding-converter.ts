@@ -35,6 +35,7 @@ function sanitizeJobErrors(errors: { orgId: string; error: string }[]) {
  */
 export const POST = handler({
   auth: 'cron',
+  cronJobName: JOB_NAME,
   name: 'POST /api/jobs/wedding-converter',
   fn: async ({ request }) => {
     const rateVerdict = await checkRateLimit(request, 'cron-wedding-converter', {
@@ -54,12 +55,9 @@ export const POST = handler({
     // and any per-org calendar nuance is handled inside the per-org
     // helper, not here.
     const lockKey = new Date().toISOString().slice(0, 10)
-    const lockResult = await withCronLock(
-      JOB_NAME,
-      lockKey,
-      async () => runJob(),
-      { ttlMs: 60 * 60 * 1000 },
-    )
+    const lockResult = await withCronLock(JOB_NAME, lockKey, async () => runJob(), {
+      ttlMs: 60 * 60 * 1000,
+    })
     if (lockResult === null) {
       return {
         data: {
@@ -133,7 +131,10 @@ async function runJob(): Promise<NextResponse> {
     })
     logError(err, { module: 'jobs', job: JOB_NAME })
     return NextResponse.json(
-      { error: 'Job failed', ...(process.env.NODE_ENV !== 'production' && { details: err?.message }) },
+      {
+        error: 'Job failed',
+        ...(process.env.NODE_ENV !== 'production' && { details: err?.message }),
+      },
       { status: 500 },
     )
   }

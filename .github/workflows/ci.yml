@@ -50,6 +50,9 @@ jobs:
           NEXT_TELEMETRY_DISABLED: '1'
         run: npm run build
 
+      - name: Bundle size budget
+        run: npm run check:bundle
+
   e2e-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -70,8 +73,8 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      - name: E2E smoke (guest + org switch)
-        run: npx playwright test e2e/guest.spec.ts e2e/org-switch.spec.ts
+      - name: E2E smoke (guest + org switch + families)
+        run: npx playwright test e2e/guest.spec.ts e2e/org-switch.spec.ts e2e/smoke-family.spec.ts
 
   security-safe:
     runs-on: ubuntu-latest

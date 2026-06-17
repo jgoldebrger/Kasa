@@ -22,7 +22,30 @@ An attacker with `CRON_SECRET` can invoke cron-capable endpoints for **any organ
 - CSRF middleware skips origin checks only when the secret matches (`lib/csrf.ts`).
 - Handlers re-verify via `isCronRequest()` / `requireOrgOrCron` and require a valid `organizationId` for cross-org cron calls.
 
-**Operational guidance**
+## Per-job cron tokens (`/api/jobs/*`)
+
+Chunked cron jobs self-call continuation URLs (next org batch, family worker batches). Those internal requests use **per-job HMAC tokens** (`lib/auth-cron-job.ts`) instead of the global bearer alone.
+
+**Token format**
+
+- Signed with HMAC-SHA256 keyed by `CRON_SECRET`.
+- Payload: `{ jobName, organizationId?, exp }` (base64url JSON + signature).
+- Passed as `x-cron-job-token` header or `jobToken` query parameter.
+- Default TTL: 1 hour (`DEFAULT_CRON_JOB_TOKEN_TTL_MS`).
+
+**Verification (`verifyCronJob`)**
+
+1. Valid global `x-cron-secret` or `Authorization: Bearer <CRON_SECRET>` still accepts the request (Vercel Cron initial triggers).
+2. Otherwise require a valid job token whose `jobName` matches the handler (e.g. `process-recurring-payments`).
+3. When the URL includes `?organizationId=`, the token payload must carry the same `organizationId` — a leaked global secret cannot pivot continuation URLs to another tenant without forging a new signature.
+
+**Operational guidance (per-job tokens)**
+
+- Vercel Cron in `vercel.json` continues to send the global secret; no change required for scheduled ticks.
+- Internal continuations from `lib/jobs.ts` attach signed job tokens automatically.
+- Rotate `CRON_SECRET` if exposed; both global auth and job tokens derive from the same key.
+
+**Operational guidance (global secret)**
 
 - Generate a long random value (32+ bytes); rotate if exposed.
 - Do not commit `CRON_SECRET` to git or log it in request traces.

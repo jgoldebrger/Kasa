@@ -7,9 +7,10 @@
     "dev": "next dev -p 3000 --turbo",
     "dev:webpack": "next dev -p 3000",
     "build": "next build",
+    "check:bundle": "npx tsx scripts/check-bundle-budget.ts",
     "analyze": "ANALYZE=true next build",
     "start": "next start -p 3000",
-    "lint": "next lint",
+    "lint": "eslint . --ext .ts,.tsx,.js",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\"",
     "test": "vitest run",
@@ -40,6 +41,9 @@
     "test:all": "vitest run && playwright test",
     "test:full": "vitest run && playwright test",
     "typecheck": "tsc --noEmit",
+    "check:env": "npx tsx scripts/check-env.ts",
+    "encrypt-legacy-secrets": "npx tsx scripts/encrypt-legacy-secrets.ts",
+    "encrypt-legacy-secrets:dry-run": "npx tsx scripts/encrypt-legacy-secrets.ts --dry-run",
     "prepare": "simple-git-hooks",
     "generate-statements": "npx tsx scripts/generate-monthly-statements.ts",
     "send-monthly-statements": "node scripts/send-monthly-statements.js",
@@ -51,7 +55,7 @@
   "lint-staged": {
     "*.{ts,tsx,js}": [
       "prettier --write",
-      "next lint --file"
+      "eslint --fix"
     ],
     "*.{json,md,yml,yaml}": [
       "prettier --write"
@@ -67,6 +71,7 @@
     "@tanstack/react-virtual": "^3.13.24",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
+    "@vercel/speed-insights": "^2.0.0",
     "bcryptjs": "^2.4.3",
     "exceljs": "^4.4.0",
     "mongoose": "^7.5.0",
@@ -110,7 +115,7 @@
     "vitest": "^4.1.6"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20 <23"
   },
   "overrides": {
     "exceljs": {

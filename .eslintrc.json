@@ -11,6 +11,11 @@
     "out",
     "build",
     "coverage",
+    "coverage-*",
+    "test-results",
+    "e2e",
+    "security",
+    "types",
     "public/sw.js",
     "scripts"
   ]

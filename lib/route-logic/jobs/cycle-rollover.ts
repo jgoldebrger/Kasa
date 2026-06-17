@@ -40,6 +40,7 @@ function sanitizeJobErrors(errors: { orgId: string; error: string }[]) {
  */
 export const POST = handler({
   auth: 'cron',
+  cronJobName: JOB_NAME,
   name: 'POST /api/jobs/cycle-rollover',
   fn: async ({ request }) => {
     const rateVerdict = await checkRateLimit(request, 'cron-cycle-rollover', {

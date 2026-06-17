@@ -10,10 +10,14 @@ const MIN_CRON_SECRET_LEN = 32
 const MIN_AUTH_SECRET_LEN = 16
 
 let validated = false
+let warnedUpstash = false
+let warnedSentry = false
 
 /** @internal Reset idempotency guard between vitest cases. */
 export function __resetEnvValidationForTests(): void {
   validated = false
+  warnedUpstash = false
+  warnedSentry = false
 }
 
 /** True when we should enforce production env requirements. */
@@ -32,6 +36,28 @@ function requireNonEmpty(name: string, value: string | undefined, minLen?: numbe
     return `${name} must be at least ${minLen} characters in production.`
   }
   return null
+}
+
+function warnOptionalProductionEnv(): void {
+  const upstashUrl = process.env.UPSTASH_REDIS_REST_URL?.trim()
+  const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
+  if (!warnedUpstash && (!upstashUrl || !upstashToken)) {
+    warnedUpstash = true
+    console.warn(
+      '[env] UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are not set. ' +
+        'Rate limiting will use MongoDB (extra writes per API hit). ' +
+        'Configure Upstash Redis for production rate limits — see .env.example.',
+    )
+  }
+
+  const sentryDsn = process.env.SENTRY_DSN?.trim()
+  if (!warnedSentry && !sentryDsn) {
+    warnedSentry = true
+    console.warn(
+      '[env] SENTRY_DSN is not set in production. Server-side errors will not be ' +
+        'reported to Sentry (observability gap). See .env.example.',
+    )
+  }
 }
 
 /**
@@ -64,5 +90,6 @@ export function validateProductionEnv(): void {
     )
   }
 
+  warnOptionalProductionEnv()
   validated = true
 }

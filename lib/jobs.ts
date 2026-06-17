@@ -19,6 +19,7 @@ import { HDate } from '@hebcal/hdate'
 import connectDB from '@/lib/database'
 import { Organization, Family, JobRun } from '@/lib/models'
 import { logError } from '@/lib/log'
+import { DEFAULT_CRON_JOB_TOKEN_TTL_MS, signCronJob } from '@/lib/auth-cron-job'
 import {
   getDayInTimeZone,
   getMonthInTimeZone,
@@ -62,7 +63,9 @@ const MAX_RECORDED_ERRORS = 50
  * batch via fire-and-forget HTTP. Returns the chunk result; the caller
  * formats the HTTP response.
  */
-export async function runChunked(opts: ChunkOptions): Promise<ChunkResult & { hasMore: boolean; cursorOut: string | null; jobRunId: string }> {
+export async function runChunked(
+  opts: ChunkOptions,
+): Promise<ChunkResult & { hasMore: boolean; cursorOut: string | null; jobRunId: string }> {
   await connectDB()
 
   const batchSize = opts.batchSize ?? DEFAULT_BATCH_SIZE
@@ -119,7 +122,7 @@ export async function runChunked(opts: ChunkOptions): Promise<ChunkResult & { ha
   // Fire-and-forget next batch. Don't await — we want this request to
   // return promptly so the cron trigger sees success.
   if (hasMore && cursorOut) {
-    triggerNextBatch(opts.selfUrl, cursorOut, { cursorParam: 'cursor' }).catch((err) => {
+    triggerNextBatch(opts.selfUrl, cursorOut, opts.name, { cursorParam: 'cursor' }).catch((err) => {
       logError(err, { module: 'jobs', job: opts.name, phase: 'next-batch' })
     })
   }
@@ -212,7 +215,7 @@ export async function runChunkedFamilies(
   })
 
   if (triggerContinuation && hasMore && familyCursorOut) {
-    triggerNextBatch(opts.selfUrl, familyCursorOut, {
+    triggerNextBatch(opts.selfUrl, familyCursorOut, opts.name, {
       cursorParam: 'familyCursor',
       extraParams: {
         organizationId: opts.organizationId,
@@ -234,10 +237,10 @@ interface TriggerNextBatchOptions {
 async function triggerNextBatch(
   selfUrl: string,
   cursor: string,
+  jobName: string,
   opts?: TriggerNextBatchOptions,
 ): Promise<void> {
-  const secret = process.env.CRON_SECRET
-  if (!secret) {
+  if (!process.env.CRON_SECRET) {
     // Without CRON_SECRET the follow-up request would 401 and the rest
     // of the chunked job would silently never run — every org past the
     // first batch would be skipped. Surface this loudly so ops sees the
@@ -251,11 +254,18 @@ async function triggerNextBatch(
 
   const u = new URL(selfUrl)
   u.searchParams.set(opts?.cursorParam || 'cursor', cursor)
+  const organizationId = opts?.extraParams?.organizationId
   if (opts?.extraParams) {
     for (const [key, value] of Object.entries(opts.extraParams)) {
       if (value != null && value !== '') u.searchParams.set(key, value)
     }
   }
+
+  const jobToken = signCronJob({
+    jobName,
+    organizationId,
+    expiresAt: Date.now() + DEFAULT_CRON_JOB_TOKEN_TTL_MS,
+  })
 
   // Use a short timeout — we don't actually care about the response,
   // just that the request got out the door.
@@ -265,7 +275,7 @@ async function triggerNextBatch(
     const res = await fetch(u.toString(), {
       method: 'POST',
       headers: {
-        'x-cron-secret': secret,
+        'x-cron-job-token': jobToken,
         'content-type': 'application/json',
       },
       body: '{}',
@@ -349,9 +359,7 @@ export function monthlyStatementHebrewDayMatcher(now: Date = new Date()): Record
  * 'gregorian' — that's the historical default and what existing rows
  * have until they're touched.
  */
-export function monthlyStatementScheduleMatcher(
-  now: Date = new Date(),
-): Record<string, unknown> {
+export function monthlyStatementScheduleMatcher(now: Date = new Date()): Record<string, unknown> {
   return {
     $or: [
       {
@@ -369,10 +377,7 @@ export function monthlyStatementScheduleMatcher(
         ],
       },
       {
-        $and: [
-          { monthlyStatementCalendar: 'hebrew' },
-          monthlyStatementHebrewDayMatcher(now),
-        ],
+        $and: [{ monthlyStatementCalendar: 'hebrew' }, monthlyStatementHebrewDayMatcher(now)],
       },
     ],
   }
@@ -526,10 +531,7 @@ export function cycleScheduleMatcher(now: Date = new Date()): Record<string, unk
         ],
       },
       {
-        $and: [
-          { cycleCalendar: 'hebrew' },
-          cycleStartHebrewMatcher(now),
-        ],
+        $and: [{ cycleCalendar: 'hebrew' }, cycleStartHebrewMatcher(now)],
       },
     ],
   }

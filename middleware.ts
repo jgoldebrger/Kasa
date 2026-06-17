@@ -32,7 +32,8 @@ function buildCsp(nonce: string): string {
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob: https:`,
     `font-src 'self' data:`,
-    `connect-src 'self' https://api.stripe.com`,
+    // Sentry client + Web Vitals beacons (see sentry.*.config.ts DSN ingest hosts).
+    `connect-src 'self' https://api.stripe.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io`,
     `frame-src https://js.stripe.com https://hooks.stripe.com`,
     // Lock everything else down.
     `object-src 'none'`,

@@ -35,6 +35,7 @@ import {
 } from '@/lib/auth-helpers'
 import { assertPlatformAdminTwoFactor, isPlatformAdminEmail } from '@/lib/platform-admin'
 import { isCronRequest, requireOrgOrCron } from '@/lib/auth-cron'
+import { verifyCronJob } from '@/lib/auth-cron-job'
 import { logError } from '@/lib/log'
 import { verifyApiCsrf } from '@/lib/csrf'
 
@@ -76,6 +77,8 @@ export interface HandlerOptions<TBody, TQuery> {
   noDb?: boolean
   /** Logical name for log/Sentry breadcrumbs (eg "POST /api/families"). */
   name?: string
+  /** For `auth: 'cron'`: job name for per-job HMAC token verification. */
+  cronJobName?: string
   fn: (input: HandlerCtx<TBody, TQuery>) => Promise<HandlerReturn>
 }
 
@@ -103,7 +106,11 @@ export function handler<TBody = unknown, TQuery = unknown>(opts: HandlerOptions<
         case 'public':
           break
         case 'cron':
-          if (!isCronRequest(request)) {
+          if (opts.cronJobName) {
+            if (!verifyCronJob(request, opts.cronJobName)) {
+              return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            }
+          } else if (!isCronRequest(request)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
           }
           break

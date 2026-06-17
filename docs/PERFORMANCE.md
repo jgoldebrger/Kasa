@@ -34,9 +34,9 @@ Fluid Compute cannot set function **memory** in `vercel.json` — adjust memory 
 MongoDB driver pool size is configured in `lib/database.ts`:
 
 | Environment | Default `maxPoolSize` | `minPoolSize` |
-|-------------|----------------------|---------------|
-| Production  | 30                   | 2             |
-| Development | 10                   | 0             |
+| ----------- | --------------------- | ------------- |
+| Production  | 30                    | 2             |
+| Development | 10                    | 0             |
 
 Override with the `MONGODB_MAX_POOL_SIZE` env var (positive integer). Useful when Atlas connection limits or Vercel concurrency change.
 
@@ -58,19 +58,25 @@ Payment and lifecycle-event writes schedule background recalculation in many pat
 
 The `Payment` model defines compound indexes for org-scoped list and balance queries. Ensure these exist in production (Mongoose creates them on connect if `autoIndex` is enabled, or run `db.payments.createIndex(...)` in Atlas):
 
-| Index keys | Purpose |
-|------------|---------|
-| `{ organizationId: 1, paymentDate: -1 }` | Org payment lists, date-sorted |
-| `{ organizationId: 1, familyId: 1, paymentDate: -1 }` | Family payment history |
-| `{ organizationId: 1, familyId: 1, year: 1 }` | Year-scoped family totals |
-| `{ organizationId: 1, stripePaymentIntentId: 1 }` (unique, partial) | Stripe idempotency per org |
-| `{ stripePaymentIntentId: 1 }` (partial) | Webhook lookup by intent |
+| Index keys                                                          | Purpose                        |
+| ------------------------------------------------------------------- | ------------------------------ |
+| `{ organizationId: 1, paymentDate: -1 }`                            | Org payment lists, date-sorted |
+| `{ organizationId: 1, familyId: 1, paymentDate: -1 }`               | Family payment history         |
+| `{ organizationId: 1, familyId: 1, year: 1 }`                       | Year-scoped family totals      |
+| `{ organizationId: 1, stripePaymentIntentId: 1 }` (unique, partial) | Stripe idempotency per org     |
+| `{ stripePaymentIntentId: 1 }` (partial)                            | Webhook lookup by intent       |
 
 Source: `lib/models/payment.ts`.
 
 ## Client-side GET caching
 
 Stable GET endpoints (`/api/payment-plans`, `/api/lifecycle-event-types`, `/api/organizations/branding`) use `cachedFetch` from `lib/client-cache.ts` where appropriate. Mutations use plain `fetch` and call `invalidate()` on the cached URL.
+
+## Vercel Speed Insights
+
+**What it does:** The root layout mounts `<SpeedInsights />` from `@vercel/speed-insights` alongside the existing `WebVitals` component (which forwards Core Web Vitals to Sentry). Speed Insights sends real-user performance samples to Vercel's dashboard — complementary to Sentry's Web Vitals charts and error correlation.
+
+**Dashboard:** Vercel project → **Speed Insights** tab. Review LCP, FCP, CLS, INP, and TTFB by route and device after production traffic accumulates. Use it to spot regressions after deploys; pair with Sentry Performance when investigating a specific slow page.
 
 ## Bundle analysis
 
@@ -83,3 +89,43 @@ The Settings page (`app/settings/SettingsView.tsx`) code-splits each tab panel w
 ## Projections server cache
 
 `loadDuesRecommendation` in `lib/projections.ts` wraps the default forecast path in Next.js `unstable_cache` keyed by **organization id + history window years**, with **`revalidate: 3600`** (1 hour). The `/projections` RSC prefetch uses this cache; the `/api/dues-recommendation` route bypasses it when the client passes custom `forecastYears` or `startYear`. Re-run **Calculate Year** on [Calculations](/calculations) if admins need fresher numbers before the hour expires.
+
+## MongoDB Atlas backup & point-in-time recovery
+
+**Requirement:** Continuous backups with point-in-time recovery (PITR) enabled on the production Atlas cluster.
+
+**Checklist**
+
+1. Atlas → **Database** → your cluster → **Backup** → confirm **Cloud Backup** is on (M10+; M0/M2 use limited snapshot-only backup).
+2. Enable **Point-in-Time Recovery** if the tier supports it; note the retention window (default 2 days on M10, longer on higher tiers).
+3. Run a **test restore** quarterly: restore to a new cluster or download a snapshot, verify `MONGODB_URI` connectivity, and spot-check org/family/payment counts.
+4. Document the Atlas project id, cluster name, and on-call restore steps in your internal runbook (who can trigger restore, how to rotate `MONGODB_URI` in Vercel after failover).
+
+**Why:** Atlas PITR is the fastest path to recover from bad migrations, accidental bulk deletes, or ransomware-style corruption without replaying Stripe webhooks manually.
+
+## Post-deploy: encrypt legacy secrets (dry run)
+
+After each production deploy that touches encryption or auth models, run a **dry run** against production data (from a machine with prod `MONGODB_URI` + `ENCRYPTION_KEY`):
+
+```bash
+npx tsx scripts/encrypt-legacy-secrets.ts --dry-run
+```
+
+The script reports plaintext SMTP passwords and 2FA secrets still at rest. If counts are non-zero, run without `--dry-run` during a maintenance window (see `docs/SECURITY.md`). Boot-time validation in `lib/env-validation.ts` does not block on legacy plaintext — this script is the operational check.
+
+## Vercel production branch
+
+**Requirement:** Production deployments must come from the **`main`** branch only — no preview or feature branches promoted to production.
+
+**How to verify**
+
+1. Vercel → Project → **Settings** → **Git** → **Production Branch** = `main`.
+2. Optionally enforce in repo config by adding to `vercel.json`:
+
+   ```json
+   "git": { "productionBranch": "main" }
+   ```
+
+3. Confirm preview deployments stay on non-production URLs and do not share production env vars unless explicitly configured.
+
+Misconfigured branch rules have caused staging secrets and experimental code to reach production URLs.
