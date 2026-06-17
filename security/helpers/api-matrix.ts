@@ -3,6 +3,7 @@ import type { APIRequestContext } from '@playwright/test'
 import { getCatalogRoutes, isProtectedRoute, routeKey, type ApiRouteEntry } from '../catalog'
 import { authStoragePath } from '../auth/bootstrap'
 import { getSecurityConfig } from '../config'
+import { IDOR_SAFE_STATUSES } from '../payloads/idor-vectors'
 import { NON_MEMBER_ORG_ID } from './idor'
 import { mutateRequest, withOrgHeader } from './request-mutation'
 import {
@@ -171,7 +172,9 @@ export async function probeTenantHeaderDenied(
   const results: MatrixProbeResult[] = []
   for (const route of routes) {
     if (route.method !== 'GET' || !route.tenantScoped) continue
-    if (route.auth === 'platform-admin' || route.auth === 'cron') continue
+    if (route.auth === 'platform-admin' || route.auth === 'admin' || route.auth === 'cron') {
+      continue
+    }
 
     const path = resolveRoutePath(route.path, fixtures)
     const res = await mutateRequest(request, {
@@ -180,7 +183,7 @@ export async function probeTenantHeaderDenied(
       headers: withOrgHeader(NON_MEMBER_ORG_ID),
     })
     const status = res.status()
-    const passed = status === 403 || status === 401 || status === 400
+    const passed = IDOR_SAFE_STATUSES.has(status)
     results.push({
       route: route.path,
       method: route.method,

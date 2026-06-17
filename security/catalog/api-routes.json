@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-17T19:59:41.848Z",
+  "generatedAt": "2026-06-17T20:17:34.866Z",
   "summary": {
     "total": 153,
     "byAuth": {
@@ -13,7 +13,7 @@
       "webhook": 1
     },
     "mutating": 78,
-    "tenantScoped": 89
+    "tenantScoped": 87
   },
   "routes": [
     {
@@ -21,7 +21,7 @@
       "method": "GET",
       "auth": "admin",
       "csrf": false,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/admin/invite-requests/route.ts"
     },
@@ -30,7 +30,7 @@
       "method": "PATCH",
       "auth": "admin",
       "csrf": true,
-      "tenantScoped": true,
+      "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/admin/invite-requests/route.ts"
     },

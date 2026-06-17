@@ -247,11 +247,8 @@ function scanFile(file: string): ApiRouteEntry[] {
       effectiveAuth === 'org' || effectiveAuth === 'org-or-cron'
         ? (minRole ?? fileAuth.minRole ?? 'member')
         : undefined
-    const tenantScoped =
-      effectiveAuth === 'org' ||
-      effectiveAuth === 'org-or-cron' ||
-      effectiveAuth === 'admin' ||
-      effectiveAuth === 'platform-admin'
+    // Platform-admin routes (auth admin/platform-admin) are not org-scoped.
+    const tenantScoped = effectiveAuth === 'org' || effectiveAuth === 'org-or-cron'
     const csrf = effectiveAuth !== 'public' && !isCsrfExempt(apiPath, method, effectiveAuth)
     entries.push({
       path: apiPath,
