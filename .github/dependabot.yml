@@ -15,6 +15,21 @@ updates:
         dependency-type: development
         patterns:
           - '*'
+        exclude-patterns:
+          # Toolchain majors need coordinated upgrades (Next, PostCSS, ESLint).
+          - 'tailwindcss'
+          - 'eslint'
+          - 'eslint-config-next'
+          - '@next/bundle-analyzer'
+    ignore:
+      # Tailwind v4 requires @tailwindcss/postcss — stay on v3 until migrated.
+      - dependency-name: tailwindcss
+        update-types: [version-update:semver-major]
+      # ESLint 10 / eslint-config-next 16 conflict with Next 15 lint plugins.
+      - dependency-name: eslint
+        update-types: [version-update:semver-major]
+      - dependency-name: eslint-config-next
+        update-types: [version-update:semver-major]
     commit-message:
       prefix: deps
 
