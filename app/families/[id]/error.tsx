@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import Link from 'next/link'
 import * as Sentry from '@sentry/nextjs'
 
 import { Button } from '@/app/components/ui'
@@ -35,17 +36,15 @@ export default function FamilyDetailError({
             ? error.message
             : 'Something went wrong loading this page.'}
         </p>
-        {error?.digest && (
-          <p className="mt-1 text-xs text-fg-subtle">Ref: {error.digest}</p>
-        )}
+        {error?.digest && <p className="mt-1 text-xs text-fg-subtle">Ref: {error.digest}</p>}
         <div className="mt-5 flex flex-col-reverse justify-center gap-2 sm:flex-row">
           <Button onClick={() => reset()}>Try again</Button>
-          <a
+          <Link
             href="/families"
             className="focus-ring inline-flex min-h-[var(--touch-target)] items-center justify-center rounded-lg border border-border bg-surface px-4 text-sm font-medium text-fg shadow-sm hover:bg-fg/5 sm:min-h-10"
           >
             Back to families
-          </a>
+          </Link>
         </div>
       </div>
     </div>

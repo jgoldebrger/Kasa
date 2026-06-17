@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import Link from 'next/link'
 import * as Sentry from '@sentry/nextjs'
 
 /**
@@ -38,9 +39,7 @@ export default function RootError({
             ? error.message
             : 'An unexpected error occurred.'}
         </p>
-        {error?.digest && (
-          <p className="mt-1 text-xs text-fg-subtle">Ref: {error.digest}</p>
-        )}
+        {error?.digest && <p className="mt-1 text-xs text-fg-subtle">Ref: {error.digest}</p>}
         <div className="mt-5 flex justify-center gap-2">
           <button
             type="button"
@@ -49,12 +48,12 @@ export default function RootError({
           >
             Try again
           </button>
-          <a
+          <Link
             href="/"
             className="focus-ring inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium text-fg hover:bg-fg/5"
           >
             Go home
-          </a>
+          </Link>
         </div>
       </div>
     </div>
