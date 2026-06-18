@@ -55,7 +55,7 @@ describe('previousStatementPeriodBounds', () => {
     const expected = previousHebrewYearMonth(ref)
     expect(period.year).toBe(expected.year)
     expect(period.month).toBe(expected.month)
-    const bounds = hebrewMonthBounds(expected.year, expected.month)
+    const bounds = hebrewMonthBounds(expected.year, expected.month, 'America/New_York')
     expect(period.fromDate.getTime()).toBe(bounds.fromDate.getTime())
     expect(period.toDate.getTime()).toBe(bounds.toDate.getTime())
   })

@@ -1,6 +1,6 @@
 import type { Page, APIResponse } from '@playwright/test'
 import { expect } from '@playwright/test'
-import { E2E_ORGS, E2E_USER, E2E_TOTP_SECRET } from './seed'
+import { E2E_ORGS, E2E_USER, E2E_MEMBER, E2E_TOTP_SECRET } from './seed'
 import { generateTotpCode } from '../lib/totp'
 import { apiMutationHeaders } from './helpers/api-origin'
 
@@ -11,36 +11,55 @@ export async function acceptCookieConsent(page: Page): Promise<void> {
   })
 }
 
+/** Sign in via the login UI (optional TOTP when the account has 2FA). */
+export async function loginViaUi(
+  page: Page,
+  credentials: { email: string; password: string },
+  totpSecret?: string,
+): Promise<void> {
+  await acceptCookieConsent(page)
+  await page.goto('/login', { waitUntil: 'domcontentloaded' })
+  await page.getByLabel('Email').fill(credentials.email)
+  await page.getByLabel('Password').fill(credentials.password)
+  await page.getByRole('button', { name: 'Sign in' }).click()
+
+  const twoFactorInput = page.getByLabel(/two-factor authentication/i)
+  const needs2fa = await twoFactorInput
+    .waitFor({ state: 'visible', timeout: 30_000 })
+    .then(() => true)
+    .catch(() => false)
+
+  if (needs2fa) {
+    if (!totpSecret) {
+      throw new Error(`Account ${credentials.email} requires 2FA but no TOTP secret was provided`)
+    }
+    await twoFactorInput.fill(generateTotpCode(totpSecret))
+    await page.getByRole('button', { name: /verify and sign in/i }).click()
+  }
+
+  await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 60_000 })
+}
+
 /** Full login flow for the seeded owner (password + TOTP). */
 export async function loginAsE2eUser(page: Page): Promise<void> {
   let lastError: unknown
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      await acceptCookieConsent(page)
-      await page.goto('/login', { waitUntil: 'domcontentloaded' })
-      await page.getByLabel('Email').fill(E2E_USER.email)
-      await page.getByLabel('Password').fill(E2E_USER.password)
-      await page.getByRole('button', { name: 'Sign in' }).click()
-
-      const twoFactorInput = page.getByLabel(/two-factor authentication/i)
-      const needs2fa = await twoFactorInput
-        .waitFor({ state: 'visible', timeout: 60_000 })
-        .then(() => true)
-        .catch(() => false)
-
-      if (needs2fa) {
-        await twoFactorInput.fill(generateTotpCode(E2E_TOTP_SECRET))
-        await page.getByRole('button', { name: /verify and sign in/i }).click()
-      }
-
-      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 60_000 })
+      await loginViaUi(page, E2E_USER, E2E_TOTP_SECRET)
       return
     } catch (err) {
       lastError = err
-      if (attempt < 2) await page.waitForTimeout(2_000)
+      if (attempt < 2 && !page.isClosed()) {
+        await page.waitForTimeout(2_000)
+      }
     }
   }
   throw lastError
+}
+
+/** Login as the seeded member (no 2FA) — used by guest smoke tests. */
+export async function loginAsE2eMember(page: Page): Promise<void> {
+  await loginViaUi(page, E2E_MEMBER)
 }
 
 /** Activate an org via API (uses session cookies from the page context). */
