@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { CalendarIcon, ExclamationTriangleIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
 import { formatLocaleDate } from '@/lib/date-utils'
@@ -53,17 +53,17 @@ export default function EventsView({
   const [loading, setLoading] = useState(!serverHydrated)
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadError, setLoadError] = useState(false)
-  const [visibleEvents, setVisibleEvents] = useState<LifecycleEvent[]>([])
-  const hasFetchedRef = useRef(serverHydrated)
+  const [visibleEvents, setVisibleEvents] = useState<LifecycleEvent[]>(initialEvents ?? [])
   const { begin, invalidate, isStale } = useRequestGeneration()
 
   const fetchEvents = useCallback(
-    async (opts?: { cursor?: string | null; append?: boolean }) => {
+    async (opts?: { cursor?: string | null; append?: boolean; background?: boolean }) => {
       const gen = begin()
       const append = opts?.append ?? false
+      const background = opts?.background ?? false
       try {
         if (append) setLoadingMore(true)
-        else {
+        else if (!background) {
           setLoading(true)
           setLoadError(false)
         }
@@ -76,6 +76,9 @@ export default function EventsView({
         setEvents((prev) =>
           append ? [...prev, ...(items as LifecycleEvent[])] : (items as LifecycleEvent[]),
         )
+        if (!append) {
+          setVisibleEvents(items as LifecycleEvent[])
+        }
         setNextCursor(pageNext)
       } catch {
         if (isStale(gen)) return
@@ -98,21 +101,20 @@ export default function EventsView({
   )
 
   useEffect(() => {
-    if (hasFetchedRef.current) return
-    hasFetchedRef.current = true
-    void fetchEvents()
-  }, [fetchEvents])
+    void fetchEvents({
+      background: serverHydrated && (initialEvents?.length ?? 0) > 0,
+    })
+  }, [fetchEvents, serverHydrated, initialEvents])
 
   useOrgChanged(
     useCallback(() => {
       invalidate()
-      hasFetchedRef.current = false
       setEvents([])
+      setVisibleEvents([])
       setNextCursor(null)
       setLoadError(false)
       setLoading(true)
-      hasFetchedRef.current = true
-      fetchEvents()
+      void fetchEvents()
     }, [fetchEvents, invalidate]),
   )
 

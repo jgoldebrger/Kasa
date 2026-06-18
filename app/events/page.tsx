@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { Types } from 'mongoose'
 import { requireServerOrgContext } from '@/lib/auth-server'
 import connectDB from '@/lib/database'
 import { LifecycleEventPayment } from '@/lib/models'
@@ -13,7 +14,8 @@ export const dynamic = 'force-dynamic'
 
 async function fetchInitialEvents(organizationId: string) {
   await connectDB()
-  const rows = await LifecycleEventPayment.find({ organizationId })
+  const orgOid = new Types.ObjectId(organizationId)
+  const rows = await LifecycleEventPayment.find({ organizationId: orgOid })
     .sort({ eventDate: -1, _id: -1 })
     .limit(EVENTS_LIST_PAGE_SIZE + 1)
     .lean<any[]>()
@@ -42,7 +44,12 @@ async function EventsServer() {
   const ctx = await requireServerOrgContext({ minRole: 'admin' })
   try {
     const { items, nextCursor } = await fetchInitialEvents(ctx.organizationId)
-    return <EventsView initialEvents={items as NonNullable<EventsViewProps['initialEvents']>} initialNextCursor={nextCursor} />
+    return (
+      <EventsView
+        initialEvents={items as NonNullable<EventsViewProps['initialEvents']>}
+        initialNextCursor={nextCursor}
+      />
+    )
   } catch (err) {
     console.error('[events] server prefetch failed:', err)
     return <EventsView />

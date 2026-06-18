@@ -47,10 +47,7 @@ const NET_PAYMENT_SUM = {
     $max: [
       0,
       {
-        $subtract: [
-          { $ifNull: ['$amount', 0] },
-          { $ifNull: ['$refundedAmount', 0] },
-        ],
+        $subtract: [{ $ifNull: ['$amount', 0] }, { $ifNull: ['$refundedAmount', 0] }],
       },
     ],
   },
@@ -203,18 +200,11 @@ export async function countMembersByPaymentPlan(
  * is either explicitly null or absent, so the fallback branch covers
  * both shapes without a separate `$exists` clause.
  */
-export function buildPaymentYearFilter(
-  year: number,
-  organizationId: string,
-  tz?: string | null,
-) {
+export function buildPaymentYearFilter(year: number, organizationId: string, tz?: string | null) {
   const { start: startDate, endExclusive } = calendarYearBoundsInTimeZone(year, tz ?? 'UTC')
   return {
     organizationId,
-    $or: [
-      { year },
-      { year: null, paymentDate: { $gte: startDate, $lt: endExclusive } },
-    ],
+    $or: [{ year }, { year: null, paymentDate: { $gte: startDate, $lt: endExclusive } }],
   }
 }
 
@@ -268,14 +258,14 @@ export async function calculateYearlyIncome(
     deletedAt: null,
   }
   const totalPayments = await sumAggregate(
-    Payment as unknown as { aggregate: (pipeline: unknown[]) => Promise<Array<{ total?: number }>> },
+    Payment as unknown as {
+      aggregate: (pipeline: unknown[]) => Promise<Array<{ total?: number }>>
+    },
     paymentFilter,
     NET_PAYMENT_SUM,
   )
 
-  const calculatedIncome = roundMoneyValue(
-    totalPayments + (Number(extraDonation) || 0),
-  )
+  const calculatedIncome = roundMoneyValue(totalPayments + (Number(extraDonation) || 0))
   const totalIncome = calculatedIncome
 
   return {
@@ -440,10 +430,7 @@ export async function calculateAndSaveYear(
  * edited / removed. Preserves the org's existing extraDonation /
  * extraExpense overrides.
  */
-export async function updateYearlyCalculationForEvent(
-  eventYear: number,
-  organizationId: string,
-) {
+export async function updateYearlyCalculationForEvent(eventYear: number, organizationId: string) {
   try {
     await connectDB()
     const existing = await YearlyCalculation.findOne({ year: eventYear, organizationId })
@@ -458,10 +445,7 @@ export async function updateYearlyCalculationForEvent(
 }
 
 /** Fire-and-forget refresh of a saved YearlyCalculation snapshot. */
-export function scheduleYearlyCalculationRefresh(
-  year: number,
-  organizationId: string,
-): void {
+export function scheduleYearlyCalculationRefresh(year: number, organizationId: string): void {
   if (!Number.isFinite(year) || year < 1900 || year > 2200) return
   updateYearlyCalculationForEvent(year, organizationId).catch((err) => {
     console.error(`Failed to refresh YearlyCalculation for year ${year}:`, err)
@@ -509,6 +493,10 @@ export function scheduleYearlyCalculationRefreshForPayment(payment: {
  * just-completed cycle's expected dues — those rows accumulate in
  * `totalCycleCharges` so multi-year arrears finally show up correctly.
  *
+ * `totalLifecyclePayments` sums all recorded lifecycle events for the
+ * family (not filtered by `asOfDate`) — informational only; lifecycle
+ * events are not subtracted from `balance`.
+ *
  * For orgs that haven't enabled `cycleAutoRollover` there will be no
  * CycleCharge rows and the behavior collapses back to the old
  * one-year-only math, so nothing changes for them until they opt in.
@@ -544,30 +532,46 @@ export async function calculateFamilyBalance(
   const [totalPayments, totalWithdrawals, totalLifecyclePayments, totalCycleCharges] =
     await Promise.all([
       sumAggregate(
-        Payment as unknown as { aggregate: (pipeline: unknown[]) => Promise<Array<{ total?: number }>> },
-        { organizationId: orgOid, familyId: famOid, paymentDate: { $lte: asOfDate }, ...notDeleted },
+        Payment as unknown as {
+          aggregate: (pipeline: unknown[]) => Promise<Array<{ total?: number }>>
+        },
+        {
+          organizationId: orgOid,
+          familyId: famOid,
+          paymentDate: { $lte: asOfDate },
+          ...notDeleted,
+        },
         NET_PAYMENT_SUM,
       ),
       sumAggregate(
-        Withdrawal as unknown as { aggregate: (pipeline: unknown[]) => Promise<Array<{ total?: number }>> },
-        { organizationId: orgOid, familyId: famOid, withdrawalDate: { $lte: asOfDate }, ...notDeleted },
+        Withdrawal as unknown as {
+          aggregate: (pipeline: unknown[]) => Promise<Array<{ total?: number }>>
+        },
+        {
+          organizationId: orgOid,
+          familyId: famOid,
+          withdrawalDate: { $lte: asOfDate },
+          ...notDeleted,
+        },
         AMOUNT_SUM,
       ),
       sumAggregate(
-        LifecycleEventPayment as unknown as { aggregate: (pipeline: unknown[]) => Promise<Array<{ total?: number }>> },
-        { organizationId: orgOid, familyId: famOid, eventDate: { $lte: asOfDate }, ...notDeleted },
+        LifecycleEventPayment as unknown as {
+          aggregate: (pipeline: unknown[]) => Promise<Array<{ total?: number }>>
+        },
+        { organizationId: orgOid, familyId: famOid, ...notDeleted },
         AMOUNT_SUM,
       ),
       sumAggregate(
-        CycleCharge as unknown as { aggregate: (pipeline: unknown[]) => Promise<Array<{ total?: number }>> },
+        CycleCharge as unknown as {
+          aggregate: (pipeline: unknown[]) => Promise<Array<{ total?: number }>>
+        },
         { organizationId: orgOid, familyId: famOid, chargeDate: { $lte: asOfDate }, ...notDeleted },
         AMOUNT_SUM,
       ),
     ])
 
-  const balance = roundMoneyValue(
-    totalPayments - totalWithdrawals - totalCycleCharges - planCost,
-  )
+  const balance = roundMoneyValue(totalPayments - totalWithdrawals - totalCycleCharges - planCost)
 
   return {
     openingBalance: roundMoneyValue(0),
@@ -619,13 +623,17 @@ export async function calculateMemberBalance(
 
   const [totalPayments, totalLifecyclePayments] = await Promise.all([
     sumAggregate(
-      Payment as unknown as { aggregate: (pipeline: unknown[]) => Promise<Array<{ total?: number }>> },
+      Payment as unknown as {
+        aggregate: (pipeline: unknown[]) => Promise<Array<{ total?: number }>>
+      },
       { organizationId: orgOid, memberId: memOid, paymentDate: { $lte: asOfDate }, ...notDeleted },
       NET_PAYMENT_SUM,
     ),
     sumAggregate(
-      LifecycleEventPayment as unknown as { aggregate: (pipeline: unknown[]) => Promise<Array<{ total?: number }>> },
-      { organizationId: orgOid, memberId: memOid, eventDate: { $lte: asOfDate }, ...notDeleted },
+      LifecycleEventPayment as unknown as {
+        aggregate: (pipeline: unknown[]) => Promise<Array<{ total?: number }>>
+      },
+      { organizationId: orgOid, memberId: memOid, ...notDeleted },
       AMOUNT_SUM,
     ),
   ])
