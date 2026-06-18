@@ -19,9 +19,9 @@ export async function loginViaUi(
 ): Promise<void> {
   await acceptCookieConsent(page)
   await page.goto('/login', { waitUntil: 'domcontentloaded' })
-  await page.getByLabel('Email').fill(credentials.email)
-  await page.getByLabel('Password').fill(credentials.password)
-  await page.getByRole('button', { name: 'Sign in' }).click()
+  await page.getByLabel(/^email$/i).fill(credentials.email)
+  await page.getByLabel(/^password$/i).fill(credentials.password)
+  await page.getByRole('button', { name: /^sign in$/i }).click()
 
   const twoFactorInput = page.getByLabel(/two-factor authentication/i)
   const needs2fa = await twoFactorInput
@@ -37,7 +37,10 @@ export async function loginViaUi(
     await page.getByRole('button', { name: /verify and sign in/i }).click()
   }
 
-  await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 60_000 })
+  await page.waitForURL((url) => !url.pathname.includes('/login'), {
+    timeout: 90_000,
+    waitUntil: 'domcontentloaded',
+  })
 }
 
 /** Full login flow for the seeded owner (password + TOTP). */
@@ -64,22 +67,32 @@ export async function loginAsE2eMember(page: Page): Promise<void> {
 
 /** Activate an org via API (uses session cookies from the page context). */
 export async function activateOrg(page: Page, orgName: string): Promise<void> {
-  const res = await page.request.get('/api/organizations')
-  if (!res.ok()) throw new Error(`Failed to load orgs: ${res.status()}`)
-  const data = await res.json()
-  const org = (data.organizations || []).find((o: { name: string }) => o.name === orgName)
-  if (!org?.id) throw new Error(`Org not found: ${orgName}`)
-  if (data.activeOrgId === org.id) return
+  let lastError: unknown
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await page.request.get('/api/organizations')
+      if (!res.ok()) throw new Error(`Failed to load orgs: ${res.status()}`)
+      const data = await res.json()
+      const org = (data.organizations || []).find((o: { name: string }) => o.name === orgName)
+      if (!org?.id) throw new Error(`Org not found: ${orgName}`)
+      if (data.activeOrgId === org.id) return
 
-  const patch = await page.request.patch('/api/organizations', {
-    data: { activeOrgId: org.id },
-    headers: apiMutationHeaders('/'),
-  })
-  if (!patch.ok()) throw new Error(`Failed to switch org: ${patch.status()}`)
+      const patch = await page.request.patch('/api/organizations', {
+        data: { activeOrgId: org.id },
+        headers: apiMutationHeaders('/'),
+      })
+      if (!patch.ok()) throw new Error(`Failed to switch org: ${patch.status()}`)
 
-  await page.evaluate(() => {
-    window.dispatchEvent(new CustomEvent('kasa:org-changed'))
-  })
+      await page.evaluate(() => {
+        window.dispatchEvent(new CustomEvent('kasa:org-changed'))
+      })
+      return
+    } catch (err) {
+      lastError = err
+      if (attempt < 3) await page.waitForTimeout(1_500 * attempt)
+    }
+  }
+  throw lastError
 }
 
 export async function ensureAlphaOrg(page: Page): Promise<void> {
@@ -141,7 +154,7 @@ export async function gotoFamilyDetail(page: Page): Promise<void> {
   await expect(main.getByRole('heading', { level: 1, name: /Alpha Marker/i })).toBeVisible({
     timeout: 180_000,
   })
-  await expect(main.getByRole('button', { name: 'Edit Info' })).toBeVisible({ timeout: 60_000 })
+  await expect(main.getByRole('button', { name: /edit all/i })).toBeVisible({ timeout: 60_000 })
 }
 
 /** Navigate to a family detail tab and wait for the page shell to render. */

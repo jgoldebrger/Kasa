@@ -59,7 +59,7 @@ export async function gotoFamilyInfoTab(page: Page): Promise<void> {
 }
 
 export async function openFamilyEditModal(page: Page): Promise<Locator> {
-  await page.getByRole('button', { name: 'Edit Info' }).click()
+  await page.getByRole('button', { name: /edit all/i }).click()
   const modal = page.locator('h2', { hasText: 'Edit Family Information' }).locator('..')
   await expect(modal).toBeVisible({ timeout: 30_000 })
   return modal

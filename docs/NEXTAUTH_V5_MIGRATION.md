@@ -15,12 +15,12 @@ Auth.js maintenance transferred to the Better Auth team (Sept 2025). Expect **se
 
 ## Current dependencies
 
-| Package | Version | Notes |
-|---------|---------|-------|
-| `next-auth` | `5.0.0-beta.31` (pinned) | Transitive `@auth/core@0.41.2` |
-| `nodemailer` | `7.0.10` | Satisfies optional peer `^7.0.7`; used for platform SMTP, not NextAuth email provider |
-| `next` | `^14.2.33` | App Router; compatible with v5 |
-| `bcryptjs` | `^2.4.3` | Credentials `authorize()` only |
+| Package      | Version                  | Notes                                                                               |
+| ------------ | ------------------------ | ----------------------------------------------------------------------------------- |
+| `next-auth`  | `5.0.0-beta.31` (pinned) | Transitive `@auth/core@0.41.2`                                                      |
+| `nodemailer` | `9.0.1`                  | Pinned via overrides for audit; used for platform SMTP, not NextAuth email provider |
+| `next`       | `^14.2.33`               | App Router; compatible with v5                                                      |
+| `bcryptjs`   | `^2.4.3`                 | Credentials `authorize()` only                                                      |
 
 No `@auth/*-adapter` packages — JWT strategy, no database sessions.
 
@@ -51,11 +51,11 @@ lib/auth-server.ts   → getCachedAuth / getServerOrgContext via auth()
 
 ## Release status (npm + maintainer signals)
 
-| Dist-tag | Version | Meaning |
-|----------|---------|---------|
-| `latest` | `4.24.14` | v4 maintenance line |
-| `beta` | `5.0.0-beta.31` | **Newest v5 build** (KASA is here) |
-| `canary` / `next` | 3.x / 4.0.0-next | Unrelated legacy tags |
+| Dist-tag          | Version          | Meaning                            |
+| ----------------- | ---------------- | ---------------------------------- |
+| `latest`          | `4.24.14`        | v4 maintenance line                |
+| `beta`            | `5.0.0-beta.31`  | **Newest v5 build** (KASA is here) |
+| `canary` / `next` | 3.x / 4.0.0-next | Unrelated legacy tags              |
 
 - v5 betas run `5.0.0-beta.0` … `5.0.0-beta.31` with **no RC or stable `5.0.0`** published.
 - GitHub releases for `5.0.0-beta.31` (Apr 2025) are mostly `@auth/core` dependency bumps and provider fixes.
@@ -69,14 +69,14 @@ lib/auth-server.ts   → getCachedAuth / getServerOrgContext via auth()
 
 ### v4 → v5 (already absorbed by KASA)
 
-| v4 | v5 (current KASA) |
-|----|-------------------|
-| `getServerSession(authOptions)` | `auth()` from `app/auth.ts` |
+| v4                                                          | v5 (current KASA)                                                  |
+| ----------------------------------------------------------- | ------------------------------------------------------------------ |
+| `getServerSession(authOptions)`                             | `auth()` from `app/auth.ts`                                        |
 | `[...nextauth].ts` default export / `NextAuth(authOptions)` | `export const { handlers, auth, signIn, signOut } = NextAuth(...)` |
-| `next-auth/middleware` | `NextAuth(authConfig)` middleware wrapper |
-| `NEXTAUTH_*` env prefix | `AUTH_*` preferred; `NEXTAUTH_*` still accepted |
-| `next-auth.session-token` cookie | `authjs.session-token` |
-| Monolithic `authOptions` | Split `auth.config.ts` (edge) + `auth.ts` (Node providers) |
+| `next-auth/middleware`                                      | `NextAuth(authConfig)` middleware wrapper                          |
+| `NEXTAUTH_*` env prefix                                     | `AUTH_*` preferred; `NEXTAUTH_*` still accepted                    |
+| `next-auth.session-token` cookie                            | `authjs.session-token`                                             |
+| Monolithic `authOptions`                                    | Split `auth.config.ts` (edge) + `auth.ts` (Node providers)         |
 
 KASA has **no remaining v4 APIs** (`getServerSession`, `withAuth`, `NextAuthOptions`, `next-auth/middleware`).
 
@@ -97,13 +97,13 @@ Review the [next-auth changelog](https://github.com/nextauthjs/next-auth/release
 
 ### Today (`.env.example` / `.env.local`)
 
-| Variable | Role | v5 canonical? |
-|----------|------|---------------|
-| `AUTH_SECRET` | JWT signing | **Yes** (v5 primary) |
-| `NEXTAUTH_SECRET` | JWT signing fallback | Legacy alias; still read by Auth.js |
-| `NEXTAUTH_URL` | Canonical app URL | Legacy; v5 also accepts `AUTH_URL` |
-| `PLATFORM_ADMIN_EMAILS` | Custom; read in jwt callback | App-specific |
-| `ENCRYPTION_KEY` | TOTP/SMTP encryption; dev fallback uses `NEXTAUTH_SECRET` | App-specific |
+| Variable                | Role                                                      | v5 canonical?                       |
+| ----------------------- | --------------------------------------------------------- | ----------------------------------- |
+| `AUTH_SECRET`           | JWT signing                                               | **Yes** (v5 primary)                |
+| `NEXTAUTH_SECRET`       | JWT signing fallback                                      | Legacy alias; still read by Auth.js |
+| `NEXTAUTH_URL`          | Canonical app URL                                         | Legacy; v5 also accepts `AUTH_URL`  |
+| `PLATFORM_ADMIN_EMAILS` | Custom; read in jwt callback                              | App-specific                        |
+| `ENCRYPTION_KEY`        | TOTP/SMTP encryption; dev fallback uses `NEXTAUTH_SECRET` | App-specific                        |
 
 ### Recommended cleanup (non-breaking, post-stable)
 
@@ -136,14 +136,14 @@ Custom logic in `app/auth.ts` must survive any library bump:
 
 ## Test impact matrix
 
-| Area | Files | Action on upgrade |
-|------|-------|-------------------|
+| Area                                 | Files                                                                                           | Action on upgrade                                                    |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | Unit / integration (mocked `auth()`) | `lib/auth-helpers.integration.test.ts`, `lib/auth-server.test.ts`, `lib/auth-cron.unit.test.ts` | **No changes expected** — mocks `@/app/auth`, not NextAuth internals |
-| Vitest global env | `vitest.setup.ts` | Already sets `AUTH_SECRET` + `NEXTAUTH_SECRET` |
-| Route-logic / api-routes harness | `app/api/api-routes.integration.test.ts`, `vitest.route-logic.setup.ts` | **Do not edit** per workstream rules; mocks `auth` |
-| E2E login | `e2e/auth.setup.ts`, `security/auth/bootstrap.ts` | Re-run after bump; UI flow unchanged |
-| Security probes | `security/helpers/auth-testing.ts` | Verify cookie tamper still 401s; cookie names already v5 |
-| CSRF allow-list | `lib/csrf.ts`, `middleware.ts` | Confirm `/api/auth/*` paths still exempt |
+| Vitest global env                    | `vitest.setup.ts`                                                                               | Already sets `AUTH_SECRET` + `NEXTAUTH_SECRET`                       |
+| Route-logic / api-routes harness     | `app/api/api-routes.integration.test.ts`, `vitest.route-logic.setup.ts`                         | **Do not edit** per workstream rules; mocks `auth`                   |
+| E2E login                            | `e2e/auth.setup.ts`, `security/auth/bootstrap.ts`                                               | Re-run after bump; UI flow unchanged                                 |
+| Security probes                      | `security/helpers/auth-testing.ts`                                                              | Verify cookie tamper still 401s; cookie names already v5             |
+| CSRF allow-list                      | `lib/csrf.ts`, `middleware.ts`                                                                  | Confirm `/api/auth/*` paths still exempt                             |
 
 **Suggested commands after package bump:**
 
@@ -192,12 +192,12 @@ npm run security:test:safe   # if staging available
 
 ## Risk summary
 
-| Risk | Likelihood | Mitigation |
-|------|------------|------------|
-| Stable `5.0.0` never ships | Medium | Stay pinned; security patches on beta line |
-| Breaking change in final stable | Low–medium | Staged rollout + changelog review |
-| Auth.js maintenance stagnation | Medium | Monitor advisories; long-term Better Auth evaluation |
-| Session invalidation on bump | Low | Staging soak; keep secrets unchanged |
+| Risk                            | Likelihood | Mitigation                                           |
+| ------------------------------- | ---------- | ---------------------------------------------------- |
+| Stable `5.0.0` never ships      | Medium     | Stay pinned; security patches on beta line           |
+| Breaking change in final stable | Low–medium | Staged rollout + changelog review                    |
+| Auth.js maintenance stagnation  | Medium     | Monitor advisories; long-term Better Auth evaluation |
+| Session invalidation on bump    | Low        | Staging soak; keep secrets unchanged                 |
 
 ---
 
