@@ -5,6 +5,18 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const SEGMENT_CONFIG = new Set([
+  'dynamic',
+  'runtime',
+  'revalidate',
+  'fetchCache',
+  'preferredRegion',
+  'maxDuration',
+])
+const SEGMENT_DEFAULTS: Record<string, string> = {
+  dynamic: "'force-dynamic'",
+  runtime: "'nodejs'",
+}
 
 function isThinReexport(content: string): boolean {
   const lines = content
@@ -72,8 +84,23 @@ function main() {
       continue
     }
 
+    const segmentExports = exportNames.filter((n) => SEGMENT_CONFIG.has(n))
+    const handlerExports = exportNames.filter((n) => !SEGMENT_CONFIG.has(n))
+    if (handlerExports.length === 0) {
+      console.warn('No handler exports found:', routeFile)
+      continue
+    }
+
     const importFrom = handlerImportPath(handlerFile)
-    const routeBody = `export { ${exportNames.join(', ')} } from '${importFrom}'\n`
+    const segmentLines = segmentExports.map(
+      (name) => `export const ${name} = ${SEGMENT_DEFAULTS[name] ?? "'force-dynamic'"}`,
+    )
+    const routeBody = [
+      ...segmentLines,
+      '',
+      `export { ${handlerExports.join(', ')} } from '${importFrom}'`,
+      '',
+    ].join('\n')
     fs.writeFileSync(routeFile, routeBody, 'utf8')
     extracted++
   }

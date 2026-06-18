@@ -1,1 +1,3 @@
-export { GET, PUT, dynamic } from '@/lib/api-handlers/organizations/automation/handler'
+export const dynamic = 'force-dynamic'
+
+export { GET, PUT } from '@/lib/api-handlers/organizations/automation/handler'

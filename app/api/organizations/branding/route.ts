@@ -1,1 +1,3 @@
-export { DELETE, GET, PUT, dynamic } from '@/lib/api-handlers/organizations/branding/handler'
+export const dynamic = 'force-dynamic'
+
+export { DELETE, GET, PUT } from '@/lib/api-handlers/organizations/branding/handler'

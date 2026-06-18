@@ -1,1 +1,3 @@
-export { POST, dynamic } from '@/lib/api-handlers/tax-receipts/email/handler'
+export const dynamic = 'force-dynamic'
+
+export { POST } from '@/lib/api-handlers/tax-receipts/email/handler'

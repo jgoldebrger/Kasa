@@ -1,1 +1,3 @@
-export { GET, POST, dynamic } from '@/lib/api-handlers/tasks/handler'
+export const dynamic = 'force-dynamic'
+
+export { GET, POST } from '@/lib/api-handlers/tasks/handler'

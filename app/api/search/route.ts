@@ -1,1 +1,3 @@
-export { GET, dynamic } from '@/lib/api-handlers/search/handler'
+export const dynamic = 'force-dynamic'
+
+export { GET } from '@/lib/api-handlers/search/handler'

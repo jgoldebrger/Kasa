@@ -1,1 +1,3 @@
-export { GET, PATCH, dynamic } from '@/lib/api-handlers/user/preferences/handler'
+export const dynamic = 'force-dynamic'
+
+export { GET, PATCH } from '@/lib/api-handlers/user/preferences/handler'
