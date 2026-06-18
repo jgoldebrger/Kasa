@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import type React from 'react'
 import { PrinterIcon, TagIcon } from '@heroicons/react/24/outline'
+import { SettingsPanel } from '@/app/components/settings/SettingsPanel'
 import { Button, EmptyState, Input } from '@/app/components/ui'
 import { escapeHtml } from '@/lib/html-escape'
 
@@ -205,10 +206,12 @@ export default function MailLabelsPanel({ families, plans, filters, setFilters }
     })()
   }, [filters.balance, balanceMap])
 
-  useOrgChanged(useCallback(() => {
-    balanceFetchGenRef.current += 1
-    setBalanceMap(null)
-  }, []))
+  useOrgChanged(
+    useCallback(() => {
+      balanceFetchGenRef.current += 1
+      setBalanceMap(null)
+    }, []),
+  )
 
   const filtered = useMemo(() => {
     const search = filters.search.trim().toLowerCase()
@@ -270,29 +273,21 @@ export default function MailLabelsPanel({ families, plans, filters, setFilters }
   }
 
   return (
-    <div className="bg-surface rounded-lg shadow-lg p-4 sm:p-6">
-      <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/40 rounded-lg flex items-center justify-center">
-            <TagIcon className="h-6 w-6 text-amber-600 dark:text-amber-300" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-fg">Mail Labels</h2>
-            <p className="text-sm text-fg-muted">
-              Avery 5160 (30 labels per sheet, 1" × 2.625").
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2">
+    <SettingsPanel
+      icon={<TagIcon />}
+      title="Mail Labels"
+      description='Avery 5160 (30 labels per sheet, 1" × 2.625").'
+      actions={
+        <>
           <Button variant="secondary" onClick={handleTestSheet}>
             Print test sheet
           </Button>
           <Button leftIcon={<PrinterIcon className="h-4 w-4" />} onClick={handlePrint}>
             Print labels
           </Button>
-        </div>
-      </div>
-
+        </>
+      }
+    >
       {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Input
@@ -328,9 +323,7 @@ export default function MailLabelsPanel({ families, plans, filters, setFilters }
             <input
               type="checkbox"
               checked={filters.requireAddress}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, requireAddress: e.target.checked }))
-              }
+              onChange={(e) => setFilters((f) => ({ ...f, requireAddress: e.target.checked }))}
               className="h-4 w-4 rounded border-border text-accent focus-ring"
             />
             Require street address (skip families with no mailing address)
@@ -384,9 +377,7 @@ export default function MailLabelsPanel({ families, plans, filters, setFilters }
             Preview ({filtered.length} {filtered.length === 1 ? 'family' : 'families'})
           </h3>
           {filtered.length > previewRows.length && (
-            <span className="text-xs text-fg-muted">
-              Showing first {previewRows.length}.
-            </span>
+            <span className="text-xs text-fg-muted">Showing first {previewRows.length}.</span>
           )}
         </div>
         {filtered.length === 0 ? (
@@ -409,6 +400,6 @@ export default function MailLabelsPanel({ families, plans, filters, setFilters }
           </div>
         )}
       </div>
-    </div>
+    </SettingsPanel>
   )
 }

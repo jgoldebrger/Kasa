@@ -17,6 +17,8 @@ import {
   MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline'
 import { Input } from '@/app/components/ui'
+import { useT } from '@/lib/client/i18n'
+import type { MessageKey } from '@/lib/i18n/load-locale'
 
 export type SettingsTabId =
   | 'email'
@@ -36,7 +38,7 @@ export type SettingsTabId =
 
 interface NavItem {
   id: SettingsTabId
-  label: string
+  labelKey: MessageKey
   icon: ReactNode
   privileged?: boolean
   keywords?: string
@@ -44,53 +46,129 @@ interface NavItem {
 
 interface NavSection {
   id: string
-  title: string
+  titleKey: MessageKey
   items: NavItem[]
 }
 
 const ALL_SECTIONS: NavSection[] = [
   {
     id: 'organization',
-    title: 'Organization',
+    titleKey: 'settings.organization',
     items: [
-      { id: 'email', label: 'Email', icon: <EnvelopeIcon className="h-4 w-4" aria-hidden="true" />, keywords: 'smtp gmail configuration' },
-      { id: 'branding', label: 'Branding', icon: <PhotoIcon className="h-4 w-4" aria-hidden="true" />, keywords: 'logo colors' },
-      { id: 'members', label: 'Members', icon: <UserGroupIcon className="h-4 w-4" aria-hidden="true" />, privileged: true, keywords: 'invite users roles' },
-      { id: 'localization', label: 'Localization', icon: <GlobeAltIcon className="h-4 w-4" aria-hidden="true" />, privileged: true, keywords: 'currency locale language' },
+      {
+        id: 'email',
+        labelKey: 'settings.email',
+        icon: <EnvelopeIcon className="h-4 w-4" aria-hidden="true" />,
+        keywords: 'smtp gmail configuration',
+      },
+      {
+        id: 'branding',
+        labelKey: 'settings.branding',
+        icon: <PhotoIcon className="h-4 w-4" aria-hidden="true" />,
+        keywords: 'logo colors',
+      },
+      {
+        id: 'members',
+        labelKey: 'settings.nav.members',
+        icon: <UserGroupIcon className="h-4 w-4" aria-hidden="true" />,
+        privileged: true,
+        keywords: 'invite users roles',
+      },
+      {
+        id: 'localization',
+        labelKey: 'settings.localization',
+        icon: <GlobeAltIcon className="h-4 w-4" aria-hidden="true" />,
+        privileged: true,
+        keywords: 'currency locale language',
+      },
     ],
   },
   {
     id: 'finance',
-    title: 'Finance',
+    titleKey: 'settings.nav.section.finance',
     items: [
-      { id: 'paymentPlans', label: 'Payment Plans', icon: <CreditCardIcon className="h-4 w-4" aria-hidden="true" />, keywords: 'plans dues pricing' },
-      { id: 'eventTypes', label: 'Event Types', icon: <CalendarIcon className="h-4 w-4" aria-hidden="true" />, keywords: 'lifecycle events amounts' },
-      { id: 'cycle', label: 'Cycle', icon: <CalendarIcon className="h-4 w-4" aria-hidden="true" />, keywords: 'hebrew year billing period' },
-      { id: 'billing', label: 'Billing', icon: <CreditCardIcon className="h-4 w-4" aria-hidden="true" />, privileged: true, keywords: 'subscription stripe' },
+      {
+        id: 'paymentPlans',
+        labelKey: 'settings.nav.paymentPlans',
+        icon: <CreditCardIcon className="h-4 w-4" aria-hidden="true" />,
+        keywords: 'plans dues pricing',
+      },
+      {
+        id: 'eventTypes',
+        labelKey: 'settings.eventTypes',
+        icon: <CalendarIcon className="h-4 w-4" aria-hidden="true" />,
+        keywords: 'lifecycle events amounts',
+      },
+      {
+        id: 'cycle',
+        labelKey: 'settings.cycle',
+        icon: <CalendarIcon className="h-4 w-4" aria-hidden="true" />,
+        keywords: 'hebrew year billing period',
+      },
+      {
+        id: 'billing',
+        labelKey: 'settings.nav.billing',
+        icon: <CreditCardIcon className="h-4 w-4" aria-hidden="true" />,
+        privileged: true,
+        keywords: 'subscription stripe',
+      },
     ],
   },
   {
     id: 'communications',
-    title: 'Communications',
+    titleKey: 'settings.nav.section.communications',
     items: [
-      { id: 'letterhead', label: 'Letterhead', icon: <IdentificationIcon className="h-4 w-4" aria-hidden="true" />, privileged: true, keywords: 'statements receipts address' },
-      { id: 'labels', label: 'Mail Labels', icon: <TagIcon className="h-4 w-4" aria-hidden="true" />, keywords: 'print labels envelopes' },
-      { id: 'kevittel', label: 'Kevittel', icon: <UserGroupIcon className="h-4 w-4" aria-hidden="true" />, keywords: 'print hebrew families' },
+      {
+        id: 'letterhead',
+        labelKey: 'settings.nav.letterhead',
+        icon: <IdentificationIcon className="h-4 w-4" aria-hidden="true" />,
+        privileged: true,
+        keywords: 'statements receipts address',
+      },
+      {
+        id: 'labels',
+        labelKey: 'settings.nav.labels',
+        icon: <TagIcon className="h-4 w-4" aria-hidden="true" />,
+        keywords: 'print labels envelopes',
+      },
+      {
+        id: 'kevittel',
+        labelKey: 'settings.nav.kevittel',
+        icon: <UserGroupIcon className="h-4 w-4" aria-hidden="true" />,
+        keywords: 'print hebrew families',
+      },
     ],
   },
   {
     id: 'automation',
-    title: 'Automation',
+    titleKey: 'settings.nav.section.automation',
     items: [
-      { id: 'automation', label: 'Rules', icon: <Cog6ToothIcon className="h-4 w-4" aria-hidden="true" />, keywords: 'auto send statements monthly' },
+      {
+        id: 'automation',
+        labelKey: 'settings.nav.rules',
+        icon: <Cog6ToothIcon className="h-4 w-4" aria-hidden="true" />,
+        keywords: 'auto send statements monthly',
+      },
     ],
   },
   {
     id: 'admin',
-    title: 'Admin',
+    titleKey: 'settings.nav.section.admin',
     items: [
-      { id: 'activity', label: 'Activity', icon: <ClockIcon className="h-4 w-4" aria-hidden="true" />, privileged: true, keywords: 'audit log history' },
-      { id: 'trash', label: 'Recycle bin', icon: <TrashIcon className="h-4 w-4" aria-hidden="true" />, privileged: true, keywords: 'deleted restore purge' },
+      {
+        id: 'activity',
+        labelKey: 'settings.nav.activity',
+        icon: <ClockIcon className="h-4 w-4" aria-hidden="true" />,
+        privileged: true,
+        keywords: 'audit log history',
+      },
+      {
+        id: 'trash',
+        labelKey: 'settings.nav.trash',
+        icon: <TrashIcon className="h-4 w-4" aria-hidden="true" />,
+        privileged: true,
+        keywords: 'deleted restore purge',
+      },
     ],
   },
 ]
@@ -101,35 +179,54 @@ export interface SettingsNavProps {
   canSeePrivilegedTabs: boolean
 }
 
-function matchesQuery(item: NavItem, sectionTitle: string, query: string): boolean {
-  const haystack = [item.label, item.keywords ?? '', sectionTitle].join(' ').toLowerCase()
+function matchesQuery(
+  item: NavItem,
+  sectionTitle: string,
+  query: string,
+  t: (key: MessageKey) => string,
+): boolean {
+  const haystack = [t(item.labelKey), item.keywords ?? '', sectionTitle].join(' ').toLowerCase()
   return haystack.includes(query)
 }
 
-export default function SettingsNav({ activeId, onChange, canSeePrivilegedTabs }: SettingsNavProps) {
+export default function SettingsNav({
+  activeId,
+  onChange,
+  canSeePrivilegedTabs,
+}: SettingsNavProps) {
+  const t = useT()
   const [query, setQuery] = useState('')
   const normalizedQuery = query.trim().toLowerCase()
 
   const sections = useMemo(() => {
-    return ALL_SECTIONS.map((section) => ({
-      ...section,
-      items: section.items.filter((item) => {
-        if (item.privileged && !canSeePrivilegedTabs) return false
-        if (!normalizedQuery) return true
-        return matchesQuery(item, section.title, normalizedQuery) || item.id === activeId
-      }),
-    })).filter((section) => section.items.length > 0)
-  }, [activeId, canSeePrivilegedTabs, normalizedQuery])
+    return ALL_SECTIONS.map((section) => {
+      const title = t(section.titleKey)
+      return {
+        id: section.id,
+        title,
+        items: section.items
+          .filter((item) => {
+            if (item.privileged && !canSeePrivilegedTabs) return false
+            if (!normalizedQuery) return true
+            return matchesQuery(item, title, normalizedQuery, t) || item.id === activeId
+          })
+          .map((item) => ({
+            ...item,
+            label: t(item.labelKey),
+          })),
+      }
+    }).filter((section) => section.items.length > 0)
+  }, [activeId, canSeePrivilegedTabs, normalizedQuery, t])
 
   return (
-    <nav aria-label="Settings sections" className="surface-card p-3 sm:p-4">
+    <nav aria-label={t('settings.nav.ariaLabel')} className="surface-card p-3 sm:p-4">
       <div className="mb-3">
         <Input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Type to find a setting"
-          aria-label="Filter settings"
+          placeholder={t('settings.nav.searchPlaceholder')}
+          aria-label={t('settings.nav.filterAriaLabel')}
           leftIcon={<MagnifyingGlassIcon className="h-4 w-4" aria-hidden="true" />}
           className="text-sm"
         />
@@ -167,7 +264,9 @@ export default function SettingsNav({ activeId, onChange, canSeePrivilegedTabs }
         ))}
 
         {sections.length === 0 && (
-          <p className="px-2 py-4 text-sm text-fg-muted text-center">No settings match your search.</p>
+          <p className="px-2 py-4 text-sm text-fg-muted text-center">
+            {t('settings.nav.noResults')}
+          </p>
         )}
       </div>
     </nav>

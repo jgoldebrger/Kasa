@@ -2,6 +2,7 @@
 
 import type React from 'react'
 import { IdentificationIcon } from '@heroicons/react/24/outline'
+import { SettingsPanel } from '@/app/components/settings/SettingsPanel'
 import { Button, Input, Textarea } from '@/app/components/ui'
 
 /**
@@ -54,19 +55,11 @@ export default function LetterheadPanel({ letterhead, setLetterhead, saving, onS
   })
 
   return (
-    <div className="bg-surface rounded-lg shadow-lg p-4 sm:p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/40 rounded-lg flex items-center justify-center">
-          <IdentificationIcon className="h-6 w-6 text-indigo-600 dark:text-indigo-300" />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-fg">Letterhead</h2>
-          <p className="text-sm text-fg-muted">
-            Address, tax ID, and signature lines used on tax receipts.
-          </p>
-        </div>
-      </div>
-
+    <SettingsPanel
+      icon={<IdentificationIcon />}
+      title="Letterhead"
+      description="Address, tax ID, and signature lines used on tax receipts."
+    >
       <form onSubmit={onSubmit} className="space-y-8">
         {/* Mailing address */}
         <section>
@@ -74,7 +67,11 @@ export default function LetterheadPanel({ letterhead, setLetterhead, saving, onS
             Mailing address
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label="Address line 1" placeholder="123 Main St" {...bindInput('addressLine1')} />
+            <Input
+              label="Address line 1"
+              placeholder="123 Main St"
+              {...bindInput('addressLine1')}
+            />
             <Input label="Address line 2" placeholder="Suite 200" {...bindInput('addressLine2')} />
             <Input label="City" {...bindInput('city')} />
             <Input label="State / region" {...bindInput('state')} />
@@ -157,6 +154,6 @@ export default function LetterheadPanel({ letterhead, setLetterhead, saving, onS
           </Button>
         </div>
       </form>
-    </div>
+    </SettingsPanel>
   )
 }

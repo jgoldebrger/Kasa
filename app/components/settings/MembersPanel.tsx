@@ -20,6 +20,7 @@ import {
   Input,
   Select,
   SkeletonRows,
+  Alert,
   type DataColumn,
 } from '@/app/components/ui'
 
@@ -289,10 +290,9 @@ export default function MembersPanel({ onRoleResolved }: MembersPanelProps = {})
             </Button>
           </form>
           {lastInviteUrl && (
-            <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-900 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-200">
-              <p className="mb-1 font-medium">Invite created. Share this link:</p>
+            <Alert variant="success" className="mt-4" title="Invite created. Share this link:">
               <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
-                <code className="flex-1 break-all rounded border border-green-200 bg-surface px-2 py-1 text-xs dark:border-green-500/30">
+                <code className="flex-1 break-all rounded border border-border bg-surface px-2 py-1 text-xs">
                   {lastInviteUrl}
                 </code>
                 <Button
@@ -312,7 +312,7 @@ export default function MembersPanel({ onRoleResolved }: MembersPanelProps = {})
                   {copiedKey === 'last' && copied ? 'Copied' : 'Copy'}
                 </Button>
               </div>
-            </div>
+            </Alert>
           )}
         </div>
       )}

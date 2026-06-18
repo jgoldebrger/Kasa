@@ -4,36 +4,37 @@ import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
 import { Bars3Icon } from '@heroicons/react/24/outline'
 import OrgLogo from './OrgLogo'
+import { useT } from '@/lib/client/i18n'
+import type { MessageKey } from '@/lib/i18n/load-locale'
 
 const GlobalSearch = dynamic(() => import('./GlobalSearch'), { ssr: false })
 const NotificationsBell = dynamic(() => import('./NotificationsBell'), { ssr: false })
 
 /**
- * Map a route prefix to a friendly title shown in the mobile top bar.
- * Kept in this file (not a context) to avoid the prop-drilling tax —
- * 99% of pages don't need a custom title, and the ones that do can
- * still render their own heading inside the page.
+ * Map a route prefix to an i18n key shown in the mobile top bar.
+ * Page titles inside the content use PageHeader (hidden on mobile) so
+ * this bar is the sole visible heading on small screens.
  */
-const PATH_TITLES: { match: RegExp; title: string }[] = [
-  { match: /^\/$/, title: 'Dashboard' },
-  { match: /^\/families/, title: 'Families' },
-  { match: /^\/payments/, title: 'Payments' },
-  { match: /^\/tasks/, title: 'Tasks' },
-  { match: /^\/calculations/, title: 'Calculations' },
-  { match: /^\/events/, title: 'Events' },
-  { match: /^\/projections/, title: 'Dues calc' },
-  { match: /^\/lifecycle-event-types/, title: 'Event Types' },
-  { match: /^\/reports/, title: 'Reports' },
-  { match: /^\/statements/, title: 'Statements' },
-  { match: /^\/settings\/members/, title: 'Members' },
-  { match: /^\/settings/, title: 'Settings' },
-  { match: /^\/admin/, title: 'Admin' },
+const PATH_TITLE_KEYS: { match: RegExp; key: MessageKey }[] = [
+  { match: /^\/$/, key: 'nav.dashboard' },
+  { match: /^\/families/, key: 'nav.families' },
+  { match: /^\/payments/, key: 'nav.payments' },
+  { match: /^\/tasks/, key: 'nav.tasks' },
+  { match: /^\/calculations/, key: 'nav.calculations' },
+  { match: /^\/events/, key: 'nav.events' },
+  { match: /^\/projections/, key: 'nav.projections' },
+  { match: /^\/lifecycle-event-types/, key: 'settings.eventTypes' },
+  { match: /^\/reports/, key: 'nav.reports' },
+  { match: /^\/statements/, key: 'nav.statements' },
+  { match: /^\/settings\/members/, key: 'nav.members' },
+  { match: /^\/settings/, key: 'nav.settings' },
+  { match: /^\/admin/, key: 'nav.admin' },
 ]
 
-function titleForPath(path: string | null): string {
-  if (!path) return 'Kasa'
-  const hit = PATH_TITLES.find((p) => p.match.test(path))
-  return hit?.title || 'Kasa'
+function titleKeyForPath(path: string | null): MessageKey {
+  if (!path) return 'nav.brand'
+  const hit = PATH_TITLE_KEYS.find((p) => p.match.test(path))
+  return hit?.key ?? 'nav.brand'
 }
 
 interface MobileTopBarProps {
@@ -48,7 +49,8 @@ interface MobileTopBarProps {
  */
 export default function MobileTopBar({ onOpenMenu, menuOpen }: MobileTopBarProps) {
   const pathname = usePathname()
-  const title = titleForPath(pathname)
+  const t = useT()
+  const title = t(titleKeyForPath(pathname))
 
   return (
     <header
@@ -58,7 +60,7 @@ export default function MobileTopBar({ onOpenMenu, menuOpen }: MobileTopBarProps
       <button
         type="button"
         onClick={onOpenMenu}
-        aria-label="Open navigation menu"
+        aria-label={t('nav.openMenu')}
         aria-controls="primary-sidebar"
         aria-expanded={menuOpen}
         className="focus-ring inline-flex min-h-[var(--touch-target)] min-w-[var(--touch-target)] items-center justify-center rounded-md text-fg-muted hover:bg-fg/5 hover:text-fg"

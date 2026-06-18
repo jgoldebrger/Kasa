@@ -12,7 +12,9 @@ export default function FamilyHeader() {
   return (
     <div className="surface-card p-5 sm:p-6 mb-6">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <h1 className="text-2xl sm:text-3xl font-bold text-fg">{data.family.name}</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-fg">
+          {data.family.name}
+        </h1>
         {isAdmin && (
           <Button
             size="sm"
@@ -23,7 +25,9 @@ export default function FamilyHeader() {
           </Button>
         )}
       </div>
-      <div className={`grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-border${isAdmin ? ' md:grid-cols-7' : ''}`}>
+      <div
+        className={`grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-border${isAdmin ? ' md:grid-cols-7' : ''}`}
+      >
         <div>
           <p className="text-sm text-fg-muted">Wedding Date</p>
           <p className="font-medium">{new Date(data.family.weddingDate).toLocaleDateString()}</p>
@@ -41,7 +45,7 @@ export default function FamilyHeader() {
                   <QuestionMarkCircleIcon className="h-4 w-4 text-fg-muted" aria-hidden="true" />
                 </Tooltip>
               </p>
-              <p className="font-medium text-green-600">{formatMoney(data.balance.balance)}</p>
+              <p className="font-medium text-success">{formatMoney(data.balance.balance)}</p>
             </div>
             <div>
               <p className="text-sm text-fg-muted">Members</p>
@@ -49,20 +53,26 @@ export default function FamilyHeader() {
             </div>
             <div>
               <p className="text-sm text-fg-muted">Total Payments</p>
-              <p className="font-medium text-green-600">{formatMoney(data.balance.totalPayments)}</p>
+              <p className="font-medium text-success">{formatMoney(data.balance.totalPayments)}</p>
             </div>
             <div>
               <p className="text-sm text-fg-muted">Lifecycle Events</p>
-              <p className="font-medium text-accent">{formatMoney(data.balance.totalLifecyclePayments)}</p>
+              <p className="font-medium text-accent">
+                {formatMoney(data.balance.totalLifecyclePayments)}
+              </p>
             </div>
             <div>
               <p className="text-sm text-fg-muted">Plan Cost (Annual)</p>
-              <p className="font-medium text-orange-600">{formatMoney(-(data.balance.planCost || 0))}</p>
+              <p className="font-medium text-warning">
+                {formatMoney(-(data.balance.planCost || 0))}
+              </p>
             </div>
             {(data.balance.totalCycleCharges || 0) > 0 && (
               <div>
                 <p className="text-sm text-fg-muted">Past Cycle Charges</p>
-                <p className="font-medium text-orange-600">{formatMoney(-(data.balance.totalCycleCharges || 0))}</p>
+                <p className="font-medium text-warning">
+                  {formatMoney(-(data.balance.totalCycleCharges || 0))}
+                </p>
               </div>
             )}
           </>

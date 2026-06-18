@@ -17,6 +17,7 @@ import {
   type DataColumn,
 } from '@/app/components/ui'
 import { eventsListUrl, parseEventsListResponse } from '@/lib/client/events-list'
+import { useT } from '@/lib/client/i18n'
 
 interface LifecycleEvent {
   _id: string
@@ -63,6 +64,7 @@ export default function EventsView({
   initialNextCursor = null,
 }: EventsViewProps = {}) {
   const toast = useToast()
+  const t = useT()
   const { format: formatMoney } = useCurrency()
   const serverHydrated = initialEvents !== undefined
   const [events, setEvents] = useState<LifecycleEvent[]>(initialEvents ?? [])
@@ -279,7 +281,7 @@ export default function EventsView({
               loading={loadingMore}
               onClick={() => fetchEvents({ cursor: nextCursor, append: true })}
             >
-              {loadingMore ? 'Loading…' : 'Load more'}
+              {t('common.loadMore')}
             </Button>
           </div>
         )}

@@ -41,7 +41,10 @@ export const metadata: Metadata = {
 // Leaving it on `metadata` works but logs a deprecation warning every
 // SSR pass, drowning out real server-side log signal during incidents.
 export const viewport: Viewport = {
-  themeColor: '#0f172a',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0a0a0a' },
+  ],
 }
 
 /**

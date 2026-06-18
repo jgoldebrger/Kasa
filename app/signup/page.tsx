@@ -5,46 +5,34 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import Link from 'next/link'
 import { z } from 'zod'
-import { Button, Input, Skeleton } from '@/app/components/ui'
+import { Button, ButtonLink, Input, Skeleton } from '@/app/components/ui'
 import { useFormState } from '@/lib/client/useFormState'
 import { useToast } from '@/app/components/Toast'
+import { useT } from '@/lib/client/i18n'
 import { LockClosedIcon } from '@heroicons/react/24/outline'
+import type { MessageKey } from '@/lib/i18n/load-locale'
 
 type InvalidReason = 'missing-code' | 'not-found' | 'used' | 'expired' | 'error'
+
+const REASON_KEYS: Record<InvalidReason, MessageKey> = {
+  'missing-code': 'signup.reason.missingCode',
+  'not-found': 'signup.reason.notFound',
+  used: 'signup.reason.used',
+  expired: 'signup.reason.expired',
+  error: 'signup.reason.error',
+}
 
 type CodeState =
   | { kind: 'loading' }
   | { kind: 'valid'; email: string; name: string }
   | { kind: 'invalid'; reason: InvalidReason }
 
-function reasonMessage(reason: InvalidReason): string {
-  switch (reason) {
-    case 'missing-code':
-      return 'Signing up is invitation-only. Please use the link from your invitation email.'
-    case 'not-found':
-      return 'This invitation code is not recognized. Please use the link from your invitation email.'
-    case 'used':
-      return 'This invitation has already been used. If you already created an account, please sign in.'
-    case 'expired':
-      return 'This invitation has expired. Please request a new one.'
-    default:
-      return 'We couldn\u2019t validate your invitation. Please try again later.'
-  }
-}
-
-const signupSchema = z.object({
-  name: z.string().trim().min(2, 'Name must be at least 2 characters').max(100),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters')
-    .max(200, 'Password too long'),
-})
-
 function SignupForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const code = searchParams.get('code') || ''
   const toast = useToast()
+  const t = useT()
 
   const [codeState, setCodeState] = useState<CodeState>({ kind: 'loading' })
 
@@ -85,10 +73,8 @@ function SignupForm() {
           <div className="inline-flex items-center justify-center w-10 h-10 bg-accent text-accent-fg rounded-lg font-semibold mb-4">
             K
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-fg">Create your account</h1>
-          <p className="text-sm text-fg-muted mt-1">
-            Get started with Kasa — you&apos;ll get your own private workspace.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-fg">{t('signup.title')}</h1>
+          <p className="text-sm text-fg-muted mt-1">{t('signup.subtitle')}</p>
         </div>
 
         {codeState.kind === 'loading' && (
@@ -102,24 +88,21 @@ function SignupForm() {
 
         {codeState.kind === 'invalid' && (
           <div className="surface-card p-6 text-center space-y-4">
-            <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-app-subtle border border-border text-fg-subtle" aria-hidden="true">
+            <div
+              className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-app-subtle border border-border text-fg-subtle"
+              aria-hidden="true"
+            >
               <LockClosedIcon className="h-6 w-6" />
             </div>
-            <h2 className="text-base font-semibold text-fg">Invitation required</h2>
-            <p className="text-sm text-fg-muted">{reasonMessage(codeState.reason)}</p>
+            <h2 className="text-base font-semibold text-fg">{t('signup.invitationRequired')}</h2>
+            <p className="text-sm text-fg-muted">{t(REASON_KEYS[codeState.reason])}</p>
             <div className="pt-2 flex flex-col gap-2">
-              <Link
-                href="/request-invite"
-                className="focus-ring w-full bg-accent text-accent-fg font-medium py-2.5 rounded-md hover:bg-accent-hover transition-colors"
-              >
-                Request an invitation
-              </Link>
-              <Link
-                href="/login"
-                className="focus-ring w-full text-fg font-medium py-2.5 rounded-md border border-border hover:bg-fg/5 transition-colors"
-              >
-                Sign in
-              </Link>
+              <ButtonLink href="/request-invite" block size="lg">
+                {t('auth.requestInvite')}
+              </ButtonLink>
+              <ButtonLink href="/login" variant="secondary" block size="lg">
+                {t('auth.signIn')}
+              </ButtonLink>
             </div>
           </div>
         )}
@@ -136,7 +119,7 @@ function SignupForm() {
                 redirect: false,
               })
               if (signInRes?.error) {
-                toast.error('Account created but auto-login failed. Please log in manually.')
+                toast.error(t('signup.autoLoginFailed'))
                 router.push('/login')
                 return
               }
@@ -162,6 +145,15 @@ function ValidSignupForm({
   onSuccess: (password: string) => Promise<void>
 }) {
   const toast = useToast()
+  const t = useT()
+
+  const signupSchema = z.object({
+    name: z.string().trim().min(2, t('signup.validation.nameMin')).max(100),
+    password: z
+      .string()
+      .min(8, t('signup.validation.passwordMin'))
+      .max(200, t('signup.validation.passwordMax')),
+  })
 
   const form = useFormState({
     schema: signupSchema,
@@ -175,60 +167,56 @@ function ValidSignupForm({
         })
         const data = await res.json().catch(() => ({}))
         if (!res.ok) {
-          const msg = data?.error || 'Signup failed'
+          const msg = data?.error || t('signup.failed')
           if (msg.toLowerCase().includes('password')) setFieldError('password', msg)
           else toast.error(msg)
           return
         }
         await onSuccess(values.password)
       } catch {
-        toast.error('Network error — please try again.')
+        toast.error(t('common.networkError'))
       }
     },
   })
 
   return (
-    <form
-      onSubmit={form.handleSubmit}
-      className="surface-card p-6 space-y-5"
-      noValidate
-    >
+    <form onSubmit={form.handleSubmit} className="surface-card p-6 space-y-5" noValidate>
       <Input
-        label="Email"
+        label={t('auth.email')}
         type="email"
         value={email}
         readOnly
         disabled
-        hint="This is the email your invitation was sent to."
+        hint={t('signup.emailHint')}
         autoComplete="email"
       />
 
       <Input
-        label="Full Name"
+        label={t('signup.fullName')}
         type="text"
         required
         autoComplete="name"
-        placeholder="Your name"
+        placeholder={t('signup.namePlaceholder')}
         {...form.register('name')}
       />
 
       <Input
-        label="Password"
+        label={t('auth.password')}
         type="password"
         required
         autoComplete="new-password"
-        placeholder="At least 8 characters"
+        placeholder={t('signup.passwordPlaceholder')}
         {...form.register('password')}
       />
 
       <Button type="submit" loading={form.isSubmitting} block size="lg">
-        Create account
+        {t('signup.createAccount')}
       </Button>
 
       <p className="text-sm text-fg-muted text-center">
-        Already have an account?{' '}
+        {t('signup.alreadyHaveAccount')}{' '}
         <Link href="/login" className="text-accent hover:text-accent-hover font-medium">
-          Sign in
+          {t('auth.signIn')}
         </Link>
       </p>
     </form>

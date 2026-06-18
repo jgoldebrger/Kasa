@@ -4,6 +4,15 @@ import Link from 'next/link'
 import { useEffect, useState, useCallback } from 'react'
 import { useToast, useConfirm } from '@/app/components/Toast'
 import { PLATFORM_ADMIN_2FA_REQUIRED_CODE } from '@/lib/platform-admin'
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  PageHeader,
+  SkeletonRows,
+} from '@/app/components/ui'
 
 type RequestRow = {
   id: string
@@ -18,6 +27,20 @@ type RequestRow = {
   rejectReason: string | null
   createdAt: string
   reviewedAt: string | null
+}
+
+function statusBadge(row: RequestRow) {
+  if (row.status === 'pending') {
+    return <Badge variant="warning">pending</Badge>
+  }
+  if (row.status === 'approved') {
+    return row.usedAt ? (
+      <Badge variant="muted">used</Badge>
+    ) : (
+      <Badge variant="success">approved</Badge>
+    )
+  }
+  return <Badge variant="danger">rejected</Badge>
 }
 
 export default function InviteRequestsAdminPage() {
@@ -37,9 +60,10 @@ export default function InviteRequestsAdminPage() {
     setError(null)
     setTwoFactorRequired(false)
     try {
-      const url = filter === 'all'
-        ? '/api/admin/invite-requests'
-        : `/api/admin/invite-requests?status=${filter}`
+      const url =
+        filter === 'all'
+          ? '/api/admin/invite-requests'
+          : `/api/admin/invite-requests?status=${filter}`
       const res = await fetch(url)
       if (res.status === 403) {
         const data = await res.json().catch(() => ({}))
@@ -76,7 +100,11 @@ export default function InviteRequestsAdminPage() {
     }
   }, [load])
 
-  const act = async (id: string, action: 'approve' | 'reject' | 'reissue', rejectReason?: string) => {
+  const act = async (
+    id: string,
+    action: 'approve' | 'reject' | 'reissue',
+    rejectReason?: string,
+  ) => {
     setBusyId(id)
     try {
       const res = await fetch('/api/admin/invite-requests', {
@@ -140,66 +168,61 @@ export default function InviteRequestsAdminPage() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-fg">Invitation requests</h1>
-          <p className="text-sm text-fg-muted mt-1">
-            Review who has asked for access. Approving generates a one-time signup link.
-          </p>
-        </div>
-        {!emailEnabled && (
-          <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2 max-w-xs">
-            Platform email is not configured. Approval emails won&apos;t be sent — copy the
-            signup link manually.
-          </div>
-        )}
-      </div>
+      <PageHeader
+        title="Invitation requests"
+        subtitle="Review who has asked for access. Approving generates a one-time signup link."
+        actions={
+          !emailEnabled ? (
+            <Alert variant="warning" className="max-w-xs text-xs">
+              Platform email is not configured. Approval emails won&apos;t be sent — copy the signup
+              link manually.
+            </Alert>
+          ) : undefined
+        }
+      />
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4">
         {(['pending', 'approved', 'rejected', 'all'] as const).map((f) => (
-          <button
+          <Button
             key={f}
+            size="sm"
+            variant={filter === f ? 'primary' : 'secondary'}
             onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${
-              filter === f
-                ? 'bg-accent text-white border-blue-600'
-                : 'bg-surface text-fg border-border hover:bg-app-subtle'
-            }`}
           >
             {f.charAt(0).toUpperCase() + f.slice(1)}
-          </button>
+          </Button>
         ))}
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-fg-muted">Loading…</div>
+        <Card>
+          <SkeletonRows count={5} />
+        </Card>
       ) : twoFactorRequired ? (
-        <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-6 space-y-3">
-          <p className="font-medium">Two-factor authentication required</p>
-          <p className="text-sm">
-            Platform admin access requires 2FA on your account. Enable it in account settings,
-            then return to this page.
+        <Alert variant="warning" title="Two-factor authentication required">
+          <p>
+            Platform admin access requires 2FA on your account. Enable it in account settings, then
+            return to this page.
           </p>
           <Link
             href="/account"
-            className="inline-flex items-center text-sm font-medium text-accent hover:text-accent-hover"
+            className="mt-2 inline-flex text-sm font-medium text-accent hover:text-accent-hover"
           >
             Go to account settings →
           </Link>
-        </div>
+        </Alert>
       ) : error ? (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4">{error}</div>
+        <Alert variant="danger">{error}</Alert>
       ) : rows.length === 0 ? (
-        <div className="bg-surface border border-border rounded-lg p-10 text-center text-fg-muted">
-          No requests {filter !== 'all' ? `(${filter})` : ''}.
-        </div>
+        <EmptyState
+          title={`No requests${filter !== 'all' ? ` (${filter})` : ''}`}
+          description="New invitation requests will appear here when someone asks for access."
+          cta={null}
+        />
       ) : (
         <div className="space-y-3">
           {rows.map((row) => (
-            <div
-              key={row.id}
-              className="bg-surface border border-border rounded-lg p-4 flex flex-col gap-3"
-            >
+            <Card key={row.id} compact className="flex flex-col gap-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="font-semibold text-fg">{row.name}</div>
@@ -208,19 +231,7 @@ export default function InviteRequestsAdminPage() {
                     Requested {new Date(row.createdAt).toLocaleString()}
                   </div>
                 </div>
-                <span
-                  className={`text-xs font-medium px-2 py-1 rounded-full ${
-                    row.status === 'pending'
-                      ? 'bg-amber-100 text-amber-800'
-                      : row.status === 'approved'
-                      ? row.usedAt
-                        ? 'bg-fg/5 text-fg'
-                        : 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}
-                >
-                  {row.status === 'approved' && row.usedAt ? 'used' : row.status}
-                </span>
+                {statusBadge(row)}
               </div>
 
               {row.message && (
@@ -245,61 +256,60 @@ export default function InviteRequestsAdminPage() {
                       value={row.signupUrl}
                       className="flex-1 text-xs bg-surface border border-accent/20 rounded px-2 py-1.5"
                     />
-                    <button
-                      onClick={() => copy(row.signupUrl!)}
-                      className="text-xs bg-accent text-white px-3 py-1.5 rounded hover:bg-accent-hover"
-                    >
+                    <Button size="sm" onClick={() => copy(row.signupUrl!)}>
                       Copy
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
 
               {row.status === 'rejected' && row.rejectReason && (
-                <div className="text-sm text-red-700 bg-red-50 rounded p-3">
-                  Reason: {row.rejectReason}
-                </div>
+                <Alert variant="danger" title="Reason">
+                  {row.rejectReason}
+                </Alert>
               )}
 
               <div className="flex flex-wrap gap-2">
                 {row.status === 'pending' && (
                   <>
-                    <button
+                    <Button
+                      size="sm"
                       onClick={() => act(row.id, 'approve')}
-                      disabled={busyId === row.id}
-                      className="bg-green-600 text-white px-4 py-1.5 rounded text-sm font-medium hover:bg-green-700 disabled:opacity-60"
+                      loading={busyId === row.id}
                     >
-                      {busyId === row.id ? 'Working…' : 'Approve'}
-                    </button>
-                    <button
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
                       onClick={() => handleReject(row)}
                       disabled={busyId === row.id}
-                      className="bg-surface text-red-700 border border-red-300 px-4 py-1.5 rounded text-sm font-medium hover:bg-red-50 disabled:opacity-60"
                     >
                       Reject
-                    </button>
+                    </Button>
                   </>
                 )}
                 {row.status === 'approved' && !row.usedAt && (
-                  <button
+                  <Button
+                    size="sm"
+                    variant="secondary"
                     onClick={() => handleReissue(row)}
-                    disabled={busyId === row.id}
-                    className="bg-surface text-fg border border-border px-4 py-1.5 rounded text-sm font-medium hover:bg-app-subtle disabled:opacity-60"
+                    loading={busyId === row.id}
                   >
                     Re-issue code
-                  </button>
+                  </Button>
                 )}
                 {row.status === 'rejected' && (
-                  <button
+                  <Button
+                    size="sm"
                     onClick={() => act(row.id, 'approve')}
-                    disabled={busyId === row.id}
-                    className="bg-green-600 text-white px-4 py-1.5 rounded text-sm font-medium hover:bg-green-700 disabled:opacity-60"
+                    loading={busyId === row.id}
                   >
                     Approve instead
-                  </button>
+                  </Button>
                 )}
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}

@@ -1,15 +1,9 @@
 'use client'
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { cachedFetch, invalidate as invalidateCache } from '@/lib/client-cache'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
+import { applyAccentCssVars, clearAccentCssVars } from '@/lib/branding-colors'
 
 const URL = '/api/organizations/branding'
 const TTL_MS = 5 * 60 * 1000
@@ -45,10 +39,7 @@ export interface OrgBrandingProviderProps {
   initialBranding?: OrgBranding
 }
 
-export function OrgBrandingProvider({
-  children,
-  initialBranding,
-}: OrgBrandingProviderProps) {
+export function OrgBrandingProvider({ children, initialBranding }: OrgBrandingProviderProps) {
   const serverSeeded = initialBranding !== undefined
   const [branding, setBranding] = useState<OrgBranding>(initialBranding ?? EMPTY)
   const [loading, setLoading] = useState(!serverSeeded)
@@ -109,10 +100,31 @@ export function OrgBrandingProvider({
     }
   }, [refresh, invalidate, serverSeeded])
 
+  useEffect(() => {
+    const root = document.documentElement
+
+    function syncAccentVars() {
+      if (!branding.accentColor) {
+        clearAccentCssVars(root)
+        return
+      }
+      const isDark = root.classList.contains('dark')
+      applyAccentCssVars(branding.accentColor, isDark, root)
+    }
+
+    syncAccentVars()
+
+    const observer = new MutationObserver(syncAccentVars)
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] })
+
+    return () => {
+      observer.disconnect()
+      clearAccentCssVars(root)
+    }
+  }, [branding.accentColor])
+
   return (
-    <BrandingCtx.Provider value={{ branding, loading, refresh }}>
-      {children}
-    </BrandingCtx.Provider>
+    <BrandingCtx.Provider value={{ branding, loading, refresh }}>{children}</BrandingCtx.Provider>
   )
 }
 

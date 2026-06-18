@@ -1,3 +1,5 @@
+import type { MessageKey } from '@/lib/i18n/load-locale'
+
 export const ADMIN_ONLY_FAMILY_TABS = new Set([
   'payments',
   'withdrawals',
@@ -45,14 +47,29 @@ export function familyTabHref(familyId: string, tab: FamilyTabId): string {
   return seg ? `/families/${familyId}/${seg}` : `/families/${familyId}`
 }
 
-export const FAMILY_TABS: { id: FamilyTabId; label: string; adminOnly?: boolean }[] = [
-  { id: 'info', label: 'Info' },
-  { id: 'members', label: 'Members' },
-  { id: 'payments', label: 'Payments', adminOnly: true },
-  { id: 'withdrawals', label: 'Withdrawals', adminOnly: true },
-  { id: 'events', label: 'Lifecycle Events', adminOnly: true },
-  { id: 'cycle-charges', label: 'Cycle Charges', adminOnly: true },
-  { id: 'statements', label: 'Statements', adminOnly: true },
-  { id: 'tasks', label: 'Tasks', adminOnly: true },
-  { id: 'sub-families', label: 'Sub-Families' },
+export type FamilyTabDef = {
+  id: FamilyTabId
+  /** Fallback label when i18nKey is absent or untranslated */
+  label: string
+  i18nKey?: string
+  adminOnly?: boolean
+}
+
+export const FAMILY_TABS: FamilyTabDef[] = [
+  { id: 'info', label: 'Info', i18nKey: 'family.tab.info' },
+  { id: 'members', label: 'Members', i18nKey: 'family.members' },
+  { id: 'payments', label: 'Payments', i18nKey: 'family.payments', adminOnly: true },
+  { id: 'withdrawals', label: 'Withdrawals', i18nKey: 'family.withdrawals', adminOnly: true },
+  { id: 'events', label: 'Lifecycle Events', i18nKey: 'family.lifecycleEvents', adminOnly: true },
+  { id: 'cycle-charges', label: 'Cycle Charges', i18nKey: 'family.cycleCharges', adminOnly: true },
+  { id: 'statements', label: 'Statements', i18nKey: 'family.statements', adminOnly: true },
+  { id: 'tasks', label: 'Tasks', i18nKey: 'nav.tasks', adminOnly: true },
+  { id: 'sub-families', label: 'Sub-Families', i18nKey: 'family.subFamilies' },
 ]
+
+export function resolveFamilyTabLabel(
+  tab: FamilyTabDef,
+  t: (key: MessageKey, fallback?: string) => string,
+): string {
+  return tab.i18nKey ? t(tab.i18nKey as MessageKey, tab.label) : tab.label
+}

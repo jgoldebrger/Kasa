@@ -1,6 +1,8 @@
 'use client'
 
 import { CalendarIcon, PlusIcon } from '@heroicons/react/24/outline'
+import { SettingsPanel } from '@/app/components/settings/SettingsPanel'
+import { Button } from '@/app/components/ui'
 import EventTypesTable from '@/app/components/settings/EventTypesTable'
 
 export interface EventTypeRow {
@@ -26,28 +28,16 @@ export default function EventTypesPanel({
   onDelete,
 }: EventTypesPanelProps) {
   return (
-    <div className="bg-surface rounded-lg shadow-lg p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">
-            <CalendarIcon className="h-6 w-6 text-accent" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-fg">Lifecycle Event Types</h2>
-            <p className="text-sm text-fg-muted">Manage event types and their default amounts</p>
-          </div>
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={onAdd}
-            className="bg-accent text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-accent-hover transition-colors"
-          >
-            <PlusIcon className="h-5 w-5" />
-            Add Event Type
-          </button>
-        </div>
-      </div>
-
+    <SettingsPanel
+      icon={<CalendarIcon />}
+      title="Lifecycle Event Types"
+      description="Manage event types and their default amounts"
+      actions={
+        <Button onClick={onAdd} leftIcon={<PlusIcon className="h-4 w-4" />}>
+          Add Event Type
+        </Button>
+      }
+    >
       <EventTypesTable
         eventTypes={eventTypes}
         onEdit={onEdit}
@@ -77,6 +67,6 @@ export default function EventTypesPanel({
           </span>
         </div>
       )}
-    </div>
+    </SettingsPanel>
   )
 }

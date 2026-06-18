@@ -14,19 +14,10 @@ import { invalidate as invalidateCache } from '@/lib/client-cache'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { formatLocaleDate } from '@/lib/date-utils'
-import {
-  TASKS_LIST_PAGE_SIZE,
-  parseTasksListResponse,
-  tasksListUrl,
-} from '@/lib/client/tasks-list'
-import {
-  Button,
-  EmptyState,
-  PageHeader,
-  SkeletonRows,
-  Tabs,
-} from '@/app/components/ui'
+import { TASKS_LIST_PAGE_SIZE, parseTasksListResponse, tasksListUrl } from '@/lib/client/tasks-list'
+import { Button, EmptyState, PageHeader, SkeletonRows, Tabs } from '@/app/components/ui'
 import TaskFormModal from '@/app/components/tasks/TaskFormModal'
+import { useT } from '@/lib/client/i18n'
 
 interface Task {
   _id: string
@@ -58,11 +49,9 @@ function taskFilterQuery(filter: 'all' | 'pending' | 'today' | 'overdue'): strin
   return ''
 }
 
-export default function TasksView({
-  initialTasks,
-  initialNextCursor = null,
-}: TasksViewProps = {}) {
+export default function TasksView({ initialTasks, initialNextCursor = null }: TasksViewProps = {}) {
   const toast = useToast()
+  const t = useT()
   const confirm = useConfirm()
   const tasksHydrated = initialTasks !== undefined
   const [tasks, setTasks] = useState<Task[]>(initialTasks ?? [])
@@ -72,9 +61,7 @@ export default function TasksView({
   const [tasksError, setTasksError] = useState(false)
   const [taskFilter, setTaskFilter] = useState<'all' | 'pending' | 'today' | 'overdue'>('all')
   const [showTaskModal, setShowTaskModal] = useState(false)
-  const fetchedTaskFilterRef = useRef<typeof taskFilter | null>(
-    tasksHydrated ? 'all' : null,
-  )
+  const fetchedTaskFilterRef = useRef<typeof taskFilter | null>(tasksHydrated ? 'all' : null)
   const { begin, invalidate, isStale } = useRequestGeneration()
 
   const fetchTasks = useCallback(
@@ -87,11 +74,7 @@ export default function TasksView({
           setLoadingTasks(true)
           setTasksError(false)
         }
-        const url = tasksListUrl(
-          opts?.cursor,
-          TASKS_LIST_PAGE_SIZE,
-          taskFilterQuery(taskFilter),
-        )
+        const url = tasksListUrl(opts?.cursor, TASKS_LIST_PAGE_SIZE, taskFilterQuery(taskFilter))
         const res = await fetch(url)
         if (isStale(gen)) return
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -127,19 +110,23 @@ export default function TasksView({
     fetchTasks()
   }, [taskFilter, fetchTasks])
 
-  useOrgChanged(useCallback(() => {
-    invalidate()
-    fetchedTaskFilterRef.current = null
-    setTasks([])
-    setNextCursor(null)
-    setLoadingTasks(true)
-    fetchedTaskFilterRef.current = taskFilter
-    fetchTasks()
-  }, [taskFilter, fetchTasks, invalidate]))
+  useOrgChanged(
+    useCallback(() => {
+      invalidate()
+      fetchedTaskFilterRef.current = null
+      setTasks([])
+      setNextCursor(null)
+      setLoadingTasks(true)
+      fetchedTaskFilterRef.current = taskFilter
+      fetchTasks()
+    }, [taskFilter, fetchTasks, invalidate]),
+  )
 
   const completeTask = async (taskId: string) => {
     const prev = tasks
-    setTasks((cur) => cur.map((t) => (t._id === taskId ? { ...t, status: 'completed' as const } : t)))
+    setTasks((cur) =>
+      cur.map((t) => (t._id === taskId ? { ...t, status: 'completed' as const } : t)),
+    )
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
@@ -183,7 +170,10 @@ export default function TasksView({
           title="Tasks"
           subtitle="Manage your tasks and reminders."
           actions={
-            <Button leftIcon={<PlusIcon className="h-5 w-5" />} onClick={() => setShowTaskModal(true)}>
+            <Button
+              leftIcon={<PlusIcon className="h-5 w-5" />}
+              onClick={() => setShowTaskModal(true)}
+            >
               Add Task
             </Button>
           }
@@ -264,10 +254,14 @@ export default function TasksView({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-2 flex-wrap">
                             <h3 className="font-semibold text-fg break-words">{task.title}</h3>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${priorityColors[task.priority]}`}>
+                            <span
+                              className={`px-2 py-1 rounded text-xs font-medium ${priorityColors[task.priority]}`}
+                            >
                               {task.priority}
                             </span>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[task.status]}`}>
+                            <span
+                              className={`px-2 py-1 rounded text-xs font-medium ${statusColors[task.status]}`}
+                            >
                               {task.status.replace('_', ' ')}
                             </span>
                             {isDueToday && task.status !== 'completed' && (
@@ -283,14 +277,19 @@ export default function TasksView({
                               </span>
                             )}
                           </div>
-                          {task.description && <p className="text-sm text-fg mb-2">{task.description}</p>}
+                          {task.description && (
+                            <p className="text-sm text-fg mb-2">{task.description}</p>
+                          )}
                           <div className="flex items-center gap-x-4 gap-y-1 text-xs text-fg-muted flex-wrap">
                             <span>Due: {formatLocaleDate(task.dueDate)}</span>
                             <span>Email: {task.email}</span>
-                            {task.relatedFamilyId && <span>Family: {task.relatedFamilyId.name}</span>}
+                            {task.relatedFamilyId && (
+                              <span>Family: {task.relatedFamilyId.name}</span>
+                            )}
                             {task.relatedMemberId && (
                               <span>
-                                Member: {task.relatedMemberId.firstName} {task.relatedMemberId.lastName}
+                                Member: {task.relatedMemberId.firstName}{' '}
+                                {task.relatedMemberId.lastName}
                               </span>
                             )}
                             {task.emailSent && <span className="text-green-700">✓ Email Sent</span>}
@@ -328,7 +327,7 @@ export default function TasksView({
                     loading={loadingMore}
                     onClick={() => fetchTasks({ cursor: nextCursor, append: true })}
                   >
-                    {loadingMore ? 'Loading…' : 'Load more'}
+                    {t('common.loadMore')}
                   </Button>
                 </div>
               )}

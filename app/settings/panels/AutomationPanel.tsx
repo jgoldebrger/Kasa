@@ -1,8 +1,10 @@
 'use client'
 
 import type React from 'react'
-import { CalendarIcon } from '@heroicons/react/24/outline'
+import { Cog6ToothIcon } from '@heroicons/react/24/outline'
 import { convertToHebrewDate } from '@/lib/hebrew-date'
+import { SettingsPanel } from '@/app/components/settings/SettingsPanel'
+import { Alert, Button, Input, Select } from '@/app/components/ui'
 
 export interface AutomationConfigShape {
   barMitzvahAutoAssignPlanId: string | null
@@ -49,19 +51,11 @@ export default function AutomationPanel({
   onSave,
 }: AutomationPanelProps) {
   return (
-    <div className="bg-surface rounded-lg shadow-lg p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">
-          <CalendarIcon className="h-6 w-6 text-accent" />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-fg">Automation</h2>
-          <p className="text-sm text-fg-muted">
-            Optional rules that fire automatically when member data changes.
-          </p>
-        </div>
-      </div>
-
+    <SettingsPanel
+      icon={<Cog6ToothIcon />}
+      title="Automation"
+      description="Optional rules that fire automatically when member data changes."
+    >
       <div className="space-y-5 max-w-2xl">
         <div className="border border-border rounded-lg p-5">
           <h3 className="text-lg font-semibold text-fg mb-1">Bar Mitzvah</h3>
@@ -71,63 +65,53 @@ export default function AutomationPanel({
           </p>
 
           <div className="space-y-4">
-            <div>
-              <label htmlFor="auto-assign-plan" className="block text-sm font-medium text-fg mb-1">
-                Auto-assign payment plan
-              </label>
-              <select
-                id="auto-assign-plan"
-                value={automationConfig.barMitzvahAutoAssignPlanId || ''}
-                onChange={(e) =>
-                  setAutomationConfig((c) => ({
-                    ...c,
-                    barMitzvahAutoAssignPlanId: e.target.value || null,
-                  }))
-                }
-                className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg outline-none"
-              >
-                <option value="">— Do not auto-assign —</option>
-                {plans.map((p) => (
-                  <option key={p._id} value={p._id}>
-                    {p.name} ({formatMoney(p.yearlyPrice)}/yr)
-                  </option>
-                ))}
-              </select>
-              {plans.length === 0 && (
-                <p className="text-xs text-fg-muted mt-1">
-                  No payment plans configured yet. Add one in the Payment Plans tab first.
-                </p>
-              )}
-            </div>
+            <Select
+              id="auto-assign-plan"
+              label="Auto-assign payment plan"
+              value={automationConfig.barMitzvahAutoAssignPlanId || ''}
+              onChange={(e) =>
+                setAutomationConfig((c) => ({
+                  ...c,
+                  barMitzvahAutoAssignPlanId: e.target.value || null,
+                }))
+              }
+              hint={
+                plans.length === 0
+                  ? 'No payment plans configured yet. Add one in the Payment Plans tab first.'
+                  : undefined
+              }
+            >
+              <option value="">— Do not auto-assign —</option>
+              {plans.map((p) => (
+                <option key={p._id} value={p._id}>
+                  {p.name} ({formatMoney(p.yearlyPrice)}/yr)
+                </option>
+              ))}
+            </Select>
 
-            <div>
-              <label htmlFor="auto-create-event" className="block text-sm font-medium text-fg mb-1">
-                Auto-create lifecycle event
-              </label>
-              <select
-                id="auto-create-event"
-                value={automationConfig.barMitzvahAutoCreateEventTypeId || ''}
-                onChange={(e) =>
-                  setAutomationConfig((c) => ({
-                    ...c,
-                    barMitzvahAutoCreateEventTypeId: e.target.value || null,
-                  }))
-                }
-                className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg outline-none"
-              >
-                <option value="">— Do not auto-create —</option>
-                {eventTypes.map((ev) => (
-                  <option key={ev._id} value={ev._id}>
-                    {ev.name} ({formatMoney(ev.amount)})
-                  </option>
-                ))}
-              </select>
-              {eventTypes.length === 0 && (
-                <p className="text-xs text-fg-muted mt-1">
-                  No event types configured yet. Add one in the Event Types tab first.
-                </p>
-              )}
-            </div>
+            <Select
+              id="auto-create-event"
+              label="Auto-create lifecycle event"
+              value={automationConfig.barMitzvahAutoCreateEventTypeId || ''}
+              onChange={(e) =>
+                setAutomationConfig((c) => ({
+                  ...c,
+                  barMitzvahAutoCreateEventTypeId: e.target.value || null,
+                }))
+              }
+              hint={
+                eventTypes.length === 0
+                  ? 'No event types configured yet. Add one in the Event Types tab first.'
+                  : undefined
+              }
+            >
+              <option value="">— Do not auto-create —</option>
+              {eventTypes.map((ev) => (
+                <option key={ev._id} value={ev._id}>
+                  {ev.name} ({formatMoney(ev.amount)})
+                </option>
+              ))}
+            </Select>
           </div>
         </div>
 
@@ -137,8 +121,8 @@ export default function AutomationPanel({
             Run the &ldquo;Generate Monthly Batch&rdquo; and email steps automatically every month
             for the previous month&rsquo;s period. Both toggles are independent — turn on only
             generation, only email, or both. The email step requires a saved Gmail configuration in
-            the Email tab, and skips any family marked &ldquo;Opt out of bulk statement emails&rdquo;
-            on the family form.
+            the Email tab, and skips any family marked &ldquo;Opt out of bulk statement
+            emails&rdquo; on the family form.
           </p>
 
           <div className="space-y-4">
@@ -178,17 +162,18 @@ export default function AutomationPanel({
               <span className="text-sm">
                 <span className="block font-medium text-fg">Auto-email monthly statements</span>
                 <span className="block text-fg-muted">
-                  Sends a PDF statement to every family with an email address on file (and not
-                  opted out). Requires email configuration in the Email tab.
+                  Sends a PDF statement to every family with an email address on file (and not opted
+                  out). Requires email configuration in the Email tab.
                 </span>
-                {automationConfig.monthlyStatementAutoEmail && !emailConfig?.email && (
-                  <span className="mt-2 inline-block text-xs text-yellow-700 dark:text-yellow-400">
-                    No email configuration found yet — set one up in the Email tab or the cron will
-                    fail for this org.
-                  </span>
-                )}
               </span>
             </label>
+
+            {automationConfig.monthlyStatementAutoEmail && !emailConfig?.email && (
+              <Alert variant="warning">
+                No email configuration found yet — set one up in the Email tab or the cron will fail
+                for this org.
+              </Alert>
+            )}
 
             <div className="pt-2 border-t border-border space-y-3">
               <div>
@@ -217,9 +202,7 @@ export default function AutomationPanel({
                           }))
                         }
                         className={`focus-ring px-3 py-1.5 text-sm transition-colors ${
-                          active
-                            ? 'bg-accent text-accent-fg'
-                            : 'bg-surface text-fg hover:bg-fg/5'
+                          active ? 'bg-accent text-accent-fg' : 'bg-surface text-fg hover:bg-fg/5'
                         } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {cal === 'gregorian' ? 'Gregorian calendar' : 'Hebrew calendar'}
@@ -231,18 +214,14 @@ export default function AutomationPanel({
 
               {automationConfig.monthlyStatementCalendar === 'gregorian' ? (
                 <div>
-                  <label
-                    htmlFor="monthly-statement-day"
-                    className="block text-sm font-medium text-fg mb-1"
-                  >
-                    Day of the Gregorian month to run
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
+                  <div className="flex items-end gap-2">
+                    <Input
                       id="monthly-statement-day"
+                      label="Day of the Gregorian month to run"
                       type="number"
                       min={1}
                       max={31}
+                      wrapperClassName="w-24"
                       value={automationConfig.monthlyStatementDay}
                       onChange={(e) => {
                         const raw = parseInt(e.target.value, 10)
@@ -256,9 +235,8 @@ export default function AutomationPanel({
                         !automationConfig.monthlyStatementAutoGenerate &&
                         !automationConfig.monthlyStatementAutoEmail
                       }
-                      className="focus-ring w-24 bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg outline-none disabled:opacity-50"
                     />
-                    <span className="text-sm text-fg-muted">of every Gregorian month</span>
+                    <span className="pb-2 text-sm text-fg-muted">of every Gregorian month</span>
                   </div>
                   <p className="text-xs text-fg-muted mt-2">
                     Generate runs at 2 AM UTC, email runs at 3 AM UTC. If the month is shorter than
@@ -268,18 +246,14 @@ export default function AutomationPanel({
                 </div>
               ) : (
                 <div>
-                  <label
-                    htmlFor="monthly-statement-hebrew-day"
-                    className="block text-sm font-medium text-fg mb-1"
-                  >
-                    Day of the Hebrew month to run
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
+                  <div className="flex items-end gap-2">
+                    <Input
                       id="monthly-statement-hebrew-day"
+                      label="Day of the Hebrew month to run"
                       type="number"
                       min={1}
                       max={30}
+                      wrapperClassName="w-24"
                       value={automationConfig.monthlyStatementHebrewDay}
                       onChange={(e) => {
                         const raw = parseInt(e.target.value, 10)
@@ -293,9 +267,8 @@ export default function AutomationPanel({
                         !automationConfig.monthlyStatementAutoGenerate &&
                         !automationConfig.monthlyStatementAutoEmail
                       }
-                      className="focus-ring w-24 bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg outline-none disabled:opacity-50"
                     />
-                    <span className="text-sm text-fg-muted">of every Hebrew month</span>
+                    <span className="pb-2 text-sm text-fg-muted">of every Hebrew month</span>
                   </div>
                   <p className="text-xs text-fg-muted mt-2">
                     Generate runs at 2 AM UTC, email runs at 3 AM UTC. Hebrew months are 29 or 30
@@ -323,47 +296,37 @@ export default function AutomationPanel({
             with no plan and assign one yourself.
           </p>
 
-          <div>
-            <label htmlFor="wedding-default-plan" className="block text-sm font-medium text-fg mb-1">
-              Default plan for newly converted families
-            </label>
-            <select
-              id="wedding-default-plan"
-              value={automationConfig.weddingConversionDefaultPlanId || ''}
-              onChange={(e) =>
-                setAutomationConfig((c) => ({
-                  ...c,
-                  weddingConversionDefaultPlanId: e.target.value || null,
-                }))
-              }
-              className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg outline-none"
-            >
-              <option value="">— Do not auto-assign —</option>
-              {plans.map((p) => (
-                <option key={p._id} value={p._id}>
-                  {p.name} ({formatMoney(p.yearlyPrice)}/yr)
-                </option>
-              ))}
-            </select>
-            {plans.length === 0 && (
-              <p className="text-xs text-fg-muted mt-1">
-                No payment plans configured yet. Add one in the Payment Plans tab first.
-              </p>
-            )}
-          </div>
+          <Select
+            id="wedding-default-plan"
+            label="Default plan for newly converted families"
+            value={automationConfig.weddingConversionDefaultPlanId || ''}
+            onChange={(e) =>
+              setAutomationConfig((c) => ({
+                ...c,
+                weddingConversionDefaultPlanId: e.target.value || null,
+              }))
+            }
+            hint={
+              plans.length === 0
+                ? 'No payment plans configured yet. Add one in the Payment Plans tab first.'
+                : undefined
+            }
+          >
+            <option value="">— Do not auto-assign —</option>
+            {plans.map((p) => (
+              <option key={p._id} value={p._id}>
+                {p.name} ({formatMoney(p.yearlyPrice)}/yr)
+              </option>
+            ))}
+          </Select>
         </div>
 
         <div>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving}
-            className="bg-accent text-white px-5 py-2 rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-60"
-          >
-            {saving ? 'Saving…' : 'Save automation settings'}
-          </button>
+          <Button type="button" onClick={onSave} loading={saving}>
+            Save automation settings
+          </Button>
         </div>
       </div>
-    </div>
+    </SettingsPanel>
   )
 }

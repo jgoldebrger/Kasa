@@ -3,7 +3,8 @@
 import { useCallback, useRef, useState } from 'react'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { ArrowUpTrayIcon, PhotoIcon, TrashIcon } from '@heroicons/react/24/outline'
-import { Button, SkeletonRows } from '@/app/components/ui'
+import { SettingsPanel } from '@/app/components/settings/SettingsPanel'
+import { Button, Card, SkeletonRows } from '@/app/components/ui'
 import { useConfirm, useToast } from '@/app/components/Toast'
 import { notifyBrandingUpdated, useOrgBranding } from '@/lib/client/useOrgBranding'
 
@@ -24,11 +25,13 @@ export default function BrandingPanel({ canManage }: BrandingPanelProps) {
   const [clearing, setClearing] = useState(false)
   const fileRef = useRef<HTMLInputElement | null>(null)
 
-  useOrgChanged(useCallback(() => {
-    setPendingPreview(null)
-    if (fileRef.current) fileRef.current.value = ''
-    void refresh()
-  }, [refresh]))
+  useOrgChanged(
+    useCallback(() => {
+      setPendingPreview(null)
+      if (fileRef.current) fileRef.current.value = ''
+      void refresh()
+    }, [refresh]),
+  )
 
   const onFileChange = useCallback(
     async (file: File | null) => {
@@ -106,23 +109,21 @@ export default function BrandingPanel({ canManage }: BrandingPanelProps) {
 
   if (loading) {
     return (
-      <div className="surface-card p-6">
+      <Card>
         <SkeletonRows count={4} />
-      </div>
+      </Card>
     )
   }
 
   const displayed = pendingPreview || branding.logoDataUrl
 
   return (
-    <div className="surface-card p-6">
-      <h2 className="text-base font-semibold text-fg">Organization logo</h2>
-      <p className="mt-1 text-sm text-fg-muted">
-        Replace the default tile in the sidebar and top bar with your own
-        logo. Uploads are resized to 256×256 PNG and capped at 200&nbsp;KB.
-      </p>
-
-      <div className="mt-6 flex flex-col gap-6 sm:flex-row sm:items-start">
+    <SettingsPanel
+      icon={<PhotoIcon />}
+      title="Organization logo"
+      description="Replace the default tile in the sidebar and top bar with your own logo. Uploads are resized to 256×256 PNG and capped at 200 KB."
+    >
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
         <div className="shrink-0">
           <div className="flex flex-col items-center gap-2">
             <div className="flex h-32 w-32 items-center justify-center rounded-xl border border-border bg-app-subtle p-3">
@@ -139,7 +140,11 @@ export default function BrandingPanel({ canManage }: BrandingPanelProps) {
               )}
             </div>
             <span className="text-xs text-fg-muted">
-              {pendingPreview ? 'Pending — click Save' : displayed ? 'Current logo' : 'No custom logo'}
+              {pendingPreview
+                ? 'Pending — click Save'
+                : displayed
+                  ? 'Current logo'
+                  : 'No custom logo'}
             </span>
           </div>
         </div>
@@ -207,6 +212,6 @@ export default function BrandingPanel({ canManage }: BrandingPanelProps) {
           )}
         </div>
       </div>
-    </div>
+    </SettingsPanel>
   )
 }

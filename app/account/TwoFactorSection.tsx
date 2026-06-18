@@ -99,7 +99,8 @@ export default function TwoFactorSection({
     e.preventDefault()
     const ok = await confirm({
       title: 'Disable two-factor authentication?',
-      message: 'Your account will be protected by your password alone. This significantly weakens your security.',
+      message:
+        'Your account will be protected by your password alone. This significantly weakens your security.',
       confirmLabel: 'Disable 2FA',
       destructive: true,
     })
@@ -144,8 +145,8 @@ export default function TwoFactorSection({
         <div>
           <h2 className="text-base font-semibold text-fg">Two-factor authentication</h2>
           <p className="text-sm text-fg-muted">
-            Add a one-time code from an authenticator app (Google Authenticator, 1Password, Authy, etc.)
-            on top of your password.
+            Add a one-time code from an authenticator app (Google Authenticator, 1Password, Authy,
+            etc.) on top of your password.
           </p>
         </div>
         <span
@@ -207,7 +208,7 @@ export default function TwoFactorSection({
               alt="2FA QR code"
               width={220}
               height={220}
-              className="border border-border rounded-md bg-white p-2"
+              className="border border-border rounded-md bg-surface p-2"
             />
           )}
           <p className="text-xs text-fg-muted break-all">
@@ -217,7 +218,8 @@ export default function TwoFactorSection({
           {enrollment.backupCodes.length > 0 && (
             <div className="rounded-md border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-3">
               <p className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-2">
-                Save these backup codes somewhere safe. Each can be used once if you lose access to your authenticator.
+                Save these backup codes somewhere safe. Each can be used once if you lose access to
+                your authenticator.
               </p>
               <div className="grid grid-cols-2 gap-1 text-xs font-mono text-amber-900 dark:text-amber-200">
                 {enrollment.backupCodes.map((c) => (

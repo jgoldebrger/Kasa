@@ -1,6 +1,7 @@
 'use client'
 
 import { ButtonHTMLAttributes, forwardRef } from 'react'
+import { cn } from '@/lib/cn'
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'destructive' | 'link'
 type Size = 'sm' | 'md' | 'lg'
@@ -25,7 +26,7 @@ const variantClass: Record<Variant, string> = {
   ghost:
     'bg-transparent text-fg-muted hover:bg-fg/5 hover:text-fg active:bg-fg/10 disabled:text-fg-subtle',
   destructive:
-    'bg-red-600 text-white shadow-sm hover:bg-red-700 active:bg-red-800 disabled:bg-red-300 dark:bg-red-500 dark:hover:bg-red-600 dark:disabled:bg-red-500/50',
+    'bg-danger text-white shadow-sm hover:bg-danger/90 active:bg-danger/80 disabled:bg-danger/40 disabled:text-white/80',
   link: 'bg-transparent text-accent hover:underline disabled:text-accent/50 px-0 py-0',
 }
 
@@ -67,7 +68,14 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       type={type ?? 'button'}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={`${base} ${variantClass[variant]} ${isLink ? '' : sizeClass[size]} ${touch} ${widthCls} ${className}`}
+      className={cn(
+        base,
+        variantClass[variant],
+        !isLink && sizeClass[size],
+        touch,
+        widthCls,
+        className,
+      )}
       {...rest}
     >
       {loading ? (

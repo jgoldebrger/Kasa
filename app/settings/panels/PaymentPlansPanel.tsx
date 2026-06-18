@@ -8,6 +8,8 @@ import {
   familiesListUrl,
   parseFamiliesListResponse,
 } from '@/lib/client/families-list'
+import { SettingsPanel } from '@/app/components/settings/SettingsPanel'
+import { Button } from '@/app/components/ui'
 import PaymentPlansTable, {
   type PaymentPlanFamily,
   type PaymentPlanRow,
@@ -80,34 +82,22 @@ export default function PaymentPlansPanel({
   }, [plans])
 
   return (
-    <div className="bg-surface rounded-lg shadow-lg p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-            <CreditCardIcon className="h-6 w-6 text-green-600" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-fg">Payment Plans</h2>
-            <p className="text-sm text-fg-muted">
-              Manage payment plans and view families using each plan
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={onAdd}
-          className="focus-ring bg-accent text-accent-fg px-4 py-2 rounded-md flex items-center gap-2 hover:bg-accent-hover transition-colors text-sm font-medium"
-        >
-          <PlusIcon className="h-4 w-4" />
+    <SettingsPanel
+      icon={<CreditCardIcon />}
+      title="Payment Plans"
+      description="Manage payment plans and view families using each plan"
+      actions={
+        <Button onClick={onAdd} leftIcon={<PlusIcon className="h-4 w-4" />}>
           Add Payment Plan
-        </button>
-      </div>
-
+        </Button>
+      }
+    >
       <PaymentPlansTable
         plans={displayPlans}
         onEdit={onEdit}
         onDelete={onDelete}
         tableId="settings-payment-plans"
       />
-    </div>
+    </SettingsPanel>
   )
 }

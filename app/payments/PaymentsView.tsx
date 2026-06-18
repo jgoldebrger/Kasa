@@ -22,11 +22,9 @@ import { formatLocaleDate } from '@/lib/date-utils'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
-import {
-  PAYMENTS_LIST_PAGE_SIZE,
-  parsePaymentsListResponse,
-} from '@/lib/client/payments-list'
+import { PAYMENTS_LIST_PAGE_SIZE, parsePaymentsListResponse } from '@/lib/client/payments-list'
 import { Button } from '@/app/components/ui'
+import { useT } from '@/lib/client/i18n'
 
 interface Payment {
   _id: string
@@ -81,6 +79,7 @@ export default function PaymentsView({
   initialNextCursor?: string | null
 } = {}) {
   const toast = useToast()
+  const t = useT()
   const { format: formatMoney } = useCurrency()
   const serverHydrated = initialPayments !== undefined
   const [allPayments, setAllPayments] = useState<Payment[]>(initialPayments ?? [])
@@ -110,7 +109,9 @@ export default function PaymentsView({
         const data = await res.json().catch(() => null)
         if (isStale(gen)) return
         const { items, nextCursor: pageNext } = parsePaymentsListResponse(data)
-        setAllPayments((prev) => (append ? [...prev, ...(items as Payment[])] : (items as Payment[])))
+        setAllPayments((prev) =>
+          append ? [...prev, ...(items as Payment[])] : (items as Payment[]),
+        )
         setNextCursor(pageNext)
       } catch {
         if (isStale(gen)) return
@@ -138,21 +139,25 @@ export default function PaymentsView({
     void fetchPayments()
   }, [fetchPayments])
 
-  useOrgChanged(useCallback(() => {
-    invalidate()
-    hasFetchedRef.current = false
-    setAllPayments([])
-    setNextCursor(null)
-    setLoading(true)
-    hasFetchedRef.current = true
-    fetchPayments()
-  }, [fetchPayments, invalidate]))
+  useOrgChanged(
+    useCallback(() => {
+      invalidate()
+      hasFetchedRef.current = false
+      setAllPayments([])
+      setNextCursor(null)
+      setLoading(true)
+      hasFetchedRef.current = true
+      fetchPayments()
+    }, [fetchPayments, invalidate]),
+  )
 
   const formatPaymentMethod = (payment: Payment) => {
     const paymentMethod = payment.paymentMethod || 'cash'
     const method = paymentMethodLabels[paymentMethod as keyof typeof paymentMethodLabels] || 'Cash'
-    if (paymentMethod === 'credit_card' && payment.ccInfo) return `${method} •••• ${payment.ccInfo.last4}`
-    if (paymentMethod === 'check' && payment.checkInfo) return `${method} #${payment.checkInfo.checkNumber}`
+    if (paymentMethod === 'credit_card' && payment.ccInfo)
+      return `${method} •••• ${payment.ccInfo.last4}`
+    if (paymentMethod === 'check' && payment.checkInfo)
+      return `${method} #${payment.checkInfo.checkNumber}`
     return method
   }
 
@@ -206,7 +211,9 @@ export default function PaymentsView({
       header: 'Family Phone',
       headerText: 'Family Phone',
       defaultHidden: true,
-      cell: (p) => <span className="text-fg-muted text-sm tabular">{p.familyId?.phone || '—'}</span>,
+      cell: (p) => (
+        <span className="text-fg-muted text-sm tabular">{p.familyId?.phone || '—'}</span>
+      ),
       exportValue: (p) => p.familyId?.phone || '',
     },
     {
@@ -215,9 +222,7 @@ export default function PaymentsView({
       headerText: 'Amount',
       align: 'right',
       cell: (p) => (
-        <span className="font-semibold text-green-700">
-          {formatMoney(netPaymentAmount(p))}
-        </span>
+        <span className="font-semibold text-green-700">{formatMoney(netPaymentAmount(p))}</span>
       ),
       exportValue: (p) => netPaymentAmount(p),
       filter: { type: 'numberRange', getValue: (p) => netPaymentAmount(p) },
@@ -244,7 +249,9 @@ export default function PaymentsView({
       headerText: 'Payment Method',
       hideBelow: 'md',
       cell: (p) => {
-        const MethodIcon = paymentMethodIcons[p.paymentMethod as keyof typeof paymentMethodIcons] || CurrencyDollarIcon
+        const MethodIcon =
+          paymentMethodIcons[p.paymentMethod as keyof typeof paymentMethodIcons] ||
+          CurrencyDollarIcon
         return (
           <div>
             <div className="flex items-center gap-2">
@@ -345,7 +352,9 @@ export default function PaymentsView({
             pageSize={10}
             onFilteredRowsChange={setVisiblePayments}
             mobileCard={(p) => {
-              const MethodIcon = paymentMethodIcons[p.paymentMethod as keyof typeof paymentMethodIcons] || CurrencyDollarIcon
+              const MethodIcon =
+                paymentMethodIcons[p.paymentMethod as keyof typeof paymentMethodIcons] ||
+                CurrencyDollarIcon
               return (
                 <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
@@ -397,7 +406,7 @@ export default function PaymentsView({
               loading={loadingMore}
               onClick={() => fetchPayments({ cursor: nextCursor, append: true })}
             >
-              {loadingMore ? 'Loading…' : 'Load more'}
+              {t('common.loadMore')}
             </Button>
           </div>
         )}
@@ -428,7 +437,15 @@ export default function PaymentsView({
   )
 }
 
-function SummaryCard({ label, value, tone = 'text-fg' }: { label: string; value: number; tone?: string }) {
+function SummaryCard({
+  label,
+  value,
+  tone = 'text-fg',
+}: {
+  label: string
+  value: number
+  tone?: string
+}) {
   return (
     <div className="surface-card rounded-xl p-4 border border-border">
       <div className="text-xs sm:text-sm text-fg">{label}</div>

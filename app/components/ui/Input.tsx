@@ -1,6 +1,7 @@
 'use client'
 
 import { InputHTMLAttributes, forwardRef, useId } from 'react'
+import { cn } from '@/lib/cn'
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   /** Field label rendered above the input. Required for a11y unless `aria-label` is supplied. */
@@ -46,7 +47,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined
 
   return (
-    <div className={`flex flex-col gap-1.5 ${wrapperClassName}`}>
+    <div className={cn('flex flex-col gap-1.5', wrapperClassName)}>
       {label && (
         <label
           htmlFor={fieldId}
@@ -54,7 +55,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         >
           {label}
           {required && (
-            <span className="ml-0.5 text-red-600 dark:text-red-400" aria-hidden="true">
+            <span className="ml-0.5 text-danger" aria-hidden="true">
               *
             </span>
           )}
@@ -73,11 +74,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           aria-required={required || undefined}
           aria-describedby={describedBy}
           required={required}
-          className={`focus-ring w-full rounded-md border bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-subtle transition-colors disabled:bg-app-subtle disabled:text-fg-muted ${
-            error
-              ? 'border-red-400 focus:border-red-500 dark:border-red-500/60'
-              : 'border-border focus:border-accent'
-          } ${leftIcon ? 'pl-10' : ''} ${rightIcon ? 'pr-10' : ''} ${className}`}
+          className={cn(
+            'focus-ring w-full rounded-md border bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-subtle transition-colors disabled:bg-app-subtle disabled:text-fg-muted',
+            error ? 'border-danger focus:border-danger' : 'border-border focus:border-accent',
+            leftIcon && 'pl-10',
+            rightIcon && 'pr-10',
+            className,
+          )}
           {...rest}
         />
         {rightIcon && (

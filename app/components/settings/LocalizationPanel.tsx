@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { GlobeAltIcon } from '@heroicons/react/24/outline'
+import { SettingsPanel } from '@/app/components/settings/SettingsPanel'
 import { Button, Select } from '@/app/components/ui'
 import { useToast } from '@/app/components/Toast'
 import { formatMoney, listSupportedCurrencies } from '@/lib/currency'
@@ -31,7 +32,7 @@ const LOCALE_LABELS: Record<Locale, string> = {
   'en-US': 'English (US)',
   'en-GB': 'English (UK)',
   'he-IL': 'עברית (Hebrew, Israel)',
-  'yi': 'ייִדיש (Yiddish)',
+  yi: 'ייִדיש (Yiddish)',
   'fr-FR': 'Français (France)',
   'es-MX': 'Español (México)',
 }
@@ -67,29 +68,31 @@ export default function LocalizationPanel() {
     })()
   }, [toast, begin, isStale])
 
-  useOrgChanged(useCallback(() => {
-    invalidate()
-    setLoading(true)
-    const gen = begin()
-    void (async () => {
-      try {
-        const res = await fetch('/api/organizations/current')
-        if (isStale(gen)) return
-        if (!res.ok) {
-          toast.error('Failed to load localization settings.')
-          return
+  useOrgChanged(
+    useCallback(() => {
+      invalidate()
+      setLoading(true)
+      const gen = begin()
+      void (async () => {
+        try {
+          const res = await fetch('/api/organizations/current')
+          if (isStale(gen)) return
+          if (!res.ok) {
+            toast.error('Failed to load localization settings.')
+            return
+          }
+          const data = await res.json().catch(() => ({}))
+          if (isStale(gen)) return
+          if (typeof data.currency === 'string') setCurrency(data.currency)
+          if (typeof data.locale === 'string') {
+            setLocaleState(data.locale as Locale)
+          }
+        } finally {
+          if (!isStale(gen)) setLoading(false)
         }
-        const data = await res.json().catch(() => ({}))
-        if (isStale(gen)) return
-        if (typeof data.currency === 'string') setCurrency(data.currency)
-        if (typeof data.locale === 'string') {
-          setLocaleState(data.locale as Locale)
-        }
-      } finally {
-        if (!isStale(gen)) setLoading(false)
-      }
-    })()
-  }, [toast, begin, invalidate, isStale]))
+      })()
+    }, [toast, begin, invalidate, isStale]),
+  )
 
   const handleSave = async () => {
     setSaving(true)
@@ -120,19 +123,12 @@ export default function LocalizationPanel() {
   }))
 
   return (
-    <div className="bg-surface rounded-lg shadow-lg p-4 sm:p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700/40 rounded-lg flex items-center justify-center">
-          <GlobeAltIcon className="h-6 w-6 text-slate-600 dark:text-slate-300" />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-fg">Localization</h2>
-          <p className="text-sm text-fg-muted">
-            Change how money and dates are displayed across the app and on PDFs.
-          </p>
-        </div>
-      </div>
-
+    <SettingsPanel
+      icon={<GlobeAltIcon />}
+      title="Localization"
+      description="Change how money and dates are displayed across the app and on PDFs."
+      className="space-y-6"
+    >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Select
           label="Currency"
@@ -166,9 +162,7 @@ export default function LocalizationPanel() {
         <ul className="space-y-0.5 text-fg-muted">
           <li>
             Whole amount:{' '}
-            <span className="text-fg font-medium">
-              {formatMoney(1234, { currency, locale })}
-            </span>
+            <span className="text-fg font-medium">{formatMoney(1234, { currency, locale })}</span>
           </li>
           <li>
             Fractional amount:{' '}
@@ -179,9 +173,7 @@ export default function LocalizationPanel() {
           <li>
             Today:{' '}
             <span className="text-fg font-medium">
-              {new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(
-                new Date(),
-              )}
+              {new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(new Date())}
             </span>
           </li>
         </ul>
@@ -192,6 +184,6 @@ export default function LocalizationPanel() {
           Save changes
         </Button>
       </div>
-    </div>
+    </SettingsPanel>
   )
 }

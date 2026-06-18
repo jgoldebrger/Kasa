@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { signIn, useSession } from 'next-auth/react'
 import Link from 'next/link'
+import { Alert, Button, ButtonLink, Input, Skeleton } from '@/app/components/ui'
+import { useT } from '@/lib/client/i18n'
 
 interface InviteInfo {
   email: string
@@ -17,6 +19,7 @@ export default function InviteAcceptPage() {
   const params = useParams<{ token: string }>()
   const token = params.token ?? ''
   const { data: session, status: sessionStatus } = useSession()
+  const t = useT()
 
   const [info, setInfo] = useState<InviteInfo | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -35,12 +38,12 @@ export default function InviteAcceptPage() {
         const data = await res.json().catch(() => ({}))
         if (cancelled) return
         if (!res.ok) {
-          setLoadError(data.error || 'Failed to load invite')
+          setLoadError(data.error || t('invite.loadFailed'))
         } else {
           setInfo(data)
         }
-      } catch (err) {
-        if (!cancelled) setLoadError('Failed to load invite')
+      } catch {
+        if (!cancelled) setLoadError(t('invite.loadFailed'))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -55,11 +58,11 @@ export default function InviteAcceptPage() {
     setSubmitError(null)
     setSubmitting(true)
     try {
-      const body: any = { token }
+      const body: Record<string, string> = { token }
       const isLoggedIn = !!session?.user
       if (!isLoggedIn) {
         if (!name.trim() || password.length < 8) {
-          setSubmitError('Name and a password of at least 8 characters are required')
+          setSubmitError(t('invite.namePasswordRequired'))
           setSubmitting(false)
           return
         }
@@ -73,7 +76,7 @@ export default function InviteAcceptPage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setSubmitError(data.error || 'Failed to accept invite')
+        setSubmitError(data.error || t('invite.acceptFailed'))
         setSubmitting(false)
         return
       }
@@ -91,16 +94,28 @@ export default function InviteAcceptPage() {
       }
       router.push('/')
       router.refresh()
-    } catch (err) {
-      setSubmitError('Something went wrong')
+    } catch {
+      setSubmitError(t('common.error'))
       setSubmitting(false)
     }
   }
 
   if (loading || sessionStatus === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-app">
-        <div className="text-sm text-fg-muted">Loading invite...</div>
+      <div className="min-h-screen flex items-center justify-center p-4 bg-app">
+        <div className="w-full max-w-sm">
+          <div className="text-center mb-8">
+            <Skeleton h={40} w={40} className="mx-auto mb-4 rounded-lg" />
+            <Skeleton h={28} w="70%" className="mx-auto mb-2" />
+            <Skeleton h={16} w="85%" className="mx-auto" />
+          </div>
+          <div className="surface-card p-6 space-y-5">
+            <Skeleton h={48} />
+            <Skeleton h={42} />
+            <Skeleton h={42} />
+            <Skeleton h={44} />
+          </div>
+        </div>
       </div>
     )
   }
@@ -110,15 +125,12 @@ export default function InviteAcceptPage() {
       <div className="min-h-screen flex items-center justify-center p-4 bg-app">
         <div className="surface-card p-6 max-w-sm w-full text-center space-y-4">
           <h1 className="text-base font-semibold text-red-600 dark:text-red-400">
-            Invite Unavailable
+            {t('invite.unavailable')}
           </h1>
           <p className="text-sm text-fg-muted">{loadError}</p>
-          <Link
-            href="/login"
-            className="inline-block text-accent hover:text-accent-hover font-medium text-sm"
-          >
-            Go to sign in
-          </Link>
+          <ButtonLink href="/login" variant="ghost" size="sm">
+            {t('invite.goToSignIn')}
+          </ButtonLink>
         </div>
       </div>
     )
@@ -136,85 +148,69 @@ export default function InviteAcceptPage() {
           <div className="inline-flex items-center justify-center w-10 h-10 bg-accent text-accent-fg rounded-lg font-semibold mb-4">
             K
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-fg">You&apos;re invited</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-fg">{t('invite.title')}</h1>
           <p className="text-sm text-fg-muted mt-1">
-            to join <span className="font-semibold text-fg">{info.organizationName}</span> as{' '}
-            <span className="font-semibold text-fg">{info.role}</span>
+            {t('invite.subtitlePrefix')}{' '}
+            <span className="font-semibold text-fg">{info.organizationName}</span>{' '}
+            {t('invite.subtitleMiddle')} <span className="font-semibold text-fg">{info.role}</span>
           </p>
         </div>
 
         <form onSubmit={accept} className="surface-card p-6 space-y-5">
-          {submitError && (
-            <div className="bg-red-50 border border-red-200 text-red-700 dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-              {submitError}
-            </div>
-          )}
+          {submitError && <Alert variant="danger">{submitError}</Alert>}
 
-          <div className="bg-accent/10 border border-accent/20 text-accent px-4 py-3 rounded-md text-sm">
-            <strong>Invite for:</strong> {info.email}
-          </div>
+          <Alert variant="info">
+            <strong>{t('invite.forLabel')}</strong> {info.email}
+          </Alert>
 
           {wrongUser ? (
             <div className="space-y-3">
-              <p className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 px-4 py-3 rounded-md">
-                You&apos;re signed in as <strong>{session?.user?.email}</strong> but this invite is
-                for <strong>{info.email}</strong>. Please sign out and use the correct account.
-              </p>
-              <Link
-                href="/api/auth/signout"
-                className="block text-center text-accent hover:text-accent-hover font-medium text-sm"
-              >
-                Sign out
-              </Link>
+              <Alert variant="warning">
+                {t('invite.wrongUserPrefix')} <strong>{session?.user?.email}</strong>{' '}
+                {t('invite.wrongUserMiddle')} <strong>{info.email}</strong>.{' '}
+                {t('invite.wrongUserSuffix')}
+              </Alert>
+              <ButtonLink href="/api/auth/signout" variant="ghost" size="sm" block>
+                {t('nav.signOut')}
+              </ButtonLink>
             </div>
           ) : isLoggedIn ? (
-            <button
-              type="submit"
-              disabled={submitting}
-              className="focus-ring w-full bg-accent text-accent-fg font-medium py-2.5 rounded-md hover:bg-accent-hover transition-colors disabled:opacity-60"
-            >
-              {submitting ? 'Accepting...' : `Accept and join ${info.organizationName}`}
-            </button>
+            <Button type="submit" loading={submitting} block size="lg">
+              {submitting
+                ? t('invite.accepting')
+                : `${t('invite.acceptJoin')} ${info.organizationName}`}
+            </Button>
           ) : (
             <>
-              <div>
-                <label className="block text-sm font-medium text-fg mb-1.5">Your Name</label>
-                <input
-                  type="text"
-                  required
-                  minLength={2}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-fg mb-1.5">Set a Password</label>
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg outline-none"
-                  placeholder="At least 8 characters"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="focus-ring w-full bg-accent text-accent-fg font-medium py-2.5 rounded-md hover:bg-accent-hover transition-colors disabled:opacity-60"
-              >
-                {submitting ? 'Creating account...' : 'Accept invite & create account'}
-              </button>
+              <Input
+                label={t('signup.fullName')}
+                type="text"
+                required
+                minLength={2}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoComplete="name"
+              />
+              <Input
+                label={t('invite.setPassword')}
+                type="password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={t('signup.passwordPlaceholder')}
+              />
+              <Button type="submit" loading={submitting} block size="lg">
+                {submitting ? t('invite.creatingAccount') : t('invite.acceptCreate')}
+              </Button>
               <p className="text-sm text-fg-muted text-center">
-                Already have an account?{' '}
+                {t('signup.alreadyHaveAccount')}{' '}
                 <Link
                   href={`/login?callbackUrl=/invite/${token}`}
                   className="text-accent hover:text-accent-hover font-medium"
                 >
-                  Sign in
+                  {t('auth.signIn')}
                 </Link>
               </p>
             </>

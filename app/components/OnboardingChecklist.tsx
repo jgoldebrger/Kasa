@@ -1,14 +1,16 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import {
-  CheckCircleIcon,
-  XMarkIcon,
-} from '@heroicons/react/24/outline'
+import { CheckCircleIcon, ChevronRightIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { cachedFetch } from '@/lib/client-cache'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
-import type { SetupProgressStep, SetupProgressStepId } from '@/lib/route-logic/organizations/setup-progress'
+import { useT } from '@/lib/client/i18n'
+import type { MessageKey } from '@/lib/i18n/load-locale'
+import type {
+  SetupProgressStep,
+  SetupProgressStepId,
+} from '@/lib/route-logic/organizations/setup-progress'
 
 interface SetupProgressResponse {
   organizationId: string
@@ -20,12 +22,12 @@ interface SetupProgressResponse {
 
 const DISMISS_KEY_PREFIX = 'kasa.onboarding.dismissed.'
 
-const STEP_LABELS: Record<SetupProgressStepId, string> = {
-  paymentPlans: 'Set up payment plans',
-  eventTypes: 'Define event types',
-  email: 'Configure email (SMTP)',
-  firstFamily: 'Add your first family',
-  firstPayment: 'Record your first payment',
+const STEP_LABEL_KEYS: Record<SetupProgressStepId, MessageKey> = {
+  paymentPlans: 'onboarding.step.paymentPlans',
+  eventTypes: 'onboarding.step.eventTypes',
+  email: 'onboarding.step.email',
+  firstFamily: 'onboarding.step.firstFamily',
+  firstPayment: 'onboarding.step.firstPayment',
 }
 
 function getDismissed(orgId: string): boolean {
@@ -88,6 +90,7 @@ export default function OnboardingChecklist({
 }: {
   initialProgress?: SetupProgressResponse | null
 }) {
+  const t = useT()
   const hasInitial = initialProgress != null
   const [progress, setProgress] = useState<SetupProgressResponse | null>(initialProgress)
   const [loading, setLoading] = useState(!hasInitial)
@@ -124,10 +127,12 @@ export default function OnboardingChecklist({
     fetchProgress()
   }, [fetchProgress, hasInitial, initialProgress])
 
-  useOrgChanged(useCallback(() => {
-    setExpanded(true)
-    fetchProgress()
-  }, [fetchProgress]))
+  useOrgChanged(
+    useCallback(() => {
+      setExpanded(true)
+      fetchProgress()
+    }, [fetchProgress]),
+  )
 
   const handleDismiss = () => {
     if (!progress) return
@@ -139,6 +144,17 @@ export default function OnboardingChecklist({
   const handleReopen = () => {
     setExpanded(true)
   }
+
+  const stepLabels = useMemo(
+    () =>
+      Object.fromEntries(
+        (Object.keys(STEP_LABEL_KEYS) as SetupProgressStepId[]).map((id) => [
+          id,
+          t(STEP_LABEL_KEYS[id]),
+        ]),
+      ) as Record<SetupProgressStepId, string>,
+    [t],
+  )
 
   if (loading) return null
   if (error || !progress || progress.complete) return null
@@ -153,16 +169,24 @@ export default function OnboardingChecklist({
           type="button"
           onClick={handleReopen}
           className="focus-ring w-full surface-card p-4 sm:px-5 flex items-center gap-3 text-left hover:bg-fg/[0.02] transition-colors"
-          aria-label={`Continue setup — ${completed} of ${total} steps complete`}
+          aria-label={t('onboarding.continueSetupAria')
+            .replace('{completed}', String(completed))
+            .replace('{total}', String(total))}
         >
           <ProgressRing completed={completed} total={total} />
           <span className="flex-1 min-w-0">
-            <span className="block text-sm font-semibold text-fg">Continue your setup</span>
+            <span className="block text-sm font-semibold text-fg">
+              {t('onboarding.continueSetup')}
+            </span>
             <span className="block text-xs text-fg-muted mt-0.5">
-              {completed} of {total} steps complete
+              {t('onboarding.stepsComplete')
+                .replace('{completed}', String(completed))
+                .replace('{total}', String(total))}
             </span>
           </span>
-          <span className="text-sm font-medium text-accent shrink-0">Show checklist</span>
+          <span className="text-sm font-medium text-accent shrink-0">
+            {t('onboarding.showChecklist')}
+          </span>
         </button>
       </div>
     )
@@ -179,19 +203,21 @@ export default function OnboardingChecklist({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h2 id="onboarding-title" className="text-base font-semibold text-fg">
-                Welcome to Kasa
+                {t('dashboard.welcomeKasa')}
               </h2>
               <p className="mt-1 text-sm text-fg-muted">
                 {completed === 0
-                  ? "Let's get your organization set up in five quick steps."
-                  : `${completed} of ${total} steps complete — keep going!`}
+                  ? t('onboarding.zeroStepsSubtitle')
+                  : t('onboarding.inProgressSubtitle')
+                      .replace('{completed}', String(completed))
+                      .replace('{total}', String(total))}
               </p>
             </div>
             <button
               type="button"
               onClick={handleDismiss}
               className="focus-ring shrink-0 p-1.5 rounded-md text-fg-muted hover:text-fg hover:bg-fg/5 transition-colors min-h-[var(--touch-target)] min-w-[var(--touch-target)] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
-              aria-label="Dismiss setup checklist"
+              aria-label={t('onboarding.dismissAria')}
             >
               <XMarkIcon className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -202,9 +228,7 @@ export default function OnboardingChecklist({
                 <Link
                   href={step.href}
                   className={`focus-ring flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors ${
-                    step.done
-                      ? 'text-fg-muted bg-fg/[0.02]'
-                      : 'text-fg hover:bg-fg/5'
+                    step.done ? 'text-fg-muted bg-fg/[0.02]' : 'text-fg hover:bg-fg/5'
                   }`}
                   aria-current={step.done ? undefined : 'step'}
                 >
@@ -216,19 +240,16 @@ export default function OnboardingChecklist({
                     }`}
                     aria-hidden="true"
                   >
-                    {step.done ? (
-                      <CheckCircleIcon className="h-4 w-4" />
-                    ) : (
-                      i + 1
-                    )}
+                    {step.done ? <CheckCircleIcon className="h-4 w-4" /> : i + 1}
                   </span>
                   <span className={`flex-1 truncate ${step.done ? 'line-through' : ''}`}>
-                    {STEP_LABELS[step.id]}
+                    {stepLabels[step.id]}
                   </span>
                   {!step.done && (
-                    <span aria-hidden="true" className="text-fg-subtle shrink-0">
-                      →
-                    </span>
+                    <ChevronRightIcon
+                      aria-hidden="true"
+                      className="h-4 w-4 text-fg-subtle shrink-0 rtl:rotate-180"
+                    />
                   )}
                 </Link>
               </li>

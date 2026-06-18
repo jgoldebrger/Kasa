@@ -2,6 +2,7 @@
 
 import type React from 'react'
 import { ArrowDownTrayIcon, ClockIcon } from '@heroicons/react/24/outline'
+import { SettingsPanel } from '@/app/components/settings/SettingsPanel'
 import { Button, DataView, EmptyState, Input, Select, type DataColumn } from '@/app/components/ui'
 
 /**
@@ -81,9 +82,7 @@ export default function ActivityPanel({
       header: 'When',
       headerText: 'When',
       cell: (i) => (
-        <span className="tabular text-sm text-fg">
-          {new Date(i.createdAt).toLocaleString()}
-        </span>
+        <span className="tabular text-sm text-fg">{new Date(i.createdAt).toLocaleString()}</span>
       ),
       exportValue: (i) => (i.createdAt ? new Date(i.createdAt) : ''),
     },
@@ -132,19 +131,11 @@ export default function ActivityPanel({
   ]
 
   return (
-    <div className="bg-surface rounded-lg shadow-lg p-4 sm:p-6">
-      <div className="flex items-start justify-between gap-3 mb-6">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700/40 rounded-lg flex items-center justify-center shrink-0">
-            <ClockIcon className="h-6 w-6 text-slate-600 dark:text-slate-300" />
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-2xl font-bold text-fg">Activity log</h2>
-            <p className="text-sm text-fg-muted">
-              Read-only audit of administrative actions in this organization.
-            </p>
-          </div>
-        </div>
+    <SettingsPanel
+      icon={<ClockIcon />}
+      title="Activity log"
+      description="Read-only audit of administrative actions in this organization."
+      actions={
         <Button
           variant="secondary"
           size="sm"
@@ -154,8 +145,8 @@ export default function ActivityPanel({
         >
           Export CSV
         </Button>
-      </div>
-
+      }
+    >
       {/* Filters */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
         <Select
@@ -199,12 +190,7 @@ export default function ActivityPanel({
           value={fromDate}
           onChange={(e) => setFromDate(e.target.value)}
         />
-        <Input
-          label="To"
-          type="date"
-          value={toDate}
-          onChange={(e) => setToDate(e.target.value)}
-        />
+        <Input label="To" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
       </div>
 
       {items.length === 0 && !loading ? (
@@ -259,6 +245,6 @@ export default function ActivityPanel({
           )}
         </>
       )}
-    </div>
+    </SettingsPanel>
   )
 }

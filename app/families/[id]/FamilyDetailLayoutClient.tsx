@@ -3,12 +3,22 @@
 import { Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
+import { ChevronRightIcon } from '@heroicons/react/24/outline'
 import { FamilyDetailProvider, useFamilyDetail } from './FamilyDetailContext'
 import FamilyHeader from './FamilyHeader'
 import FamilyTabNav from './FamilyTabNav'
 import MemberHiddenTabsNotice from './MemberHiddenTabsNotice'
-import { FAMILY_TABS } from './_lib/constants'
+import { FAMILY_TABS, resolveFamilyTabLabel } from './_lib/constants'
 import type { FamilyDetails } from './_lib/helpers'
+import { useT } from '@/lib/client/i18n'
+
+function BreadcrumbSeparator() {
+  return (
+    <li aria-hidden="true" className="flex shrink-0 items-center">
+      <ChevronRightIcon className="h-3.5 w-3.5 rtl:rotate-180" />
+    </li>
+  )
+}
 
 const FamilyModals = dynamic(() => import('./_components/FamilyModals'), {
   loading: () => null,
@@ -16,11 +26,13 @@ const FamilyModals = dynamic(() => import('./_components/FamilyModals'), {
 
 function FamilyDetailShell({ children }: { children: React.ReactNode }) {
   const { roleLoading, loading, data, isAdmin, router, activeTab } = useFamilyDetail()
-  const activeTabLabel = FAMILY_TABS.find((tab) => tab.id === activeTab)?.label
+  const t = useT()
+  const activeTabDef = FAMILY_TABS.find((tab) => tab.id === activeTab)
+  const activeTabLabel = activeTabDef ? resolveFamilyTabLabel(activeTabDef, t) : undefined
 
   if (roleLoading || loading) {
     return (
-      <main className="min-h-screen p-4 sm:p-6 md:p-8 bg-app-subtle">
+      <main className="min-h-screen p-4 sm:p-6 md:p-8 bg-app">
         <div className="max-w-7xl mx-auto">
           <div className="ui-skeleton h-8 w-40 mb-4" />
           <div className="ui-skeleton h-10 w-2/3 mb-2" />
@@ -38,7 +50,7 @@ function FamilyDetailShell({ children }: { children: React.ReactNode }) {
 
   if (!data?.family) {
     return (
-      <main className="min-h-screen p-4 sm:p-6 md:p-8 bg-app-subtle">
+      <main className="min-h-screen p-4 sm:p-6 md:p-8 bg-app">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-2xl font-bold mb-4 text-fg">Family not found</h1>
           <p className="text-fg">
@@ -56,7 +68,7 @@ function FamilyDetailShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <main className="min-h-screen p-4 sm:p-6 md:p-8 bg-app-subtle">
+    <main className="min-h-screen p-4 sm:p-6 md:p-8 bg-app">
       <div className="max-w-7xl mx-auto">
         <Link
           href="/families"
@@ -66,17 +78,17 @@ function FamilyDetailShell({ children }: { children: React.ReactNode }) {
         </Link>
 
         <nav aria-label="Breadcrumb" className="mb-4 text-sm text-fg-muted">
-          <ol className="flex flex-wrap items-center gap-1">
+          <ol className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
             <li>
               <Link href="/families" className="hover:text-fg focus-ring rounded">
-                Families
+                {t('nav.families')}
               </Link>
             </li>
-            <li aria-hidden="true">›</li>
+            <BreadcrumbSeparator />
             <li className="text-fg truncate max-w-[12rem] sm:max-w-none">{data.family.name}</li>
             {activeTab !== 'info' && activeTabLabel && (
               <>
-                <li aria-hidden="true">›</li>
+                <BreadcrumbSeparator />
                 <li className="text-fg" aria-current="page">
                   {activeTabLabel}
                 </li>
@@ -110,7 +122,7 @@ export default function FamilyDetailLayoutClient({
     <FamilyDetailProvider initialSummary={initialSummary}>
       <Suspense
         fallback={
-          <main className="min-h-screen p-4 sm:p-6 md:p-8 bg-app-subtle">
+          <main className="min-h-screen p-4 sm:p-6 md:p-8 bg-app">
             <div className="max-w-7xl mx-auto ui-skeleton h-96" />
           </main>
         }

@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
+import { Button, ButtonLink } from '@/app/components/ui'
 import { useToast } from '@/app/components/Toast'
+import { useT } from '@/lib/client/i18n'
 import type { PlanTier } from '@/lib/billing/plans'
 
 interface PricingActionsProps {
@@ -12,27 +13,26 @@ interface PricingActionsProps {
 
 export default function PricingActions({ tier, isSignedIn }: PricingActionsProps) {
   const toast = useToast()
+  const t = useT()
   const [loading, setLoading] = useState(false)
 
   if (tier === 'institution') {
     return (
-      <a
+      <ButtonLink
         href="mailto:support@kasa.com?subject=Kasa%20Institution%20plan"
-        className="focus-ring w-full text-center rounded-md border border-border px-4 py-2.5 text-sm font-medium text-fg hover:bg-fg/5"
+        variant="secondary"
+        block
       >
-        Contact sales
-      </a>
+        {t('pricing.contactSales')}
+      </ButtonLink>
     )
   }
 
   if (!isSignedIn) {
     return (
-      <Link
-        href="/login"
-        className="focus-ring w-full text-center rounded-md bg-accent text-accent-fg px-4 py-2.5 text-sm font-medium hover:bg-accent-hover"
-      >
-        Sign in to subscribe
-      </Link>
+      <ButtonLink href="/login" block>
+        {t('pricing.signInToSubscribe')}
+      </ButtonLink>
     )
   }
 
@@ -46,27 +46,22 @@ export default function PricingActions({ tier, isSignedIn }: PricingActionsProps
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
-        toast.error(body.error || 'Could not start checkout.')
+        toast.error(body.error || t('pricing.checkoutFailed'))
         return
       }
       if (body.url) {
         window.location.href = body.url
       }
     } catch {
-      toast.error('Could not start checkout.')
+      toast.error(t('pricing.checkoutFailed'))
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => void startCheckout()}
-      disabled={loading}
-      className="focus-ring w-full rounded-md bg-accent text-accent-fg px-4 py-2.5 text-sm font-medium hover:bg-accent-hover disabled:opacity-60"
-    >
-      {loading ? 'Redirecting…' : 'Subscribe'}
-    </button>
+    <Button type="button" onClick={() => void startCheckout()} loading={loading} block size="lg">
+      {loading ? t('pricing.redirecting') : t('pricing.subscribe')}
+    </Button>
   )
 }

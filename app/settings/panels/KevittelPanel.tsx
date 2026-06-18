@@ -1,7 +1,9 @@
 'use client'
 
-import { PrinterIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline'
+import { PrinterIcon, DocumentArrowDownIcon, UserGroupIcon } from '@heroicons/react/24/outline'
 import { escapeHtml } from '@/lib/html-escape'
+import { SettingsPanel } from '@/app/components/settings/SettingsPanel'
+import { Button } from '@/app/components/ui'
 
 export interface KevittelPanelProps {
   families: any[]
@@ -99,26 +101,28 @@ function openKevittelPrint(families: any[]) {
 
 export default function KevittelPanel({ families, loading }: KevittelPanelProps) {
   return (
-    <div className="bg-surface rounded-lg shadow-lg p-6">
-      <div className="flex items-center justify-end mb-6">
-        <div className="flex gap-3">
-          <button
+    <SettingsPanel
+      icon={<UserGroupIcon />}
+      title="Kevittel"
+      description="Print Hebrew family names for kevittel sheets."
+      actions={
+        <>
+          <Button
+            variant="secondary"
             onClick={() => openKevittelPrint(families)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 transition-colors"
+            leftIcon={<PrinterIcon className="h-4 w-4" />}
           >
-            <PrinterIcon className="h-5 w-5" />
             Print
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => openKevittelPrint(families)}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 transition-colors"
+            leftIcon={<DocumentArrowDownIcon className="h-4 w-4" />}
           >
-            <DocumentArrowDownIcon className="h-5 w-5" />
             Save as PDF
-          </button>
-        </div>
-      </div>
-
+          </Button>
+        </>
+      }
+    >
       <div id="kevittel-content" className="space-y-4 print:space-y-2">
         {loading ? (
           <div className="text-center py-12 text-fg-muted">Loading families...</div>
@@ -135,9 +139,7 @@ export default function KevittelPanel({ families, loading }: KevittelPanelProps)
             })
 
             if (families.length === 0) {
-              return (
-                <div className="text-center py-12 text-fg-muted">No families found.</div>
-              )
+              return <div className="text-center py-12 text-fg-muted">No families found.</div>
             }
 
             if (familiesWithHebrewNames.length === 0) {
@@ -224,6 +226,6 @@ export default function KevittelPanel({ families, loading }: KevittelPanelProps)
           })()
         )}
       </div>
-    </div>
+    </SettingsPanel>
   )
 }

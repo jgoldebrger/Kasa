@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+import { Suspense, useState, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import Link from 'next/link'
@@ -20,10 +20,11 @@ function safeCallbackUrl(raw: string | null): string {
   return raw
 }
 
-const schema = z.object({
-  email: z.string().trim().toLowerCase().email('Enter a valid email address'),
-  password: z.string().min(1, 'Password is required'),
-})
+const schema = (t: (key: import('@/lib/i18n/load-locale').MessageKey) => string) =>
+  z.object({
+    email: z.string().trim().toLowerCase().email(t('auth.emailInvalid')),
+    password: z.string().min(1, t('auth.passwordRequired')),
+  })
 
 function LoginForm() {
   const router = useRouter()
@@ -43,11 +44,9 @@ function LoginForm() {
   const [totpCode, setTotpCode] = useState('')
   const [twoFactorBusy, setTwoFactorBusy] = useState(false)
 
-  const completeSignIn = async (
-    email: string,
-    password: string,
-    totpCode: string,
-  ) => {
+  const formSchema = useMemo(() => schema(t), [t])
+
+  const completeSignIn = async (email: string, password: string, totpCode: string) => {
     const res = await signIn('credentials', {
       email,
       password,
@@ -56,9 +55,9 @@ function LoginForm() {
     })
     if (res?.error) {
       if (totpCode) {
-        toast.error('Invalid 2FA code.')
+        toast.error(t('auth.invalid2fa'))
       } else {
-        toast.error('Invalid email or password.')
+        toast.error(t('auth.invalidCredentials'))
       }
       return false
     }
@@ -68,7 +67,7 @@ function LoginForm() {
   }
 
   const form = useFormState({
-    schema,
+    schema: formSchema,
     initialValues: { email: '', password: '' },
     onSubmit: async (values) => {
       // Step 1: ask the server whether this account has 2FA enabled
@@ -86,11 +85,11 @@ function LoginForm() {
         if (!res.ok) {
           // Fall through to signIn — precheck is best-effort.
         } else {
-        const data = await res.json().catch(() => ({}))
-        if (data?.requiresTwoFactor) {
-          setTwoFactorStep({ email: values.email, password: values.password })
-          return
-        }
+          const data = await res.json().catch(() => ({}))
+          if (data?.requiresTwoFactor) {
+            setTwoFactorStep({ email: values.email, password: values.password })
+            return
+          }
         }
       } catch {
         // Network error — fall through to a normal signIn attempt; if
@@ -108,16 +107,12 @@ function LoginForm() {
     if (!twoFactorStep) return
     const cleaned = totpCode.trim()
     if (!cleaned) {
-      toast.error('Enter your 6-digit code or a backup code.')
+      toast.error(t('auth.enter2faCode'))
       return
     }
     setTwoFactorBusy(true)
     try {
-      const ok = await completeSignIn(
-        twoFactorStep.email,
-        twoFactorStep.password,
-        cleaned,
-      )
+      const ok = await completeSignIn(twoFactorStep.email, twoFactorStep.password, cleaned)
       if (!ok) {
         setTotpCode('')
       }
@@ -169,11 +164,7 @@ function LoginForm() {
             </button>
           </form>
         ) : (
-          <form
-            onSubmit={form.handleSubmit}
-            className="surface-card p-6 space-y-5"
-            noValidate
-          >
+          <form onSubmit={form.handleSubmit} className="surface-card p-6 space-y-5" noValidate>
             <Input
               label={t('auth.email')}
               type="email"
@@ -199,12 +190,18 @@ function LoginForm() {
             <div className="text-sm text-fg-muted text-center space-y-1">
               <p>
                 {t('auth.noAccount')}{' '}
-                <Link href="/request-invite" className="text-accent hover:text-accent-hover font-medium">
+                <Link
+                  href="/request-invite"
+                  className="text-accent hover:text-accent-hover font-medium"
+                >
                   {t('auth.requestInvite')}
                 </Link>
               </p>
               <p>
-                <Link href="/reset-password" className="text-accent hover:text-accent-hover font-medium">
+                <Link
+                  href="/reset-password"
+                  className="text-accent hover:text-accent-hover font-medium"
+                >
                   {t('auth.forgotPassword')}
                 </Link>
               </p>
