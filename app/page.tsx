@@ -2,9 +2,8 @@ import { Suspense } from 'react'
 import { requireServerOrgContext } from '@/lib/auth-server'
 import { hasMinRole } from '@/lib/auth-helpers'
 import connectDB from '@/lib/database'
-import { Family, FamilyMember, Task, YearlyCalculation } from '@/lib/models'
+import { Family, FamilyMember, YearlyCalculation } from '@/lib/models'
 import { loadSetupProgress } from '@/lib/organizations/setup-progress-data'
-import { serializeForRsc } from '@/lib/serialize-rsc'
 import DashboardView from './DashboardView'
 import Loading from './loading'
 
@@ -14,27 +13,14 @@ async function fetchInitialDashboardData(organizationId: string, includeFinancia
   await connectDB()
   const year = new Date().getFullYear()
 
-  // Only pull what the first paint actually shows:
-  //  - Family + member counts (for the stat cards)
-  //  - The cached yearly calc (if any) for the balance / income / expense
-  //  - The first 10 tasks (the UI only renders 5, but we want some headroom
-  //    so quick toggles don't trigger a refetch).
-  // The full task array stays in the client's existing `/api/tasks` call
-  // which still runs in useEffect to keep the page interactive.
-  const [totalFamilies, totalMembers, calcDoc, taskDocs] = await Promise.all([
+  // Only pull what the first paint actually shows: family + member counts and
+  // the cached yearly calc (if any) for balance / income / expense totals.
+  const [totalFamilies, totalMembers, calcDoc] = await Promise.all([
     Family.countDocuments({ organizationId }),
     FamilyMember.countDocuments({ organizationId, convertedToFamily: { $ne: true } }),
     includeFinancials
       ? YearlyCalculation.findOne({ year, organizationId }).lean<any>()
       : Promise.resolve(null),
-    includeFinancials
-      ? Task.find({ organizationId })
-          .select('_id title description dueDate priority status relatedFamilyId relatedMemberId')
-          .populate('relatedFamilyId', 'name')
-          .sort({ dueDate: 1, priority: -1 })
-          .limit(10)
-          .lean<any[]>()
-      : Promise.resolve([] as any[]),
   ])
 
   let calculatedIncome = 0
@@ -58,10 +44,6 @@ async function fetchInitialDashboardData(organizationId: string, includeFinancia
     balance,
   }
 
-  const initialTasks = taskDocs.map((t) => serializeForRsc(t))
-
-  // Financial cards are only trustworthy when a cached YearlyCalculation exists.
-  // Without it the client must run the live calc via /api/dashboard-stats.
   const financialsComplete = !includeFinancials || calcDoc != null
 
   let initialSetupProgress = null
@@ -73,7 +55,7 @@ async function fetchInitialDashboardData(organizationId: string, includeFinancia
     }
   }
 
-  return { initialStats, initialTasks, financialsComplete, initialSetupProgress }
+  return { initialStats, financialsComplete, initialSetupProgress }
 }
 
 async function DashboardServer() {
@@ -84,7 +66,6 @@ async function DashboardServer() {
     return (
       <DashboardView
         initialStats={data.initialStats}
-        initialTasks={data.initialTasks}
         initialFinancialsComplete={data.financialsComplete}
         initialSetupProgress={data.initialSetupProgress}
         showFinancials={showFinancials}
