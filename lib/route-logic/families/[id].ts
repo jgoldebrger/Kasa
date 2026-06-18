@@ -224,14 +224,20 @@ export const PUT = handler({
       return { status: 400, data: { error: 'No fields to update' } }
     }
 
-    // Validate paymentPlanId belongs to this org, if provided.
-    if (body.paymentPlanId) {
-      const plan = await PaymentPlan.findOne({
-        _id: body.paymentPlanId,
-        organizationId: ctx!.organizationId,
-      })
-      if (!plan)
-        return { status: 400, data: { error: `Payment plan ${body.paymentPlanId} not found` } }
+    const update: Record<string, unknown> = { ...body }
+
+    // Validate paymentPlanId belongs to this org and keep legacy currentPlan in sync.
+    if ('paymentPlanId' in body) {
+      if (body.paymentPlanId) {
+        const plan = await PaymentPlan.findOne({
+          _id: body.paymentPlanId,
+          organizationId: ctx!.organizationId,
+        })
+        if (!plan) {
+          return { status: 400, data: { error: `Payment plan ${body.paymentPlanId} not found` } }
+        }
+        update.currentPlan = plan.planNumber
+      }
     }
 
     // Tenant guard for `parentFamilyId`: must point at a family in the
@@ -253,7 +259,7 @@ export const PUT = handler({
 
     const fam = await Family.findOneAndUpdate(
       { _id: id, organizationId: ctx!.organizationId },
-      { $set: body },
+      { $set: update },
       { new: true, runValidators: true },
     )
     if (!fam) return { status: 404, data: { error: 'Family not found' } }

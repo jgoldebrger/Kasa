@@ -23,6 +23,7 @@ import {
   parseFamiliesListResponse,
 } from '@/lib/client/families-list'
 import { parseFamilySaveError, validateFamilyFormFields } from '@/lib/client/family-form'
+import { getPlanDisplayName, normalizePlanId } from '@/lib/payment-plan-display'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { formatLocaleDate, isFiniteDate } from '@/lib/date-utils'
@@ -325,15 +326,10 @@ export default function FamiliesView({
 
   const getPlanNameById = useCallback(
     (planId?: string, currentPlan?: number): string => {
-      if (planId) {
-        const plan = paymentPlans.find((p) => p._id === planId)
-        if (plan) return plan.name
-      }
-      if (currentPlan && paymentPlans.length > 0) {
-        const plan = paymentPlans.find((p: any) => p.planNumber === currentPlan)
-        if (plan) return plan.name
-      }
-      return t('families.unknownPlan')
+      return getPlanDisplayName(paymentPlans, planId, currentPlan, {
+        unknown: t('families.unknownPlan'),
+        noPlan: t('families.unknownPlan'),
+      })
     },
     [paymentPlans, t],
   )
@@ -385,9 +381,27 @@ export default function FamiliesView({
       })
 
       if (res.ok) {
+        const updated = await res.json().catch(() => null)
+        const savedFamilyId = editingFamily?._id
         resetFamilyModal()
         invalidateCache(/^\/api\/families/)
         invalidateCache(/^\/api\/dashboard-stats/)
+        if (updated && savedFamilyId && typeof updated === 'object') {
+          const paymentPlanId =
+            updated.paymentPlanId != null ? normalizePlanId(updated.paymentPlanId) : undefined
+          setFamilies((prev) =>
+            prev.map((f) =>
+              String(f._id) === String(savedFamilyId)
+                ? {
+                    ...f,
+                    ...updated,
+                    _id: String(updated._id ?? f._id),
+                    paymentPlanId: paymentPlanId ?? f.paymentPlanId,
+                  }
+                : f,
+            ),
+          )
+        }
         fetchFamilies()
         toast.success(
           editingFamily
@@ -1470,7 +1484,7 @@ function FamilyModalBody({
           >
             <option value="">{t('families.form.selectPlan')}</option>
             {paymentPlans.map((plan) => (
-              <option key={plan._id} value={plan._id}>
+              <option key={plan._id} value={normalizePlanId(plan._id)}>
                 {plan.name} —{' '}
                 {t('families.form.planYearly').replace('{price}', formatMoney(plan.yearlyPrice))}
               </option>

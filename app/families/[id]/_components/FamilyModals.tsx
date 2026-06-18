@@ -7,6 +7,8 @@ import TaskFormModal from '@/app/components/tasks/TaskFormModal'
 import { useFamilyDetail } from '../FamilyDetailContext'
 import { capitalizeName, formatPhone, handleHebrewInput, validateEmail } from '../_lib/helpers'
 import { convertToHebrewDate } from '@/lib/hebrew-date'
+import { invalidate as invalidateCache } from '@/lib/client-cache'
+import { normalizePlanId } from '@/lib/payment-plan-display'
 import { Modal } from '@/app/components/ui/Modal'
 
 const StripePaymentForm = dynamic(() => import('@/app/components/StripePaymentForm'), {
@@ -430,10 +432,25 @@ export default function FamilyModals() {
                       weddingDate: infoForm.weddingDate
                         ? new Date(infoForm.weddingDate).toISOString()
                         : undefined,
-                      paymentPlanId: infoForm.paymentPlanId || undefined,
+                      paymentPlanId: infoForm.paymentPlanId || null,
                     }),
                   })
+                  const updated = await res.json().catch(() => null)
                   if (res.ok) {
+                    if (updated && typeof updated === 'object') {
+                      setData((prev) => {
+                        if (!prev) return prev
+                        const paymentPlanId =
+                          updated.paymentPlanId != null
+                            ? normalizePlanId(updated.paymentPlanId)
+                            : null
+                        return {
+                          ...prev,
+                          family: { ...prev.family, ...updated, paymentPlanId },
+                        }
+                      })
+                    }
+                    invalidateCache(/^\/api\/families/)
                     setShowInfoModal(false)
                     fetchFamilyDetails()
                   }
@@ -492,7 +509,7 @@ export default function FamilyModals() {
                     >
                       <option value="">Select a plan</option>
                       {paymentPlans.map((plan: { _id: string; name: string }) => (
-                        <option key={plan._id} value={plan._id}>
+                        <option key={plan._id} value={normalizePlanId(plan._id)}>
                           {plan.name}
                         </option>
                       ))}

@@ -6,6 +6,7 @@ import { PencilSquareIcon } from '@heroicons/react/24/outline'
 import { Alert, Button, Card } from '@/app/components/ui'
 import type { FamilyDetailContextValue } from '../FamilyDetailContext'
 import { useFamilyDetail } from '../FamilyDetailContext'
+import { normalizePlanId } from '@/lib/payment-plan-display'
 
 function InfoSection({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -139,7 +140,10 @@ function InfoTabContent(props: FamilyDetailContextValue) {
               'paymentPlanId',
               <p className="font-medium text-fg">{getPlanNameById(family.paymentPlanId)}</p>,
               'select',
-              paymentPlans.map((plan) => ({ value: plan._id, label: plan.name })),
+              paymentPlans.map((plan) => ({
+                value: normalizePlanId(plan._id),
+                label: plan.name,
+              })),
             )}
           </InfoField>
         )}

@@ -44,10 +44,15 @@ export const POST = handler({
   body,
   name: 'POST /api/families/bulk',
   fn: async ({ ctx, body, session, request }) => {
-    const rateVerdict = await checkRateLimit(request, 'families-bulk', {
-      limit: 30,
-      windowMs: 60_000,
-    }, ctx!.organizationId)
+    const rateVerdict = await checkRateLimit(
+      request,
+      'families-bulk',
+      {
+        limit: 30,
+        windowMs: 60_000,
+      },
+      ctx!.organizationId,
+    )
     if (!rateVerdict.allowed) {
       return { status: 429, data: { error: 'Too many requests' } }
     }
@@ -98,20 +103,22 @@ export const POST = handler({
     }
 
     if (body.action === 'setPaymentPlan') {
+      let currentPlan: number | undefined
       if (body.paymentPlanId) {
         // Verify the plan belongs to this org before assigning — guards
         // against an attacker submitting another org's plan id.
         const plan = await PaymentPlan.findOne({
           _id: new Types.ObjectId(body.paymentPlanId),
           organizationId: orgId,
-        }).select('_id')
+        }).select('_id planNumber')
         if (!plan) {
           return { status: 404, data: { error: 'Payment plan not found in this org' } }
         }
+        currentPlan = plan.planNumber
       }
-      const result = await Family.updateMany(baseFilter, {
-        $set: { paymentPlanId: body.paymentPlanId },
-      })
+      const $set: Record<string, unknown> = { paymentPlanId: body.paymentPlanId }
+      if (currentPlan !== undefined) $set.currentPlan = currentPlan
+      const result = await Family.updateMany(baseFilter, { $set })
       await audit({
         organizationId: ctx!.organizationId,
         userId: session!.user.id,

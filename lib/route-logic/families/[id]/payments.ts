@@ -69,6 +69,21 @@ export const GET = handler({
         }),
         effectiveQuery,
       )
+      if (
+        effectiveQuery.limit > 0 &&
+        data &&
+        typeof data === 'object' &&
+        !Array.isArray(data) &&
+        'items' in data
+      ) {
+        return {
+          data: {
+            items: serializePaymentsPublic(data.items),
+            nextCursor: data.nextCursor,
+          },
+          headers: LEDGER_CACHE_HEADERS,
+        }
+      }
       return { data: serializePaymentsPublic(data as any[]), headers: LEDGER_CACHE_HEADERS }
     } catch (err) {
       if (err instanceof Error && err.message === 'Invalid cursor') {

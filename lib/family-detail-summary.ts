@@ -3,6 +3,7 @@ import { Family, FamilyMember } from '@/lib/models'
 import { calculateFamilyBalance } from '@/lib/calculations'
 import { hasMinRole, type Role } from '@/lib/auth-helpers'
 import { loadAllByIdCursor } from '@/lib/org-pagination'
+import { normalizePlanId } from '@/lib/payment-plan-display'
 
 const EMPTY_BALANCE = {
   openingBalance: 0,
@@ -46,8 +47,7 @@ export async function fetchFamilySummary(
   }
 
   const members = await loadAllByIdCursor<any>(
-    (filter, limit) =>
-      FamilyMember.find(filter).sort({ _id: 1 }).limit(limit).lean<any[]>(),
+    (filter, limit) => FamilyMember.find(filter).sort({ _id: 1 }).limit(limit).lean<any[]>(),
     memberFilter,
   )
 
@@ -77,8 +77,13 @@ export async function fetchFamilySummary(
 
   const balance = await calculateFamilyBalance(fam._id.toString(), organizationId)
 
+  const family = fam.toObject()
+  if (family.paymentPlanId != null) {
+    family.paymentPlanId = normalizePlanId(family.paymentPlanId)
+  }
+
   return {
-    family: fam.toObject(),
+    family,
     members,
     payments: [],
     withdrawals: [],

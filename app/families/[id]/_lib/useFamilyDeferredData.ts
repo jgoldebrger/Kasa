@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, type Dispatch, type SetStateAction } from 'react'
 import { cachedFetch } from '@/lib/client-cache'
+import { getPlanDisplayName } from '@/lib/payment-plan-display'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import type { PaymentPlan, LifecycleEventType } from './helpers'
 
@@ -218,9 +219,7 @@ export function useFamilyDeferredData({
 
   const getPlanNameById = useCallback(
     (planId: string): string => {
-      if (!planId) return 'No Plan'
-      const plan = paymentPlans.find((p) => p._id === planId)
-      return plan ? plan.name : 'Unknown Plan'
+      return getPlanDisplayName(paymentPlans, planId)
     },
     [paymentPlans],
   )

@@ -17,6 +17,8 @@ import { convertToHebrewDate } from '@/lib/hebrew-date'
 import { useToast, useConfirm } from '@/app/components/Toast'
 import { useOrgRole } from '@/lib/client/useOrgRole'
 import { useCurrency } from '@/lib/client/useCurrency'
+import { invalidate as invalidateCache } from '@/lib/client-cache'
+import { normalizePlanId } from '@/lib/payment-plan-display'
 import {
   ADMIN_ONLY_FAMILY_TABS,
   familyTabFromPathname,
@@ -134,7 +136,9 @@ export function FamilyDetailProvider({
         return
       }
       try {
-        const res = await fetch(`/api/families/${familyId}?view=summary`)
+        const res = await fetch(`/api/families/${familyId}?view=summary`, {
+          cache: 'no-store',
+        })
         if (isFamilyFetchStale(gen)) return
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
@@ -153,6 +157,10 @@ export function FamilyDetailProvider({
           setData(null)
           setLoading(false)
           return
+        }
+
+        if (familyData.family.paymentPlanId != null) {
+          familyData.family.paymentPlanId = normalizePlanId(familyData.family.paymentPlanId)
         }
 
         if (familyData.members) {
@@ -372,12 +380,34 @@ export function FamilyDetailProvider({
         body: JSON.stringify(updateData),
       })
 
+      const updated = await res.json().catch(() => null)
+
       if (res.ok) {
         setEditingField(null)
         setEditValue('')
+        if (updated && typeof updated === 'object' && !Array.isArray(updated)) {
+          setData((prev) => {
+            if (!prev) return prev
+            const paymentPlanId =
+              'paymentPlanId' in updated
+                ? updated.paymentPlanId != null
+                  ? normalizePlanId(updated.paymentPlanId)
+                  : null
+                : prev.family.paymentPlanId
+            return {
+              ...prev,
+              family: {
+                ...prev.family,
+                ...updated,
+                paymentPlanId,
+              },
+            }
+          })
+        }
+        invalidateCache(/^\/api\/families/)
         void refreshFamily()
       } else {
-        const errorData = await res.json().catch(() => ({}))
+        const errorData = updated && typeof updated === 'object' ? updated : {}
         toast.error(`Error updating field: ${errorData.error || 'Unknown error'}`)
       }
     } catch (error) {

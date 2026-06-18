@@ -76,19 +76,12 @@ export const GET = handler({
       if (!c) {
         return { status: 400, data: { error: 'Invalid cursor' } }
       }
-      Object.assign(
-        baseFilter,
-        compoundCursorFilter('name', c.v as string | null, c.id, 1),
-      )
+      Object.assign(baseFilter, compoundCursorFilter('name', c.v as string | null, c.id, 1))
     }
 
     const familySelect = '-deletedAt -deletedBy -deletedKind -updatedAt -__v'
     const loadFamilyPage = async (filter: Record<string, unknown>, limit: number) =>
-      Family.find(filter)
-        .select(familySelect)
-        .sort({ name: 1, _id: 1 })
-        .limit(limit)
-        .lean<any[]>()
+      Family.find(filter).select(familySelect).sort({ name: 1, _id: 1 }).limit(limit).lean<any[]>()
 
     let nextCursor: string | null = null
     let families: any[]
@@ -248,7 +241,10 @@ export const POST = handler({
     // Find payment plan by ID only — must belong to the user's org
     let paymentPlan = null
     try {
-      paymentPlan = await PaymentPlan.findOne({ _id: paymentPlanId, organizationId: ctx!.organizationId })
+      paymentPlan = await PaymentPlan.findOne({
+        _id: paymentPlanId,
+        organizationId: ctx!.organizationId,
+      })
       if (!paymentPlan) {
         return {
           status: 400,
@@ -289,8 +285,11 @@ export const POST = handler({
       state: state || undefined,
       zip: zip || undefined,
       paymentPlanId: paymentPlanId,
+      currentPlan: paymentPlan.planNumber,
       currentPayment:
-        currentPayment !== undefined && currentPayment !== null && Number.isFinite(Number(currentPayment))
+        currentPayment !== undefined &&
+        currentPayment !== null &&
+        Number.isFinite(Number(currentPayment))
           ? Number(currentPayment)
           : 0,
       openBalance:

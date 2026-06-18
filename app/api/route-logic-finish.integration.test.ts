@@ -1354,19 +1354,17 @@ describe.sequential('route-logic finish coverage', () => {
           },
         },
       )
-      const spy = vi
-        .spyOn(scheduler, 'generateMonthlyStatements')
-        .mockResolvedValue({
-          success: true,
-          month: 1,
-          year: 2024,
-          generated: 0,
-          failed: 0,
-          statements: [],
-          errors: [],
-          hasMore: false,
-          familyCursorOut: null,
-        })
+      const spy = vi.spyOn(scheduler, 'generateMonthlyStatements').mockResolvedValue({
+        success: true,
+        month: 1,
+        year: 2024,
+        generated: 0,
+        failed: 0,
+        statements: [],
+        errors: [],
+        hasMore: false,
+        familyCursorOut: null,
+      })
 
       try {
         const { POST } = await import('@/lib/route-logic/jobs/generate-monthly-statements')
@@ -5389,6 +5387,12 @@ describe.sequential('route-logic finish coverage', () => {
       const list = await GET(orgJsonReq(path, 'GET'), { params })
       expect(list.status).toBe(200)
       expect(Array.isArray(await list.json())).toBe(true)
+
+      const paged = await GET(orgJsonReq(`${path}?limit=50`, 'GET'), { params })
+      expect(paged.status).toBe(200)
+      const pageBody = await paged.json()
+      expect(Array.isArray(pageBody.items)).toBe(true)
+      expect('nextCursor' in pageBody).toBe(true)
 
       const y = year()
       const mismatch = await POST(

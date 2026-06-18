@@ -7,6 +7,7 @@ import connectDB from '@/lib/database'
 import { Family, FamilyMember, PaymentPlan } from '@/lib/models'
 import { encodeCompoundCursor } from '@/lib/pagination'
 import { serializeForRsc } from '@/lib/serialize-rsc'
+import { normalizePlanId } from '@/lib/payment-plan-display'
 import FamiliesView from './FamiliesView'
 import FamiliesLoading from './loading'
 
@@ -60,6 +61,9 @@ async function fetchInitialData(organizationId: string, isAdmin: boolean) {
   const initialFamilies = families.map((f) => {
     const plain = serializeForRsc(f)
     plain.memberCount = countByFamily.get(String(f._id)) || 0
+    if (plain.paymentPlanId != null) {
+      plain.paymentPlanId = normalizePlanId(plain.paymentPlanId)
+    }
     if (!isAdmin) {
       delete plain.openBalance
       delete plain.currentPayment

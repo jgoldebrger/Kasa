@@ -1314,6 +1314,29 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
       expect(putRes.status).toBe(200)
 
+      const { PaymentPlan } = await import('@/lib/models')
+      const altPlan = await PaymentPlan.create({
+        organizationId: ctx.orgId,
+        name: 'Alt Plan',
+        planNumber: 99,
+        yearlyPrice: 1200,
+      })
+      const planPut = await invokeRouteLogic(
+        PUT,
+        orgJsonReq(`/api/families/${disposable._id}`, 'PUT', {
+          paymentPlanId: altPlan._id.toString(),
+        }),
+        params,
+      )
+      expect(planPut.status).toBe(200)
+      const planBody = await planPut.json()
+      expect(String(planBody.paymentPlanId)).toBe(altPlan._id.toString())
+      expect(planBody.currentPlan).toBe(99)
+
+      const reloaded = await Family.findById(disposable._id).lean<any>()
+      expect(String(reloaded?.paymentPlanId)).toBe(altPlan._id.toString())
+      expect(reloaded?.currentPlan).toBe(99)
+
       const emptyPut = await invokeRouteLogic(
         PUT,
         orgJsonReq(`/api/families/${disposable._id}`, 'PUT', {}),
