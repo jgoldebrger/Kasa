@@ -1,6 +1,14 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef, createContext, useContext, useMemo } from 'react'
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  createContext,
+  useContext,
+  useMemo,
+} from 'react'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { useParams, useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
@@ -275,10 +283,7 @@ export function FamilyDetailProvider({
     else if (activeTab === 'sub-families') void deferred.fetchSubFamilies()
     else if (activeTab === 'tasks') void deferred.fetchFamilyTasks()
     else if (['info', 'members'].includes(activeTab)) void deferred.ensurePaymentPlans()
-    else if (
-      LEDGER_TABS.has(activeTab) &&
-      !ledger.loadedLedgerTabsRef.current.has(activeTab)
-    ) {
+    else if (LEDGER_TABS.has(activeTab) && !ledger.loadedLedgerTabsRef.current.has(activeTab)) {
       ledger.loadedLedgerTabsRef.current.add(activeTab)
       void ledger.fetchLedgerForTab(activeTab)
     }
@@ -318,12 +323,14 @@ export function FamilyDetailProvider({
     }
   }, [isAdmin, roleLoading, activeTab, memberActiveTab, familyId, router, setMemberActiveTab])
 
-  const handleFieldEdit = (fieldName: string, currentValue: any) => {
+  const handleFieldEdit = (fieldName: string, currentValue: unknown) => {
     if (fieldName === 'weddingDate' && currentValue) {
-      const date = new Date(currentValue)
-      setEditValue(date.toISOString().split('T')[0])
+      const date = new Date(currentValue as string | Date)
+      setEditValue(Number.isFinite(date.getTime()) ? date.toISOString().split('T')[0] : '')
+    } else if (fieldName === 'paymentPlanId') {
+      setEditValue(currentValue != null && currentValue !== '' ? String(currentValue) : '')
     } else {
-      setEditValue(currentValue || '')
+      setEditValue(currentValue != null ? String(currentValue) : '')
     }
     setEditingField(fieldName)
   }
@@ -395,7 +402,14 @@ export function FamilyDetailProvider({
     }
 
     const isEditing = editingField === fieldName
-    const currentValue = data?.family?.[fieldName] || ''
+    const rawValue = data?.family?.[fieldName as keyof typeof data.family]
+    const currentValue =
+      fieldName === 'street'
+        ? data?.family?.street || data?.family?.address || ''
+        : (rawValue ?? '')
+
+    const inputClassName =
+      'focus-ring w-full min-w-0 rounded-md border border-accent/40 bg-surface px-3 py-2 text-sm text-fg'
 
     const getInputProps = () => {
       if (fieldType === 'phone') {
@@ -403,31 +417,14 @@ export function FamilyDetailProvider({
           type: 'tel' as const,
           value: editValue,
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-            const formatted = formatPhone(e.target.value)
-            setEditValue(formatted)
+            setEditValue(formatPhone(e.target.value))
           },
           onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
             if (e.key === 'Enter') handleFieldSave(fieldName)
             if (e.key === 'Escape') handleFieldCancel()
-            if (
-              !/[0-9]/.test(e.key) &&
-              ![
-                'Backspace',
-                'Delete',
-                'ArrowLeft',
-                'ArrowRight',
-                'ArrowUp',
-                'ArrowDown',
-                'Tab',
-              ].includes(e.key) &&
-              !e.ctrlKey &&
-              !e.metaKey
-            ) {
-              e.preventDefault()
-            }
           },
-          placeholder: '1234567890',
-          pattern: '[0-9]*',
+          placeholder: '(555) 555-5555',
+          inputMode: 'tel' as const,
         }
       } else if (fieldType === 'email') {
         return {
@@ -490,7 +487,7 @@ export function FamilyDetailProvider({
           onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
             if (e.key === 'Enter') handleFieldSave(fieldName)
             if (e.key === 'Escape') handleFieldCancel()
-            handleHebrewInput(e, editValue, setEditValue)
+            handleHebrewInput(e, setEditValue)
           },
           style: { fontFamily: 'Arial Hebrew, David, sans-serif' },
         }
@@ -509,7 +506,11 @@ export function FamilyDetailProvider({
 
     if (isEditing) {
       return (
-        <div className="flex items-center gap-2">
+        <div
+          className="flex items-center gap-2"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           {fieldType === 'select' && options ? (
             <select
               value={editValue}
@@ -517,10 +518,10 @@ export function FamilyDetailProvider({
               onKeyDown={(e) => {
                 if (e.key === 'Escape') handleFieldCancel()
               }}
-              className="flex-1 border border-accent/30 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-accent bg-surface text-fg"
+              className={inputClassName}
               autoFocus
             >
-              <option value="">Select...</option>
+              <option value="">Select…</option>
               {options.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
@@ -528,23 +529,23 @@ export function FamilyDetailProvider({
               ))}
             </select>
           ) : (
-            <input
-              {...getInputProps()}
-              className="flex-1 border border-accent/30 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-accent bg-surface text-fg"
-              autoFocus
-            />
+            <input {...getInputProps()} className={inputClassName} autoFocus />
           )}
           <button
+            type="button"
             onClick={() => handleFieldSave(fieldName)}
-            className="text-success hover:text-success font-bold"
+            className="focus-ring inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-success hover:bg-success/10"
             title="Save"
+            aria-label="Save"
           >
             ✓
           </button>
           <button
+            type="button"
             onClick={handleFieldCancel}
-            className="text-danger hover:text-danger font-bold"
+            className="focus-ring inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-danger hover:bg-danger/10"
             title="Cancel"
+            aria-label="Cancel"
           >
             ✕
           </button>
@@ -554,12 +555,26 @@ export function FamilyDetailProvider({
 
     return (
       <div
-        onClick={() => handleFieldEdit(fieldName, currentValue)}
-        className="flex items-center justify-between px-2 py-1 -mx-2 rounded relative group cursor-pointer hover:bg-app-subtle transition-colors"
+        role="button"
+        tabIndex={0}
+        onMouseDown={(e) => {
+          e.preventDefault()
+          handleFieldEdit(fieldName, currentValue)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            handleFieldEdit(fieldName, currentValue)
+          }
+        }}
+        className="group flex min-h-[2.5rem] cursor-text items-center justify-between gap-2 rounded-md border border-transparent px-3 py-2 transition-colors hover:border-border hover:bg-app-subtle"
         title="Click to edit"
       >
-        <div className="flex-1 min-w-0">{displayValue}</div>
-        <PencilIcon className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-fg-subtle ml-2 shrink-0" />
+        <div className="min-w-0 flex-1 text-sm">{displayValue}</div>
+        <PencilIcon
+          className="h-4 w-4 shrink-0 text-fg-subtle opacity-0 transition-opacity group-hover:opacity-100"
+          aria-hidden="true"
+        />
       </div>
     )
   }
@@ -754,8 +769,6 @@ export function FamilyDetailProvider({
   )
 
   return (
-    <FamilyDetailContext.Provider value={contextValue}>
-      {children}
-    </FamilyDetailContext.Provider>
+    <FamilyDetailContext.Provider value={contextValue}>{children}</FamilyDetailContext.Provider>
   )
 }

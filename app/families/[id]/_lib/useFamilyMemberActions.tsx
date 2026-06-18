@@ -357,31 +357,14 @@ export function useFamilyMemberActions({
           type: 'tel' as const,
           value: editMemberValue,
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-            const formatted = formatPhone(e.target.value)
-            setEditMemberValue(formatted)
+            setEditMemberValue(formatPhone(e.target.value))
           },
           onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
             if (e.key === 'Enter') handleMemberFieldSave(fieldName, memberId)
             if (e.key === 'Escape') handleMemberFieldCancel()
-            if (
-              !/[0-9]/.test(e.key) &&
-              ![
-                'Backspace',
-                'Delete',
-                'ArrowLeft',
-                'ArrowRight',
-                'ArrowUp',
-                'ArrowDown',
-                'Tab',
-              ].includes(e.key) &&
-              !e.ctrlKey &&
-              !e.metaKey
-            ) {
-              e.preventDefault()
-            }
           },
-          placeholder: '1234567890',
-          pattern: '[0-9]*',
+          placeholder: '(555) 555-5555',
+          inputMode: 'tel' as const,
         }
       } else if (fieldType === 'email') {
         return {
@@ -428,8 +411,7 @@ export function useFamilyMemberActions({
         return {
           type: 'date' as const,
           value: editMemberValue,
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-            setEditMemberValue(e.target.value),
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) => setEditMemberValue(e.target.value),
           onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
             if (e.key === 'Enter') handleMemberFieldSave(fieldName, memberId)
             if (e.key === 'Escape') handleMemberFieldCancel()
@@ -441,12 +423,11 @@ export function useFamilyMemberActions({
           dir: 'rtl' as const,
           lang: 'he' as const,
           value: editMemberValue,
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-            setEditMemberValue(e.target.value),
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) => setEditMemberValue(e.target.value),
           onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
             if (e.key === 'Enter') handleMemberFieldSave(fieldName, memberId)
             if (e.key === 'Escape') handleMemberFieldCancel()
-            handleHebrewInput(e, editMemberValue, setEditMemberValue)
+            handleHebrewInput(e, setEditMemberValue)
           },
           style: { fontFamily: 'Arial Hebrew, David, sans-serif' },
         }
@@ -454,8 +435,7 @@ export function useFamilyMemberActions({
         return {
           type: 'text' as const,
           value: editMemberValue,
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-            setEditMemberValue(e.target.value),
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) => setEditMemberValue(e.target.value),
           onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
             if (e.key === 'Enter') handleMemberFieldSave(fieldName, memberId)
             if (e.key === 'Escape') handleMemberFieldCancel()
@@ -466,7 +446,11 @@ export function useFamilyMemberActions({
 
     if (isEditing) {
       return (
-        <div className="flex items-center gap-2">
+        <div
+          className="flex items-center gap-2"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           {fieldType === 'select' && options ? (
             <select
               value={editMemberValue}
@@ -511,12 +495,26 @@ export function useFamilyMemberActions({
 
     return (
       <div
-        onClick={() => handleMemberFieldEdit(fieldName, currentValue, memberId)}
-        className="flex items-center justify-between px-2 py-1 -mx-2 rounded relative group cursor-pointer hover:bg-app-subtle transition-colors"
+        role="button"
+        tabIndex={0}
+        onMouseDown={(e) => {
+          e.preventDefault()
+          handleMemberFieldEdit(fieldName, currentValue, memberId)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            handleMemberFieldEdit(fieldName, currentValue, memberId)
+          }
+        }}
+        className="group flex min-h-[2.5rem] cursor-text items-center justify-between gap-2 rounded-md border border-transparent px-3 py-2 transition-colors hover:border-border hover:bg-app-subtle"
         title="Click to edit"
       >
-        <div className="flex-1 min-w-0">{displayValue}</div>
-        <PencilIcon className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-fg-subtle ml-2 shrink-0" />
+        <div className="min-w-0 flex-1 text-sm">{displayValue}</div>
+        <PencilIcon
+          className="h-4 w-4 shrink-0 text-fg-subtle opacity-0 transition-opacity group-hover:opacity-100"
+          aria-hidden="true"
+        />
       </div>
     )
   }
@@ -528,9 +526,7 @@ export function useFamilyMemberActions({
       ...memberForm,
       firstName: capitalizeName(memberForm.firstName),
       lastName: capitalizeName(memberForm.lastName),
-      spouseFirstName: memberForm.spouseFirstName
-        ? capitalizeName(memberForm.spouseFirstName)
-        : '',
+      spouseFirstName: memberForm.spouseFirstName ? capitalizeName(memberForm.spouseFirstName) : '',
       spouseName: memberForm.spouseName ? capitalizeName(memberForm.spouseName) : '',
       phone: memberForm.phone ? formatPhone(memberForm.phone) : '',
       spouseCellPhone: memberForm.spouseCellPhone ? formatPhone(memberForm.spouseCellPhone) : '',

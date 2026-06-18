@@ -80,20 +80,22 @@ export const qwertyToHebrew: Record<string, string> = {
 /** Map QWERTY keystrokes to Hebrew characters at the cursor in a controlled input. */
 export function handleHebrewInput(
   e: React.KeyboardEvent<HTMLInputElement>,
-  currentValue: string,
-  setValue: (value: string) => void,
+  setValue: React.Dispatch<React.SetStateAction<string>>,
 ) {
   const input = e.currentTarget
-  const cursorPosition = input.selectionStart || 0
+  const cursorPosition = input.selectionStart ?? 0
 
   if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
     e.preventDefault()
-    const hebrewChar = qwertyToHebrew[e.key] || e.key
-    const newValue =
-      currentValue.slice(0, cursorPosition) + hebrewChar + currentValue.slice(cursorPosition)
-    setValue(newValue)
-    setTimeout(() => {
-      input.setSelectionRange(cursorPosition + 1, cursorPosition + 1)
-    }, 0)
+    const hebrewChar = qwertyToHebrew[e.key] ?? e.key
+    setValue((currentValue) => {
+      const next =
+        currentValue.slice(0, cursorPosition) + hebrewChar + currentValue.slice(cursorPosition)
+      return next
+    })
+    const nextPos = cursorPosition + 1
+    requestAnimationFrame(() => {
+      input.setSelectionRange(nextPos, nextPos)
+    })
   }
 }

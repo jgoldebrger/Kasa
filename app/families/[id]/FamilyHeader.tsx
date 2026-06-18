@@ -45,7 +45,13 @@ export default function FamilyHeader() {
                   <QuestionMarkCircleIcon className="h-4 w-4 text-fg-muted" aria-hidden="true" />
                 </Tooltip>
               </p>
-              <p className="font-medium text-success">{formatMoney(data.balance.balance)}</p>
+              <p
+                className={`font-medium tabular ${
+                  data.balance.balance < 0 ? 'text-danger' : 'text-success'
+                }`}
+              >
+                {formatMoney(data.balance.balance)}
+              </p>
             </div>
             <div>
               <p className="text-sm text-fg-muted">Members</p>

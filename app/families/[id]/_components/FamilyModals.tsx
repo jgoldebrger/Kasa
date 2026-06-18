@@ -195,8 +195,12 @@ export default function FamilyModals() {
                     setMemberForm({ ...memberForm, hebrewFirstName: e.target.value })
                   }
                   onKeyDown={(e) =>
-                    handleHebrewInput(e, memberForm.hebrewFirstName, (value) =>
-                      setMemberForm({ ...memberForm, hebrewFirstName: value }),
+                    handleHebrewInput(e, (value) =>
+                      setMemberForm((prev) => ({
+                        ...prev,
+                        hebrewFirstName:
+                          typeof value === 'function' ? value(prev.hebrewFirstName) : value,
+                      })),
                     )
                   }
                   className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all text-right font-hebrew"
@@ -238,8 +242,12 @@ export default function FamilyModals() {
                       setMemberForm({ ...memberForm, hebrewLastName: e.target.value })
                     }
                     onKeyDown={(e) =>
-                      handleHebrewInput(e, memberForm.hebrewLastName, (value) =>
-                        setMemberForm({ ...memberForm, hebrewLastName: value }),
+                      handleHebrewInput(e, (value) =>
+                        setMemberForm((prev) => ({
+                          ...prev,
+                          hebrewLastName:
+                            typeof value === 'function' ? value(prev.hebrewLastName) : value,
+                        })),
                       )
                     }
                     className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all text-right font-hebrew"

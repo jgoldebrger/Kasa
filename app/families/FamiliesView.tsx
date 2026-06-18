@@ -1191,9 +1191,10 @@ function FamilyModalBody({
             value={formData.hebrewName}
             onChange={(e) => setFormData({ ...formData, hebrewName: e.target.value })}
             onKeyDown={(e) =>
-              handleHebrewInput(e, formData.hebrewName, (value) =>
-                setFormData({ ...formData, hebrewName: value }),
-              )
+              handleHebrewInput(e, (value) => {
+                const next = typeof value === 'function' ? value(formData.hebrewName) : value
+                setFormData({ ...formData, hebrewName: next })
+              })
             }
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle text-right outline-none"
             placeholder="שם משפחה בעברית"
@@ -1229,9 +1230,10 @@ function FamilyModalBody({
             value={formData.husbandHebrewName}
             onChange={(e) => setFormData({ ...formData, husbandHebrewName: e.target.value })}
             onKeyDown={(e) =>
-              handleHebrewInput(e, formData.husbandHebrewName, (value) =>
-                setFormData({ ...formData, husbandHebrewName: value }),
-              )
+              handleHebrewInput(e, (value) => {
+                const next = typeof value === 'function' ? value(formData.husbandHebrewName) : value
+                setFormData({ ...formData, husbandHebrewName: next })
+              })
             }
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle text-right outline-none"
             placeholder="שם פרטי בעברית"
@@ -1250,9 +1252,11 @@ function FamilyModalBody({
             value={formData.husbandFatherHebrewName}
             onChange={(e) => setFormData({ ...formData, husbandFatherHebrewName: e.target.value })}
             onKeyDown={(e) =>
-              handleHebrewInput(e, formData.husbandFatherHebrewName, (value) =>
-                setFormData({ ...formData, husbandFatherHebrewName: value }),
-              )
+              handleHebrewInput(e, (value) => {
+                const next =
+                  typeof value === 'function' ? value(formData.husbandFatherHebrewName) : value
+                setFormData({ ...formData, husbandFatherHebrewName: next })
+              })
             }
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle text-right outline-none"
             placeholder="שם פרטי של האב בעברית"
@@ -1288,9 +1292,10 @@ function FamilyModalBody({
             value={formData.wifeHebrewName}
             onChange={(e) => setFormData({ ...formData, wifeHebrewName: e.target.value })}
             onKeyDown={(e) =>
-              handleHebrewInput(e, formData.wifeHebrewName, (value) =>
-                setFormData({ ...formData, wifeHebrewName: value }),
-              )
+              handleHebrewInput(e, (value) => {
+                const next = typeof value === 'function' ? value(formData.wifeHebrewName) : value
+                setFormData({ ...formData, wifeHebrewName: next })
+              })
             }
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle text-right outline-none"
             placeholder="שם פרטי בעברית"
@@ -1309,9 +1314,11 @@ function FamilyModalBody({
             value={formData.wifeFatherHebrewName}
             onChange={(e) => setFormData({ ...formData, wifeFatherHebrewName: e.target.value })}
             onKeyDown={(e) =>
-              handleHebrewInput(e, formData.wifeFatherHebrewName, (value) =>
-                setFormData({ ...formData, wifeFatherHebrewName: value }),
-              )
+              handleHebrewInput(e, (value) => {
+                const next =
+                  typeof value === 'function' ? value(formData.wifeFatherHebrewName) : value
+                setFormData({ ...formData, wifeFatherHebrewName: next })
+              })
             }
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle text-right outline-none"
             placeholder="שם פרטי של האב בעברית"
