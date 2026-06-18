@@ -11,6 +11,9 @@ updates:
         dependency-type: production
         patterns:
           - '*'
+        exclude-patterns:
+          # next-auth@5 beta peerOptional is ^7.0.7 — v9 breaks npm ci.
+          - 'nodemailer'
       development-dependencies:
         dependency-type: development
         patterns:
@@ -41,6 +44,9 @@ updates:
         update-types: [version-update:semver-major]
       # @next/bundle-analyzer major must match the installed Next major.
       - dependency-name: '@next/bundle-analyzer'
+        update-types: [version-update:semver-major]
+      # next-auth@5.0.0-beta.31 peerOptional nodemailer@^7.0.7 — v8+ breaks npm ci.
+      - dependency-name: nodemailer
         update-types: [version-update:semver-major]
     commit-message:
       prefix: deps
