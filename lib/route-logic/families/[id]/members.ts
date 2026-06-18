@@ -78,9 +78,25 @@ export const POST = handler({
 
     const id = params.id as string
     const {
-      firstName, hebrewFirstName, lastName, hebrewLastName, birthDate: birthDateObj, hebrewBirthDate, gender,
-      weddingDate, spouseName, spouseFirstName, spouseHebrewName, spouseFatherHebrewName,
-      spouseCellPhone, phone, email, address, city, state, zip
+      firstName,
+      hebrewFirstName,
+      lastName,
+      hebrewLastName,
+      birthDate: birthDateObj,
+      hebrewBirthDate,
+      gender,
+      weddingDate,
+      spouseName,
+      spouseFirstName,
+      spouseHebrewName,
+      spouseFatherHebrewName,
+      spouseCellPhone,
+      phone,
+      email,
+      address,
+      city,
+      state,
+      zip,
     } = body
 
     const fam = await Family.findOne({ _id: id, organizationId: ctx!.organizationId }).select('_id')
@@ -142,6 +158,41 @@ export const POST = handler({
       request,
     })
 
+    const org = await Organization.findById(ctx!.organizationId)
+      .select(
+        'barMitzvahAutoAssignPlanId barMitzvahAutoCreateEventTypeId addChildAutoCreateEventTypeId timezone',
+      )
+      .lean<any>()
+
+    if (org?.addChildAutoCreateEventTypeId) {
+      try {
+        const evType = await LifecycleEvent.findOne({
+          _id: org.addChildAutoCreateEventTypeId,
+          organizationId: ctx!.organizationId,
+        })
+          .select('type amount name')
+          .lean<any>()
+        if (evType) {
+          const eventDate = birthDateObj ?? new Date()
+          const eventYear = getYearInTimeZone(org?.timezone, eventDate)
+          await LifecycleEventPayment.create({
+            familyId: id,
+            eventType: evType.type,
+            amount: evType.amount,
+            eventDate,
+            year: eventYear,
+            notes: `Auto-added: ${evType.name} for ${firstName} ${lastName} (child added)`,
+            organizationId: ctx!.organizationId,
+          })
+          console.log(
+            `Added "${evType.name}" event for new child ${firstName} ${lastName} (year ${eventYear})`,
+          )
+        }
+      } catch (eventError) {
+        console.error('Error auto-adding child lifecycle event:', eventError)
+      }
+    }
+
     const reachedBarMitzvahNow =
       gender === 'male' &&
       finalHebrewBirthDate &&
@@ -149,10 +200,6 @@ export const POST = handler({
       hasReachedBarMitzvahAge(finalHebrewBirthDate)
 
     if (reachedBarMitzvahNow || (barMitzvahDate && !member.barMitzvahEventAdded)) {
-      const org = await Organization.findById(ctx!.organizationId)
-        .select('barMitzvahAutoAssignPlanId barMitzvahAutoCreateEventTypeId timezone')
-        .lean<any>()
-
       if (reachedBarMitzvahNow && org?.barMitzvahAutoAssignPlanId) {
         try {
           const plan = await PaymentPlan.findOne({

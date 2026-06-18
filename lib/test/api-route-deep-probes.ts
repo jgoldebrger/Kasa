@@ -108,6 +108,7 @@ function deepProbeBody(route: ApiRouteEntry, ctx: ApiTestContext): unknown {
     return {
       barMitzvahAutoAssignPlanId: f.paymentPlanId,
       barMitzvahAutoCreateEventTypeId: f.lifecycleEventTypeId,
+      addChildAutoCreateEventTypeId: f.lifecycleEventTypeId,
       monthlyStatementAutoGenerate: false,
       monthlyStatementAutoEmail: false,
     }
@@ -241,10 +242,18 @@ function deepProbeBody(route: ApiRouteEntry, ctx: ApiTestContext): unknown {
     }
   }
 
-  if (base !== undefined && !(typeof base === 'object' && Object.keys(base as object).length === 0)) {
+  if (
+    base !== undefined &&
+    !(typeof base === 'object' && Object.keys(base as object).length === 0)
+  ) {
     return base
   }
-  if (route.method === 'GET' || route.method === 'HEAD' || route.method === 'OPTIONS' || route.method === 'DELETE') {
+  if (
+    route.method === 'GET' ||
+    route.method === 'HEAD' ||
+    route.method === 'OPTIONS' ||
+    route.method === 'DELETE'
+  ) {
     return undefined
   }
   return base ?? {}

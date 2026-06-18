@@ -346,6 +346,7 @@ export default function SettingsView({
   const [automationConfig, setAutomationConfig] = useState<{
     barMitzvahAutoAssignPlanId: string | null
     barMitzvahAutoCreateEventTypeId: string | null
+    addChildAutoCreateEventTypeId: string | null
     weddingConversionDefaultPlanId: string | null
     monthlyStatementAutoGenerate: boolean
     monthlyStatementAutoEmail: boolean
@@ -355,6 +356,7 @@ export default function SettingsView({
   }>({
     barMitzvahAutoAssignPlanId: null,
     barMitzvahAutoCreateEventTypeId: null,
+    addChildAutoCreateEventTypeId: null,
     weddingConversionDefaultPlanId: null,
     monthlyStatementAutoGenerate: false,
     monthlyStatementAutoEmail: false,
@@ -474,6 +476,7 @@ export default function SettingsView({
       setAutomationConfig({
         barMitzvahAutoAssignPlanId: null,
         barMitzvahAutoCreateEventTypeId: null,
+        addChildAutoCreateEventTypeId: null,
         weddingConversionDefaultPlanId: null,
         monthlyStatementAutoGenerate: false,
         monthlyStatementAutoEmail: false,
@@ -652,6 +655,8 @@ export default function SettingsView({
         barMitzvahAutoAssignPlanId: (data.barMitzvahAutoAssignPlanId as string | null) ?? null,
         barMitzvahAutoCreateEventTypeId:
           (data.barMitzvahAutoCreateEventTypeId as string | null) ?? null,
+        addChildAutoCreateEventTypeId:
+          (data.addChildAutoCreateEventTypeId as string | null) ?? null,
         weddingConversionDefaultPlanId:
           (data.weddingConversionDefaultPlanId as string | null) ?? null,
         monthlyStatementAutoGenerate: !!data.monthlyStatementAutoGenerate,
@@ -687,6 +692,7 @@ export default function SettingsView({
         body: JSON.stringify({
           barMitzvahAutoAssignPlanId: automationConfig.barMitzvahAutoAssignPlanId || null,
           barMitzvahAutoCreateEventTypeId: automationConfig.barMitzvahAutoCreateEventTypeId || null,
+          addChildAutoCreateEventTypeId: automationConfig.addChildAutoCreateEventTypeId || null,
           weddingConversionDefaultPlanId: automationConfig.weddingConversionDefaultPlanId || null,
           monthlyStatementAutoGenerate: automationConfig.monthlyStatementAutoGenerate,
           monthlyStatementAutoEmail: automationConfig.monthlyStatementAutoEmail,
@@ -700,6 +706,7 @@ export default function SettingsView({
         setAutomationConfig({
           barMitzvahAutoAssignPlanId: data.barMitzvahAutoAssignPlanId ?? null,
           barMitzvahAutoCreateEventTypeId: data.barMitzvahAutoCreateEventTypeId ?? null,
+          addChildAutoCreateEventTypeId: data.addChildAutoCreateEventTypeId ?? null,
           weddingConversionDefaultPlanId: data.weddingConversionDefaultPlanId ?? null,
           monthlyStatementAutoGenerate: !!data.monthlyStatementAutoGenerate,
           monthlyStatementAutoEmail: !!data.monthlyStatementAutoEmail,

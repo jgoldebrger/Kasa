@@ -26,17 +26,20 @@ organizations with role-based access.
 ## Quick start
 
 ### 1. Prerequisites
+
 - Node.js **18+**
 - A MongoDB cluster (local or Atlas)
 - (Optional) Stripe account for card payments
 - (Optional) SMTP credentials for the platform-level sender
 
 ### 2. Install
+
 ```bash
 npm install
 ```
 
 ### 3. Environment variables (`.env.local`)
+
 ```env
 # Database
 MONGODB_URI=mongodb+srv://USER:PASS@cluster.mongodb.net/kasa?retryWrites=true&w=majority
@@ -74,12 +77,14 @@ TRUST_PROXY_HEADERS=false
 ```
 
 ### 4. Run
+
 ```bash
 npm run dev
 # → http://localhost:3000
 ```
 
 ### 5. First-time setup
+
 - `/login` first request → no users exist → use `/request-invite` to ask
   for an invite. A platform admin receives an email and approves it in
   the admin panel, which issues an invite code → use the code on
@@ -107,11 +112,13 @@ sensitive routes (deletes, SMTP send, member role changes, etc.).
 ## Features
 
 ### Family & member management
+
 - CRUD for families, including Hebrew names for husband/wife/parents
 - Add children with English + Hebrew names, gender, and birth date
 - Per-member age computed against December 31st of each year
 
 ### Payment plans (fully per-organization)
+
 Every organization defines its own list of payment plans in
 **Settings → Payment Plans**. Each plan has a `name`, `planNumber`,
 and `yearlyPrice`. There are no built-in plans, no default prices,
@@ -120,24 +127,31 @@ iterate the configured plans verbatim — adding a fifth plan
 automatically adds a fifth row everywhere it matters.
 
 ### Lifecycle events (fully per-organization)
+
 Event types are configured in **Settings → Event Types**. Each entry
 has a `type` (lowercase identifier), `name` (human label), and default
 `amount`. The yearly calculation, the events list, and the per-family
 event form all read from this list — nothing is hardcoded.
 
 ### Optional automation (per organization)
-**Settings → Automation** exposes three independent opt-in rules. Each
+
+**Settings → Automation** exposes independent opt-in rules. Each
 one no-ops when left blank.
+
 - **Bar Mitzvah auto-assign payment plan** — when a male member reaches
   Bar Mitzvah age (Hebrew calendar), assign the selected plan.
 - **Bar Mitzvah auto-create lifecycle event** — same trigger, record a
   lifecycle event payment of the selected type at that type's
   configured amount.
+- **Add child auto-create lifecycle event** — when a child is added to a
+  family, record a lifecycle event of the selected type (event date is
+  the child's birth date, or today if none).
 - **Child → family conversion default plan** — when a child member is
   converted to a family (wedding-date cron or the manual button), the
   new family is created with the selected plan.
 
 ### Payments
+
 - Cash, Credit Card, Check, Quick Pay
 - Stripe Elements for PCI-compliant card entry; cards can be saved
   (Stripe customer + payment method) and re-charged
@@ -145,20 +159,23 @@ one no-ops when left blank.
   that the cron processor charges every month against the saved card
 
 ### Statements
+
 - Per-family monthly statements with opening balance, income,
   withdrawals, expenses, closing balance
 - One-click bulk auto-generate for any month
 - One-click email blast (per-org SMTP) with PDF attachment
 
 ### Yearly calculations
+
 - Income = Σ (members in age group × plan price) + extra donations
 - Expenses = Σ (lifecycle event payments in year) + extra expenses
 - Balance = Income − Expenses
 - Cached in `YearlyCalculation`; auto-recomputed when missing
 
 ### Dues calculator (`/projections`)
+
 - Break-even recommendation: `dues = expected event expenses ÷ projected
-  payers`. Surfaced as one headline number plus an Excel-style
+payers`. Surfaced as one headline number plus an Excel-style
   year-by-year table.
 - "Expected event expenses" = Σ over lifecycle event types of
   `historicalAvgCount × currentCost`. The count comes from the last
@@ -247,6 +264,7 @@ node scripts/migrate-to-multi-tenant.js \
 ```
 
 The script is idempotent. It:
+
 1. Upserts the admin `User`.
 2. Creates a "Default Organization".
 3. Sets the owner `OrgMembership`.
@@ -267,13 +285,13 @@ Production cron entry points are HTTP routes under `/api/jobs/*`, secured
 with `CRON_SECRET` (see `.env.example`). `vercel.json` ships with five
 schedules — **Vercel Pro** is required (Hobby allows at most two cron jobs).
 
-| API route | Purpose | Schedule (UTC) |
-| --------- | ------- | -------------- |
-| `/api/jobs/cycle-rollover` | Annual cycle rollover per org | `0 1 * * *` |
-| `/api/jobs/generate-monthly-statements` | Generate previous-month statements | `0 2 * * *` |
-| `/api/jobs/process-recurring-payments` | Charge due `RecurringPayment` rows | `0 2 * * *` |
-| `/api/jobs/send-monthly-statements` | Email statements as PDF | `0 3 * * *` |
-| `/api/jobs/wedding-converter` | Child → family conversion on wedding date | `0 4 * * *` |
+| API route                               | Purpose                                   | Schedule (UTC) |
+| --------------------------------------- | ----------------------------------------- | -------------- |
+| `/api/jobs/cycle-rollover`              | Annual cycle rollover per org             | `0 1 * * *`    |
+| `/api/jobs/generate-monthly-statements` | Generate previous-month statements        | `0 2 * * *`    |
+| `/api/jobs/process-recurring-payments`  | Charge due `RecurringPayment` rows        | `0 2 * * *`    |
+| `/api/jobs/send-monthly-statements`     | Email statements as PDF                   | `0 3 * * *`    |
+| `/api/jobs/wedding-converter`           | Child → family conversion on wedding date | `0 4 * * *`    |
 
 Legacy CLI scripts (`scripts/generate-monthly-statements.js`, etc.) and
 matching `npm run …` aliases remain for local or non-Vercel hosts. Ops
@@ -288,11 +306,11 @@ Set `CRON_SECRET` in Vercel env vars before enabling production crons.
 
 ## Stripe — test cards
 
-| Scenario               | Number                |
-| ---------------------- | --------------------- |
-| Success                | `4242 4242 4242 4242` |
-| Decline                | `4000 0000 0000 0002` |
-| Requires 3-D Secure    | `4000 0025 0000 3155` |
+| Scenario            | Number                |
+| ------------------- | --------------------- |
+| Success             | `4242 4242 4242 4242` |
+| Decline             | `4000 0000 0000 0002` |
+| Requires 3-D Secure | `4000 0025 0000 3155` |
 
 Use any future expiry, any 3-digit CVC, any 5-digit ZIP. Switch to
 live keys (`pk_live_…` / `sk_live_…`) for production.
@@ -302,12 +320,14 @@ live keys (`pk_live_…` / `sk_live_…`) for production.
 ## Deploy
 
 ### Vercel (recommended)
+
 1. `npm i -g vercel && vercel` from the project root.
 2. Add the env vars from the [Environment variables](#3-environment-variables-envlocal)
    section in **Project Settings → Environment Variables**.
 3. Redeploy with `vercel --prod`.
 
 ### Anywhere with Node 18+
+
 ```bash
 npm install
 npm run build
@@ -315,6 +335,7 @@ npm start    # serves on port 3000
 ```
 
 ### Pre-deploy checklist
+
 - `MONGODB_URI` does **not** contain `tlsAllowInvalidCertificates` /
   `tlsInsecure` (the connection helper strips them in prod and warns,
   but fix the source).
@@ -331,13 +352,14 @@ npm start    # serves on port 3000
 
 ### Operations docs
 
-| Doc | Purpose |
-| --- | ------- |
-| [docs/STRIPE_MONEY_FLOW.md](docs/STRIPE_MONEY_FLOW.md) | Platform Stripe account, PCI (SAQ A), org expectations vs Connect, live webhooks |
-| [docs/NEXTAUTH_UPGRADE_POLICY.md](docs/NEXTAUTH_UPGRADE_POLICY.md) | Beta pin, monitoring, when to upgrade `next-auth` |
-| [docs/NEXTAUTH_V5_MIGRATION.md](docs/NEXTAUTH_V5_MIGRATION.md) | v5 architecture, env vars, full migration notes |
+| Doc                                                                | Purpose                                                                          |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| [docs/STRIPE_MONEY_FLOW.md](docs/STRIPE_MONEY_FLOW.md)             | Platform Stripe account, PCI (SAQ A), org expectations vs Connect, live webhooks |
+| [docs/NEXTAUTH_UPGRADE_POLICY.md](docs/NEXTAUTH_UPGRADE_POLICY.md) | Beta pin, monitoring, when to upgrade `next-auth`                                |
+| [docs/NEXTAUTH_V5_MIGRATION.md](docs/NEXTAUTH_V5_MIGRATION.md)     | v5 architecture, env vars, full migration notes                                  |
 
 ### Post-deploy smoke test
+
 1. `curl https://your-domain/api/health` → `{"status":"ok",...}` with Mongo up.
 2. Visit `/` from incognito → redirected to `/login`.
 3. `curl https://your-domain/api/families` (no cookie) → 401 JSON.
@@ -367,7 +389,7 @@ and reload.
 build cache: delete `.next/`, restart `npm run dev`.
 
 **Login looks broken after upgrading from beta NextAuth** — make sure
-both `NEXTAUTH_SECRET` *and* `AUTH_SECRET` are set to the same value.
+both `NEXTAUTH_SECRET` _and_ `AUTH_SECRET` are set to the same value.
 
 **Hard refresh** — Windows: `Ctrl + Shift + R`, Mac: `Cmd + Shift + R`.
 
@@ -375,37 +397,35 @@ both `NEXTAUTH_SECRET` *and* `AUTH_SECRET` are set to the same value.
 
 ## Testing
 
-| Command | What it runs |
-| ------- | -------------- |
-| `npm test` | Vitest: `lib`, `api-routes`, `route-logic`, `app` (parallel) |
-| `npm run test:coverage` | Coverage: **100% lines** on `lib/` + `app/api/**/route.ts` + `lib/route-logic/**` report |
-| `npm run test:api-routes` | API route catalog integration only |
-| `npm run test:route-logic-coverage` | Full API catalog against `lib/route-logic/**` (implementation coverage) |
-| `npm run test:route-logic-coverage:report` | Same + list files still below 100% lines |
-| `npm run app-smoke:generate` | Regenerate `app/components/ui/*.smoke.test.tsx` |
-| `npm run route-logic:extract` | Move handler bodies from `lib/api-handlers` → `lib/route-logic` |
-| `npm run test:coverage:report` | Coverage + list of files still below 100% |
-| `npm run test:e2e` | Playwright smoke/regression (`e2e/`) |
-| `npm run test:all` | Vitest + Playwright |
+| Command                                    | What it runs                                                                             |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| `npm test`                                 | Vitest: `lib`, `api-routes`, `route-logic`, `app` (parallel)                             |
+| `npm run test:coverage`                    | Coverage: **100% lines** on `lib/` + `app/api/**/route.ts` + `lib/route-logic/**` report |
+| `npm run test:api-routes`                  | API route catalog integration only                                                       |
+| `npm run test:route-logic-coverage`        | Full API catalog against `lib/route-logic/**` (implementation coverage)                  |
+| `npm run test:route-logic-coverage:report` | Same + list files still below 100% lines                                                 |
+| `npm run app-smoke:generate`               | Regenerate `app/components/ui/*.smoke.test.tsx`                                          |
+| `npm run route-logic:extract`              | Move handler bodies from `lib/api-handlers` → `lib/route-logic`                          |
+| `npm run test:coverage:report`             | Coverage + list of files still below 100%                                                |
+| `npm run test:e2e`                         | Playwright smoke/regression (`e2e/`)                                                     |
+| `npm run test:all`                         | Vitest + Playwright                                                                      |
 
 **Coverage policy (CI):**
 
-- **`lib/**/*.ts`** — **100% lines** (`vitest.lib.config.ts`), excluding thin
-  `lib/api-handlers/**` and `lib/route-logic/**`.
+- **`lib/**/\*.ts`** — **100% lines** (`vitest.lib.config.ts`), excluding thin
+`lib/api-handlers/**`and`lib/route-logic/**`.
 - **`app/api/**/route.ts`** + **`lib/api-handlers/**/handler.ts`** — **100% lines**
-  (`vitest.api.config.ts`, per-file). Each file re-exports from **`lib/route-logic/**`**
+  (`vitest.api.config.ts`, per-file). Each file re-exports from **`lib/route-logic/**`\*\*
   where the real handler code lives.
 - **`lib/route-logic/**`** — implementation modules under `lib/route-logic/`. Integration
-  tests import them directly (`routeSourceToLogicModule` in `lib/test/api-route-harness.ts`).
-  Track progress with `npm run test:route-logic-coverage:report` (target **100% lines** per file;
-  currently **~80%** aggregate lines). Shared success bodies live in
-  `lib/test/catalog-probe-bodies.ts`; add branches in `lib/import-route-logic.integration.test.ts`,
-  the sequential block `route-logic row coverage (gap order)` in
-  `app/api/api-routes.integration.test.ts`, and `app/api/route-logic-finish.integration.test.ts`
+tests import them directly (`routeSourceToLogicModule`in`lib/test/api-route-harness.ts`).
+Track progress with `npm run test:route-logic-coverage:report`(target **100% lines** per file;
+currently **~80%** aggregate lines). Shared success bodies live in`lib/test/catalog-probe-bodies.ts`; add branches in `lib/import-route-logic.integration.test.ts`,
+the sequential block `route-logic row coverage (gap order)`in`app/api/api-routes.integration.test.ts`, and `app/api/route-logic-finish.integration.test.ts`
   (gap-order finish pass: workers, cron jobs, families, invites, etc.).
-- **`app/components/ui/**`** — smoke render tests (`*.smoke.test.tsx`, `app` Vitest
-  project). Regenerate with `npm run app-smoke:generate`. Complex widgets (`DataView`,
-  `ImportModal`, …) and page-level `*View.tsx` files are Playwright / manual next.
+- **`app/components/ui/**`** — smoke render tests (`*.smoke.test.tsx`, `app`Vitest
+project). Regenerate with`npm run app-smoke:generate`. Complex widgets (`DataView`,
+`ImportModal`, …) and page-level `*View.tsx` files are Playwright / manual next.
 
 **API routes:** `app/api/api-routes.integration.test.ts` runs catalog + deep
 probes (including multi-type `/api/import` and Stripe webhook events) against

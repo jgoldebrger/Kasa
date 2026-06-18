@@ -123,6 +123,7 @@ export function catalogSuccessBody(route: ApiRouteEntry, ctx: ApiTestContext): u
     'PUT /api/organizations/automation': {
       barMitzvahAutoAssignPlanId: f.paymentPlanId,
       barMitzvahAutoCreateEventTypeId: f.lifecycleEventTypeId,
+      addChildAutoCreateEventTypeId: f.lifecycleEventTypeId,
       monthlyStatementAutoGenerate: false,
       monthlyStatementAutoEmail: false,
     },

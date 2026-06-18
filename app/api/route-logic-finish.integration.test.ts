@@ -239,6 +239,35 @@ describe.sequential('route-logic finish coverage', () => {
       expect(res.status).toBe(201)
     })
 
+    it('auto-creates a lifecycle event when adding a child if configured', async () => {
+      const { Organization, LifecycleEventPayment } = await import('@/lib/models')
+      await Organization.updateOne(
+        { _id: ctx.orgId },
+        { $set: { addChildAutoCreateEventTypeId: ctx.fixtures.lifecycleEventTypeId } },
+      )
+
+      const { POST } = await import('@/lib/route-logic/families/[id]/members')
+      const params = { id: ctx.fixtures.familyId }
+      const res = await POST(
+        orgJsonReq(`/api/families/${params.id}/members`, 'POST', {
+          firstName: 'New',
+          lastName: 'Child',
+          birthDate: '2018-06-01',
+          gender: 'female',
+        }),
+        { params },
+      )
+      expect(res.status).toBe(201)
+
+      const events = await LifecycleEventPayment.find({
+        familyId: ctx.fixtures.familyId,
+        organizationId: ctx.orgId,
+        notes: /child added/i,
+      }).lean()
+      expect(events.length).toBeGreaterThan(0)
+      expect(events.some((e) => String(e.notes).includes('New Child'))).toBe(true)
+    })
+
     it('auto-assigns bar mitzvah plan when creating an eligible male member', async () => {
       const { Organization, FamilyMember } = await import('@/lib/models')
       const { convertToHebrewDate } = await import('@/lib/hebrew-date')

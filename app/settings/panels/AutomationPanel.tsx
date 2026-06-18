@@ -9,6 +9,7 @@ import { Alert, Button, Input, Select } from '@/app/components/ui'
 export interface AutomationConfigShape {
   barMitzvahAutoAssignPlanId: string | null
   barMitzvahAutoCreateEventTypeId: string | null
+  addChildAutoCreateEventTypeId: string | null
   weddingConversionDefaultPlanId: string | null
   monthlyStatementAutoGenerate: boolean
   monthlyStatementAutoEmail: boolean
@@ -113,6 +114,39 @@ export default function AutomationPanel({
               ))}
             </Select>
           </div>
+        </div>
+
+        <div className="border border-border rounded-lg p-5">
+          <h3 className="text-lg font-semibold text-fg mb-1">Add child</h3>
+          <p className="text-sm text-fg-muted mb-5">
+            When a child is added to a family, automatically record a lifecycle event for the
+            family. Uses the child&rsquo;s birth date as the event date (or today if no birth date
+            was entered). Leave the dropdown blank to skip.
+          </p>
+
+          <Select
+            id="add-child-auto-create-event"
+            label="Auto-create lifecycle event"
+            value={automationConfig.addChildAutoCreateEventTypeId || ''}
+            onChange={(e) =>
+              setAutomationConfig((c) => ({
+                ...c,
+                addChildAutoCreateEventTypeId: e.target.value || null,
+              }))
+            }
+            hint={
+              eventTypes.length === 0
+                ? 'No event types configured yet. Add one in the Event Types tab first.'
+                : undefined
+            }
+          >
+            <option value="">— Do not auto-create —</option>
+            {eventTypes.map((ev) => (
+              <option key={ev._id} value={ev._id}>
+                {ev.name} ({formatMoney(ev.amount)})
+              </option>
+            ))}
+          </Select>
         </div>
 
         <div className="border border-border rounded-lg p-5">

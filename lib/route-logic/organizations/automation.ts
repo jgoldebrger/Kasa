@@ -11,6 +11,9 @@
  *   - barMitzvahAutoCreateEventTypeId: ObjectId of the LifecycleEvent type
  *     whose configured amount is recorded as an event payment on the same
  *     trigger. Null disables auto-event-creation.
+ *   - addChildAutoCreateEventTypeId: ObjectId of the LifecycleEvent type
+ *     recorded when a child member is added to a family. Uses the child's
+ *     birth date (or today if none) as the event date. Null disables.
  *   - weddingConversionDefaultPlanId: ObjectId of the PaymentPlan assigned
  *     to a newly converted family (wedding-date cron / manual convert).
  *     Null leaves the family unassigned for the admin to set manually.
@@ -47,6 +50,7 @@ export const dynamic = 'force-dynamic'
 const putBody = z.object({
   barMitzvahAutoAssignPlanId: z.string().min(0).nullable().optional(),
   barMitzvahAutoCreateEventTypeId: z.string().min(0).nullable().optional(),
+  addChildAutoCreateEventTypeId: z.string().min(0).nullable().optional(),
   weddingConversionDefaultPlanId: z.string().min(0).nullable().optional(),
   monthlyStatementAutoGenerate: z.boolean().optional(),
   monthlyStatementAutoEmail: z.boolean().optional(),
@@ -78,7 +82,7 @@ export const GET = handler({
 
     const org = await Organization.findById(ctx!.organizationId)
       .select(
-        'barMitzvahAutoAssignPlanId barMitzvahAutoCreateEventTypeId weddingConversionDefaultPlanId monthlyStatementAutoGenerate monthlyStatementAutoEmail monthlyStatementCalendar monthlyStatementDay monthlyStatementHebrewDay',
+        'barMitzvahAutoAssignPlanId barMitzvahAutoCreateEventTypeId addChildAutoCreateEventTypeId weddingConversionDefaultPlanId monthlyStatementAutoGenerate monthlyStatementAutoEmail monthlyStatementCalendar monthlyStatementDay monthlyStatementHebrewDay',
       )
       .lean<any>()
     if (!org) return { status: 404, data: { error: 'Organization not found' } }
@@ -89,6 +93,9 @@ export const GET = handler({
           : null,
         barMitzvahAutoCreateEventTypeId: org.barMitzvahAutoCreateEventTypeId
           ? String(org.barMitzvahAutoCreateEventTypeId)
+          : null,
+        addChildAutoCreateEventTypeId: org.addChildAutoCreateEventTypeId
+          ? String(org.addChildAutoCreateEventTypeId)
           : null,
         weddingConversionDefaultPlanId: org.weddingConversionDefaultPlanId
           ? String(org.weddingConversionDefaultPlanId)
@@ -125,6 +132,7 @@ export const PUT = handler({
     const update: Record<string, unknown> = {}
     const planTouched = body.barMitzvahAutoAssignPlanId !== undefined
     const eventTouched = body.barMitzvahAutoCreateEventTypeId !== undefined
+    const addChildEventTouched = body.addChildAutoCreateEventTypeId !== undefined
     const weddingTouched = body.weddingConversionDefaultPlanId !== undefined
     const autoGenerateTouched = body.monthlyStatementAutoGenerate !== undefined
     const autoEmailTouched = body.monthlyStatementAutoEmail !== undefined
@@ -135,6 +143,7 @@ export const PUT = handler({
     if (
       !planTouched &&
       !eventTouched &&
+      !addChildEventTouched &&
       !weddingTouched &&
       !autoGenerateTouched &&
       !autoEmailTouched &&
@@ -154,7 +163,10 @@ export const PUT = handler({
       }
       const planId = objectIdOrNull(body.barMitzvahAutoAssignPlanId)
       if (planId) {
-        const exists = await PaymentPlan.exists({ _id: planId, organizationId: ctx!.organizationId })
+        const exists = await PaymentPlan.exists({
+          _id: planId,
+          organizationId: ctx!.organizationId,
+        })
         if (!exists) {
           return { status: 400, data: { error: 'Payment plan not found in this organization' } }
         }
@@ -168,12 +180,38 @@ export const PUT = handler({
       }
       const eventId = objectIdOrNull(body.barMitzvahAutoCreateEventTypeId)
       if (eventId) {
-        const exists = await LifecycleEvent.exists({ _id: eventId, organizationId: ctx!.organizationId })
+        const exists = await LifecycleEvent.exists({
+          _id: eventId,
+          organizationId: ctx!.organizationId,
+        })
         if (!exists) {
-          return { status: 400, data: { error: 'Lifecycle event type not found in this organization' } }
+          return {
+            status: 400,
+            data: { error: 'Lifecycle event type not found in this organization' },
+          }
         }
       }
       update.barMitzvahAutoCreateEventTypeId = eventId
+    }
+    if (addChildEventTouched) {
+      const raw = body.addChildAutoCreateEventTypeId
+      if (raw != null && raw !== '' && !Types.ObjectId.isValid(String(raw))) {
+        return { status: 400, data: { error: 'Invalid addChildAutoCreateEventTypeId' } }
+      }
+      const eventId = objectIdOrNull(body.addChildAutoCreateEventTypeId)
+      if (eventId) {
+        const exists = await LifecycleEvent.exists({
+          _id: eventId,
+          organizationId: ctx!.organizationId,
+        })
+        if (!exists) {
+          return {
+            status: 400,
+            data: { error: 'Lifecycle event type not found in this organization' },
+          }
+        }
+      }
+      update.addChildAutoCreateEventTypeId = eventId
     }
     if (weddingTouched) {
       const raw = body.weddingConversionDefaultPlanId
@@ -182,7 +220,10 @@ export const PUT = handler({
       }
       const planId = objectIdOrNull(body.weddingConversionDefaultPlanId)
       if (planId) {
-        const exists = await PaymentPlan.exists({ _id: planId, organizationId: ctx!.organizationId })
+        const exists = await PaymentPlan.exists({
+          _id: planId,
+          organizationId: ctx!.organizationId,
+        })
         if (!exists) {
           return { status: 400, data: { error: 'Payment plan not found in this organization' } }
         }
@@ -216,7 +257,7 @@ export const PUT = handler({
       { new: true },
     )
       .select(
-        'barMitzvahAutoAssignPlanId barMitzvahAutoCreateEventTypeId weddingConversionDefaultPlanId monthlyStatementAutoGenerate monthlyStatementAutoEmail monthlyStatementCalendar monthlyStatementDay monthlyStatementHebrewDay',
+        'barMitzvahAutoAssignPlanId barMitzvahAutoCreateEventTypeId addChildAutoCreateEventTypeId weddingConversionDefaultPlanId monthlyStatementAutoGenerate monthlyStatementAutoEmail monthlyStatementCalendar monthlyStatementDay monthlyStatementHebrewDay',
       )
       .lean<any>()
 
@@ -231,6 +272,7 @@ export const PUT = handler({
       metadata: {
         planTouched,
         eventTouched,
+        addChildEventTouched,
         weddingTouched,
         autoGenerateTouched,
         autoEmailTouched,
@@ -248,6 +290,9 @@ export const PUT = handler({
           : null,
         barMitzvahAutoCreateEventTypeId: org.barMitzvahAutoCreateEventTypeId
           ? String(org.barMitzvahAutoCreateEventTypeId)
+          : null,
+        addChildAutoCreateEventTypeId: org.addChildAutoCreateEventTypeId
+          ? String(org.addChildAutoCreateEventTypeId)
           : null,
         weddingConversionDefaultPlanId: org.weddingConversionDefaultPlanId
           ? String(org.weddingConversionDefaultPlanId)
