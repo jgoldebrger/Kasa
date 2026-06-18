@@ -8,15 +8,18 @@ import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import type { PlReportData } from '@/lib/reports/pl-data'
 import {
+  Badge,
   Button,
+  ButtonLink,
+  Card,
   DataView,
   EmptyState,
   PageHeader,
   type DataColumn,
 } from '@/app/components/ui'
+import { useT } from '@/lib/client/i18n'
 
 type Transaction = PlReportData['transactions'][number]
-type ReportSummary = PlReportData['summary']
 
 const REPORTS_VISITED_KEY = 'kasa:reports:visited'
 
@@ -30,6 +33,7 @@ export default function ReportsView({
   initialYear = new Date().getFullYear(),
 }: ReportsViewProps = {}) {
   const toast = useToast()
+  const t = useT()
   const { format: formatMoney } = useCurrency()
   const [loading, setLoading] = useState(false)
   const [reportData, setReportData] = useState<PlReportData | null>(initialReportData)
@@ -40,11 +44,13 @@ export default function ReportsView({
   const { begin, invalidate, isStale } = useRequestGeneration()
   const deferredGenerateRef = useRef(false)
 
-  useOrgChanged(useCallback(() => {
-    invalidate()
-    setReportData(null)
-    deferredGenerateRef.current = false
-  }, [invalidate]))
+  useOrgChanged(
+    useCallback(() => {
+      invalidate()
+      setReportData(null)
+      deferredGenerateRef.current = false
+    }, [invalidate]),
+  )
 
   const generateReport = useCallback(async () => {
     const gen = begin()
@@ -55,7 +61,7 @@ export default function ReportsView({
         url += `year=${year}`
       } else {
         if (!startDate || !endDate) {
-          toast.error('Please select both start and end dates')
+          toast.error(t('reports.error.dateRange'))
           if (!isStale(gen)) setLoading(false)
           return
         }
@@ -66,7 +72,7 @@ export default function ReportsView({
       if (isStale(gen)) return
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        toast.error(data.error || 'Failed to generate report')
+        toast.error(data.error || t('reports.error.generate'))
         return
       }
       const data = await res.json().catch(() => ({}))
@@ -74,11 +80,11 @@ export default function ReportsView({
       setReportData(data)
     } catch {
       if (isStale(gen)) return
-      toast.error('Failed to generate report')
+      toast.error(t('reports.error.generate'))
     } finally {
       if (!isStale(gen)) setLoading(false)
     }
-  }, [begin, isStale, reportType, year, startDate, endDate, toast])
+  }, [begin, isStale, reportType, year, startDate, endDate, toast, t])
 
   useEffect(() => {
     if (initialReportData || deferredGenerateRef.current) return
@@ -118,108 +124,103 @@ export default function ReportsView({
 
   const columns: DataColumn<Transaction>[] = useMemo(
     () => [
-    {
-      id: 'type',
-      header: 'Type',
-      headerText: 'Type',
-      cell: (t) => (
-        <span
-          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-            t.type === 'Income'
-              ? 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300'
-              : 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-400'
-          }`}
-        >
-          {t.type}
-        </span>
-      ),
-      exportValue: (t) => t.type,
-      filter: { type: 'select' },
-    },
-    {
-      id: 'date',
-      header: 'Date',
-      headerText: 'Date',
-      cell: (t) => <span className="tabular">{new Date(t.date).toLocaleDateString()}</span>,
-      exportValue: (t) => (t.date ? new Date(t.date) : ''),
-      filter: { type: 'dateRange', getValue: (t) => t.date || null },
-    },
-    {
-      id: 'year',
-      header: 'Year',
-      headerText: 'Year',
-      hideBelow: 'md',
-      cell: (t) => <span className="text-fg-muted tabular">{t.year}</span>,
-      exportValue: (t) => t.year,
-      filter: { type: 'select', getValue: (t) => String(t.year) },
-    },
-    {
-      id: 'family',
-      header: 'Family',
-      headerText: 'Family',
-      cell: (t) => <span className="font-medium text-fg">{t.family}</span>,
-      exportValue: (t) => t.family || '',
-      filter: { type: 'select' },
-    },
-    {
-      id: 'description',
-      header: 'Description',
-      headerText: 'Description',
-      hideBelow: 'md',
-      cell: (t) => <span className="text-fg-muted">{t.description}</span>,
-      exportValue: (t) => t.description || '',
-    },
-    {
-      id: 'amount',
-      header: 'Amount',
-      headerText: 'Amount',
-      align: 'right',
-      cell: (t) => (
-        <span
-          className={`font-medium tabular ${
-            t.amount >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'
-          }`}
-        >
-          {formatMoney(t.amount)}
-        </span>
-      ),
-      exportValue: (t) => t.amount,
-      filter: { type: 'numberRange', getValue: (t) => t.amount || 0 },
-    },
-    {
-      id: 'notes',
-      header: 'Notes',
-      headerText: 'Notes',
-      hideBelow: 'lg',
-      defaultHidden: true,
-      cell: (t) => <span className="text-fg-muted text-sm">{t.notes || '—'}</span>,
-      exportValue: (t) => t.notes || '',
-    },
-  ],
-    [formatMoney],
+      {
+        id: 'type',
+        header: t('reports.column.type'),
+        headerText: t('reports.column.type'),
+        cell: (row) => (
+          <Badge
+            variant={row.type === 'Income' ? 'success' : 'danger'}
+            size="md"
+            className="rounded-full normal-case tracking-normal"
+          >
+            {row.type === 'Income' ? t('reports.type.income') : t('reports.type.expense')}
+          </Badge>
+        ),
+        exportValue: (row) => row.type,
+        filter: { type: 'select' },
+      },
+      {
+        id: 'date',
+        header: t('reports.column.date'),
+        headerText: t('reports.column.date'),
+        cell: (row) => <span className="tabular">{new Date(row.date).toLocaleDateString()}</span>,
+        exportValue: (row) => (row.date ? new Date(row.date) : ''),
+        filter: { type: 'dateRange', getValue: (row) => row.date || null },
+      },
+      {
+        id: 'year',
+        header: t('reports.column.year'),
+        headerText: t('reports.column.year'),
+        hideBelow: 'md',
+        cell: (row) => <span className="text-fg-muted tabular">{row.year}</span>,
+        exportValue: (row) => row.year,
+        filter: { type: 'select', getValue: (row) => String(row.year) },
+      },
+      {
+        id: 'family',
+        header: t('reports.column.family'),
+        headerText: t('reports.column.family'),
+        cell: (row) => <span className="font-medium text-fg">{row.family}</span>,
+        exportValue: (row) => row.family || '',
+        filter: { type: 'select' },
+      },
+      {
+        id: 'description',
+        header: t('reports.column.description'),
+        headerText: t('reports.column.description'),
+        hideBelow: 'md',
+        cell: (row) => <span className="text-fg-muted">{row.description}</span>,
+        exportValue: (row) => row.description || '',
+      },
+      {
+        id: 'amount',
+        header: t('reports.column.amount'),
+        headerText: t('reports.column.amount'),
+        align: 'right',
+        cell: (row) => (
+          <span
+            className={`font-medium tabular ${row.amount >= 0 ? 'text-success' : 'text-danger'}`}
+          >
+            {formatMoney(row.amount)}
+          </span>
+        ),
+        exportValue: (row) => row.amount,
+        filter: { type: 'numberRange', getValue: (row) => row.amount || 0 },
+      },
+      {
+        id: 'notes',
+        header: t('reports.column.notes'),
+        headerText: t('reports.column.notes'),
+        hideBelow: 'lg',
+        defaultHidden: true,
+        cell: (row) => <span className="text-fg-muted text-sm">{row.notes || '—'}</span>,
+        exportValue: (row) => row.notes || '',
+      },
+    ],
+    [formatMoney, t],
   )
 
   return (
     <div className="min-h-screen p-4 sm:p-6 md:p-8">
       <div className="max-w-7xl mx-auto">
         <PageHeader
-          title="Financial Reports"
-          subtitle="Generate a profit & loss report for a year or date range, then export it."
+          title={t('reports.title')}
+          subtitle={t('reports.subtitle')}
           actions={
-            <a
-              href="/reports/builder"
-              className="focus-ring inline-flex items-center rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-fg hover:bg-fg/5"
-            >
-              Open report builder →
-            </a>
+            <ButtonLink href="/reports/builder" variant="secondary" size="sm">
+              {t('reports.openBuilder')}
+            </ButtonLink>
           }
         />
 
-        <div className="surface-card p-4 sm:p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4 text-fg">Generate P&amp;L Report</h2>
+        <Card className="mb-6">
+          <h2 className="text-lg font-semibold mb-4 text-fg">{t('reports.generate.title')}</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-fg mb-2">Report Period</label>
+              <label className="block text-sm font-medium text-fg mb-2">
+                {t('reports.generate.period')}
+              </label>
               <div className="flex gap-4">
                 <label className="flex items-center text-sm text-fg">
                   <input
@@ -229,7 +230,7 @@ export default function ReportsView({
                     onChange={(e) => setReportType(e.target.value as 'year' | 'range')}
                     className="mr-2"
                   />
-                  By Year
+                  {t('reports.generate.byYear')}
                 </label>
                 <label className="flex items-center text-sm text-fg">
                   <input
@@ -239,14 +240,16 @@ export default function ReportsView({
                     onChange={(e) => setReportType(e.target.value as 'year' | 'range')}
                     className="mr-2"
                   />
-                  Date Range
+                  {t('reports.generate.dateRange')}
                 </label>
               </div>
             </div>
 
             {reportType === 'year' ? (
               <div>
-                <label className="block text-sm font-medium text-fg mb-2">Year</label>
+                <label className="block text-sm font-medium text-fg mb-2">
+                  {t('reports.generate.year')}
+                </label>
                 <input
                   type="number"
                   value={year}
@@ -259,7 +262,9 @@ export default function ReportsView({
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-fg mb-2">Start Date</label>
+                  <label className="block text-sm font-medium text-fg mb-2">
+                    {t('reports.generate.startDate')}
+                  </label>
                   <input
                     type="date"
                     value={startDate}
@@ -268,7 +273,9 @@ export default function ReportsView({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-fg mb-2">End Date</label>
+                  <label className="block text-sm font-medium text-fg mb-2">
+                    {t('reports.generate.endDate')}
+                  </label>
                   <input
                     type="date"
                     value={endDate}
@@ -284,64 +291,78 @@ export default function ReportsView({
               disabled={loading}
               leftIcon={<CalendarIcon className="h-5 w-5" />}
             >
-              {loading ? 'Generating…' : 'Generate Report'}
+              {loading ? t('reports.generate.loading') : t('reports.generate.button')}
             </Button>
           </div>
-        </div>
+        </Card>
 
         {reportData && (
-          <div className="surface-card p-4 sm:p-6">
-            <h2 className="text-xl font-semibold text-fg mb-4">Report Results</h2>
+          <Card>
+            <h2 className="text-xl font-semibold text-fg mb-4">{t('reports.results.title')}</h2>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-              <SummaryCard label="Total Income" value={formatMoney(reportData.summary.totalIncome)} tone="success" />
-              <SummaryCard label="Total Expenses" value={formatMoney(reportData.summary.totalExpenses)} tone="danger" />
               <SummaryCard
-                label="Net Profit/Loss"
+                label={t('reports.summary.totalIncome')}
+                value={formatMoney(reportData.summary.totalIncome)}
+                tone="success"
+              />
+              <SummaryCard
+                label={t('reports.summary.totalExpenses')}
+                value={formatMoney(reportData.summary.totalExpenses)}
+                tone="danger"
+              />
+              <SummaryCard
+                label={t('reports.summary.netProfit')}
                 value={formatMoney(reportData.summary.netProfit)}
                 tone={reportData.summary.netProfit >= 0 ? 'success' : 'danger'}
               />
-              <SummaryCard label="Transactions" value={String(reportData.summary.transactionCount)} tone="accent" />
+              <SummaryCard
+                label={t('reports.summary.transactions')}
+                value={String(reportData.summary.transactionCount)}
+                tone="accent"
+              />
             </div>
 
             <DataView
               tableId="reports-pl"
               rows={reportData.transactions}
               columns={columns}
-              rowKey={(_t, i) => String(i)}
+              rowKey={(_row, i) => String(i)}
               exportFileName={reportFileName}
-              globalSearch={{ placeholder: 'Search family, description, notes…' }}
+              globalSearch={{ placeholder: t('reports.searchPlaceholder') }}
               pageSize={25}
-              mobileCard={(t) => (
-                <div className="surface-card p-4">
+              mobileCard={(row) => (
+                <Card compact>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="font-medium text-fg truncate">{t.family}</div>
-                      <div className="text-xs text-fg-muted truncate">{t.description}</div>
+                      <div className="font-medium text-fg truncate">{row.family}</div>
+                      <div className="text-xs text-fg-muted truncate">{row.description}</div>
                     </div>
                     <span
                       className={`font-medium tabular ${
-                        t.amount >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'
+                        row.amount >= 0 ? 'text-success' : 'text-danger'
                       }`}
                     >
-                      {formatMoney(t.amount)}
+                      {formatMoney(row.amount)}
                     </span>
                   </div>
                   <div className="mt-2 flex justify-between text-xs text-fg-muted">
-                    <span>{t.type}</span>
-                    <span className="tabular">{new Date(t.date).toLocaleDateString()}</span>
+                    <span>
+                      {row.type === 'Income' ? t('reports.type.income') : t('reports.type.expense')}
+                    </span>
+                    <span className="tabular">{new Date(row.date).toLocaleDateString()}</span>
                   </div>
-                </div>
+                </Card>
               )}
               empty={
                 <EmptyState
                   icon={<ChartBarIcon className="h-10 w-10" />}
-                  title="No transactions"
-                  description="No transactions match the selected period."
+                  title={t('reports.empty.title')}
+                  description={t('reports.empty.description')}
                 />
               }
             />
-          </div>
+          </Card>
         )}
       </div>
     </div>
@@ -358,15 +379,11 @@ function SummaryCard({
   tone: 'success' | 'danger' | 'accent'
 }) {
   const toneClass =
-    tone === 'success'
-      ? 'text-green-700 dark:text-green-400'
-      : tone === 'danger'
-      ? 'text-red-700 dark:text-red-400'
-      : 'text-accent'
+    tone === 'success' ? 'text-success' : tone === 'danger' ? 'text-danger' : 'text-accent'
   return (
-    <div className="rounded-lg border border-border bg-app-subtle p-4">
+    <Card compact className="bg-app-subtle">
       <div className="text-xs text-fg-muted">{label}</div>
       <div className={`mt-1 text-xl sm:text-2xl font-bold tabular ${toneClass}`}>{value}</div>
-    </div>
+    </Card>
   )
 }

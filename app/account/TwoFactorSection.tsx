@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Button, Input } from '@/app/components/ui'
+import { Button, Card, Input } from '@/app/components/ui'
 import { useToast, useConfirm } from '@/app/components/Toast'
 
 /**
@@ -140,7 +140,7 @@ export default function TwoFactorSection({
     : null
 
   return (
-    <section className="surface-card rounded-2xl shadow-xl p-6 border border-border">
+    <Card>
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
           <h2 className="text-base font-semibold text-fg">Two-factor authentication</h2>
@@ -290,6 +290,6 @@ export default function TwoFactorSection({
           </div>
         </form>
       )}
-    </section>
+    </Card>
   )
 }

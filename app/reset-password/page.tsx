@@ -1,18 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { z } from 'zod'
-import { Button, Input } from '@/app/components/ui'
+import { Alert, Button, ButtonLink, Card, Input } from '@/app/components/ui'
 import { useFormState } from '@/lib/client/useFormState'
-
-const schema = z.object({
-  email: z.string().trim().toLowerCase().email('Enter a valid email address'),
-})
+import { useT } from '@/lib/client/i18n'
 
 export default function ForgotPasswordPage() {
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null)
   const [devResetUrl, setDevResetUrl] = useState<string | null>(null)
+  const t = useT()
+
+  const schema = useMemo(
+    () =>
+      z.object({
+        email: z.string().trim().toLowerCase().email(t('resetPassword.validation.email')),
+      }),
+    [t],
+  )
 
   const form = useFormState({
     schema,
@@ -44,47 +50,48 @@ export default function ForgotPasswordPage() {
           <div className="inline-flex items-center justify-center w-10 h-10 bg-accent text-accent-fg rounded-lg font-semibold mb-4">
             K
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-fg">Reset your password</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-fg">
+            {t('resetPassword.title')}
+          </h1>
         </div>
 
         {submittedEmail ? (
-          <div className="surface-card p-6 text-center space-y-4">
+          <Card className="text-center space-y-4">
             <p className="text-sm text-fg">
-              If an account exists for <strong>{submittedEmail}</strong>, a reset link has been sent.
+              {t('resetPassword.emailSentPrefix')} <strong>{submittedEmail}</strong>
+              {t('resetPassword.emailSentSuffix')}
             </p>
             {devResetUrl && (
-              <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-md p-3 text-left text-xs">
-                <p className="font-medium text-amber-800 dark:text-amber-300 mb-1">Dev only — reset URL:</p>
-                <code className="break-all text-amber-900 dark:text-amber-200">{devResetUrl}</code>
-              </div>
+              <Alert variant="warning" className="text-left text-xs">
+                <p className="font-medium mb-1">{t('resetPassword.devOnlyLabel')}</p>
+                <code className="break-all">{devResetUrl}</code>
+              </Alert>
             )}
-            <Link href="/login" className="inline-block text-accent hover:text-accent-hover font-medium text-sm">
-              Back to sign in
-            </Link>
-          </div>
+            <ButtonLink href="/login" variant="ghost" size="sm">
+              {t('resetPassword.backToSignIn')}
+            </ButtonLink>
+          </Card>
         ) : (
-          <form
-            onSubmit={form.handleSubmit}
-            className="surface-card p-6 space-y-5"
-            noValidate
-          >
-            <Input
-              label="Email"
-              type="email"
-              required
-              autoComplete="email"
-              placeholder="you@example.com"
-              {...form.register('email')}
-            />
-            <Button type="submit" loading={form.isSubmitting} block size="lg">
-              Send reset link
-            </Button>
-            <p className="text-sm text-fg-muted text-center">
-              <Link href="/login" className="text-accent hover:text-accent-hover font-medium">
-                Back to sign in
-              </Link>
-            </p>
-          </form>
+          <Card>
+            <form onSubmit={form.handleSubmit} className="space-y-5" noValidate>
+              <Input
+                label={t('auth.email')}
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="you@example.com"
+                {...form.register('email')}
+              />
+              <Button type="submit" loading={form.isSubmitting} block size="lg">
+                {t('resetPassword.sendLink')}
+              </Button>
+              <p className="text-sm text-fg-muted text-center">
+                <Link href="/login" className="text-accent hover:text-accent-hover font-medium">
+                  {t('resetPassword.backToSignIn')}
+                </Link>
+              </p>
+            </form>
+          </Card>
         )}
       </div>
     </div>

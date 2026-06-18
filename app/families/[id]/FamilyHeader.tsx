@@ -1,18 +1,20 @@
 'use client'
 
 import { PlusIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline'
-import { Button, Tooltip } from '@/app/components/ui'
+import { Button, Card, Tooltip } from '@/app/components/ui'
+import { useT } from '@/lib/client/i18n'
 import { useFamilyDetail } from './FamilyDetailContext'
 
 export default function FamilyHeader() {
+  const t = useT()
   const { data, isAdmin, formatMoney, getPlanNameById, setShowTaskModal } = useFamilyDetail()
 
   if (!data?.family) return null
 
   return (
-    <div className="surface-card p-5 sm:p-6 mb-6">
+    <Card className="mb-6">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-fg">
+        <h1 className="text-xl font-semibold tracking-tight text-fg sm:text-2xl">
           {data.family.name}
         </h1>
         {isAdmin && (
@@ -21,27 +23,29 @@ export default function FamilyHeader() {
             onClick={() => setShowTaskModal(true)}
             leftIcon={<PlusIcon className="h-4 w-4" aria-hidden="true" />}
           >
-            Add Task
+            {t('family.header.addTask')}
           </Button>
         )}
       </div>
       <div
-        className={`grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-border${isAdmin ? ' md:grid-cols-7' : ''}`}
+        className={`mt-4 grid grid-cols-2 gap-4 border-t border-border pt-4${isAdmin ? ' md:grid-cols-7' : ''}`}
       >
         <div>
-          <p className="text-sm text-fg-muted">Wedding Date</p>
-          <p className="font-medium">{new Date(data.family.weddingDate).toLocaleDateString()}</p>
+          <p className="text-sm text-fg-muted">{t('family.weddingDate')}</p>
+          <p className="font-medium tabular">
+            {new Date(data.family.weddingDate).toLocaleDateString()}
+          </p>
         </div>
         {isAdmin && (
           <>
             <div>
-              <p className="text-sm text-fg-muted">Current Plan</p>
+              <p className="text-sm text-fg-muted">{t('family.header.currentPlan')}</p>
               <p className="font-medium">{getPlanNameById(data.family.paymentPlanId)}</p>
             </div>
             <div>
-              <p className="text-sm text-fg-muted flex items-center gap-1">
-                Balance
-                <Tooltip content="Cash received minus lifecycle expenses and plan costs for the current cycle.">
+              <p className="flex items-center gap-1 text-sm text-fg-muted">
+                {t('family.balance')}
+                <Tooltip content={t('family.header.balanceTooltip')}>
                   <QuestionMarkCircleIcon className="h-4 w-4 text-fg-muted" aria-hidden="true" />
                 </Tooltip>
               </p>
@@ -54,29 +58,31 @@ export default function FamilyHeader() {
               </p>
             </div>
             <div>
-              <p className="text-sm text-fg-muted">Members</p>
-              <p className="font-medium">{data.members.length}</p>
+              <p className="text-sm text-fg-muted">{t('family.members')}</p>
+              <p className="font-medium tabular">{data.members.length}</p>
             </div>
             <div>
-              <p className="text-sm text-fg-muted">Total Payments</p>
-              <p className="font-medium text-success">{formatMoney(data.balance.totalPayments)}</p>
+              <p className="text-sm text-fg-muted">{t('family.header.totalPayments')}</p>
+              <p className="font-medium tabular text-success">
+                {formatMoney(data.balance.totalPayments)}
+              </p>
             </div>
             <div>
-              <p className="text-sm text-fg-muted">Lifecycle Events</p>
-              <p className="font-medium text-accent">
+              <p className="text-sm text-fg-muted">{t('family.lifecycleEvents')}</p>
+              <p className="font-medium tabular text-accent">
                 {formatMoney(data.balance.totalLifecyclePayments)}
               </p>
             </div>
             <div>
-              <p className="text-sm text-fg-muted">Plan Cost (Annual)</p>
-              <p className="font-medium text-warning">
+              <p className="text-sm text-fg-muted">{t('family.header.planCostAnnual')}</p>
+              <p className="font-medium tabular text-warning">
                 {formatMoney(-(data.balance.planCost || 0))}
               </p>
             </div>
             {(data.balance.totalCycleCharges || 0) > 0 && (
               <div>
-                <p className="text-sm text-fg-muted">Past Cycle Charges</p>
-                <p className="font-medium text-warning">
+                <p className="text-sm text-fg-muted">{t('family.header.pastCycleCharges')}</p>
+                <p className="font-medium tabular text-warning">
                   {formatMoney(-(data.balance.totalCycleCharges || 0))}
                 </p>
               </div>
@@ -85,11 +91,11 @@ export default function FamilyHeader() {
         )}
         {!isAdmin && (
           <div>
-            <p className="text-sm text-fg-muted">Members</p>
-            <p className="font-medium">{data.members.length}</p>
+            <p className="text-sm text-fg-muted">{t('family.members')}</p>
+            <p className="font-medium tabular">{data.members.length}</p>
           </div>
         )}
       </div>
-    </div>
+    </Card>
   )
 }

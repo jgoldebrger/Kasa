@@ -11,6 +11,8 @@ import {
 } from '@heroicons/react/24/outline'
 import { useToast } from '@/app/components/Toast'
 import {
+  Button,
+  Card,
   DataView,
   EmptyState,
   PageHeader,
@@ -23,8 +25,8 @@ import { useCurrency } from '@/lib/client/useCurrency'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { PAYMENTS_LIST_PAGE_SIZE, parsePaymentsListResponse } from '@/lib/client/payments-list'
-import { Button } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
+import type { MessageKey } from '@/lib/i18n/load-locale'
 
 interface Payment {
   _id: string
@@ -64,11 +66,17 @@ const paymentMethodIcons = {
   quick_pay: BoltIcon,
 }
 
-const paymentMethodLabels = {
-  cash: 'Cash',
-  credit_card: 'Credit Card',
-  check: 'Check',
-  quick_pay: 'Quick Pay',
+const PAYMENT_METHOD_KEYS: Record<Payment['paymentMethod'], MessageKey> = {
+  cash: 'payments.method.cash',
+  credit_card: 'payments.method.credit_card',
+  check: 'payments.method.check',
+  quick_pay: 'payments.method.quick_pay',
+}
+
+const PAYMENT_TYPE_KEYS: Record<Payment['type'], MessageKey> = {
+  membership: 'payments.type.membership',
+  donation: 'payments.type.donation',
+  other: 'payments.type.other',
 }
 
 export default function PaymentsView({
@@ -119,9 +127,9 @@ export default function PaymentsView({
           setAllPayments([])
           setNextCursor(null)
           setError(true)
-          toast.error('Could not load payments.')
+          toast.error(t('payments.error.load'))
         } else {
-          toast.error('Could not load more payments.')
+          toast.error(t('payments.error.loadMore'))
         }
       } finally {
         if (!isStale(gen)) {
@@ -130,7 +138,7 @@ export default function PaymentsView({
         }
       }
     },
-    [toast, begin, isStale],
+    [toast, begin, isStale, t],
   )
 
   useEffect(() => {
@@ -151,181 +159,189 @@ export default function PaymentsView({
     }, [fetchPayments, invalidate]),
   )
 
-  const formatPaymentMethod = (payment: Payment) => {
-    const paymentMethod = payment.paymentMethod || 'cash'
-    const method = paymentMethodLabels[paymentMethod as keyof typeof paymentMethodLabels] || 'Cash'
-    if (paymentMethod === 'credit_card' && payment.ccInfo)
-      return `${method} •••• ${payment.ccInfo.last4}`
-    if (paymentMethod === 'check' && payment.checkInfo)
-      return `${method} #${payment.checkInfo.checkNumber}`
-    return method
-  }
+  const formatPaymentMethod = useCallback(
+    (payment: Payment) => {
+      const paymentMethod = payment.paymentMethod || 'cash'
+      const methodKey = PAYMENT_METHOD_KEYS[paymentMethod as keyof typeof PAYMENT_METHOD_KEYS]
+      const method = methodKey ? t(methodKey) : t('payments.method.cash')
+      if (paymentMethod === 'credit_card' && payment.ccInfo)
+        return `${method} •••• ${payment.ccInfo.last4}`
+      if (paymentMethod === 'check' && payment.checkInfo)
+        return `${method} #${payment.checkInfo.checkNumber}`
+      return method
+    },
+    [t],
+  )
 
   const totalAmount = useMemo(
     () => visiblePayments.reduce((sum, p) => sum + netPaymentAmount(p), 0),
     [visiblePayments],
   )
 
-  const columns: DataColumn<Payment>[] = [
-    {
-      id: 'date',
-      header: 'Date',
-      headerText: 'Date',
-      cell: (p) => formatLocaleDate(p.paymentDate),
-      exportValue: (p) => (p.paymentDate ? new Date(p.paymentDate) : ''),
-      filter: { type: 'dateRange', getValue: (p) => p.paymentDate || null },
-    },
-    {
-      id: 'family',
-      header: 'Family',
-      headerText: 'Family',
-      cell: (p) =>
-        p.familyId ? (
-          <div className="min-w-0">
-            <Link
-              href={`/families/${p.familyId._id}`}
-              className="focus-ring text-accent hover:text-accent-hover font-medium hover:underline rounded"
-            >
-              {p.familyId.name}
-            </Link>
-            {p.familyId.email && (
-              <div className="text-xs text-fg-muted mt-1 truncate">{p.familyId.email}</div>
-            )}
-          </div>
-        ) : (
-          <span className="italic text-fg-muted">(family deleted)</span>
-        ),
-      exportValue: (p) => p.familyId?.name || '',
-      filter: { type: 'select', getValue: (p) => p.familyId?.name || '' },
-    },
-    {
-      id: 'familyEmail',
-      header: 'Family Email',
-      headerText: 'Family Email',
-      defaultHidden: true,
-      cell: (p) => <span className="text-fg-muted text-sm">{p.familyId?.email || '—'}</span>,
-      exportValue: (p) => p.familyId?.email || '',
-    },
-    {
-      id: 'familyPhone',
-      header: 'Family Phone',
-      headerText: 'Family Phone',
-      defaultHidden: true,
-      cell: (p) => (
-        <span className="text-fg-muted text-sm tabular">{p.familyId?.phone || '—'}</span>
-      ),
-      exportValue: (p) => p.familyId?.phone || '',
-    },
-    {
-      id: 'amount',
-      header: 'Amount',
-      headerText: 'Amount',
-      align: 'right',
-      cell: (p) => (
-        <span className="font-semibold text-green-700">{formatMoney(netPaymentAmount(p))}</span>
-      ),
-      exportValue: (p) => netPaymentAmount(p),
-      filter: { type: 'numberRange', getValue: (p) => netPaymentAmount(p) },
-    },
-    {
-      id: 'type',
-      header: 'Type',
-      headerText: 'Type',
-      hideBelow: 'md',
-      cell: (p) => <span className="capitalize">{p.type}</span>,
-      exportValue: (p) => p.type || '',
-      filter: {
-        type: 'multiselect',
-        options: [
-          { value: 'membership', label: 'Membership' },
-          { value: 'donation', label: 'Donation' },
-          { value: 'other', label: 'Other' },
-        ],
+  const columns: DataColumn<Payment>[] = useMemo(
+    () => [
+      {
+        id: 'date',
+        header: t('payments.column.date'),
+        headerText: t('payments.column.date'),
+        cell: (p) => formatLocaleDate(p.paymentDate),
+        exportValue: (p) => (p.paymentDate ? new Date(p.paymentDate) : ''),
+        filter: { type: 'dateRange', getValue: (p) => p.paymentDate || null },
       },
-    },
-    {
-      id: 'method',
-      header: 'Payment Method',
-      headerText: 'Payment Method',
-      hideBelow: 'md',
-      cell: (p) => {
-        const MethodIcon =
-          paymentMethodIcons[p.paymentMethod as keyof typeof paymentMethodIcons] ||
-          CurrencyDollarIcon
-        return (
-          <div>
-            <div className="flex items-center gap-2">
-              <MethodIcon className="h-4 w-4 text-fg-muted" aria-hidden="true" />
-              <span className="text-sm">{formatPaymentMethod(p)}</span>
+      {
+        id: 'family',
+        header: t('payments.column.family'),
+        headerText: t('payments.column.family'),
+        cell: (p) =>
+          p.familyId ? (
+            <div className="min-w-0">
+              <Link
+                href={`/families/${p.familyId._id}`}
+                className="focus-ring text-accent hover:text-accent-hover font-medium hover:underline rounded"
+              >
+                {p.familyId.name}
+              </Link>
+              {p.familyId.email && (
+                <div className="text-xs text-fg-muted mt-1 truncate">{p.familyId.email}</div>
+              )}
             </div>
-            {p.paymentMethod === 'credit_card' && p.ccInfo?.cardType && (
-              <div className="text-xs text-fg-muted mt-1">{p.ccInfo.cardType}</div>
-            )}
-            {p.paymentMethod === 'check' && p.checkInfo?.bankName && (
-              <div className="text-xs text-fg-muted mt-1">{p.checkInfo.bankName}</div>
-            )}
-          </div>
-        )
+          ) : (
+            <span className="italic text-fg-muted">{t('payments.familyDeleted')}</span>
+          ),
+        exportValue: (p) => p.familyId?.name || '',
+        filter: { type: 'select', getValue: (p) => p.familyId?.name || '' },
       },
-      exportValue: (p) => formatPaymentMethod(p),
-      filter: {
-        type: 'multiselect',
-        getValue: (p) => p.paymentMethod || 'cash',
-        options: [
-          { value: 'cash', label: 'Cash' },
-          { value: 'credit_card', label: 'Credit Card' },
-          { value: 'check', label: 'Check' },
-          { value: 'quick_pay', label: 'Quick Pay' },
-        ],
+      {
+        id: 'familyEmail',
+        header: t('payments.column.familyEmail'),
+        headerText: t('payments.column.familyEmail'),
+        defaultHidden: true,
+        cell: (p) => <span className="text-fg-muted text-sm">{p.familyId?.email || '—'}</span>,
+        exportValue: (p) => p.familyId?.email || '',
       },
-    },
-    {
-      id: 'year',
-      header: 'Year',
-      headerText: 'Year',
-      hideBelow: 'lg',
-      cell: (p) => p.year,
-      exportValue: (p) => p.year || '',
-      filter: { type: 'select', getValue: (p) => (p.year ? String(p.year) : '') },
-    },
-    {
-      id: 'notes',
-      header: 'Notes',
-      headerText: 'Notes',
-      hideBelow: 'lg',
-      defaultHidden: true,
-      cell: (p) => <span className="text-fg text-sm">{p.notes || '—'}</span>,
-      exportValue: (p) => p.notes || '',
-    },
-  ]
+      {
+        id: 'familyPhone',
+        header: t('payments.column.familyPhone'),
+        headerText: t('payments.column.familyPhone'),
+        defaultHidden: true,
+        cell: (p) => (
+          <span className="text-fg-muted text-sm tabular">{p.familyId?.phone || '—'}</span>
+        ),
+        exportValue: (p) => p.familyId?.phone || '',
+      },
+      {
+        id: 'amount',
+        header: t('payments.column.amount'),
+        headerText: t('payments.column.amount'),
+        align: 'right',
+        cell: (p) => (
+          <span className="font-semibold text-success tabular">
+            {formatMoney(netPaymentAmount(p))}
+          </span>
+        ),
+        exportValue: (p) => netPaymentAmount(p),
+        filter: { type: 'numberRange', getValue: (p) => netPaymentAmount(p) },
+      },
+      {
+        id: 'type',
+        header: t('payments.column.type'),
+        headerText: t('payments.column.type'),
+        hideBelow: 'md',
+        cell: (p) => <span>{t(PAYMENT_TYPE_KEYS[p.type])}</span>,
+        exportValue: (p) => p.type || '',
+        filter: {
+          type: 'multiselect',
+          options: [
+            { value: 'membership', label: t('payments.type.membership') },
+            { value: 'donation', label: t('payments.type.donation') },
+            { value: 'other', label: t('payments.type.other') },
+          ],
+        },
+      },
+      {
+        id: 'method',
+        header: t('payments.column.method'),
+        headerText: t('payments.column.method'),
+        hideBelow: 'md',
+        cell: (p) => {
+          const MethodIcon =
+            paymentMethodIcons[p.paymentMethod as keyof typeof paymentMethodIcons] ||
+            CurrencyDollarIcon
+          return (
+            <div>
+              <div className="flex items-center gap-2">
+                <MethodIcon className="h-4 w-4 text-fg-muted" aria-hidden="true" />
+                <span className="text-sm">{formatPaymentMethod(p)}</span>
+              </div>
+              {p.paymentMethod === 'credit_card' && p.ccInfo?.cardType && (
+                <div className="text-xs text-fg-muted mt-1">{p.ccInfo.cardType}</div>
+              )}
+              {p.paymentMethod === 'check' && p.checkInfo?.bankName && (
+                <div className="text-xs text-fg-muted mt-1">{p.checkInfo.bankName}</div>
+              )}
+            </div>
+          )
+        },
+        exportValue: (p) => formatPaymentMethod(p),
+        filter: {
+          type: 'multiselect',
+          getValue: (p) => p.paymentMethod || 'cash',
+          options: [
+            { value: 'cash', label: t('payments.method.cash') },
+            { value: 'credit_card', label: t('payments.method.credit_card') },
+            { value: 'check', label: t('payments.method.check') },
+            { value: 'quick_pay', label: t('payments.method.quick_pay') },
+          ],
+        },
+      },
+      {
+        id: 'year',
+        header: t('payments.column.year'),
+        headerText: t('payments.column.year'),
+        hideBelow: 'lg',
+        cell: (p) => p.year,
+        exportValue: (p) => p.year || '',
+        filter: { type: 'select', getValue: (p) => (p.year ? String(p.year) : '') },
+      },
+      {
+        id: 'notes',
+        header: t('payments.column.notes'),
+        headerText: t('payments.column.notes'),
+        hideBelow: 'lg',
+        defaultHidden: true,
+        cell: (p) => <span className="text-fg text-sm">{p.notes || '—'}</span>,
+        exportValue: (p) => p.notes || '',
+      },
+    ],
+    [t, formatMoney, formatPaymentMethod],
+  )
 
   return (
     <div className="min-h-screen p-4 sm:p-6 md:p-8">
       <div className="max-w-7xl mx-auto">
         <PageHeader
-          title="All Payments"
-          subtitle="View and manage all payments across all families."
+          title={t('payments.title')}
+          subtitle={t('payments.subtitle')}
           actions={
             <div className="text-right">
-              <div className="text-xs text-fg-muted">Total Amount</div>
-              <div className="text-2xl sm:text-3xl font-bold text-green-700">
+              <div className="text-xs text-fg-muted">{t('payments.totalAmount')}</div>
+              <div className="text-2xl sm:text-3xl font-bold text-fg tabular">
                 {formatMoney(totalAmount)}
               </div>
             </div>
           }
         />
 
-        {/* Payments list */}
         {loading ? (
-          <div className="surface-card rounded-2xl border border-border p-6">
+          <Card>
             <SkeletonRows count={8} />
-          </div>
+          </Card>
         ) : error ? (
           <EmptyState
             icon={<ExclamationTriangleIcon />}
-            title="Couldn't load payments"
-            description="Check your connection and try again."
-            cta={{ label: 'Retry', onClick: () => fetchPayments() }}
+            title={t('payments.loadError.title')}
+            description={t('payments.loadError.description')}
+            cta={{ label: t('common.retry'), onClick: () => fetchPayments() }}
           />
         ) : (
           <DataView
@@ -334,7 +350,7 @@ export default function PaymentsView({
             columns={columns}
             rowKey={(p) => p._id}
             globalSearch={{
-              placeholder: 'Search family, notes, last 4, check #, date…',
+              placeholder: t('payments.searchPlaceholder'),
               getValue: (p) =>
                 [
                   p.familyId?.name,
@@ -356,7 +372,7 @@ export default function PaymentsView({
                 paymentMethodIcons[p.paymentMethod as keyof typeof paymentMethodIcons] ||
                 CurrencyDollarIcon
               return (
-                <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
+                <Card compact>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       {p.familyId ? (
@@ -367,17 +383,17 @@ export default function PaymentsView({
                           {p.familyId.name}
                         </Link>
                       ) : (
-                        <span className="italic text-fg-muted">(family deleted)</span>
+                        <span className="italic text-fg-muted">{t('payments.familyDeleted')}</span>
                       )}
                       <div className="text-xs text-fg-muted mt-1">
                         {formatLocaleDate(p.paymentDate)} · {p.year}
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-lg font-semibold text-green-700">
+                      <div className="text-lg font-semibold text-success tabular">
                         {formatMoney(netPaymentAmount(p))}
                       </div>
-                      <div className="text-xs text-fg-muted capitalize">{p.type}</div>
+                      <div className="text-xs text-fg-muted">{t(PAYMENT_TYPE_KEYS[p.type])}</div>
                     </div>
                   </div>
                   <div className="mt-2 flex items-center gap-2 text-sm text-fg">
@@ -385,15 +401,15 @@ export default function PaymentsView({
                     {formatPaymentMethod(p)}
                   </div>
                   {p.notes && <p className="mt-2 text-xs text-fg">{p.notes}</p>}
-                </div>
+                </Card>
               )
             }}
             empty={
               <EmptyState
                 icon={<CreditCardIcon />}
-                title="No payments yet"
-                description="Record a payment from a family detail page to see it here."
-                cta={{ label: 'Open Families', href: '/families' }}
+                title={t('payments.empty.title')}
+                description={t('payments.empty.description')}
+                cta={{ label: t('payments.empty.cta'), href: '/families' }}
               />
             }
           />
@@ -411,24 +427,23 @@ export default function PaymentsView({
           </div>
         )}
 
-        {/* Summary Cards reflect the currently filtered set */}
         {!loading && !error && visiblePayments.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mt-6">
-            <SummaryCard label="Total Payments" value={visiblePayments.length} />
+            <SummaryCard label={t('payments.summary.total')} value={visiblePayments.length} />
             <SummaryCard
-              label="Cash"
+              label={t('payments.summary.cash')}
               value={visiblePayments.filter((p) => p.paymentMethod === 'cash').length}
-              tone="text-green-700"
+              tone="text-success"
             />
             <SummaryCard
-              label="Credit Card"
+              label={t('payments.summary.creditCard')}
               value={visiblePayments.filter((p) => p.paymentMethod === 'credit_card').length}
               tone="text-accent"
             />
             <SummaryCard
-              label="Check"
+              label={t('payments.summary.check')}
               value={visiblePayments.filter((p) => p.paymentMethod === 'check').length}
-              tone="text-purple-700"
+              tone="text-fg"
             />
           </div>
         )}
@@ -447,9 +462,9 @@ function SummaryCard({
   tone?: string
 }) {
   return (
-    <div className="surface-card rounded-xl p-4 border border-border">
-      <div className="text-xs sm:text-sm text-fg">{label}</div>
-      <div className={`text-xl sm:text-2xl font-bold ${tone}`}>{value}</div>
-    </div>
+    <Card compact>
+      <div className="text-xs sm:text-sm text-fg-muted">{label}</div>
+      <div className={`text-xl sm:text-2xl font-bold tabular ${tone}`}>{value}</div>
+    </Card>
   )
 }

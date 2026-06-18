@@ -1,24 +1,28 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import Link from 'next/link'
+import { z } from 'zod'
+import { Alert, Button, ButtonLink, Card, Input, Skeleton } from '@/app/components/ui'
+import { useFormState } from '@/lib/client/useFormState'
+import { useT } from '@/lib/client/i18n'
 
 export default function ResetPasswordTokenPage() {
   const router = useRouter()
   const params = useParams<{ token: string }>()
   const token = params.token ?? ''
+  const t = useT()
+
   const [valid, setValid] = useState<boolean | null>(null)
   const [reason, setReason] = useState<string | null>(null)
-  const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     ;(async () => {
       const res = await fetch(`/api/auth/reset-password?token=${encodeURIComponent(token)}`)
+      if (cancelled) return
       if (!res.ok) {
         setValid(false)
         setReason('invalid')
@@ -28,42 +32,57 @@ export default function ResetPasswordTokenPage() {
       setValid(!!data.valid)
       setReason(data.reason || null)
     })()
+    return () => {
+      cancelled = true
+    }
   }, [token])
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters')
-      return
-    }
-    if (password !== confirm) {
-      setError('Passwords do not match')
-      return
-    }
-    setBusy(true)
-    try {
+  const schema = useMemo(
+    () =>
+      z
+        .object({
+          password: z.string().min(8, t('resetPassword.validation.passwordMin')),
+          confirm: z.string().min(8, t('resetPassword.validation.passwordMin')),
+        })
+        .refine((values) => values.password === values.confirm, {
+          message: t('resetPassword.validation.passwordMismatch'),
+          path: ['confirm'],
+        }),
+    [t],
+  )
+
+  const form = useFormState({
+    schema,
+    initialValues: { password: '', confirm: '' },
+    onSubmit: async (values) => {
+      setSubmitError(null)
       const res = await fetch('/api/auth/reset-password', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, newPassword: password }),
+        body: JSON.stringify({ token, newPassword: values.password }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(data.error || 'Failed to reset password')
+        setSubmitError(data.error || t('resetPassword.failed'))
         return
       }
       setDone(true)
       setTimeout(() => router.push('/login'), 1500)
-    } finally {
-      setBusy(false)
-    }
-  }
+    },
+  })
 
   if (valid === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-app">
-        <p className="text-sm text-fg-muted">Verifying token...</p>
+      <div className="min-h-screen flex items-center justify-center p-4 bg-app">
+        <div className="w-full max-w-sm">
+          <div className="text-center mb-8">
+            <Skeleton h={40} w={40} className="mx-auto mb-4 rounded-lg" />
+            <Skeleton h={28} w="70%" className="mx-auto" />
+          </div>
+          <Card className="text-center">
+            <p className="text-sm text-fg-muted">{t('resetPassword.verifying')}</p>
+          </Card>
+        </div>
       </div>
     )
   }
@@ -71,21 +90,17 @@ export default function ResetPasswordTokenPage() {
   if (!valid) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-app">
-        <div className="surface-card p-6 max-w-sm w-full text-center space-y-4">
-          <h1 className="text-base font-semibold text-red-600 dark:text-red-400">
-            Invalid or expired link
-          </h1>
+        <Card className="max-w-sm w-full text-center space-y-4">
+          <h1 className="text-base font-semibold text-danger">{t('resetPassword.invalidTitle')}</h1>
           <p className="text-sm text-fg-muted">
-            This password reset link is no longer valid ({reason || 'unknown'}). Please request a
-            new one.
+            {t('resetPassword.invalidBodyPrefix')}
+            {reason || t('resetPassword.invalidReasonUnknown')}
+            {t('resetPassword.invalidBodySuffix')}
           </p>
-          <Link
-            href="/reset-password"
-            className="inline-block text-accent hover:text-accent-hover font-medium text-sm"
-          >
-            Request a new reset link
-          </Link>
-        </div>
+          <ButtonLink href="/reset-password" variant="secondary" size="sm">
+            {t('resetPassword.requestNewLink')}
+          </ButtonLink>
+        </Card>
       </div>
     )
   }
@@ -97,50 +112,46 @@ export default function ResetPasswordTokenPage() {
           <div className="inline-flex items-center justify-center w-10 h-10 bg-accent text-accent-fg rounded-lg font-semibold mb-4">
             K
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-fg">Set a new password</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-fg">
+            {t('resetPassword.setNewTitle')}
+          </h1>
         </div>
 
         {done ? (
-          <div className="bg-green-50 border border-green-200 text-green-800 dark:bg-green-500/10 dark:border-green-500/30 dark:text-green-300 rounded-lg p-6 text-center text-sm">
-            Password updated. Redirecting to sign-in...
-          </div>
+          <Alert variant="success" className="text-center">
+            {t('resetPassword.successMessage')}
+          </Alert>
         ) : (
-          <form onSubmit={submit} className="surface-card p-6 space-y-5">
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                {error}
-              </div>
-            )}
-            <div>
-              <label className="block text-sm font-medium text-fg mb-1.5">New password</label>
-              <input
+          <Card>
+            <form onSubmit={form.handleSubmit} className="space-y-5" noValidate>
+              {submitError && <Alert variant="danger">{submitError}</Alert>}
+
+              <Input
+                label={t('resetPassword.newPassword')}
                 type="password"
                 required
                 minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg outline-none"
+                autoComplete="new-password"
+                placeholder={t('signup.passwordPlaceholder')}
+                {...form.register('password')}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-fg mb-1.5">Confirm password</label>
-              <input
+
+              <Input
+                label={t('resetPassword.confirmPassword')}
                 type="password"
                 required
                 minLength={8}
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg outline-none"
+                autoComplete="new-password"
+                {...form.register('confirm')}
               />
-            </div>
-            <button
-              type="submit"
-              disabled={busy}
-              className="focus-ring w-full bg-accent text-accent-fg font-medium py-2.5 rounded-md hover:bg-accent-hover disabled:opacity-60"
-            >
-              {busy ? 'Updating...' : 'Update password'}
-            </button>
-          </form>
+
+              <Button type="submit" loading={form.isSubmitting} block size="lg">
+                {form.isSubmitting
+                  ? t('resetPassword.updating')
+                  : t('resetPassword.updatePassword')}
+              </Button>
+            </form>
+          </Card>
         )}
       </div>
     </div>

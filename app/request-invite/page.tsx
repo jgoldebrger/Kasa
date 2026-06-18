@@ -3,11 +3,11 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { z } from 'zod'
-import { Button, Input, Textarea } from '@/app/components/ui'
+import { Button, ButtonLink, Card, Input, Textarea } from '@/app/components/ui'
 import { useFormState } from '@/lib/client/useFormState'
 import { useToast } from '@/app/components/Toast'
 import { useT } from '@/lib/client/i18n'
-import { CheckCircleIcon } from '@heroicons/react/24/outline'
+import { CheckCircleIcon, ChevronLeftIcon } from '@heroicons/react/24/outline'
 
 export default function RequestInvitePage() {
   const [submitted, setSubmitted] = useState(false)
@@ -51,8 +51,12 @@ export default function RequestInvitePage() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-app">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <Link href="/welcome" className="text-sm text-fg-muted hover:text-fg inline-block mb-4">
-            &larr; {t('common.back')}
+          <Link
+            href="/welcome"
+            className="inline-flex items-center justify-center gap-1 text-sm text-fg-muted hover:text-fg mb-4"
+          >
+            <ChevronLeftIcon className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
+            {t('common.back')}
           </Link>
           <div className="inline-flex items-center justify-center w-10 h-10 bg-accent text-accent-fg rounded-lg font-semibold mb-4">
             K
@@ -64,63 +68,64 @@ export default function RequestInvitePage() {
         </div>
 
         {submitted ? (
-          <div className="surface-card p-6 text-center">
+          <Card className="text-center">
             <div
-              className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400 mb-4"
+              className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-success/10 text-success mb-4"
               aria-hidden="true"
             >
               <CheckCircleIcon className="h-6 w-6" />
             </div>
-            <h2 className="text-base font-semibold text-fg mb-2">
+            <h2 className="text-base font-semibold tracking-tight text-fg mb-2">
               {t('requestInvite.thanksTitle')}
             </h2>
-            <p className="text-sm text-fg-muted mb-6">{t('requestInvite.thanksBody')}</p>
-            <Link
-              href="/welcome"
-              className="text-accent hover:text-accent-hover font-medium text-sm"
-            >
-              {t('requestInvite.backHome')}
-            </Link>
-          </div>
-        ) : (
-          <form onSubmit={form.handleSubmit} className="surface-card p-6 space-y-5" noValidate>
-            <Input
-              label={t('signup.fullName')}
-              type="text"
-              required
-              autoComplete="name"
-              placeholder={t('signup.namePlaceholder')}
-              {...form.register('name')}
-            />
-
-            <Input
-              label={t('auth.email')}
-              type="email"
-              required
-              autoComplete="email"
-              placeholder="you@example.com"
-              {...form.register('email')}
-            />
-
-            <Textarea
-              label={t('requestInvite.messageLabel')}
-              hint={t('requestInvite.messageHint')}
-              rows={4}
-              maxLength={1000}
-              {...form.register('message')}
-            />
-
-            <Button type="submit" loading={form.isSubmitting} block size="lg">
-              {t('requestInvite.submit')}
-            </Button>
-
-            <p className="text-sm text-fg-muted text-center">
-              {t('signup.alreadyHaveAccount')}{' '}
-              <Link href="/login" className="text-accent hover:text-accent-hover font-medium">
-                {t('auth.signIn')}
-              </Link>
+            <p className="text-sm text-fg-muted mb-6 leading-relaxed text-pretty">
+              {t('requestInvite.thanksBody')}
             </p>
-          </form>
+            <ButtonLink href="/welcome" variant="ghost" size="sm">
+              {t('requestInvite.backHome')}
+            </ButtonLink>
+          </Card>
+        ) : (
+          <Card>
+            <form onSubmit={form.handleSubmit} className="space-y-5" noValidate>
+              <Input
+                label={t('signup.fullName')}
+                type="text"
+                required
+                autoComplete="name"
+                placeholder={t('signup.namePlaceholder')}
+                {...form.register('name')}
+              />
+
+              <Input
+                label={t('auth.email')}
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="you@example.com"
+                {...form.register('email')}
+              />
+
+              <Textarea
+                label={t('requestInvite.messageLabel')}
+                hint={t('requestInvite.messageHint')}
+                rows={4}
+                maxLength={1000}
+                {...form.register('message')}
+              />
+
+              <Button type="submit" loading={form.isSubmitting} block size="lg">
+                {t('requestInvite.submit')}
+              </Button>
+
+              <p className="text-sm text-fg-muted text-center">
+                {t('signup.alreadyHaveAccount')}{' '}
+                <Link href="/login" className="text-accent hover:text-accent-hover font-medium">
+                  {t('auth.signIn')}
+                </Link>
+              </p>
+            </form>
+          </Card>
         )}
       </div>
     </div>

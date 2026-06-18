@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline'
 import {
   Button,
+  Card,
   DataView,
   EmptyState,
   Select,
@@ -124,14 +125,16 @@ export default function TaxReceiptsPanel() {
     }
   }, [year, fetchRows, begin, invalidate])
 
-  useOrgChanged(useCallback(() => {
-    invalidate()
-    pollGenRef.current += 1
-    setRows([])
-    setEmailJobStatus(null)
-    if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
-    void fetchRows(year)
-  }, [year, fetchRows, invalidate]))
+  useOrgChanged(
+    useCallback(() => {
+      invalidate()
+      pollGenRef.current += 1
+      setRows([])
+      setEmailJobStatus(null)
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
+      void fetchRows(year)
+    }, [year, fetchRows, invalidate]),
+  )
 
   const downloadOne = useCallback(
     async (row: ReceiptRow) => {
@@ -226,42 +229,45 @@ export default function TaxReceiptsPanel() {
     }
   }
 
-  const pollJob = useCallback((jobId: string, total: number) => {
-    if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
-    const pollGen = ++pollGenRef.current
-    const tick = async () => {
-      if (!mountedRef.current || pollGen !== pollGenRef.current) return
-      try {
-        const res = await fetch(`/api/statements/send-emails/status?jobId=${jobId}`)
+  const pollJob = useCallback(
+    (jobId: string, total: number) => {
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
+      const pollGen = ++pollGenRef.current
+      const tick = async () => {
         if (!mountedRef.current || pollGen !== pollGenRef.current) return
-        if (!res.ok) return
-        const data = await res.json().catch(() => ({}))
-        if (!mountedRef.current || pollGen !== pollGenRef.current) return
-        setEmailJobStatus({
-          jobId,
-          processed: Number(data.processed || 0),
-          total: Number(data.totalFamilies || total || 0),
-          sent: Number(data.sent || 0),
-          failed: Number(data.failed || 0),
-          done: !!data.done,
-        })
-        if (!data.done) {
-          if (pollGen === pollGenRef.current) {
-            pollTimerRef.current = setTimeout(tick, 2000)
+        try {
+          const res = await fetch(`/api/statements/send-emails/status?jobId=${jobId}`)
+          if (!mountedRef.current || pollGen !== pollGenRef.current) return
+          if (!res.ok) return
+          const data = await res.json().catch(() => ({}))
+          if (!mountedRef.current || pollGen !== pollGenRef.current) return
+          setEmailJobStatus({
+            jobId,
+            processed: Number(data.processed || 0),
+            total: Number(data.totalFamilies || total || 0),
+            sent: Number(data.sent || 0),
+            failed: Number(data.failed || 0),
+            done: !!data.done,
+          })
+          if (!data.done) {
+            if (pollGen === pollGenRef.current) {
+              pollTimerRef.current = setTimeout(tick, 2000)
+            }
+            return
           }
-          return
+          if (data.failed > 0) {
+            toast.error(`Job complete — ${data.sent} sent, ${data.failed} failed.`)
+          } else {
+            toast.success(`Sent ${data.sent} receipts.`)
+          }
+        } catch (e) {
+          console.error('status poll failed', e)
         }
-        if (data.failed > 0) {
-          toast.error(`Job complete — ${data.sent} sent, ${data.failed} failed.`)
-        } else {
-          toast.success(`Sent ${data.sent} receipts.`)
-        }
-      } catch (e) {
-        console.error('status poll failed', e)
       }
-    }
-    void tick()
-  }, [toast])
+      void tick()
+    },
+    [toast],
+  )
 
   const columns: DataColumn<ReceiptRow>[] = useMemo(
     () => [
@@ -279,7 +285,8 @@ export default function TaxReceiptsPanel() {
         headerText: 'Email',
         cell: (r) => (
           <span className={r.emailOptOut || !r.email ? 'text-fg-muted italic' : 'text-fg'}>
-            {r.email || '(no email)'}{r.emailOptOut ? ' — opted out' : ''}
+            {r.email || '(no email)'}
+            {r.emailOptOut ? ' — opted out' : ''}
           </span>
         ),
         exportValue: (r) => r.email || '',
@@ -325,7 +332,7 @@ export default function TaxReceiptsPanel() {
   )
 
   return (
-    <div className="bg-surface rounded-2xl shadow border border-border">
+    <Card noPadding>
       <div className="p-4 sm:p-6 border-b border-border flex items-end justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-semibold text-fg">Year-end Tax Receipts</h2>
@@ -417,13 +424,11 @@ export default function TaxReceiptsPanel() {
               getValue: (r) => `${r.familyName} ${r.email}`,
             }}
             mobileCard={(r) => (
-              <div className="surface-card p-3 text-sm">
+              <Card compact className="text-sm">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="font-medium text-fg">{r.familyName}</div>
-                    <div className="text-xs text-fg-muted truncate">
-                      {r.email || '(no email)'}
-                    </div>
+                    <div className="text-xs text-fg-muted truncate">{r.email || '(no email)'}</div>
                   </div>
                   <div className="tabular font-semibold text-green-700 dark:text-green-400">
                     {formatMoney(r.totalPaid)}
@@ -440,11 +445,11 @@ export default function TaxReceiptsPanel() {
                     PDF
                   </Button>
                 </div>
-              </div>
+              </Card>
             )}
           />
         )}
       </div>
-    </div>
+    </Card>
   )
 }

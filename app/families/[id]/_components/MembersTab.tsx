@@ -3,11 +3,38 @@
 
 import type { FamilyDetailContextValue } from '../FamilyDetailContext'
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
-import { DataView, EmptyState, SkeletonRows, Button } from '@/app/components/ui'
+import type { ReactNode } from 'react'
+import { DataView, EmptyState, SkeletonRows, Button, Card } from '@/app/components/ui'
 import { calculateHebrewAge, convertToHebrewDate } from '@/lib/hebrew-date'
 import { buildMemberColumns, computeMemberDisplay, planColorForNumber } from '../_lib/helpers'
 import { paymentColumnsFor, paymentMobileCard } from '../_lib/helpers'
 import { useFamilyDetail } from '../FamilyDetailContext'
+
+function InfoSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <Card compact>
+      <h4 className="mb-4 border-b border-border pb-2 text-sm font-semibold text-fg">{title}</h4>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div>
+    </Card>
+  )
+}
+
+function InfoField({
+  label,
+  children,
+  dir,
+}: {
+  label: string
+  children: ReactNode
+  dir?: 'rtl' | 'ltr'
+}) {
+  return (
+    <div className="min-w-0" dir={dir}>
+      <p className="mb-1 text-xs font-medium text-fg-muted">{label}</p>
+      {children}
+    </div>
+  )
+}
 
 function MembersTabContent(props: FamilyDetailContextValue) {
   const {
@@ -162,15 +189,17 @@ function MembersTabContent(props: FamilyDetailContextValue) {
             <div>
               <div className="flex justify-between items-center mb-6">
                 <div>
-                  <button
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="mb-2"
                     onClick={() => {
                       setViewingMemberId(null)
                       setMemberActiveTab('info')
                     }}
-                    className="text-accent hover:text-accent-hover mb-2 flex items-center gap-2"
                   >
                     ← Back to Members List
-                  </button>
+                  </Button>
                   <h3 className="text-xl font-semibold text-fg">
                     {member.firstName} {member.lastName} - Details
                   </h3>
@@ -183,7 +212,7 @@ function MembersTabContent(props: FamilyDetailContextValue) {
                   onClick={() => setMemberActiveTab('info')}
                   className={`px-4 py-2 font-medium transition-colors ${
                     memberActiveTab === 'info'
-                      ? 'text-accent border-b-2 border-blue-600'
+                      ? 'text-accent border-b-2 border-accent'
                       : 'text-fg-muted hover:text-fg'
                   }`}
                 >
@@ -195,7 +224,7 @@ function MembersTabContent(props: FamilyDetailContextValue) {
                       onClick={() => setMemberActiveTab('balance')}
                       className={`px-4 py-2 font-medium transition-colors ${
                         memberActiveTab === 'balance'
-                          ? 'text-accent border-b-2 border-blue-600'
+                          ? 'text-accent border-b-2 border-accent'
                           : 'text-fg-muted hover:text-fg'
                       }`}
                     >
@@ -205,7 +234,7 @@ function MembersTabContent(props: FamilyDetailContextValue) {
                       onClick={() => setMemberActiveTab('payments')}
                       className={`px-4 py-2 font-medium transition-colors ${
                         memberActiveTab === 'payments'
-                          ? 'text-accent border-b-2 border-blue-600'
+                          ? 'text-accent border-b-2 border-accent'
                           : 'text-fg-muted hover:text-fg'
                       }`}
                     >
@@ -215,7 +244,7 @@ function MembersTabContent(props: FamilyDetailContextValue) {
                       onClick={() => setMemberActiveTab('statements')}
                       className={`px-4 py-2 font-medium transition-colors ${
                         memberActiveTab === 'statements'
-                          ? 'text-accent border-b-2 border-blue-600'
+                          ? 'text-accent border-b-2 border-accent'
                           : 'text-fg-muted hover:text-fg'
                       }`}
                     >
@@ -227,152 +256,111 @@ function MembersTabContent(props: FamilyDetailContextValue) {
 
               {memberActiveTab === 'info' && (
                 <div className="space-y-4">
-                  {/* Basic Information */}
-                  <div className="surface-card rounded-lg p-4 border border-border">
-                    <h4 className="text-base font-semibold mb-3 text-fg">Basic Information</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                          First Name
-                        </label>
-                        {renderEditableMemberField(
-                          'firstName',
-                          <p className="text-base font-semibold text-fg">
-                            {member.firstName || (
-                              <span className="text-fg-subtle font-normal">Not provided</span>
-                            )}
-                          </p>,
-                          'name',
-                          member._id,
-                          undefined,
-                        )}
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                          First Name (Hebrew)
-                        </label>
-                        {renderEditableMemberField(
-                          'hebrewFirstName',
-                          <p className="text-base font-semibold text-fg" dir="rtl">
-                            {member.hebrewFirstName || (
-                              <span className="text-fg-subtle font-normal">Not provided</span>
-                            )}
-                          </p>,
-                          'hebrew',
-                          member._id,
-                          undefined,
-                        )}
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                          Last Name
-                        </label>
-                        {renderEditableMemberField(
-                          'lastName',
-                          <p className="text-base font-semibold text-fg">
-                            {member.lastName || (
-                              <span className="text-fg-subtle font-normal">Not provided</span>
-                            )}
-                          </p>,
-                          'name',
-                          member._id,
-                          undefined,
-                        )}
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                          Last Name (Hebrew)
-                        </label>
-                        {renderEditableMemberField(
-                          'hebrewLastName',
-                          <p className="text-base font-semibold text-fg" dir="rtl">
-                            {member.hebrewLastName || (
-                              <span className="text-fg-subtle font-normal">Not provided</span>
-                            )}
-                          </p>,
-                          'hebrew',
-                          member._id,
-                          undefined,
-                        )}
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                          Gender
-                        </label>
-                        {renderEditableMemberField(
-                          'gender',
-                          <p className="text-base font-semibold text-fg capitalize">
-                            {member.gender || (
-                              <span className="text-fg-subtle font-normal">Not provided</span>
-                            )}
-                          </p>,
-                          'select',
-                          member._id,
-                          [
-                            { value: 'male', label: 'Male' },
-                            { value: 'female', label: 'Female' },
-                          ],
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Birth Information */}
-                  <div className="surface-card rounded-lg p-4 border border-border">
-                    <h4 className="text-base font-semibold mb-3 text-fg">Birth Information</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                          Birth Date
-                        </label>
-                        {renderEditableMemberField(
-                          'birthDate',
-                          <p className="text-base font-semibold text-fg">
-                            {member.birthDate ? (
-                              new Date(member.birthDate).toLocaleDateString()
-                            ) : (
-                              <span className="text-fg-subtle font-normal">Not provided</span>
-                            )}
-                          </p>,
-                          'date',
-                          member._id,
-                          undefined,
-                        )}
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                          Hebrew Birth Date (Auto-calculated)
-                        </label>
-                        <div className="border border-border rounded px-3 py-2">
-                          <p className="text-base font-semibold text-fg" dir="rtl">
-                            {displayHebrewDate || (
-                              <span className="text-fg-subtle font-normal">Not provided</span>
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                          Current Age
-                        </label>
-                        <div className="border border-border rounded px-3 py-2">
-                          <p className="text-base font-semibold text-fg">{age} years</p>
-                        </div>
-                      </div>
-                      {member.barMitzvahDate && (
-                        <div>
-                          <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                            Bar/Bat Mitzvah Date
-                          </label>
-                          <div className="border border-border rounded px-3 py-2">
-                            <p className="text-base font-semibold text-fg">
-                              {new Date(member.barMitzvahDate).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
+                  <InfoSection title="Basic Information">
+                    <InfoField label="First Name">
+                      {renderEditableMemberField(
+                        'firstName',
+                        <p className="font-medium text-fg">
+                          {member.firstName || (
+                            <span className="text-fg-subtle font-normal">Not provided</span>
+                          )}
+                        </p>,
+                        'name',
+                        member._id,
+                        undefined,
                       )}
-                    </div>
-                  </div>
+                    </InfoField>
+                    <InfoField label="First Name (Hebrew)" dir="rtl">
+                      {renderEditableMemberField(
+                        'hebrewFirstName',
+                        <p className="font-medium text-fg" dir="rtl">
+                          {member.hebrewFirstName || (
+                            <span className="text-fg-subtle font-normal">Not provided</span>
+                          )}
+                        </p>,
+                        'hebrew',
+                        member._id,
+                        undefined,
+                      )}
+                    </InfoField>
+                    <InfoField label="Last Name">
+                      {renderEditableMemberField(
+                        'lastName',
+                        <p className="font-medium text-fg">
+                          {member.lastName || (
+                            <span className="text-fg-subtle font-normal">Not provided</span>
+                          )}
+                        </p>,
+                        'name',
+                        member._id,
+                        undefined,
+                      )}
+                    </InfoField>
+                    <InfoField label="Last Name (Hebrew)" dir="rtl">
+                      {renderEditableMemberField(
+                        'hebrewLastName',
+                        <p className="font-medium text-fg" dir="rtl">
+                          {member.hebrewLastName || (
+                            <span className="text-fg-subtle font-normal">Not provided</span>
+                          )}
+                        </p>,
+                        'hebrew',
+                        member._id,
+                        undefined,
+                      )}
+                    </InfoField>
+                    <InfoField label="Gender">
+                      {renderEditableMemberField(
+                        'gender',
+                        <p className="font-medium capitalize text-fg">
+                          {member.gender || (
+                            <span className="text-fg-subtle font-normal">Not provided</span>
+                          )}
+                        </p>,
+                        'select',
+                        member._id,
+                        [
+                          { value: 'male', label: 'Male' },
+                          { value: 'female', label: 'Female' },
+                        ],
+                      )}
+                    </InfoField>
+                  </InfoSection>
+
+                  <InfoSection title="Birth Information">
+                    <InfoField label="Birth Date">
+                      {renderEditableMemberField(
+                        'birthDate',
+                        <p className="font-medium text-fg">
+                          {member.birthDate ? (
+                            new Date(member.birthDate).toLocaleDateString()
+                          ) : (
+                            <span className="text-fg-subtle font-normal">Not provided</span>
+                          )}
+                        </p>,
+                        'date',
+                        member._id,
+                        undefined,
+                      )}
+                    </InfoField>
+                    <InfoField label="Hebrew Birth Date (Auto-calculated)" dir="rtl">
+                      <p className="font-medium text-fg" dir="rtl">
+                        {displayHebrewDate || (
+                          <span className="text-fg-subtle font-normal">Not provided</span>
+                        )}
+                      </p>
+                    </InfoField>
+                    <InfoField label="Current Age">
+                      <p className="font-medium text-fg">{age} years</p>
+                    </InfoField>
+                    {member.barMitzvahDate && (
+                      <InfoField label="Bar/Bat Mitzvah Date">
+                        <p className="font-medium text-fg">
+                          {new Date(member.barMitzvahDate).toLocaleDateString()}
+                        </p>
+                      </InfoField>
+                    )}
+                  </InfoSection>
 
                   {/* Marriage Information - Show if age >= 18 or if fields have values */}
                   {(age >= 18 ||
@@ -382,206 +370,164 @@ function MembersTabContent(props: FamilyDetailContextValue) {
                     member.email ||
                     member.address ||
                     member.phone) && (
-                    <div className="surface-card rounded-lg p-4 border border-border">
-                      <h4 className="text-base font-semibold mb-3 text-fg">Marriage Information</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                            Wedding Date
-                          </label>
-                          {renderEditableMemberField(
-                            'weddingDate',
-                            <p className="text-base font-semibold text-fg">
-                              {member.weddingDate ? (
-                                new Date(member.weddingDate).toLocaleDateString()
-                              ) : (
-                                <span className="text-fg-subtle font-normal">Not provided</span>
-                              )}
-                            </p>,
-                            'date',
-                            member._id,
-                            undefined,
-                          )}
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                            Spouse First Name
-                          </label>
-                          {renderEditableMemberField(
-                            'spouseFirstName',
-                            <p className="text-base font-semibold text-fg">
-                              {member.spouseFirstName || (
-                                <span className="text-fg-subtle font-normal">Not provided</span>
-                              )}
-                            </p>,
-                            'name',
-                            member._id,
-                            undefined,
-                          )}
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                            Spouse Hebrew Name
-                          </label>
-                          {renderEditableMemberField(
-                            'spouseHebrewName',
-                            <p className="text-base font-semibold text-fg" dir="rtl">
-                              {member.spouseHebrewName || (
-                                <span className="text-fg-subtle font-normal">Not provided</span>
-                              )}
-                            </p>,
-                            'hebrew',
-                            member._id,
-                            undefined,
-                          )}
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                            Spouse Father's Hebrew Name
-                          </label>
-                          {renderEditableMemberField(
-                            'spouseFatherHebrewName',
-                            <p className="text-base font-semibold text-fg" dir="rtl">
-                              {member.spouseFatherHebrewName || (
-                                <span className="text-fg-subtle font-normal">Not provided</span>
-                              )}
-                            </p>,
-                            'hebrew',
-                            member._id,
-                            undefined,
-                          )}
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                            Spouse Cell Phone
-                          </label>
-                          {renderEditableMemberField(
-                            'spouseCellPhone',
-                            <p className="text-base font-semibold text-fg">
-                              {member.spouseCellPhone || (
-                                <span className="text-fg-subtle font-normal">Not provided</span>
-                              )}
-                            </p>,
-                            'phone',
-                            member._id,
-                            undefined,
-                          )}
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                            Phone
-                          </label>
-                          {renderEditableMemberField(
-                            'phone',
-                            <p className="text-base font-semibold text-fg">
-                              {member.phone || (
-                                <span className="text-fg-subtle font-normal">Not provided</span>
-                              )}
-                            </p>,
-                            'phone',
-                            member._id,
-                            undefined,
-                          )}
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                            Email
-                          </label>
-                          {renderEditableMemberField(
-                            'email',
-                            <p className="text-base font-semibold text-fg">
-                              {member.email || (
-                                <span className="text-fg-subtle font-normal">Not provided</span>
-                              )}
-                            </p>,
-                            'email',
-                            member._id,
-                            undefined,
-                          )}
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                            Address
-                          </label>
-                          {renderEditableMemberField(
-                            'address',
-                            <p className="text-base font-semibold text-fg">
-                              {member.address || (
-                                <span className="text-fg-subtle font-normal">Not provided</span>
-                              )}
-                            </p>,
-                            'name',
-                            member._id,
-                            undefined,
-                          )}
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                            City
-                          </label>
-                          {renderEditableMemberField(
-                            'city',
-                            <p className="text-base font-semibold text-fg">
-                              {member.city || (
-                                <span className="text-fg-subtle font-normal">Not provided</span>
-                              )}
-                            </p>,
-                            'name',
-                            member._id,
-                            undefined,
-                          )}
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                            State
-                          </label>
-                          {renderEditableMemberField(
-                            'state',
-                            <p className="text-base font-semibold text-fg">
-                              {member.state || (
-                                <span className="text-fg-subtle font-normal">Not provided</span>
-                              )}
-                            </p>,
-                            'name',
-                            member._id,
-                            undefined,
-                          )}
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                            ZIP Code
-                          </label>
-                          {renderEditableMemberField(
-                            'zip',
-                            <p className="text-base font-semibold text-fg">
-                              {member.zip || (
-                                <span className="text-fg-subtle font-normal">Not provided</span>
-                              )}
-                            </p>,
-                            'text',
-                            member._id,
-                            undefined,
-                          )}
-                        </div>
-                        {/* Keep spouseName for backward compatibility */}
-                        {member.spouseName && !member.spouseFirstName && (
-                          <div>
-                            <label className="text-xs font-bold text-fg mb-1 block uppercase tracking-wide">
-                              Spouse Name (Legacy)
-                            </label>
-                            {renderEditableMemberField(
-                              'spouseName',
-                              <p className="text-base font-semibold text-fg">
-                                {member.spouseName}
-                              </p>,
-                              'name',
-                              member._id,
-                              undefined,
+                    <InfoSection title="Marriage Information">
+                      <InfoField label="Wedding Date">
+                        {renderEditableMemberField(
+                          'weddingDate',
+                          <p className="font-medium text-fg">
+                            {member.weddingDate ? (
+                              new Date(member.weddingDate).toLocaleDateString()
+                            ) : (
+                              <span className="text-fg-subtle font-normal">Not provided</span>
                             )}
-                          </div>
+                          </p>,
+                          'date',
+                          member._id,
+                          undefined,
                         )}
-                      </div>
-                    </div>
+                      </InfoField>
+                      <InfoField label="Spouse First Name">
+                        {renderEditableMemberField(
+                          'spouseFirstName',
+                          <p className="font-medium text-fg">
+                            {member.spouseFirstName || (
+                              <span className="text-fg-subtle font-normal">Not provided</span>
+                            )}
+                          </p>,
+                          'name',
+                          member._id,
+                          undefined,
+                        )}
+                      </InfoField>
+                      <InfoField label="Spouse Hebrew Name" dir="rtl">
+                        {renderEditableMemberField(
+                          'spouseHebrewName',
+                          <p className="font-medium text-fg" dir="rtl">
+                            {member.spouseHebrewName || (
+                              <span className="text-fg-subtle font-normal">Not provided</span>
+                            )}
+                          </p>,
+                          'hebrew',
+                          member._id,
+                          undefined,
+                        )}
+                      </InfoField>
+                      <InfoField label="Spouse Father's Hebrew Name" dir="rtl">
+                        {renderEditableMemberField(
+                          'spouseFatherHebrewName',
+                          <p className="font-medium text-fg" dir="rtl">
+                            {member.spouseFatherHebrewName || (
+                              <span className="text-fg-subtle font-normal">Not provided</span>
+                            )}
+                          </p>,
+                          'hebrew',
+                          member._id,
+                          undefined,
+                        )}
+                      </InfoField>
+                      <InfoField label="Spouse Cell Phone">
+                        {renderEditableMemberField(
+                          'spouseCellPhone',
+                          <p className="font-medium text-fg">
+                            {member.spouseCellPhone || (
+                              <span className="text-fg-subtle font-normal">Not provided</span>
+                            )}
+                          </p>,
+                          'phone',
+                          member._id,
+                          undefined,
+                        )}
+                      </InfoField>
+                      <InfoField label="Phone">
+                        {renderEditableMemberField(
+                          'phone',
+                          <p className="font-medium text-fg">
+                            {member.phone || (
+                              <span className="text-fg-subtle font-normal">Not provided</span>
+                            )}
+                          </p>,
+                          'phone',
+                          member._id,
+                          undefined,
+                        )}
+                      </InfoField>
+                      <InfoField label="Email">
+                        {renderEditableMemberField(
+                          'email',
+                          <p className="font-medium text-fg">
+                            {member.email || (
+                              <span className="text-fg-subtle font-normal">Not provided</span>
+                            )}
+                          </p>,
+                          'email',
+                          member._id,
+                          undefined,
+                        )}
+                      </InfoField>
+                      <InfoField label="Address">
+                        {renderEditableMemberField(
+                          'address',
+                          <p className="font-medium text-fg">
+                            {member.address || (
+                              <span className="text-fg-subtle font-normal">Not provided</span>
+                            )}
+                          </p>,
+                          'name',
+                          member._id,
+                          undefined,
+                        )}
+                      </InfoField>
+                      <InfoField label="City">
+                        {renderEditableMemberField(
+                          'city',
+                          <p className="font-medium text-fg">
+                            {member.city || (
+                              <span className="text-fg-subtle font-normal">Not provided</span>
+                            )}
+                          </p>,
+                          'name',
+                          member._id,
+                          undefined,
+                        )}
+                      </InfoField>
+                      <InfoField label="State">
+                        {renderEditableMemberField(
+                          'state',
+                          <p className="font-medium text-fg">
+                            {member.state || (
+                              <span className="text-fg-subtle font-normal">Not provided</span>
+                            )}
+                          </p>,
+                          'name',
+                          member._id,
+                          undefined,
+                        )}
+                      </InfoField>
+                      <InfoField label="ZIP Code">
+                        {renderEditableMemberField(
+                          'zip',
+                          <p className="font-medium text-fg">
+                            {member.zip || (
+                              <span className="text-fg-subtle font-normal">Not provided</span>
+                            )}
+                          </p>,
+                          'text',
+                          member._id,
+                          undefined,
+                        )}
+                      </InfoField>
+                      {member.spouseName && !member.spouseFirstName && (
+                        <InfoField label="Spouse Name (Legacy)">
+                          {renderEditableMemberField(
+                            'spouseName',
+                            <p className="font-medium text-fg">{member.spouseName}</p>,
+                            'name',
+                            member._id,
+                            undefined,
+                          )}
+                        </InfoField>
+                      )}
+                    </InfoSection>
                   )}
 
                   {/* Actions */}
@@ -635,22 +581,23 @@ function MembersTabContent(props: FamilyDetailContextValue) {
                   ) : memberBalance ? (
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="surface-card rounded-lg p-6 border border-border">
+                        <Card compact>
                           <p className="text-sm font-medium text-fg-muted mb-1">
                             Plan Cost (Annual)
                           </p>
-                          <p className="text-2xl font-bold text-fg">
+                          <p className="text-2xl font-bold tabular text-fg">
                             {formatMoney(memberBalance.planCost)}
                           </p>
-                        </div>
-                        <div className="surface-card rounded-lg p-6 border border-border">
+                        </Card>
+                        <Card compact>
                           <p className="text-sm font-medium text-fg-muted mb-1">Total Payments</p>
-                          <p className="text-2xl font-bold text-success">
+                          <p className="text-2xl font-bold tabular text-success">
                             {formatMoney(memberBalance.totalPayments)}
                           </p>
-                        </div>
-                        <div
-                          className={`surface-card rounded-lg p-6 border border-border ${memberBalance.balance >= 0 ? 'bg-success/10' : 'bg-danger/10'}`}
+                        </Card>
+                        <Card
+                          compact
+                          className={memberBalance.balance >= 0 ? 'bg-success/10' : 'bg-danger/10'}
                         >
                           <p className="text-sm font-medium text-fg-muted mb-1">Current Balance</p>
                           <p
@@ -658,10 +605,10 @@ function MembersTabContent(props: FamilyDetailContextValue) {
                           >
                             {formatMoney(memberBalance.balance)}
                           </p>
-                        </div>
+                        </Card>
                       </div>
                       {memberBalance.totalLifecyclePayments > 0 && (
-                        <div className="surface-card rounded-lg p-4 border border-border">
+                        <Card compact>
                           <p className="text-sm font-medium text-fg-muted mb-1">
                             Lifecycle Events (Informational)
                           </p>
@@ -671,13 +618,14 @@ function MembersTabContent(props: FamilyDetailContextValue) {
                           <p className="text-xs text-fg-muted mt-1">
                             Note: Lifecycle events are not included in balance calculation
                           </p>
-                        </div>
+                        </Card>
                       )}
                     </div>
                   ) : (
-                    <div className="text-center py-12 glass rounded-xl border border-border">
-                      <p className="text-fg-muted">No balance data available</p>
-                    </div>
+                    <EmptyState
+                      title="No balance data"
+                      description="Balance information is not available for this member."
+                    />
                   )}
                 </div>
               )}
@@ -734,17 +682,15 @@ function MembersTabContent(props: FamilyDetailContextValue) {
                   {loadingMemberFinancials ? (
                     <SkeletonRows count={4} />
                   ) : memberStatements.length === 0 ? (
-                    <div className="text-center py-12 glass rounded-xl border border-border">
-                      <div className="text-4xl mb-4">📄</div>
-                      <p className="text-fg-muted">No statements found for this member.</p>
-                    </div>
+                    <EmptyState
+                      icon="📄"
+                      title="No statements"
+                      description="No statements found for this member."
+                    />
                   ) : (
                     <div className="space-y-4">
                       {memberStatements.map((statement) => (
-                        <div
-                          key={statement._id}
-                          className="glass rounded-xl p-6 border border-border"
-                        >
+                        <Card key={statement._id} compact>
                           <div className="flex justify-between items-start mb-4">
                             <div>
                               <h4 className="font-semibold text-lg">{statement.statementNumber}</h4>
@@ -789,7 +735,7 @@ function MembersTabContent(props: FamilyDetailContextValue) {
                               </p>
                             </div>
                           </div>
-                        </div>
+                        </Card>
                       ))}
                     </div>
                   )}
@@ -846,7 +792,7 @@ function MembersTabContent(props: FamilyDetailContextValue) {
             mobileCard={(m: any) => {
               const info = computeMemberDisplay(m, paymentPlans, getPlanName, formatMoney)
               return (
-                <div className="surface-card p-4">
+                <Card compact>
                   <div className="flex items-start justify-between gap-3">
                     <button
                       onClick={() => setViewingMemberId(viewingMemberId === m._id ? null : m._id)}
@@ -866,7 +812,7 @@ function MembersTabContent(props: FamilyDetailContextValue) {
                         <button
                           onClick={() => handleDeleteMember(m)}
                           aria-label="Delete"
-                          className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-md text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                          className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-md text-danger hover:bg-danger/10"
                         >
                           <TrashIcon className="h-4 w-4" />
                         </button>
@@ -887,7 +833,7 @@ function MembersTabContent(props: FamilyDetailContextValue) {
                       <dd>{info.planText || '—'}</dd>
                     </div>
                   </dl>
-                </div>
+                </Card>
               )
             }}
             empty={

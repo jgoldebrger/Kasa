@@ -10,6 +10,7 @@ import {
   Button,
   Card,
   EmptyState,
+  Input,
   PageHeader,
   SkeletonRows,
 } from '@/app/components/ui'
@@ -251,10 +252,13 @@ export default function InviteRequestsAdminPage() {
                     )}
                   </div>
                   <div className="flex gap-2">
-                    <input
+                    <Input
                       readOnly
                       value={row.signupUrl}
-                      className="flex-1 text-xs bg-surface border border-accent/20 rounded px-2 py-1.5"
+                      labelHidden
+                      aria-label="Signup link"
+                      wrapperClassName="flex-1"
+                      className="text-xs"
                     />
                     <Button size="sm" onClick={() => copy(row.signupUrl!)}>
                       Copy

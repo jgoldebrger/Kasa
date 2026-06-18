@@ -28,6 +28,7 @@ const PATH_TITLE_KEYS: { match: RegExp; key: MessageKey }[] = [
   { match: /^\/statements/, key: 'nav.statements' },
   { match: /^\/settings\/members/, key: 'nav.members' },
   { match: /^\/settings/, key: 'nav.settings' },
+  { match: /^\/account/, key: 'nav.account' },
   { match: /^\/admin/, key: 'nav.admin' },
 ]
 

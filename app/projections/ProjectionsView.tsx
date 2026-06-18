@@ -2,20 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowPathIcon, InformationCircleIcon } from '@heroicons/react/24/outline'
-import { PageHeader, Tooltip } from '@/app/components/ui'
+import { Button, Card, PageHeader, Tooltip } from '@/app/components/ui'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useToast } from '@/app/components/Toast'
-
-/**
- * 20-year dues-recommendation breakdown.
- *
- * Excel-style: rows are years, columns are the inputs and the answer.
- * Each year, the projected member base grows by the historical average of
- * new payers, and the recommended dues are recomputed against that base.
- * Event expenses are held flat (no inflation in v1 — keeps the math honest
- * with the "average from history" framing the user asked for).
- */
+import { useT } from '@/lib/client/i18n'
 
 interface PerEventRow {
   eventTypeId: string
@@ -64,9 +55,12 @@ const DEFAULT_HORIZON = 20
 
 export default function ProjectionsView({ initialRecommendation, initialWindowYears }: Props) {
   const toast = useToast()
+  const t = useT()
   const { format: formatMoney } = useCurrency()
   const currentYear = new Date().getFullYear()
-  const [recommendation, setRecommendation] = useState<DuesRecommendation | null>(initialRecommendation)
+  const [recommendation, setRecommendation] = useState<DuesRecommendation | null>(
+    initialRecommendation,
+  )
   const [windowYears, setWindowYears] = useState<number>(initialWindowYears)
   const [horizon, setHorizon] = useState<number>(
     initialRecommendation?.multiYear.length ?? DEFAULT_HORIZON,
@@ -86,9 +80,6 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
     }
   }, [])
 
-  // Tracks the (window, horizon, startYear) triple the recommendation was
-  // last fetched with. Lets the refetch effect compare against the server's
-  // initial values so we don't double-fetch on mount.
   const initialKey = `${initialWindowYears}|${
     initialRecommendation?.multiYear.length ?? DEFAULT_HORIZON
   }|${initialRecommendation?.multiYear[0]?.year ?? currentYear}`
@@ -106,7 +97,7 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
         if (!res.ok) {
           if (!cancelled?.()) {
             setHasError(true)
-            toast.error('Could not load dues recommendation.')
+            toast.error(t('projections.error.load'))
           }
           return
         }
@@ -123,7 +114,7 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
         if (!cancelled?.() && mountedRef.current) setLoading(false)
       }
     },
-    [toast],
+    [toast, t],
   )
 
   const runRefetch = useCallback(
@@ -143,45 +134,55 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
     }
   }, [windowYears, horizon, startYear, initialKey, initialRecommendation, runRefetch])
 
-  useOrgChanged(useCallback(() => {
-    setRecommendation(null)
-    setHasError(false)
-    runRefetch(windowYears, horizon, startYear)
-  }, [runRefetch, windowYears, horizon, startYear]))
+  useOrgChanged(
+    useCallback(() => {
+      setRecommendation(null)
+      setHasError(false)
+      runRefetch(windowYears, horizon, startYear)
+    }, [runRefetch, windowYears, horizon, startYear]),
+  )
 
   const r = recommendation
   const showBM = r?.chargesBarMitzvahPayers ?? false
+  const yearLabel =
+    r && r.historyYearsSeen === 1 ? t('projections.yearSingular') : t('projections.yearPlural')
 
   return (
     <div className="min-h-screen p-4 sm:p-6 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         <PageHeader
-          title="Dues calculator"
-          subtitle={`${horizon}-year break-even projection. Each year shows how many payers you'll have and what each must pay to cover expected event expenses.`}
+          title={t('projections.title')}
+          subtitle={t('projections.subtitle').replace('{horizon}', String(horizon))}
         />
 
         {!r && !hasError && (
-          <div className="surface-card p-6 text-sm text-fg-muted">Loading projection…</div>
+          <Card>
+            <p className="text-sm text-fg-muted">{t('projections.loading')}</p>
+          </Card>
         )}
 
         {hasError && (
-          <div className="surface-card p-6 border-l-4 border-red-500">
-            <p className="text-sm text-fg">Failed to load the projection.</p>
-            <button
+          <Card className="border-l-4 border-danger">
+            <p className="text-sm text-fg">{t('projections.error.title')}</p>
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-2 px-0"
               onClick={() => refetch(windowYears, horizon, startYear)}
-              className="text-xs text-accent hover:underline mt-2"
             >
-              Try again
-            </button>
-          </div>
+              {t('projections.error.retry')}
+            </Button>
+          </Card>
         )}
 
         {r && (
           <>
-            {/* Controls bar — three knobs grouped left, loading + summary on the right */}
-            <div className="surface-card p-3 sm:p-4 space-y-3 sm:space-y-0 sm:flex sm:flex-wrap sm:items-end sm:gap-6">
-              <ControlGroup label="History window">
+            <Card
+              compact
+              className="space-y-3 sm:space-y-0 sm:flex sm:flex-wrap sm:items-end sm:gap-6"
+            >
+              <ControlGroup label={t('projections.control.historyWindow')}>
                 <div className="flex flex-wrap gap-1">
                   {WINDOW_OPTIONS.map((opt) => (
                     <Chip
@@ -189,33 +190,29 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                       selected={windowYears === opt}
                       onClick={() => setWindowYears(opt)}
                     >
-                      {opt} yr
+                      {opt} {t('projections.control.yearSuffix')}
                     </Chip>
                   ))}
                 </div>
               </ControlGroup>
 
-              <ControlGroup label="Forecast horizon">
+              <ControlGroup label={t('projections.control.forecastHorizon')}>
                 <div className="flex flex-wrap gap-1">
                   {HORIZON_OPTIONS.map((opt) => (
-                    <Chip
-                      key={opt}
-                      selected={horizon === opt}
-                      onClick={() => setHorizon(opt)}
-                    >
-                      {opt} yr
+                    <Chip key={opt} selected={horizon === opt} onClick={() => setHorizon(opt)}>
+                      {opt} {t('projections.control.yearSuffix')}
                     </Chip>
                   ))}
                 </div>
               </ControlGroup>
 
-              <ControlGroup label="Start year">
+              <ControlGroup label={t('projections.control.startYear')}>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setStartYear((y) => Math.max(currentYear - 5, y - 1))}
                     className="text-xs px-2 py-1 rounded border border-border text-fg hover:bg-surface focus-ring"
-                    aria-label="Earlier start year"
+                    aria-label={t('projections.control.earlierYear')}
                   >
                     −
                   </button>
@@ -238,7 +235,7 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                     type="button"
                     onClick={() => setStartYear((y) => Math.min(currentYear + 50, y + 1))}
                     className="text-xs px-2 py-1 rounded border border-border text-fg hover:bg-surface focus-ring"
-                    aria-label="Later start year"
+                    aria-label={t('projections.control.laterYear')}
                   >
                     +
                   </button>
@@ -248,7 +245,7 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                       onClick={() => setStartYear(currentYear)}
                       className="text-xs text-accent hover:underline focus-ring rounded"
                     >
-                      reset
+                      {t('projections.control.reset')}
                     </button>
                   )}
                 </div>
@@ -257,43 +254,60 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
               <div className="sm:ml-auto flex items-center gap-3">
                 {loading && (
                   <span className="inline-flex items-center gap-1 text-xs text-fg-muted">
-                    <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" /> updating…
+                    <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" />{' '}
+                    {t('projections.control.updating')}
                   </span>
                 )}
                 <span className="text-xs text-fg-muted text-right">
-                  Based on {r.historyYearsSeen} year
-                  {r.historyYearsSeen === 1 ? '' : 's'} of event history,
+                  {t('projections.control.historySummary')
+                    .replace('{years}', String(r.historyYearsSeen))
+                    .replace('{yearLabel}', yearLabel)}
                   <br />
-                  {r.avgNewFamiliesPerYear.toFixed(1)} new families/yr
+                  {t('projections.control.newFamilies').replace(
+                    '{count}',
+                    r.avgNewFamiliesPerYear.toFixed(1),
+                  )}
                   {showBM && (
-                    <>, {r.avgNewBarMitzvahsPerYear.toFixed(1)} new bar-mitzvah payers/yr</>
+                    <>
+                      ,{' '}
+                      {t('projections.control.newBmPayers').replace(
+                        '{count}',
+                        r.avgNewBarMitzvahsPerYear.toFixed(1),
+                      )}
+                    </>
                   )}
                   .
                 </span>
               </div>
-            </div>
+            </Card>
 
-            {/* The main event: 20-row Excel-style table */}
-            <section className="surface-card p-0 overflow-hidden" aria-label="20-year projection">
+            <Card
+              noPadding
+              aria-label={t('projections.table.ariaLabel').replace('{horizon}', String(horizon))}
+            >
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border-collapse">
                   <thead>
                     <tr className="bg-app-subtle border-b-2 border-border text-fg-muted text-xs uppercase tracking-wide">
                       <th className="text-left px-3 py-2 sticky left-0 bg-app-subtle z-10">
-                        Year
+                        {t('projections.table.year')}
                       </th>
-                      <th className="text-right px-3 py-2">Families</th>
-                      {showBM && <th className="text-right px-3 py-2">BM payers</th>}
-                      <th className="text-right px-3 py-2">Total payers</th>
-                      <th className="text-right px-3 py-2">Expected expenses</th>
+                      <th className="text-right px-3 py-2">{t('projections.table.families')}</th>
+                      {showBM && (
+                        <th className="text-right px-3 py-2">{t('projections.table.bmPayers')}</th>
+                      )}
+                      <th className="text-right px-3 py-2">{t('projections.table.totalPayers')}</th>
+                      <th className="text-right px-3 py-2">
+                        {t('projections.table.expectedExpenses')}
+                      </th>
                       <th className="text-right px-3 py-2 bg-accent/5">
                         <span className="inline-flex items-center justify-end gap-1">
-                          Recommended dues / payer
-                          <Tooltip content="Planning estimate — assumes flat event costs and linear growth.">
+                          {t('projections.table.recommendedDues')}
+                          <Tooltip content={t('projections.table.duesTooltip')}>
                             <button
                               type="button"
                               className="text-fg-subtle hover:text-fg-muted focus-ring rounded normal-case"
-                              aria-label="About recommended dues"
+                              aria-label={t('projections.table.duesAria')}
                             >
                               <InformationCircleIcon className="h-3.5 w-3.5" aria-hidden="true" />
                             </button>
@@ -313,15 +327,15 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                             isCurrent
                               ? 'bg-accent/5 font-medium'
                               : isFifth
-                              ? 'bg-app-subtle/40'
-                              : ''
+                                ? 'bg-app-subtle/40'
+                                : ''
                           }`}
                         >
                           <td className="text-left px-3 py-1.5 sticky left-0 bg-inherit tabular text-fg">
                             {row.year}
                             {isCurrent && (
                               <span className="ml-2 text-[10px] uppercase tracking-wide text-accent">
-                                this year
+                                {t('projections.table.thisYear')}
                               </span>
                             )}
                           </td>
@@ -354,99 +368,137 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                   </tbody>
                 </table>
               </div>
-            </section>
+            </Card>
 
-            {/* How this is calculated (formula + per-event breakdown, collapsed by default) */}
-            <details className="surface-card border border-border rounded-lg" aria-label="Calculation breakdown">
-              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-fg focus-ring rounded-lg">
-                How is this calculated?
-              </summary>
-              <div className="border-t border-border p-4 sm:p-6 space-y-4">
-              <p className="text-xs text-fg-muted">
-                Formulas live in{' '}
-                <code className="rounded bg-app-subtle px-1 py-0.5 text-xs text-fg">lib/projections.ts</code>.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2 text-xs text-fg-muted">
-                  <p className="text-fg">
-                    <span className="font-medium">Recommended dues</span> ={' '}
-                    <span className="tabular">expected event expenses ÷ total payers that year</span>
+            <details>
+              <Card
+                compact
+                className="overflow-hidden p-0"
+                aria-label={t('projections.howCalculated')}
+              >
+                <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-fg focus-ring">
+                  {t('projections.howCalculated')}
+                </summary>
+                <div className="border-t border-border p-4 sm:p-6 space-y-4">
+                  <p className="text-xs text-fg-muted">
+                    {t('projections.how.formulasIn')}{' '}
+                    <code className="rounded bg-app-subtle px-1 py-0.5 text-xs text-fg">
+                      lib/projections.ts
+                    </code>
+                    .
                   </p>
-                  <p>
-                    <span className="font-medium text-fg">Expected event expenses</span> ={' '}
-                    {formatMoney(r.expectedAnnualEventExpense)} — for each lifecycle event, the average
-                    historical count per year times the event's current cost, summed. Constant
-                    across all forecast years (no inflation).
-                  </p>
-                  <p>
-                    <span className="font-medium text-fg">Total payers per year</span> = current
-                    families ({r.currentFamilies})
-                    {showBM && (
-                      <> + current bar-mitzvah-aged payers ({r.currentBarMitzvahPayers})</>
-                    )}
-                    , growing each year by the historical average:{' '}
-                    +{r.avgNewFamiliesPerYear.toFixed(1)} families
-                    {showBM && <> and +{r.avgNewBarMitzvahsPerYear.toFixed(1)} BM payers</>}.
-                  </p>
-                  {!showBM && (
-                    <p className="pt-1 border-t border-border">
-                      Your organization doesn't auto-assign a plan to bar-mitzvah-aged males, so
-                      only families count as payers. To enable that, configure "Bar Mitzvah
-                      auto-assign plan" on the organization settings.
-                    </p>
-                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2 text-xs text-fg-muted">
+                      <p className="text-fg">
+                        <span className="font-medium">{t('projections.how.recommendedDues')}</span>{' '}
+                        ={' '}
+                        <span className="tabular">
+                          {t('projections.how.recommendedDuesFormula')}
+                        </span>
+                      </p>
+                      <p>
+                        <span className="font-medium text-fg">
+                          {t('projections.how.expectedExpenses')}
+                        </span>{' '}
+                        {formatMoney(r.expectedAnnualEventExpense)}{' '}
+                        {t('projections.how.expectedExpensesDesc')}
+                      </p>
+                      <p>
+                        <span className="font-medium text-fg">
+                          {t('projections.how.totalPayers')}
+                        </span>{' '}
+                        ={' '}
+                        {t('projections.how.currentFamilies').replace(
+                          '{count}',
+                          String(r.currentFamilies),
+                        )}
+                        {showBM && (
+                          <>
+                            {' '}
+                            +{' '}
+                            {t('projections.how.currentBmPayers').replace(
+                              '{count}',
+                              String(r.currentBarMitzvahPayers),
+                            )}
+                          </>
+                        )}
+                        , {t('projections.how.growthNote')}{' '}
+                        {t('projections.how.newFamiliesGrowth').replace(
+                          '{count}',
+                          r.avgNewFamiliesPerYear.toFixed(1),
+                        )}
+                        {showBM && (
+                          <>
+                            {' '}
+                            {t('projections.how.newBmGrowth').replace(
+                              '{count}',
+                              r.avgNewBarMitzvahsPerYear.toFixed(1),
+                            )}
+                          </>
+                        )}
+                        .
+                      </p>
+                      {!showBM && (
+                        <p className="pt-1 border-t border-border">
+                          {t('projections.how.noBmNote')}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-xs font-semibold text-fg uppercase tracking-wide">
+                        {t('projections.how.eventExpenses')}
+                      </h3>
+                      {r.perEvent.length === 0 ? (
+                        <p className="text-xs text-fg-muted">
+                          {t('projections.how.noEvents')}{' '}
+                          <a
+                            href="/settings?tab=eventTypes"
+                            className="text-accent hover:underline"
+                          >
+                            {t('projections.how.settingsLink')}
+                          </a>
+                          .
+                        </p>
+                      ) : (
+                        <table className="w-full text-xs">
+                          <thead className="text-fg-muted">
+                            <tr>
+                              <th className="text-left py-1">{t('projections.how.eventColumn')}</th>
+                              <th className="text-right py-1">{t('projections.how.avgPerYear')}</th>
+                              <th className="text-right py-1">{t('projections.how.cost')}</th>
+                              <th className="text-right py-1">{t('projections.how.total')}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {r.perEvent.map((e) => (
+                              <tr key={e.eventTypeId} className="border-t border-border">
+                                <td className="py-1 text-fg">{e.name}</td>
+                                <td className="py-1 text-right tabular text-fg">
+                                  {e.historicalAvgCount.toFixed(1)}
+                                </td>
+                                <td className="py-1 text-right tabular text-fg-muted">
+                                  {formatMoney(e.currentCost)}
+                                </td>
+                                <td className="py-1 text-right tabular font-medium text-fg">
+                                  {formatMoney(e.expectedExpense)}
+                                </td>
+                              </tr>
+                            ))}
+                            <tr className="border-t-2 border-border">
+                              <td className="py-1 font-semibold text-fg" colSpan={3}>
+                                {t('projections.how.total')}
+                              </td>
+                              <td className="py-1 text-right tabular font-bold text-fg">
+                                {formatMoney(r.expectedAnnualEventExpense)}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-xs font-semibold text-fg uppercase tracking-wide">
-                    Event expenses
-                  </h3>
-                  {r.perEvent.length === 0 ? (
-                    <p className="text-xs text-fg-muted">
-                      No lifecycle events configured. Add some on{' '}
-                      <a href="/settings?tab=eventTypes" className="text-accent hover:underline">
-                        Settings → Event Types
-                      </a>
-                      .
-                    </p>
-                  ) : (
-                    <table className="w-full text-xs">
-                      <thead className="text-fg-muted">
-                        <tr>
-                          <th className="text-left py-1">Event</th>
-                          <th className="text-right py-1">Avg/yr</th>
-                          <th className="text-right py-1">Cost</th>
-                          <th className="text-right py-1">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {r.perEvent.map((e) => (
-                          <tr key={e.eventTypeId} className="border-t border-border">
-                            <td className="py-1 text-fg">{e.name}</td>
-                            <td className="py-1 text-right tabular text-fg">
-                              {e.historicalAvgCount.toFixed(1)}
-                            </td>
-                            <td className="py-1 text-right tabular text-fg-muted">
-                              {formatMoney(e.currentCost)}
-                            </td>
-                            <td className="py-1 text-right tabular font-medium text-fg">
-                              {formatMoney(e.expectedExpense)}
-                            </td>
-                          </tr>
-                        ))}
-                        <tr className="border-t-2 border-border">
-                          <td className="py-1 font-semibold text-fg" colSpan={3}>
-                            Total
-                          </td>
-                          <td className="py-1 text-right tabular font-bold text-fg">
-                            {formatMoney(r.expectedAnnualEventExpense)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-              </div>
+              </Card>
             </details>
           </>
         )}
@@ -458,9 +510,7 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
 function ControlGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <div className="text-[10px] uppercase tracking-wide text-fg-muted font-medium">
-        {label}
-      </div>
+      <div className="text-[10px] uppercase tracking-wide text-fg-muted font-medium">{label}</div>
       {children}
     </div>
   )
@@ -492,7 +542,6 @@ function Chip({
 
 function fmt(n: number): string {
   if (!Number.isFinite(n)) return '0'
-  // Whole-number friendly for whole values, one decimal otherwise.
   if (Math.abs(n - Math.round(n)) < 1e-6) return String(Math.round(n))
   return n.toFixed(1)
 }

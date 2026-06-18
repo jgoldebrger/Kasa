@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import Link from 'next/link'
 import { z } from 'zod'
-import { Button, Input } from '@/app/components/ui'
+import { Button, Card, Input } from '@/app/components/ui'
 import { useFormState } from '@/lib/client/useFormState'
 import { useToast } from '@/app/components/Toast'
 import { useT } from '@/lib/client/i18n'
@@ -133,80 +133,84 @@ function LoginForm() {
         </div>
 
         {twoFactorStep ? (
-          <form onSubmit={submitTwoFactor} className="surface-card p-6 space-y-5" noValidate>
-            <div className="text-sm text-fg-muted">
-              <span className="text-fg font-medium">{twoFactorStep.email}</span>
-              {' — '}
-              {t('auth.2faPrompt')}
-            </div>
-            <Input
-              label={t('auth.2faTitle')}
-              required
-              inputMode="text"
-              autoComplete="one-time-code"
-              autoFocus
-              placeholder="123456 / XXXX-XXXX"
-              value={totpCode}
-              onChange={(e) => setTotpCode(e.target.value)}
-            />
-            <Button type="submit" loading={twoFactorBusy} block size="lg">
-              {t('auth.verify')}
-            </Button>
-            <button
-              type="button"
-              onClick={() => {
-                setTwoFactorStep(null)
-                setTotpCode('')
-              }}
-              className="block w-full text-center text-sm text-accent hover:text-accent-hover"
-            >
-              {t('auth.back')}
-            </button>
-          </form>
+          <Card>
+            <form onSubmit={submitTwoFactor} className="space-y-5" noValidate>
+              <div className="text-sm text-fg-muted">
+                <span className="text-fg font-medium">{twoFactorStep.email}</span>
+                {' — '}
+                {t('auth.2faPrompt')}
+              </div>
+              <Input
+                label={t('auth.2faTitle')}
+                required
+                inputMode="text"
+                autoComplete="one-time-code"
+                autoFocus
+                placeholder="123456 / XXXX-XXXX"
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value)}
+              />
+              <Button type="submit" loading={twoFactorBusy} block size="lg">
+                {t('auth.verify')}
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTwoFactorStep(null)
+                  setTotpCode('')
+                }}
+                className="block w-full text-center text-sm text-accent hover:text-accent-hover"
+              >
+                {t('auth.back')}
+              </button>
+            </form>
+          </Card>
         ) : (
-          <form onSubmit={form.handleSubmit} className="surface-card p-6 space-y-5" noValidate>
-            <Input
-              label={t('auth.email')}
-              type="email"
-              required
-              autoComplete="email"
-              placeholder="you@example.com"
-              {...form.register('email')}
-            />
+          <Card>
+            <form onSubmit={form.handleSubmit} className="space-y-5" noValidate>
+              <Input
+                label={t('auth.email')}
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="you@example.com"
+                {...form.register('email')}
+              />
 
-            <Input
-              label={t('auth.password')}
-              type="password"
-              required
-              autoComplete="current-password"
-              placeholder="••••••••"
-              {...form.register('password')}
-            />
+              <Input
+                label={t('auth.password')}
+                type="password"
+                required
+                autoComplete="current-password"
+                placeholder="••••••••"
+                {...form.register('password')}
+              />
 
-            <Button type="submit" loading={form.isSubmitting} block size="lg">
-              {t('auth.signIn')}
-            </Button>
+              <Button type="submit" loading={form.isSubmitting} block size="lg">
+                {t('auth.signIn')}
+              </Button>
 
-            <div className="text-sm text-fg-muted text-center space-y-1">
-              <p>
-                {t('auth.noAccount')}{' '}
-                <Link
-                  href="/request-invite"
-                  className="text-accent hover:text-accent-hover font-medium"
-                >
-                  {t('auth.requestInvite')}
-                </Link>
-              </p>
-              <p>
-                <Link
-                  href="/reset-password"
-                  className="text-accent hover:text-accent-hover font-medium"
-                >
-                  {t('auth.forgotPassword')}
-                </Link>
-              </p>
-            </div>
-          </form>
+              <div className="text-sm text-fg-muted text-center space-y-1">
+                <p>
+                  {t('auth.noAccount')}{' '}
+                  <Link
+                    href="/request-invite"
+                    className="text-accent hover:text-accent-hover font-medium"
+                  >
+                    {t('auth.requestInvite')}
+                  </Link>
+                </p>
+                <p>
+                  <Link
+                    href="/reset-password"
+                    className="text-accent hover:text-accent-hover font-medium"
+                  >
+                    {t('auth.forgotPassword')}
+                  </Link>
+                </p>
+              </div>
+            </form>
+          </Card>
         )}
       </div>
     </div>

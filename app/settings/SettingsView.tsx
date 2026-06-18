@@ -9,7 +9,8 @@ import { cachedFetch, invalidate as invalidateCache } from '@/lib/client-cache'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { isFiniteDate } from '@/lib/date-utils'
-import { PageHeader, SkeletonRows } from '@/app/components/ui'
+import { PageHeader, SkeletonRows, Card, Input, Modal, Button } from '@/app/components/ui'
+import { useT } from '@/lib/client/i18n'
 import SettingsNav, { type SettingsTabId } from '@/app/components/settings/SettingsNav'
 import PanelSkeleton from './panels/PanelSkeleton'
 import type { BillingSnapshot } from '@/app/components/settings/BillingPanel'
@@ -98,10 +99,9 @@ const DynamicLabelsPanel = dynamic(() => import('./panels/LabelsPanel'), {
 const DynamicActivityPanel = dynamic(() => import('./panels/ActivityPanel'), {
   loading: () => <PanelSkeleton />,
 })
-const DynamicLetterheadPanel = dynamic(
-  () => import('@/app/components/settings/LetterheadPanel'),
-  { loading: () => <PanelSkeleton /> },
-)
+const DynamicLetterheadPanel = dynamic(() => import('@/app/components/settings/LetterheadPanel'), {
+  loading: () => <PanelSkeleton />,
+})
 const DynamicMembersPanel = dynamic(() => import('@/app/components/settings/MembersPanel'), {
   loading: () => <PanelSkeleton />,
 })
@@ -138,6 +138,7 @@ export default function SettingsView({
 }: SettingsViewProps = {}) {
   const confirm = useConfirm()
   const toast = useToast()
+  const t = useT()
   const { format: formatMoney, symbol: currencySymbol } = useCurrency()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -214,7 +215,7 @@ export default function SettingsView({
     },
     [router],
   )
-  
+
   // Email Configuration state. When the server provided initial data we
   // seed both the config and the form so the email-tab form is pre-filled
   // on first paint (no skeleton flash).
@@ -235,7 +236,7 @@ export default function SettingsView({
   const [emailFormData, setEmailFormData] = useState({
     email: seededEmailConfig?.email || '',
     password: '',
-    fromName: seededEmailConfig?.fromName || 'Kasa Family Management'
+    fromName: seededEmailConfig?.fromName || 'Kasa Family Management',
   })
   // Inline status messages were replaced with toast notifications.
   // This shim keeps the existing call-sites compiling while routing the
@@ -245,7 +246,7 @@ export default function SettingsView({
     if (msg.type === 'success') toast.success(msg.text)
     else toast.error(msg.text)
   }
-  
+
   // Event Types state
   const hasInitialEventTypes = initialEventTypes !== undefined
   const seededEventTypes = hasInitialEventTypes
@@ -258,7 +259,7 @@ export default function SettingsView({
   const [eventTypeFormData, setEventTypeFormData] = useState({
     type: '',
     name: '',
-    amount: ''
+    amount: '',
   })
 
   // Payment Plans state
@@ -272,9 +273,10 @@ export default function SettingsView({
   // parsing to a number on every keystroke turned "12." into 12 and
   // ate the decimal point. The numeric coercion happens at submit time
   // (see `handleSubmitPlan`).
-  const [planFormData, setPlanFormData] = useState<{ name: string; yearlyPrice: string }>(
-    { name: '', yearlyPrice: '0' },
-  )
+  const [planFormData, setPlanFormData] = useState<{ name: string; yearlyPrice: string }>({
+    name: '',
+    yearlyPrice: '0',
+  })
 
   const resetEventTypeForm = useCallback(() => {
     setEventTypeFormData({ type: '', name: '', amount: '' })
@@ -329,14 +331,13 @@ export default function SettingsView({
     cycleAutoRollover: boolean
     description: string
   }>({
-    cycleCalendar:
-      initialCycleConfig?.cycleCalendar === 'hebrew' ? 'hebrew' : 'gregorian',
+    cycleCalendar: initialCycleConfig?.cycleCalendar === 'hebrew' ? 'hebrew' : 'gregorian',
     cycleStartMonth: initialCycleConfig?.cycleStartMonth || 9,
     cycleStartDay: initialCycleConfig?.cycleStartDay || 1,
     cycleStartHebrewMonth: initialCycleConfig?.cycleStartHebrewMonth || 7, // Tishrei
     cycleStartHebrewDay: initialCycleConfig?.cycleStartHebrewDay || 1,
     cycleAutoRollover: Boolean(initialCycleConfig?.cycleAutoRollover),
-    description: initialCycleConfig?.description || 'Membership cycle start date'
+    description: initialCycleConfig?.description || 'Membership cycle start date',
   })
 
   // Automation config (Bar Mitzvah auto-assign) state. Fetched lazily on
@@ -399,7 +400,9 @@ export default function SettingsView({
   const [auditResourceTypeFilter, setAuditResourceTypeFilter] = useState<string>('')
   const [auditFromDate, setAuditFromDate] = useState<string>('')
   const [auditToDate, setAuditToDate] = useState<string>('')
-  const [auditUsersMap, setAuditUsersMap] = useState<Record<string, { name?: string; email?: string }>>({})
+  const [auditUsersMap, setAuditUsersMap] = useState<
+    Record<string, { name?: string; email?: string }>
+  >({})
 
   // StrictMode-safe mount latch. Each ref starts as `true` for whichever
   // dataset the server provided so the corresponding fetch is skipped on
@@ -426,81 +429,83 @@ export default function SettingsView({
   const settingsFetchGenRef = useRef(0)
   const [orgFetchEpoch, setOrgFetchEpoch] = useState(0)
 
-  useOrgChanged(useCallback(() => {
-    // Bump the shared fetch-generation ONCE — fetchers below capture the
-    // post-bump value and bail if a *subsequent* org change invalidates
-    // them. (Previously each fetcher also bumped the counter, which made
-    // 4 of every 5 parallel fetches bail.)
-    settingsFetchGenRef.current += 1
-    hasFetchedEmailRef.current = false
-    hasFetchedEventTypesRef.current = false
-    hasFetchedPlansRef.current = false
-    hasFetchedCycleRef.current = false
-    hasFetchedKevittelRef.current = false
-    hasFetchedAutomationRef.current = false
-    hasFetchedLetterheadRef.current = false
-    hasFetchedLabelsRef.current = false
-    hasFetchedAuditRef.current = false
-    // Reset role gating + force the /api/org-members refetch — without
-    // this, tab gates (Members / Trash / Activity / privileged content)
-    // reflect the PREVIOUS org's role until the user opens Members.
-    hasFetchedRoleRef.current = false
-    setCurrentRole(null)
-    // Reset the "kevittel/labels was capped" warning so it can fire
-    // again for the newly switched-in org if that org is also large.
-    cancelledKevittelWarningRef.current = false
-    cancelledLabelsWarningRef.current = false
-    setEventTypes([])
-    setPlans([])
-    setCycleConfig(null)
-    setKevittelFamilies([])
-    setLabelFamilies([])
-    setAuditItems([])
-    setAuditNextCursor(null)
-    setAuditUsersMap({})
-    // Clear org-scoped form/config so the user can't briefly interact
-    // with the previous org's email or letterhead/automation state.
-    setEmailConfig(null)
-    setEmailFormData({ email: '', password: '', fromName: 'Kasa Family Management' })
-    setLoading(true)
-    setEventTypesLoading(true)
-    setPlansLoading(true)
-    setCycleLoading(true)
-    setKevittelLoading(true)
-    setAutomationConfig({
-      barMitzvahAutoAssignPlanId: null,
-      barMitzvahAutoCreateEventTypeId: null,
-      weddingConversionDefaultPlanId: null,
-      monthlyStatementAutoGenerate: false,
-      monthlyStatementAutoEmail: false,
-      monthlyStatementCalendar: 'gregorian',
-      monthlyStatementDay: 1,
-      monthlyStatementHebrewDay: 1,
-    })
-    setLetterhead(EMPTY_LETTERHEAD)
-    setLetterheadLoading(true)
-    setAutomationLoading(true)
-    setLabelsLoading(true)
-    setOrgFetchEpoch((e) => e + 1)
-    invalidateCache(/.*/)
-    // Refetch role separately — it's a tiny call and we want tab gates
-    // updated before the user clicks anything.
-    void (async () => {
-      try {
-        const res = await fetch('/api/org-members')
-        if (!res.ok) return
-        const data = await res.json().catch(() => ({}))
-        const role = data?.currentUserRole
-        if (role === 'owner' || role === 'admin' || role === 'member') {
-          setCurrentRole(role)
+  useOrgChanged(
+    useCallback(() => {
+      // Bump the shared fetch-generation ONCE — fetchers below capture the
+      // post-bump value and bail if a *subsequent* org change invalidates
+      // them. (Previously each fetcher also bumped the counter, which made
+      // 4 of every 5 parallel fetches bail.)
+      settingsFetchGenRef.current += 1
+      hasFetchedEmailRef.current = false
+      hasFetchedEventTypesRef.current = false
+      hasFetchedPlansRef.current = false
+      hasFetchedCycleRef.current = false
+      hasFetchedKevittelRef.current = false
+      hasFetchedAutomationRef.current = false
+      hasFetchedLetterheadRef.current = false
+      hasFetchedLabelsRef.current = false
+      hasFetchedAuditRef.current = false
+      // Reset role gating + force the /api/org-members refetch — without
+      // this, tab gates (Members / Trash / Activity / privileged content)
+      // reflect the PREVIOUS org's role until the user opens Members.
+      hasFetchedRoleRef.current = false
+      setCurrentRole(null)
+      // Reset the "kevittel/labels was capped" warning so it can fire
+      // again for the newly switched-in org if that org is also large.
+      cancelledKevittelWarningRef.current = false
+      cancelledLabelsWarningRef.current = false
+      setEventTypes([])
+      setPlans([])
+      setCycleConfig(null)
+      setKevittelFamilies([])
+      setLabelFamilies([])
+      setAuditItems([])
+      setAuditNextCursor(null)
+      setAuditUsersMap({})
+      // Clear org-scoped form/config so the user can't briefly interact
+      // with the previous org's email or letterhead/automation state.
+      setEmailConfig(null)
+      setEmailFormData({ email: '', password: '', fromName: 'Kasa Family Management' })
+      setLoading(true)
+      setEventTypesLoading(true)
+      setPlansLoading(true)
+      setCycleLoading(true)
+      setKevittelLoading(true)
+      setAutomationConfig({
+        barMitzvahAutoAssignPlanId: null,
+        barMitzvahAutoCreateEventTypeId: null,
+        weddingConversionDefaultPlanId: null,
+        monthlyStatementAutoGenerate: false,
+        monthlyStatementAutoEmail: false,
+        monthlyStatementCalendar: 'gregorian',
+        monthlyStatementDay: 1,
+        monthlyStatementHebrewDay: 1,
+      })
+      setLetterhead(EMPTY_LETTERHEAD)
+      setLetterheadLoading(true)
+      setAutomationLoading(true)
+      setLabelsLoading(true)
+      setOrgFetchEpoch((e) => e + 1)
+      invalidateCache(/.*/)
+      // Refetch role separately — it's a tiny call and we want tab gates
+      // updated before the user clicks anything.
+      void (async () => {
+        try {
+          const res = await fetch('/api/org-members')
+          if (!res.ok) return
+          const data = await res.json().catch(() => ({}))
+          const role = data?.currentUserRole
+          if (role === 'owner' || role === 'admin' || role === 'member') {
+            setCurrentRole(role)
+          }
+          hasFetchedRoleRef.current = true
+        } catch {
+          /* tab gating stays restrictive until next interaction */
         }
-        hasFetchedRoleRef.current = true
-      } catch {
-        /* tab gating stays restrictive until next interaction */
-      }
-    })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []))
+      })()
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  )
 
   // Refresh Kevittel data when switching to the Kevittel tab
   useEffect(() => {
@@ -577,19 +582,19 @@ export default function SettingsView({
       const res = await fetch('/api/email-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(emailFormData)
+        body: JSON.stringify(emailFormData),
       })
 
       const result = await res.json().catch(() => ({}))
 
       if (res.ok) {
         setEmailConfig(result)
-        setEmailFormData(prev => ({ ...prev, password: '' }))
-        setMessage({ 
-          type: 'success', 
-          text: emailConfig 
-            ? 'Email configuration updated successfully!' 
-            : 'Email configuration saved successfully!' 
+        setEmailFormData((prev) => ({ ...prev, password: '' }))
+        setMessage({
+          type: 'success',
+          text: emailConfig
+            ? 'Email configuration updated successfully!'
+            : 'Email configuration saved successfully!',
         })
       } else {
         setMessage({ type: 'error', text: result.error || 'Failed to save email configuration' })
@@ -614,7 +619,7 @@ export default function SettingsView({
     try {
       const res = await fetch('/api/email-config/test', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       })
 
       const result = await res.json().catch(() => ({}))
@@ -645,8 +650,10 @@ export default function SettingsView({
       if (gen !== settingsFetchGenRef.current) return
       setAutomationConfig({
         barMitzvahAutoAssignPlanId: (data.barMitzvahAutoAssignPlanId as string | null) ?? null,
-        barMitzvahAutoCreateEventTypeId: (data.barMitzvahAutoCreateEventTypeId as string | null) ?? null,
-        weddingConversionDefaultPlanId: (data.weddingConversionDefaultPlanId as string | null) ?? null,
+        barMitzvahAutoCreateEventTypeId:
+          (data.barMitzvahAutoCreateEventTypeId as string | null) ?? null,
+        weddingConversionDefaultPlanId:
+          (data.weddingConversionDefaultPlanId as string | null) ?? null,
         monthlyStatementAutoGenerate: !!data.monthlyStatementAutoGenerate,
         monthlyStatementAutoEmail: !!data.monthlyStatementAutoEmail,
         monthlyStatementCalendar:
@@ -654,9 +661,7 @@ export default function SettingsView({
         monthlyStatementDay:
           typeof data.monthlyStatementDay === 'number' ? data.monthlyStatementDay : 1,
         monthlyStatementHebrewDay:
-          typeof data.monthlyStatementHebrewDay === 'number'
-            ? data.monthlyStatementHebrewDay
-            : 1,
+          typeof data.monthlyStatementHebrewDay === 'number' ? data.monthlyStatementHebrewDay : 1,
       })
     } catch (error) {
       if (gen !== settingsFetchGenRef.current) return
@@ -681,10 +686,8 @@ export default function SettingsView({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           barMitzvahAutoAssignPlanId: automationConfig.barMitzvahAutoAssignPlanId || null,
-          barMitzvahAutoCreateEventTypeId:
-            automationConfig.barMitzvahAutoCreateEventTypeId || null,
-          weddingConversionDefaultPlanId:
-            automationConfig.weddingConversionDefaultPlanId || null,
+          barMitzvahAutoCreateEventTypeId: automationConfig.barMitzvahAutoCreateEventTypeId || null,
+          weddingConversionDefaultPlanId: automationConfig.weddingConversionDefaultPlanId || null,
           monthlyStatementAutoGenerate: automationConfig.monthlyStatementAutoGenerate,
           monthlyStatementAutoEmail: automationConfig.monthlyStatementAutoEmail,
           monthlyStatementCalendar: automationConfig.monthlyStatementCalendar,
@@ -705,9 +708,7 @@ export default function SettingsView({
           monthlyStatementDay:
             typeof data.monthlyStatementDay === 'number' ? data.monthlyStatementDay : 1,
           monthlyStatementHebrewDay:
-            typeof data.monthlyStatementHebrewDay === 'number'
-              ? data.monthlyStatementHebrewDay
-              : 1,
+            typeof data.monthlyStatementHebrewDay === 'number' ? data.monthlyStatementHebrewDay : 1,
         })
         toast.success('Automation settings saved')
         invalidateCache('/api/organizations/automation')
@@ -822,14 +823,11 @@ export default function SettingsView({
             : []
         setLabelFamilies(items)
         const LABELS_HARD_CAP = 1000
-        if (
-          items.length >= LABELS_HARD_CAP &&
-          !cancelledLabelsWarningRef.current
-        ) {
+        if (items.length >= LABELS_HARD_CAP && !cancelledLabelsWarningRef.current) {
           cancelledLabelsWarningRef.current = true
           toast.error(
             `Showing the first ${LABELS_HARD_CAP.toLocaleString()} families. ` +
-            `Filter by plan or print in batches to include the rest.`,
+              `Filter by plan or print in batches to include the rest.`,
           )
         }
       } else {
@@ -900,7 +898,14 @@ export default function SettingsView({
         if (gen === settingsFetchGenRef.current) setAuditLoading(false)
       }
     },
-    [auditActionFilter, auditUserFilter, auditResourceTypeFilter, auditFromDate, auditToDate, toast],
+    [
+      auditActionFilter,
+      auditUserFilter,
+      auditResourceTypeFilter,
+      auditFromDate,
+      auditToDate,
+      toast,
+    ],
   )
 
   // Resolve user ids in the visible audit page to display names. Fetched
@@ -979,7 +984,7 @@ export default function SettingsView({
           cycleStartHebrewMonth: config.cycleStartHebrewMonth || 7,
           cycleStartHebrewDay: config.cycleStartHebrewDay || 1,
           cycleAutoRollover: Boolean(config.cycleAutoRollover),
-          description: config.description || 'Membership cycle start date'
+          description: config.description || 'Membership cycle start date',
         })
       } else {
         if (gen !== settingsFetchGenRef.current) return
@@ -1003,7 +1008,7 @@ export default function SettingsView({
       const res = await fetch('/api/cycle-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cycleFormData)
+        body: JSON.stringify(cycleFormData),
       })
 
       const result = await res.json().catch(() => ({}))
@@ -1018,11 +1023,11 @@ export default function SettingsView({
         if (result && typeof result === 'object') {
           setCycleFormData((prev) => ({ ...prev, ...result }))
         }
-        setMessage({ 
-          type: 'success', 
-          text: cycleConfig 
-            ? 'Cycle configuration updated successfully!' 
-            : 'Cycle configuration saved successfully!' 
+        setMessage({
+          type: 'success',
+          text: cycleConfig
+            ? 'Cycle configuration updated successfully!'
+            : 'Cycle configuration saved successfully!',
         })
       } else {
         setMessage({ type: 'error', text: result.error || 'Failed to save cycle configuration' })
@@ -1067,7 +1072,7 @@ export default function SettingsView({
     setEventTypeFormData({
       type: eventType.type,
       name: eventType.name,
-      amount: eventType.amount.toString()
+      amount: eventType.amount.toString(),
     })
     setShowEventTypeModal(true)
   }
@@ -1085,7 +1090,7 @@ export default function SettingsView({
 
     try {
       const res = await fetch(`/api/lifecycle-event-types/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
       })
 
       if (res.ok) {
@@ -1121,9 +1126,9 @@ export default function SettingsView({
       const url = editingEventType
         ? `/api/lifecycle-event-types/${editingEventType._id}`
         : '/api/lifecycle-event-types'
-      
+
       const method = editingEventType ? 'PUT' : 'POST'
-      
+
       const body = editingEventType
         ? { name: eventTypeFormData.name, amount: parsedAmount }
         : { type: eventTypeFormData.type, name: eventTypeFormData.name, amount: parsedAmount }
@@ -1131,18 +1136,20 @@ export default function SettingsView({
       const res = await fetch(url, {
         method,
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
       })
 
       if (res.ok) {
         invalidateCache('/api/lifecycle-event-types')
         setShowEventTypeModal(false)
         resetEventTypeForm()
-        setMessage({ 
-          type: 'success', 
-          text: editingEventType ? 'Event type updated successfully!' : 'Event type created successfully!' 
+        setMessage({
+          type: 'success',
+          text: editingEventType
+            ? 'Event type updated successfully!'
+            : 'Event type created successfully!',
         })
         fetchEventTypes()
       } else {
@@ -1159,28 +1166,31 @@ export default function SettingsView({
   }
 
   // Payment Plans functions
-  const fetchPlans = useCallback(async (opts?: { force?: boolean }) => {
-    const gen = settingsFetchGenRef.current
-    try {
-      const data = await cachedFetch<PaymentPlan[]>('/api/payment-plans', {
-        ttl: 60_000,
-        bypass: opts?.force,
-      })
-      if (gen !== settingsFetchGenRef.current) return
-      if (Array.isArray(data)) {
-        setPlans(data)
-      } else {
-        console.error('Failed to fetch payment plans: unexpected response', data)
+  const fetchPlans = useCallback(
+    async (opts?: { force?: boolean }) => {
+      const gen = settingsFetchGenRef.current
+      try {
+        const data = await cachedFetch<PaymentPlan[]>('/api/payment-plans', {
+          ttl: 60_000,
+          bypass: opts?.force,
+        })
+        if (gen !== settingsFetchGenRef.current) return
+        if (Array.isArray(data)) {
+          setPlans(data)
+        } else {
+          console.error('Failed to fetch payment plans: unexpected response', data)
+          toast.error('Could not reload payment plans.')
+        }
+      } catch (error) {
+        if (gen !== settingsFetchGenRef.current) return
+        console.error('Error fetching payment plans:', error)
         toast.error('Could not reload payment plans.')
+      } finally {
+        if (gen === settingsFetchGenRef.current) setPlansLoading(false)
       }
-    } catch (error) {
-      if (gen !== settingsFetchGenRef.current) return
-      console.error('Error fetching payment plans:', error)
-      toast.error('Could not reload payment plans.')
-    } finally {
-      if (gen === settingsFetchGenRef.current) setPlansLoading(false)
-    }
-  }, [toast])
+    },
+    [toast],
+  )
 
   const planSubmittingRef = useRef(false)
   const [planSubmitting, setPlanSubmitting] = useState(false)
@@ -1196,12 +1206,10 @@ export default function SettingsView({
     planSubmittingRef.current = true
     setPlanSubmitting(true)
     try {
-      const url = editingPlan 
-        ? `/api/payment-plans/${editingPlan._id}`
-        : '/api/payment-plans'
-      
+      const url = editingPlan ? `/api/payment-plans/${editingPlan._id}` : '/api/payment-plans'
+
       const method = editingPlan ? 'PUT' : 'POST'
-      
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -1214,7 +1222,12 @@ export default function SettingsView({
         resetPlanForm()
         invalidateCache('/api/payment-plans')
         fetchPlans({ force: true })
-        setMessage({ type: 'success', text: editingPlan ? 'Payment plan updated successfully!' : 'Payment plan created successfully!' })
+        setMessage({
+          type: 'success',
+          text: editingPlan
+            ? 'Payment plan updated successfully!'
+            : 'Payment plan created successfully!',
+        })
       } else {
         const error = await res.json().catch(() => ({}))
         setMessage({ type: 'error', text: error.error || 'Failed to save payment plan' })
@@ -1278,7 +1291,7 @@ export default function SettingsView({
         // skeleton for the in-flight successor.
         return
       }
-      
+
       const familiesPayload = await familiesRes.json().catch(() => null)
       if (gen !== settingsFetchGenRef.current) return
 
@@ -1297,14 +1310,11 @@ export default function SettingsView({
       // surface that to the user so they know the kevittel they're
       // about to print is incomplete.
       const KEVITTEL_HARD_CAP = 1000
-      if (
-        families.length >= KEVITTEL_HARD_CAP &&
-        !cancelledKevittelWarningRef.current
-      ) {
+      if (families.length >= KEVITTEL_HARD_CAP && !cancelledKevittelWarningRef.current) {
         cancelledKevittelWarningRef.current = true
         toast.error(
           `Showing the first ${KEVITTEL_HARD_CAP.toLocaleString()} families. ` +
-          `Use search or print sections separately to include the rest.`,
+            `Use search or print sections separately to include the rest.`,
         )
       }
 
@@ -1333,7 +1343,7 @@ export default function SettingsView({
             console.error(`Error fetching members for family ${family._id}:`, error)
             return { ...family, members: [] }
           }
-        })
+        }),
       )
 
       if (gen !== settingsFetchGenRef.current) return
@@ -1442,7 +1452,7 @@ export default function SettingsView({
   return (
     <main className="min-h-screen p-4 sm:p-6 md:p-8 bg-app-subtle">
       <div className="max-w-6xl mx-auto">
-        <PageHeader title="Settings" subtitle="Manage your system configuration." />
+        <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
 
         <div className="flex flex-col md:flex-row gap-6 items-start">
           <aside className="w-full md:w-56 lg:w-64 shrink-0 md:sticky md:top-6">
@@ -1456,9 +1466,9 @@ export default function SettingsView({
           <div className="flex-1 min-w-0 w-full">
             {/* Per-tab skeleton while the relevant fetch is in flight. */}
             {isTabLoading && (
-              <div className="surface-card p-6 mb-6">
+              <Card className="mb-6">
                 <SkeletonRows count={5} />
-              </div>
+              </Card>
             )}
 
             {/* Email Configuration Tab */}
@@ -1487,117 +1497,97 @@ export default function SettingsView({
               />
             )}
 
-        {/* Payment Plans Tab */}
-        {activeTab === 'paymentPlans' && !isTabLoading && (
-          <DynamicPaymentPlansPanel
-            plans={plans}
-            onAdd={() => {
-              resetPlanForm()
-              setEditingPlan(null)
-              setShowPlanModal(true)
-            }}
-            onEdit={handleEditPlan}
-            onDelete={handleDeletePlan}
-          />
-        )}
+            {/* Payment Plans Tab */}
+            {activeTab === 'paymentPlans' && !isTabLoading && (
+              <DynamicPaymentPlansPanel
+                plans={plans}
+                onAdd={() => {
+                  resetPlanForm()
+                  setEditingPlan(null)
+                  setShowPlanModal(true)
+                }}
+                onEdit={handleEditPlan}
+                onDelete={handleDeletePlan}
+              />
+            )}
 
-        {/* Event Type Modal */}
-        {showEventTypeModal && (
-          <div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-            // Clicking the dimmed backdrop closes the modal. Inner
-            // `stopPropagation` on the dialog box prevents clicks inside
-            // form fields from also closing it.
-            onClick={(e) => {
-              if (e.target === e.currentTarget) closeEventTypeModal()
-            }}
-            role="dialog"
-            aria-modal="true"
-          >
-            <div
-              className="bg-surface rounded-lg shadow-xl p-8 max-w-md w-full"
-              onClick={(e) => e.stopPropagation()}
+            {/* Event Type Modal */}
+            <Modal
+              open={showEventTypeModal}
+              onClose={closeEventTypeModal}
+              title={
+                editingEventType
+                  ? t('settings.eventTypeModal.editTitle')
+                  : t('settings.eventTypeModal.addTitle')
+              }
+              maxWidth="max-w-md"
             >
-              <h2 className="text-2xl font-bold mb-4">
-                {editingEventType ? 'Edit' : 'Add'} Event Type
-              </h2>
               <form onSubmit={handleSubmitEventType} className="space-y-4">
                 {!editingEventType && (
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Type Code *</label>
-                    <input
-                      type="text"
-                      value={eventTypeFormData.type}
-                      onChange={(e) => setEventTypeFormData({ ...eventTypeFormData, type: e.target.value })}
-                      className="w-full border rounded px-3 py-2"
-                      placeholder="e.g., wedding, graduation"
-                      required
-                    />
-                    <p className="text-xs text-fg-muted mt-1">
-                      Unique identifier (lowercase, use underscores)
-                    </p>
-                  </div>
+                  <Input
+                    label={t('settings.eventTypeModal.typeCode')}
+                    required
+                    type="text"
+                    value={eventTypeFormData.type}
+                    onChange={(e) =>
+                      setEventTypeFormData({ ...eventTypeFormData, type: e.target.value })
+                    }
+                    placeholder={t('settings.eventTypeModal.typeCodePlaceholder')}
+                    hint={t('settings.eventTypeModal.typeCodeHint')}
+                  />
                 )}
                 {editingEventType && (
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Type Code</label>
-                    <input
-                      type="text"
-                      value={eventTypeFormData.type}
-                      className="w-full border rounded px-3 py-2 bg-fg/5"
-                      disabled
-                    />
-                    <p className="text-xs text-fg-muted mt-1">
-                      Type code cannot be changed after creation
-                    </p>
-                  </div>
-                )}
-                <div>
-                  <label className="block text-sm font-medium mb-1">Name *</label>
-                  <input
+                  <Input
+                    label={t('settings.eventTypeModal.typeCode')}
                     type="text"
-                    value={eventTypeFormData.name}
-                    onChange={(e) => setEventTypeFormData({ ...eventTypeFormData, name: e.target.value })}
-                    className="w-full border rounded px-3 py-2"
-                    placeholder="e.g., Chasena, Bar Mitzvah"
-                    required
+                    value={eventTypeFormData.type}
+                    disabled
+                    hint={t('settings.eventTypeModal.typeCodeReadonlyHint')}
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Amount ({currencySymbol}) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={eventTypeFormData.amount}
-                    onChange={(e) => setEventTypeFormData({ ...eventTypeFormData, amount: e.target.value })}
-                    className="w-full border rounded px-3 py-2"
-                    placeholder="0.00"
-                    required
-                  />
-                </div>
-                <div className="flex gap-4 pt-4">
-                  <button
-                    type="submit"
-                    disabled={eventTypeSubmitting}
-                    className="flex-1 bg-accent text-white px-4 py-2 rounded-lg hover:bg-accent-hover disabled:opacity-50"
-                  >
-                    {eventTypeSubmitting ? 'Saving…' : editingEventType ? 'Update' : 'Create'}
-                  </button>
-                  <button
+                )}
+                <Input
+                  label={t('settings.eventTypeModal.name')}
+                  required
+                  type="text"
+                  value={eventTypeFormData.name}
+                  onChange={(e) =>
+                    setEventTypeFormData({ ...eventTypeFormData, name: e.target.value })
+                  }
+                  placeholder={t('settings.eventTypeModal.namePlaceholder')}
+                />
+                <Input
+                  label={t('settings.eventTypeModal.amount').replace('{symbol}', currencySymbol)}
+                  required
+                  type="number"
+                  step="0.01"
+                  value={eventTypeFormData.amount}
+                  onChange={(e) =>
+                    setEventTypeFormData({ ...eventTypeFormData, amount: e.target.value })
+                  }
+                  placeholder="0.00"
+                />
+                <div className="flex gap-3 pt-2">
+                  <Button type="submit" loading={eventTypeSubmitting} className="flex-1">
+                    {eventTypeSubmitting
+                      ? t('settings.eventTypeModal.saving')
+                      : editingEventType
+                        ? t('settings.eventTypeModal.update')
+                        : t('settings.eventTypeModal.create')}
+                  </Button>
+                  <Button
                     type="button"
+                    variant="secondary"
+                    className="flex-1"
                     onClick={() => {
                       setShowEventTypeModal(false)
                       resetEventTypeForm()
                     }}
-                    className="flex-1 bg-fg/10 text-fg px-4 py-2 rounded-lg hover:bg-fg/10"
                   >
-                    Cancel
-                  </button>
+                    {t('settings.eventTypeModal.cancel')}
+                  </Button>
                 </div>
               </form>
-            </div>
-          </div>
-        )}
+            </Modal>
 
             {/* Automation Tab */}
             {activeTab === 'automation' && !isTabLoading && (
@@ -1613,161 +1603,141 @@ export default function SettingsView({
               />
             )}
 
-        {/* Kevittel Tab */}
-        {activeTab === 'kevittel' && !isTabLoading && (
-          <DynamicKevittelPanel families={kevittelFamilies} loading={kevittelLoading} />
-        )}
+            {/* Kevittel Tab */}
+            {activeTab === 'kevittel' && !isTabLoading && (
+              <DynamicKevittelPanel families={kevittelFamilies} loading={kevittelLoading} />
+            )}
 
-        {/* Payment Plan Modal */}
-        {showPlanModal && (
-          <div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) closePlanModal()
-            }}
-            role="dialog"
-            aria-modal="true"
-          >
-            <div
-              className="bg-surface rounded-lg shadow-xl p-8 max-w-md w-full"
-              onClick={(e) => e.stopPropagation()}
+            {/* Payment Plan Modal */}
+            <Modal
+              open={showPlanModal}
+              onClose={closePlanModal}
+              title={
+                editingPlan ? t('settings.planModal.editTitle') : t('settings.planModal.addTitle')
+              }
+              maxWidth="max-w-md"
             >
-              <h2 className="text-2xl font-bold mb-4">
-                {editingPlan ? 'Edit' : 'Add'} Payment Plan
-              </h2>
               <form onSubmit={handleSubmitPlan} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">Plan Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={planFormData.name}
-                    onChange={(e) => setPlanFormData({ ...planFormData, name: e.target.value })}
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
-                    placeholder="e.g., Yearly membership"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">Yearly Price ({currencySymbol}) *</label>
-                  <input
-                    type="number"
-                    required
-                    step="0.01"
-                    min="0"
-                    value={planFormData.yearlyPrice}
-                    onChange={(e) => setPlanFormData({ ...planFormData, yearlyPrice: e.target.value })}
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
-                  />
-                </div>
-                <div className="flex gap-4 justify-end pt-4">
-                  <button
+                <Input
+                  label={t('settings.planModal.name')}
+                  required
+                  type="text"
+                  value={planFormData.name}
+                  onChange={(e) => setPlanFormData({ ...planFormData, name: e.target.value })}
+                  placeholder={t('settings.planModal.namePlaceholder')}
+                />
+                <Input
+                  label={t('settings.planModal.yearlyPrice').replace('{symbol}', currencySymbol)}
+                  required
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={planFormData.yearlyPrice}
+                  onChange={(e) =>
+                    setPlanFormData({ ...planFormData, yearlyPrice: e.target.value })
+                  }
+                />
+                <div className="flex gap-3 justify-end pt-2">
+                  <Button
                     type="button"
+                    variant="secondary"
                     onClick={() => {
                       setShowPlanModal(false)
                       setEditingPlan(null)
                       resetPlanForm()
                     }}
-                    className="px-6 py-2 border border-border rounded-xl hover:bg-app-subtle transition-colors"
                   >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={planSubmitting}
-                    className="focus-ring px-4 py-2 bg-accent text-accent-fg rounded-md hover:bg-accent-hover transition-colors text-sm font-medium disabled:opacity-50"
-                  >
-                    {planSubmitting ? 'Saving…' : editingPlan ? 'Update' : 'Create'}
-                  </button>
+                    {t('settings.planModal.cancel')}
+                  </Button>
+                  <Button type="submit" loading={planSubmitting}>
+                    {planSubmitting
+                      ? t('settings.planModal.saving')
+                      : editingPlan
+                        ? t('settings.planModal.update')
+                        : t('settings.planModal.create')}
+                  </Button>
                 </div>
               </form>
-            </div>
-          </div>
-        )}
+            </Modal>
 
-        {/* Branding Tab — visible to all members, write-gated by role inside. */}
-        {activeTab === 'branding' && (
-          <DynamicBrandingPanel canManage={canSeePrivilegedTabs} />
-        )}
+            {/* Branding Tab — visible to all members, write-gated by role inside. */}
+            {activeTab === 'branding' && <DynamicBrandingPanel canManage={canSeePrivilegedTabs} />}
 
-        {/* Members Tab — admin / owner only. */}
-        {activeTab === 'members' && canSeePrivilegedTabs && (
-          <DynamicMembersPanel onRoleResolved={setCurrentRole} />
-        )}
+            {/* Members Tab — admin / owner only. */}
+            {activeTab === 'members' && canSeePrivilegedTabs && (
+              <DynamicMembersPanel onRoleResolved={setCurrentRole} />
+            )}
 
-        {/* Billing Tab — admin / owner can view; owner manages subscription. */}
-        {activeTab === 'billing' && canSeePrivilegedTabs && (
-          <DynamicBillingPanel
-            canManage={canSeePrivilegedTabs}
-            isOwner={isOwner}
-            initialBilling={initialBilling}
-          />
-        )}
+            {/* Billing Tab — admin / owner can view; owner manages subscription. */}
+            {activeTab === 'billing' && canSeePrivilegedTabs && (
+              <DynamicBillingPanel
+                canManage={canSeePrivilegedTabs}
+                isOwner={isOwner}
+                initialBilling={initialBilling}
+              />
+            )}
 
-        {/* Trash Tab — admin / owner only, purge is owner-only. */}
-        {activeTab === 'trash' && canSeePrivilegedTabs && (
-          <DynamicTrashPanel canPurge={canPurge} />
-        )}
+            {/* Trash Tab — admin / owner only, purge is owner-only. */}
+            {activeTab === 'trash' && canSeePrivilegedTabs && (
+              <DynamicTrashPanel canPurge={canPurge} />
+            )}
 
-        {/* If a privileged tab was deep-linked by a non-privileged user,
+            {/* If a privileged tab was deep-linked by a non-privileged user,
             show a friendly fallback instead of a silent blank page. */}
-        {(activeTab === 'members' ||
-          activeTab === 'billing' ||
-          activeTab === 'trash' ||
-          activeTab === 'letterhead' ||
-          activeTab === 'activity') &&
-          !canSeePrivilegedTabs &&
-          currentRole !== null && (
-            <div className="surface-card p-6 text-sm text-fg-muted">
-              You need to be an organization owner or admin to view this tab.
-            </div>
-          )}
+            {(activeTab === 'members' ||
+              activeTab === 'billing' ||
+              activeTab === 'trash' ||
+              activeTab === 'letterhead' ||
+              activeTab === 'activity') &&
+              !canSeePrivilegedTabs &&
+              currentRole !== null && (
+                <Card className="text-sm text-fg-muted">{t('settings.privilegedTabDenied')}</Card>
+              )}
 
-        {/* Letterhead Tab — admin / owner only. */}
-        {activeTab === 'letterhead' && canSeePrivilegedTabs && !isTabLoading && (
-          <DynamicLetterheadPanel
-            letterhead={letterhead}
-            setLetterhead={setLetterhead}
-            saving={letterheadSaving}
-            onSubmit={handleSaveLetterhead}
-          />
-        )}
+            {/* Letterhead Tab — admin / owner only. */}
+            {activeTab === 'letterhead' && canSeePrivilegedTabs && !isTabLoading && (
+              <DynamicLetterheadPanel
+                letterhead={letterhead}
+                setLetterhead={setLetterhead}
+                saving={letterheadSaving}
+                onSubmit={handleSaveLetterhead}
+              />
+            )}
 
-        {/* Mail Labels Tab — visible to all members. Print-only. */}
-        {activeTab === 'labels' && !isTabLoading && (
-          <DynamicLabelsPanel
-            families={labelFamilies}
-            plans={plans}
-            filters={labelFilters}
-            setFilters={setLabelFilters}
-          />
-        )}
+            {/* Mail Labels Tab — visible to all members. Print-only. */}
+            {activeTab === 'labels' && !isTabLoading && (
+              <DynamicLabelsPanel
+                families={labelFamilies}
+                plans={plans}
+                filters={labelFilters}
+                setFilters={setLabelFilters}
+              />
+            )}
 
-        {/* Localization (currency + locale) Tab — admin/owner only. */}
-        {activeTab === 'localization' && canSeePrivilegedTabs && (
-          <DynamicLocalizationPanel />
-        )}
+            {/* Localization (currency + locale) Tab — admin/owner only. */}
+            {activeTab === 'localization' && canSeePrivilegedTabs && <DynamicLocalizationPanel />}
 
-        {/* Activity (audit log) Tab — admin / owner only. */}
-        {activeTab === 'activity' && canSeePrivilegedTabs && (
-          <DynamicActivityPanel
-            items={auditItems}
-            nextCursor={auditNextCursor}
-            loading={auditLoading}
-            usersMap={auditUsersMap}
-            actionFilter={auditActionFilter}
-            setActionFilter={setAuditActionFilter}
-            userFilter={auditUserFilter}
-            setUserFilter={setAuditUserFilter}
-            resourceTypeFilter={auditResourceTypeFilter}
-            setResourceTypeFilter={setAuditResourceTypeFilter}
-            fromDate={auditFromDate}
-            setFromDate={setAuditFromDate}
-            toDate={auditToDate}
-            setToDate={setAuditToDate}
-            onLoadMore={() => fetchAuditPage(auditNextCursor)}
-            onExportCsv={exportAuditCsv}
-          />
-        )}
+            {/* Activity (audit log) Tab — admin / owner only. */}
+            {activeTab === 'activity' && canSeePrivilegedTabs && (
+              <DynamicActivityPanel
+                items={auditItems}
+                nextCursor={auditNextCursor}
+                loading={auditLoading}
+                usersMap={auditUsersMap}
+                actionFilter={auditActionFilter}
+                setActionFilter={setAuditActionFilter}
+                userFilter={auditUserFilter}
+                setUserFilter={setAuditUserFilter}
+                resourceTypeFilter={auditResourceTypeFilter}
+                setResourceTypeFilter={setAuditResourceTypeFilter}
+                fromDate={auditFromDate}
+                setFromDate={setAuditFromDate}
+                toDate={auditToDate}
+                setToDate={setAuditToDate}
+                onLoadMore={() => fetchAuditPage(auditNextCursor)}
+                onExportCsv={exportAuditCsv}
+              />
+            )}
 
             {/* Cycle Configuration Tab */}
             {activeTab === 'cycle' && !isTabLoading && (

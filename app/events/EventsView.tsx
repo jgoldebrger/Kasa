@@ -9,13 +9,17 @@ import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { useToast } from '@/app/components/Toast'
 import {
+  Badge,
   Button,
+  Card,
   DataView,
   EmptyState,
   PageHeader,
   SkeletonRows,
   type DataColumn,
 } from '@/app/components/ui'
+import { eventTypeBadgeClass } from '@/lib/event-type-badge'
+import { cn } from '@/lib/cn'
 import { eventsListUrl, parseEventsListResponse } from '@/lib/client/events-list'
 import { useT } from '@/lib/client/i18n'
 
@@ -29,29 +33,6 @@ interface LifecycleEvent {
   year: number
   amount: number
   notes: string
-}
-
-// Deterministic badge palette keyed off the raw eventType string. Each
-// slot must be a literal class string so Tailwind's purge keeps it. The
-// hash is stable across reloads so users see consistent colors per type
-// without us hardcoding which event gets which color.
-const EVENT_BADGE_PALETTE = [
-  'bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300',
-  'bg-accent/10 text-accent',
-  'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300',
-  'bg-pink-100 text-pink-800 dark:bg-pink-500/15 dark:text-pink-300',
-  'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
-  'bg-cyan-100 text-cyan-800 dark:bg-cyan-500/15 dark:text-cyan-300',
-  'bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-300',
-  'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300',
-] as const
-function eventTypeBadgeClass(eventType: string): string {
-  if (!eventType) return EVENT_BADGE_PALETTE[0]
-  let hash = 0
-  for (let i = 0; i < eventType.length; i++) {
-    hash = (hash * 31 + eventType.charCodeAt(i)) | 0
-  }
-  return EVENT_BADGE_PALETTE[Math.abs(hash) % EVENT_BADGE_PALETTE.length]
 }
 
 export interface EventsViewProps {
@@ -102,9 +83,9 @@ export default function EventsView({
           setEvents([])
           setNextCursor(null)
           setLoadError(true)
-          toast.error('Could not load events.')
+          toast.error(t('events.error.load'))
         } else {
-          toast.error('Could not load more events.')
+          toast.error(t('events.error.loadMore'))
         }
       } finally {
         if (!isStale(gen)) {
@@ -113,7 +94,7 @@ export default function EventsView({
         }
       }
     },
-    [toast, begin, isStale],
+    [toast, begin, isStale, t],
   )
 
   useEffect(() => {
@@ -151,8 +132,8 @@ export default function EventsView({
   const columns: DataColumn<LifecycleEvent>[] = [
     {
       id: 'family',
-      header: 'Family Name',
-      headerText: 'Family Name',
+      header: t('events.column.familyName'),
+      headerText: t('events.column.familyName'),
       cell: (e) =>
         e.familyId ? (
           <Link
@@ -169,30 +150,34 @@ export default function EventsView({
     },
     {
       id: 'eventType',
-      header: 'Event Type',
-      headerText: 'Event Type',
+      header: t('events.column.eventType'),
+      headerText: t('events.column.eventType'),
       cell: (e) => (
-        <span
-          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${eventTypeBadgeClass(e.eventType)}`}
+        <Badge
+          size="md"
+          className={cn(
+            'rounded-full normal-case tracking-normal font-semibold',
+            eventTypeBadgeClass(e.eventType),
+          )}
         >
           {e.eventTypeLabel}
-        </span>
+        </Badge>
       ),
       exportValue: (e) => e.eventTypeLabel || e.eventType || '',
       filter: { type: 'multiselect', getValue: (e) => e.eventType, options: eventTypeOptions },
     },
     {
       id: 'eventDate',
-      header: 'Event Date',
-      headerText: 'Event Date',
+      header: t('events.column.eventDate'),
+      headerText: t('events.column.eventDate'),
       cell: (e) => <span className="tabular">{formatLocaleDate(e.eventDate)}</span>,
       exportValue: (e) => (e.eventDate ? new Date(e.eventDate) : ''),
       filter: { type: 'dateRange', getValue: (e) => e.eventDate || null },
     },
     {
       id: 'year',
-      header: 'Year',
-      headerText: 'Year',
+      header: t('events.column.year'),
+      headerText: t('events.column.year'),
       hideBelow: 'md',
       cell: (e) => <span className="text-fg-muted tabular">{e.year}</span>,
       exportValue: (e) => e.year || '',
@@ -200,8 +185,8 @@ export default function EventsView({
     },
     {
       id: 'amount',
-      header: 'Amount',
-      headerText: 'Amount',
+      header: t('events.column.amount'),
+      headerText: t('events.column.amount'),
       align: 'right',
       cell: (e) => (
         <span className="font-medium tabular">
@@ -213,8 +198,8 @@ export default function EventsView({
     },
     {
       id: 'notes',
-      header: 'Notes',
-      headerText: 'Notes',
+      header: t('events.column.notes'),
+      headerText: t('events.column.notes'),
       hideBelow: 'lg',
       defaultHidden: true,
       cell: (e) => <span className="text-fg-muted text-sm">{e.notes || '—'}</span>,
@@ -226,11 +211,11 @@ export default function EventsView({
     <div className="min-h-screen p-4 sm:p-6 md:p-8">
       <div className="max-w-7xl mx-auto">
         <PageHeader
-          title="All Lifecycle Events"
-          subtitle="Every lifecycle event recorded across the organization."
+          title={t('events.title')}
+          subtitle={t('events.subtitle')}
           actions={
             <div className="text-right">
-              <div className="text-xs text-fg-muted">Total Amount</div>
+              <div className="text-xs text-fg-muted">{t('events.totalAmount')}</div>
               <div className="text-2xl sm:text-3xl font-bold text-fg tabular">
                 {formatMoney(totalAmount)}
               </div>
@@ -239,16 +224,16 @@ export default function EventsView({
         />
 
         {loading ? (
-          <div className="surface-card p-6">
+          <Card>
             <SkeletonRows count={8} />
-          </div>
+          </Card>
         ) : loadError ? (
           <EmptyState
             icon={<ExclamationTriangleIcon />}
-            title="Couldn't load events"
-            description="Check your connection and try again."
+            title={t('events.loadError.title')}
+            description={t('events.loadError.description')}
             cta={{
-              label: 'Retry',
+              label: t('common.retry'),
               onClick: () => fetchEvents(),
               icon: <ArrowPathIcon className="h-4 w-4" />,
             }}
@@ -259,7 +244,7 @@ export default function EventsView({
             rows={events}
             columns={columns}
             rowKey={(e) => e._id}
-            globalSearch={{ placeholder: 'Search family, type, notes…' }}
+            globalSearch={{ placeholder: t('events.searchPlaceholder') }}
             pageSize={10}
             import={{ type: 'lifecycle-events', onImported: () => fetchEvents({}) }}
             onFilteredRowsChange={setVisibleEvents}
@@ -267,8 +252,8 @@ export default function EventsView({
             empty={
               <EmptyState
                 icon={<CalendarIcon className="h-10 w-10" />}
-                title="No events"
-                description="Nothing recorded yet."
+                title={t('events.empty.title')}
+                description={t('events.empty.description')}
               />
             }
           />
@@ -291,9 +276,10 @@ export default function EventsView({
 }
 
 function EventMobileCard({ event }: { event: LifecycleEvent }) {
+  const t = useT()
   const { format: formatMoney } = useCurrency()
   return (
-    <div className="surface-card p-4">
+    <Card compact>
       <div className="flex items-start justify-between gap-3">
         {event.familyId ? (
           <Link
@@ -311,20 +297,30 @@ function EventMobileCard({ event }: { event: LifecycleEvent }) {
       </div>
       <dl className="mt-2 grid grid-cols-2 gap-2 text-xs text-fg">
         <div>
-          <dt className="text-fg-muted">Type</dt>
-          <dd>{event.eventTypeLabel}</dd>
+          <dt className="text-fg-muted">{t('events.mobile.type')}</dt>
+          <dd>
+            <Badge
+              size="md"
+              className={cn(
+                'rounded-full normal-case tracking-normal font-semibold',
+                eventTypeBadgeClass(event.eventType),
+              )}
+            >
+              {event.eventTypeLabel}
+            </Badge>
+          </dd>
         </div>
         <div>
-          <dt className="text-fg-muted">Date</dt>
+          <dt className="text-fg-muted">{t('events.mobile.date')}</dt>
           <dd className="tabular">{formatLocaleDate(event.eventDate)}</dd>
         </div>
         {event.notes && (
           <div className="col-span-2">
-            <dt className="text-fg-muted">Notes</dt>
+            <dt className="text-fg-muted">{t('common.notes')}</dt>
             <dd>{event.notes}</dd>
           </div>
         )}
       </dl>
-    </div>
+    </Card>
   )
 }

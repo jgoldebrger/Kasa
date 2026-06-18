@@ -15,9 +15,19 @@ import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { formatLocaleDate } from '@/lib/date-utils'
 import { TASKS_LIST_PAGE_SIZE, parseTasksListResponse, tasksListUrl } from '@/lib/client/tasks-list'
-import { Button, EmptyState, PageHeader, SkeletonRows, Tabs } from '@/app/components/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  PageHeader,
+  SkeletonRows,
+  Tabs,
+} from '@/app/components/ui'
 import TaskFormModal from '@/app/components/tasks/TaskFormModal'
 import { useT } from '@/lib/client/i18n'
+import type { MessageKey } from '@/lib/i18n/load-locale'
+import type { BadgeProps } from '@/app/components/ui'
 
 interface Task {
   _id: string
@@ -40,6 +50,34 @@ interface Task {
 export interface TasksViewProps {
   initialTasks?: Task[]
   initialNextCursor?: string | null
+}
+
+const PRIORITY_VARIANT: Record<Task['priority'], BadgeProps['variant']> = {
+  low: 'muted',
+  medium: 'accent',
+  high: 'warning',
+  urgent: 'danger',
+}
+
+const STATUS_VARIANT: Record<Task['status'], BadgeProps['variant']> = {
+  pending: 'warning',
+  in_progress: 'accent',
+  completed: 'success',
+  cancelled: 'muted',
+}
+
+const PRIORITY_KEYS: Record<Task['priority'], MessageKey> = {
+  low: 'tasks.priority.low',
+  medium: 'tasks.priority.medium',
+  high: 'tasks.priority.high',
+  urgent: 'tasks.priority.urgent',
+}
+
+const STATUS_KEYS: Record<Task['status'], MessageKey> = {
+  pending: 'tasks.status.pending',
+  in_progress: 'tasks.status.in_progress',
+  completed: 'tasks.status.completed',
+  cancelled: 'tasks.status.cancelled',
 }
 
 function taskFilterQuery(filter: 'all' | 'pending' | 'today' | 'overdue'): string {
@@ -89,9 +127,9 @@ export default function TasksView({ initialTasks, initialNextCursor = null }: Ta
           setTasks([])
           setNextCursor(null)
           setTasksError(true)
-          toast.error('Could not load tasks.')
+          toast.error(t('tasks.error.load'))
         } else {
-          toast.error('Could not load more tasks.')
+          toast.error(t('tasks.error.loadMore'))
         }
       } finally {
         if (!isStale(gen)) {
@@ -100,7 +138,7 @@ export default function TasksView({ initialTasks, initialNextCursor = null }: Ta
         }
       }
     },
-    [taskFilter, toast, begin, isStale],
+    [taskFilter, toast, begin, isStale, t],
   )
 
   useEffect(() => {
@@ -125,7 +163,7 @@ export default function TasksView({ initialTasks, initialNextCursor = null }: Ta
   const completeTask = async (taskId: string) => {
     const prev = tasks
     setTasks((cur) =>
-      cur.map((t) => (t._id === taskId ? { ...t, status: 'completed' as const } : t)),
+      cur.map((task) => (task._id === taskId ? { ...task, status: 'completed' as const } : task)),
     )
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
@@ -135,20 +173,20 @@ export default function TasksView({ initialTasks, initialNextCursor = null }: Ta
       })
       if (!res.ok) throw new Error()
       invalidateCache(/^\/api\/tasks/)
-      toast.success('Task completed.')
+      toast.success(t('tasks.success.completed'))
     } catch {
       setTasks(prev)
-      toast.error('Could not complete task.')
+      toast.error(t('tasks.error.complete'))
     }
   }
 
   const deleteTask = async (task: Task) => {
     if (
       !(await confirm({
-        title: 'Delete task?',
-        message: `“${task.title}” will be permanently removed.`,
+        title: t('tasks.confirm.deleteTitle'),
+        message: t('tasks.confirm.deleteMessage').replace('{title}', task.title),
         destructive: true,
-        confirmLabel: 'Delete',
+        confirmLabel: t('common.delete'),
       }))
     )
       return
@@ -157,9 +195,9 @@ export default function TasksView({ initialTasks, initialNextCursor = null }: Ta
       if (!res.ok) throw new Error()
       invalidateCache(/^\/api\/tasks/)
       fetchTasks()
-      toast.success('Task deleted.')
+      toast.success(t('tasks.success.deleted'))
     } catch {
-      toast.error('Could not delete task.')
+      toast.error(t('tasks.error.delete'))
     }
   }
 
@@ -167,30 +205,30 @@ export default function TasksView({ initialTasks, initialNextCursor = null }: Ta
     <div className="min-h-screen p-4 sm:p-6 md:p-8">
       <div className="max-w-7xl mx-auto">
         <PageHeader
-          title="Tasks"
-          subtitle="Manage your tasks and reminders."
+          title={t('tasks.title')}
+          subtitle={t('tasks.subtitle')}
           actions={
             <Button
               leftIcon={<PlusIcon className="h-5 w-5" />}
               onClick={() => setShowTaskModal(true)}
             >
-              Add Task
+              {t('tasks.addTask')}
             </Button>
           }
         />
 
-        <div className="surface-card rounded-2xl shadow-xl p-4 sm:p-6 mb-6 border border-border">
+        <Card className="mb-6">
           <div className="mb-4">
             <Tabs
               items={[
-                { id: 'all', label: 'All Tasks' },
-                { id: 'pending', label: 'Pending' },
-                { id: 'today', label: 'Due Today' },
-                { id: 'overdue', label: 'Overdue' },
+                { id: 'all', label: t('tasks.filters.all') },
+                { id: 'pending', label: t('tasks.filters.pending') },
+                { id: 'today', label: t('tasks.filters.today') },
+                { id: 'overdue', label: t('tasks.filters.overdue') },
               ]}
               activeId={taskFilter}
-              onChange={(id) => setTaskFilter(id as any)}
-              label="Task filters"
+              onChange={(id) => setTaskFilter(id as typeof taskFilter)}
+              label={t('tasks.filters.label')}
             />
           </div>
 
@@ -199,21 +237,23 @@ export default function TasksView({ initialTasks, initialNextCursor = null }: Ta
           ) : tasksError ? (
             <EmptyState
               icon={<ExclamationTriangleIcon />}
-              title="Couldn't load tasks"
-              description="Try again in a moment."
-              cta={{ label: 'Retry', onClick: () => fetchTasks() }}
+              title={t('tasks.loadError.title')}
+              description={t('tasks.loadError.description')}
+              cta={{ label: t('common.retry'), onClick: () => fetchTasks() }}
             />
           ) : tasks.length === 0 ? (
             <EmptyState
               icon={<ClipboardDocumentListIcon />}
-              title={taskFilter === 'all' ? 'No tasks yet' : 'Nothing here'}
+              title={
+                taskFilter === 'all' ? t('tasks.empty.all.title') : t('tasks.empty.filtered.title')
+              }
               description={
                 taskFilter === 'all'
-                  ? 'Create your first task to track follow-ups and deadlines.'
-                  : 'Try switching the filter or create a new task.'
+                  ? t('tasks.empty.all.description')
+                  : t('tasks.empty.filtered.description')
               }
               cta={{
-                label: 'Add Task',
+                label: t('tasks.addTask'),
                 onClick: () => setShowTaskModal(true),
                 icon: <PlusIcon className="h-4 w-4" />,
               }}
@@ -229,93 +269,83 @@ export default function TasksView({ initialTasks, initialNextCursor = null }: Ta
                   const isOverdue = dueValid && dueDate < today && task.status !== 'completed'
                   const isDueToday = dueValid && dueDate.toDateString() === today.toDateString()
 
-                  const priorityColors = {
-                    low: 'bg-fg/5 text-fg',
-                    medium: 'bg-accent/10 text-accent',
-                    high: 'bg-orange-100 text-orange-800',
-                    urgent: 'bg-red-100 text-red-800',
-                  }
-
-                  const statusColors = {
-                    pending: 'bg-yellow-100 text-yellow-800',
-                    in_progress: 'bg-accent/10 text-accent',
-                    completed: 'bg-green-100 text-green-800',
-                    cancelled: 'bg-fg/5 text-fg',
-                  }
-
                   return (
-                    <li
-                      key={task._id}
-                      className={`glass rounded-xl p-4 border border-border hover:border-white/40 transition-all ${
-                        isOverdue ? 'border-red-300 bg-red-50/50' : ''
-                      }`}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            <h3 className="font-semibold text-fg break-words">{task.title}</h3>
-                            <span
-                              className={`px-2 py-1 rounded text-xs font-medium ${priorityColors[task.priority]}`}
-                            >
-                              {task.priority}
-                            </span>
-                            <span
-                              className={`px-2 py-1 rounded text-xs font-medium ${statusColors[task.status]}`}
-                            >
-                              {task.status.replace('_', ' ')}
-                            </span>
-                            {isDueToday && task.status !== 'completed' && (
-                              <span className="px-2 py-1 rounded text-xs font-medium bg-orange-100 text-orange-800 flex items-center gap-1">
-                                <ClockIcon className="h-3 w-3" aria-hidden="true" />
-                                Due Today
-                              </span>
+                    <li key={task._id}>
+                      <Card
+                        compact
+                        className={isOverdue ? 'border-danger/30 bg-danger/5' : undefined}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              <h3 className="font-semibold text-fg break-words">{task.title}</h3>
+                              <Badge variant={PRIORITY_VARIANT[task.priority]} size="md">
+                                {t(PRIORITY_KEYS[task.priority])}
+                              </Badge>
+                              <Badge variant={STATUS_VARIANT[task.status]} size="md">
+                                {t(STATUS_KEYS[task.status])}
+                              </Badge>
+                              {isDueToday && task.status !== 'completed' && (
+                                <Badge variant="warning" size="md" className="gap-1">
+                                  <ClockIcon className="h-3 w-3" aria-hidden="true" />
+                                  {t('tasks.dueToday')}
+                                </Badge>
+                              )}
+                              {isOverdue && (
+                                <Badge variant="danger" size="md" className="gap-1">
+                                  <ExclamationTriangleIcon className="h-3 w-3" aria-hidden="true" />
+                                  {t('tasks.overdue')}
+                                </Badge>
+                              )}
+                            </div>
+                            {task.description && (
+                              <p className="text-sm text-fg mb-2">{task.description}</p>
                             )}
-                            {isOverdue && (
-                              <span className="px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-800 flex items-center gap-1">
-                                <ExclamationTriangleIcon className="h-3 w-3" aria-hidden="true" />
-                                Overdue
-                              </span>
-                            )}
-                          </div>
-                          {task.description && (
-                            <p className="text-sm text-fg mb-2">{task.description}</p>
-                          )}
-                          <div className="flex items-center gap-x-4 gap-y-1 text-xs text-fg-muted flex-wrap">
-                            <span>Due: {formatLocaleDate(task.dueDate)}</span>
-                            <span>Email: {task.email}</span>
-                            {task.relatedFamilyId && (
-                              <span>Family: {task.relatedFamilyId.name}</span>
-                            )}
-                            {task.relatedMemberId && (
+                            <div className="flex items-center gap-x-4 gap-y-1 text-xs text-fg-muted flex-wrap">
                               <span>
-                                Member: {task.relatedMemberId.firstName}{' '}
-                                {task.relatedMemberId.lastName}
+                                {t('tasks.due')}: {formatLocaleDate(task.dueDate)}
                               </span>
+                              <span>
+                                {t('tasks.emailLabel')}: {task.email}
+                              </span>
+                              {task.relatedFamilyId && (
+                                <span>
+                                  {t('tasks.familyLabel')}: {task.relatedFamilyId.name}
+                                </span>
+                              )}
+                              {task.relatedMemberId && (
+                                <span>
+                                  {t('tasks.memberLabel')}: {task.relatedMemberId.firstName}{' '}
+                                  {task.relatedMemberId.lastName}
+                                </span>
+                              )}
+                              {task.emailSent && (
+                                <span className="text-success">{t('tasks.emailSent')}</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 self-end sm:self-start">
+                            {task.status !== 'completed' && (
+                              <button
+                                onClick={() => completeTask(task._id)}
+                                aria-label={t('tasks.completeAria').replace('{title}', task.title)}
+                                title={t('tasks.completeTitle')}
+                                className="focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full text-success hover:bg-success/10 transition-colors"
+                              >
+                                <CheckCircleIcon className="h-5 w-5" aria-hidden="true" />
+                              </button>
                             )}
-                            {task.emailSent && <span className="text-green-700">✓ Email Sent</span>}
+                            <button
+                              onClick={() => deleteTask(task)}
+                              aria-label={t('tasks.deleteAria').replace('{title}', task.title)}
+                              title={t('tasks.deleteTitle')}
+                              className="focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors"
+                            >
+                              <TrashIcon className="h-5 w-5" aria-hidden="true" />
+                            </button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 self-end sm:self-start">
-                          {task.status !== 'completed' && (
-                            <button
-                              onClick={() => completeTask(task._id)}
-                              aria-label={`Mark ${task.title} as completed`}
-                              title="Mark as completed"
-                              className="focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full text-green-700 hover:bg-green-50 transition-colors"
-                            >
-                              <CheckCircleIcon className="h-5 w-5" aria-hidden="true" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => deleteTask(task)}
-                            aria-label={`Delete ${task.title}`}
-                            title="Delete task"
-                            className="focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full text-red-700 hover:bg-red-50 transition-colors"
-                          >
-                            <TrashIcon className="h-5 w-5" aria-hidden="true" />
-                          </button>
-                        </div>
-                      </div>
+                      </Card>
                     </li>
                   )
                 })}
@@ -333,7 +363,7 @@ export default function TasksView({ initialTasks, initialNextCursor = null }: Ta
               )}
             </>
           )}
-        </div>
+        </Card>
       </div>
 
       <TaskFormModal

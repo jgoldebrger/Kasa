@@ -123,7 +123,7 @@ function PaymentsTabContent(props: FamilyDetailContextValue) {
   return (
     <div>
       <div className="flex justify-between mb-4">
-        <h3 className="text-lg font-semibold">Payments</h3>
+        <h3 className="text-lg font-semibold text-fg">Payments</h3>
         <Button
           size="sm"
           leftIcon={<PlusIcon className="h-4 w-4" aria-hidden="true" />}

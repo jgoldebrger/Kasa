@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import Link from 'next/link'
 import { z } from 'zod'
-import { Button, ButtonLink, Input, Skeleton } from '@/app/components/ui'
+import { Button, ButtonLink, Card, Input, Skeleton } from '@/app/components/ui'
 import { useFormState } from '@/lib/client/useFormState'
 import { useToast } from '@/app/components/Toast'
 import { useT } from '@/lib/client/i18n'
@@ -78,16 +78,16 @@ function SignupForm() {
         </div>
 
         {codeState.kind === 'loading' && (
-          <div className="surface-card p-6 space-y-3">
+          <Card className="space-y-3">
             <Skeleton h={20} w="60%" />
             <Skeleton h={42} />
             <Skeleton h={42} />
             <Skeleton h={42} />
-          </div>
+          </Card>
         )}
 
         {codeState.kind === 'invalid' && (
-          <div className="surface-card p-6 text-center space-y-4">
+          <Card className="text-center space-y-4">
             <div
               className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-app-subtle border border-border text-fg-subtle"
               aria-hidden="true"
@@ -104,7 +104,7 @@ function SignupForm() {
                 {t('auth.signIn')}
               </ButtonLink>
             </div>
-          </div>
+          </Card>
         )}
 
         {codeState.kind === 'valid' && (
@@ -180,46 +180,48 @@ function ValidSignupForm({
   })
 
   return (
-    <form onSubmit={form.handleSubmit} className="surface-card p-6 space-y-5" noValidate>
-      <Input
-        label={t('auth.email')}
-        type="email"
-        value={email}
-        readOnly
-        disabled
-        hint={t('signup.emailHint')}
-        autoComplete="email"
-      />
+    <Card>
+      <form onSubmit={form.handleSubmit} className="space-y-5" noValidate>
+        <Input
+          label={t('auth.email')}
+          type="email"
+          value={email}
+          readOnly
+          disabled
+          hint={t('signup.emailHint')}
+          autoComplete="email"
+        />
 
-      <Input
-        label={t('signup.fullName')}
-        type="text"
-        required
-        autoComplete="name"
-        placeholder={t('signup.namePlaceholder')}
-        {...form.register('name')}
-      />
+        <Input
+          label={t('signup.fullName')}
+          type="text"
+          required
+          autoComplete="name"
+          placeholder={t('signup.namePlaceholder')}
+          {...form.register('name')}
+        />
 
-      <Input
-        label={t('auth.password')}
-        type="password"
-        required
-        autoComplete="new-password"
-        placeholder={t('signup.passwordPlaceholder')}
-        {...form.register('password')}
-      />
+        <Input
+          label={t('auth.password')}
+          type="password"
+          required
+          autoComplete="new-password"
+          placeholder={t('signup.passwordPlaceholder')}
+          {...form.register('password')}
+        />
 
-      <Button type="submit" loading={form.isSubmitting} block size="lg">
-        {t('signup.createAccount')}
-      </Button>
+        <Button type="submit" loading={form.isSubmitting} block size="lg">
+          {t('signup.createAccount')}
+        </Button>
 
-      <p className="text-sm text-fg-muted text-center">
-        {t('signup.alreadyHaveAccount')}{' '}
-        <Link href="/login" className="text-accent hover:text-accent-hover font-medium">
-          {t('auth.signIn')}
-        </Link>
-      </p>
-    </form>
+        <p className="text-sm text-fg-muted text-center">
+          {t('signup.alreadyHaveAccount')}{' '}
+          <Link href="/login" className="text-accent hover:text-accent-hover font-medium">
+            {t('auth.signIn')}
+          </Link>
+        </p>
+      </form>
+    </Card>
   )
 }
 

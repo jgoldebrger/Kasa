@@ -24,6 +24,7 @@ import { FAMILY_BALANCES_IDS_CAP } from '@/lib/schemas'
 import { parseFamiliesListResponse } from '@/lib/client/families-list'
 import {
   Button,
+  Card,
   DataView,
   EmptyState,
   Input,
@@ -64,9 +65,7 @@ interface Transaction {
   notes: string
 }
 
-const buildStatementTxColumns = (
-  formatMoney: (v: number) => string,
-): DataColumn<Transaction>[] => [
+const buildStatementTxColumns = (formatMoney: (v: number) => string): DataColumn<Transaction>[] => [
   {
     id: 'date',
     header: 'Date',
@@ -84,17 +83,17 @@ const buildStatementTxColumns = (
           t.type === 'payment'
             ? 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300'
             : t.type === 'withdrawal' || t.type === 'cycle-charge'
-            ? 'bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-300'
-            : 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300'
+              ? 'bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-300'
+              : 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300'
         }`}
       >
         {t.type === 'payment'
           ? 'Payment'
           : t.type === 'withdrawal'
-          ? 'Withdrawal'
-          : t.type === 'cycle-charge'
-          ? 'Annual Dues'
-          : 'Event'}
+            ? 'Withdrawal'
+            : t.type === 'cycle-charge'
+              ? 'Annual Dues'
+              : 'Event'}
       </span>
     ),
     exportValue: (t) => t.type,
@@ -137,9 +136,7 @@ export interface StatementsViewProps {
   initialStatements?: Statement[]
 }
 
-export default function StatementsView({
-  initialStatements,
-}: StatementsViewProps = {}) {
+export default function StatementsView({ initialStatements }: StatementsViewProps = {}) {
   const toast = useToast()
   const confirm = useConfirm()
   const { format: formatMoney } = useCurrency()
@@ -174,7 +171,11 @@ export default function StatementsView({
   const [sendingEmails, setSendingEmails] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [autoGenerating, setAutoGenerating] = useState(false)
-  const [emailResult, setEmailResult] = useState<{ sent: number; failed: number; errors: string[] } | null>(null)
+  const [emailResult, setEmailResult] = useState<{
+    sent: number
+    failed: number
+    errors: string[]
+  } | null>(null)
   const [expandedStatement, setExpandedStatement] = useState<string | null>(null)
   const [statementDetails, setStatementDetails] = useState<{ [key: string]: Transaction[] }>({})
   const [formData, setFormData] = useState({ familyId: '', fromDate: '', toDate: '' })
@@ -353,35 +354,37 @@ export default function StatementsView({
     }
   }, [showModal, pickerSearch])
 
-  useOrgChanged(useCallback(() => {
-    invalidate()
-    pollGenRef.current += 1
-    hasFetchedRef.current = false
-    hasFetchedPickerFamiliesRef.current = false
-    setStatements([])
-    setFamilyNameById({})
-    setPickerFamilies([])
-    setPickerSearch('')
-    setDebouncedPickerSearch('')
-    setStatementDetails({})
-    setExpandedStatement(null)
-    // Clear cross-tenant email config + UI state. Without this the
-    // previous org's Gmail "from" address and any partially-typed
-    // password would stay visible after switching orgs.
-    setEmailConfig(null)
-    setEmailFormData((prev) => ({
-      ...prev,
-      email: '',
-      password: '',
-      fromName: 'Kasa Family Management',
-    }))
-    setEmailResult(null)
-    setSendingEmails(false)
-    setGenerating(false)
-    setAutoGenerating(false)
-    setLoading(true)
-    fetchData()
-  }, [fetchData, invalidate]))
+  useOrgChanged(
+    useCallback(() => {
+      invalidate()
+      pollGenRef.current += 1
+      hasFetchedRef.current = false
+      hasFetchedPickerFamiliesRef.current = false
+      setStatements([])
+      setFamilyNameById({})
+      setPickerFamilies([])
+      setPickerSearch('')
+      setDebouncedPickerSearch('')
+      setStatementDetails({})
+      setExpandedStatement(null)
+      // Clear cross-tenant email config + UI state. Without this the
+      // previous org's Gmail "from" address and any partially-typed
+      // password would stay visible after switching orgs.
+      setEmailConfig(null)
+      setEmailFormData((prev) => ({
+        ...prev,
+        email: '',
+        password: '',
+        fromName: 'Kasa Family Management',
+      }))
+      setEmailResult(null)
+      setSendingEmails(false)
+      setGenerating(false)
+      setAutoGenerating(false)
+      setLoading(true)
+      fetchData()
+    }, [fetchData, invalidate]),
+  )
 
   const fetchStatementDetails = async (statementId: string) => {
     if (statementDetails[statementId]) {
@@ -616,7 +619,9 @@ export default function StatementsView({
         await new Promise((r) => setTimeout(r, 2000))
         if (!mountedRef.current || pollGen !== pollGenRef.current) return
         try {
-          const sres = await fetch(`/api/statements/send-emails/status?jobId=${encodeURIComponent(jobId)}`)
+          const sres = await fetch(
+            `/api/statements/send-emails/status?jobId=${encodeURIComponent(jobId)}`,
+          )
           if (!mountedRef.current || pollGen !== pollGenRef.current) return
           if (!sres.ok) continue
           const status = await sres.json()
@@ -704,7 +709,10 @@ export default function StatementsView({
                 <span className="hidden sm:inline">Generate Monthly Batch</span>
                 <span className="sm:hidden">Batch</span>
               </Button>
-              <Button leftIcon={<PlusIcon className="h-5 w-5" />} onClick={() => setShowModal(true)}>
+              <Button
+                leftIcon={<PlusIcon className="h-5 w-5" />}
+                onClick={() => setShowModal(true)}
+              >
                 Generate
               </Button>
             </>
@@ -715,7 +723,7 @@ export default function StatementsView({
             new year-end tax-receipts workflow. Kept inline (not deep-linked)
             because receipts are a print-once-per-year flow — not worth a
             URL slot, and matches the rest of the page's modal-driven UX. */}
-        <div className="bg-surface rounded-2xl shadow border border-border mb-6 p-2 sm:p-3">
+        <Card compact className="mb-6">
           <Tabs
             label="Statements sections"
             activeId={view}
@@ -739,299 +747,323 @@ export default function StatementsView({
               },
             ]}
           />
-        </div>
+        </Card>
 
         {view === 'receipts' ? (
           <TaxReceiptsPanel />
         ) : (
-        <div className="bg-surface rounded-2xl shadow overflow-hidden border border-border">
-          <div className="p-4 border-b border-border">
-            <h2 className="text-lg font-semibold text-fg">Last Month&apos;s Statements</h2>
-            <p className="text-sm text-fg-muted">
-              Showing statements from{' '}
-              {new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toLocaleDateString()} to{' '}
-              {new Date(new Date().getFullYear(), new Date().getMonth(), 0).toLocaleDateString()}.
-            </p>
-          </div>
+          <Card noPadding>
+            <div className="p-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-fg">Last Month&apos;s Statements</h2>
+              <p className="text-sm text-fg-muted">
+                Showing statements from{' '}
+                {new Date(
+                  new Date().getFullYear(),
+                  new Date().getMonth() - 1,
+                  1,
+                ).toLocaleDateString()}{' '}
+                to{' '}
+                {new Date(new Date().getFullYear(), new Date().getMonth(), 0).toLocaleDateString()}.
+              </p>
+            </div>
 
-          {loading ? (
-            <div className="p-6">
-              <SkeletonRows count={5} />
-            </div>
-          ) : error ? (
-            <div className="p-6">
-              <EmptyState
-                icon={<ExclamationTriangleIcon />}
-                title="Couldn't load statements"
-                description="Check your connection and try again."
-                cta={{ label: 'Retry', onClick: () => fetchData() }}
-              />
-            </div>
-          ) : (
-            <div className="p-4 sm:p-6">
-              <DataView<Statement>
-                tableId="statements"
-                rows={statements}
-                rowKey={(s) => s._id}
-                tableFrom="never"
-                globalSearch={{
-                  placeholder: 'Search statement #, family…',
-                  getValue: (s) => {
-                    const name = getFamilyName(s.familyId)
-                    return [s.statementNumber, name === 'N/A' ? '' : name].filter(Boolean).join(' ')
-                  },
-                }}
-                pageSize={10}
-                columns={[
-                  {
-                    id: 'statementNumber',
-                    header: 'Statement #',
-                    headerText: 'Statement #',
-                    cell: (s) => s.statementNumber,
-                    filter: { type: 'text' },
-                  },
-                  {
-                    id: 'family',
-                    header: 'Family',
-                    headerText: 'Family',
-                    cell: (s) => getFamilyName(s.familyId),
-                    exportValue: (s) => {
+            {loading ? (
+              <div className="p-6">
+                <SkeletonRows count={5} />
+              </div>
+            ) : error ? (
+              <div className="p-6">
+                <EmptyState
+                  icon={<ExclamationTriangleIcon />}
+                  title="Couldn't load statements"
+                  description="Check your connection and try again."
+                  cta={{ label: 'Retry', onClick: () => fetchData() }}
+                />
+              </div>
+            ) : (
+              <div className="p-4 sm:p-6">
+                <DataView<Statement>
+                  tableId="statements"
+                  rows={statements}
+                  rowKey={(s) => s._id}
+                  tableFrom="never"
+                  globalSearch={{
+                    placeholder: 'Search statement #, family…',
+                    getValue: (s) => {
                       const name = getFamilyName(s.familyId)
-                      return name === 'N/A' ? '' : name
+                      return [s.statementNumber, name === 'N/A' ? '' : name]
+                        .filter(Boolean)
+                        .join(' ')
                     },
-                    filter: {
-                      type: 'select',
-                      getValue: (s) => {
+                  }}
+                  pageSize={10}
+                  columns={[
+                    {
+                      id: 'statementNumber',
+                      header: 'Statement #',
+                      headerText: 'Statement #',
+                      cell: (s) => s.statementNumber,
+                      filter: { type: 'text' },
+                    },
+                    {
+                      id: 'family',
+                      header: 'Family',
+                      headerText: 'Family',
+                      cell: (s) => getFamilyName(s.familyId),
+                      exportValue: (s) => {
                         const name = getFamilyName(s.familyId)
                         return name === 'N/A' ? '' : name
                       },
+                      filter: {
+                        type: 'select',
+                        getValue: (s) => {
+                          const name = getFamilyName(s.familyId)
+                          return name === 'N/A' ? '' : name
+                        },
+                      },
                     },
-                  },
-                  {
-                    id: 'fromDate',
-                    header: 'From',
-                    headerText: 'From',
-                    cell: (s) => formatLocaleDate(s.fromDate),
-                    exportValue: (s) => (s.fromDate ? new Date(s.fromDate) : ''),
-                    filter: { type: 'dateRange', getValue: (s) => s.fromDate || null },
-                  },
-                  {
-                    id: 'toDate',
-                    header: 'To',
-                    headerText: 'To',
-                    cell: (s) => formatLocaleDate(s.toDate),
-                    exportValue: (s) => (s.toDate ? new Date(s.toDate) : ''),
-                    filter: { type: 'dateRange', getValue: (s) => s.toDate || null },
-                  },
-                  {
-                    id: 'openingBalance',
-                    header: 'Opening',
-                    headerText: 'Opening Balance',
-                    // Desktop table previously rendered the raw number
-                    // (e.g. `12.3456789` from float math); mobile cards
-                    // used `formatMoney`. Same column should respect the
-                    // org's currency formatter on both surfaces.
-                    cell: (s) => formatMoney(Number(s.openingBalance ?? 0)),
-                    exportValue: (s) => s.openingBalance ?? 0,
-                    filter: { type: 'numberRange', getValue: (s) => s.openingBalance ?? 0 },
-                  },
-                  {
-                    id: 'income',
-                    header: 'Income',
-                    headerText: 'Income',
-                    cell: (s) => formatMoney(Number(s.income ?? 0)),
-                    exportValue: (s) => s.income ?? 0,
-                  },
-                  {
-                    id: 'withdrawals',
-                    header: 'Withdrawals',
-                    headerText: 'Withdrawals',
-                    cell: (s) => formatMoney(Number(s.withdrawals ?? 0)),
-                    exportValue: (s) => s.withdrawals ?? 0,
-                  },
-                  {
-                    id: 'expenses',
-                    header: 'Expenses',
-                    headerText: 'Expenses',
-                    cell: (s) => formatMoney(Number(s.expenses ?? 0)),
-                    exportValue: (s) => s.expenses ?? 0,
-                  },
-                  {
-                    id: 'closingBalance',
-                    header: 'Closing',
-                    headerText: 'Closing Balance',
-                    cell: (s) => formatMoney(Number(s.closingBalance ?? 0)),
-                    exportValue: (s) => s.closingBalance ?? 0,
-                    filter: { type: 'numberRange', getValue: (s) => s.closingBalance ?? 0 },
-                  },
-                ]}
-                mobileCard={(statement) => {
-                  const familyName = getFamilyName(statement.familyId)
-                  const familyId = statement.familyId
-                  const isExpanded = expandedStatement === statement._id
-                  const transactions = statementDetails[statement._id] || []
-                  return (
-                    <div className="rounded-xl border border-border bg-surface p-4 sm:p-6 hover:bg-app-subtle transition-colors">
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 flex-1 min-w-0">
-                          <div>
-                            <div className="text-xs text-fg-muted">Statement #</div>
-                            <div className="font-medium text-fg truncate">{statement.statementNumber}</div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-fg-muted">Family</div>
-                            {familyName !== 'N/A' ? (
-                              <Link
-                                href={`/families/${familyId}`}
-                                className="focus-ring font-medium text-accent hover:text-accent-hover hover:underline rounded"
-                              >
-                                {familyName}
-                              </Link>
-                            ) : (
-                              <div className="font-medium text-fg-muted">N/A</div>
-                            )}
-                          </div>
-                          <div className="col-span-2 sm:col-span-1">
-                            <div className="text-xs text-fg-muted">Period</div>
-                            <div className="text-sm">
-                              {new Date(statement.fromDate).toLocaleDateString()} —{' '}
-                              {new Date(statement.toDate).toLocaleDateString()}
+                    {
+                      id: 'fromDate',
+                      header: 'From',
+                      headerText: 'From',
+                      cell: (s) => formatLocaleDate(s.fromDate),
+                      exportValue: (s) => (s.fromDate ? new Date(s.fromDate) : ''),
+                      filter: { type: 'dateRange', getValue: (s) => s.fromDate || null },
+                    },
+                    {
+                      id: 'toDate',
+                      header: 'To',
+                      headerText: 'To',
+                      cell: (s) => formatLocaleDate(s.toDate),
+                      exportValue: (s) => (s.toDate ? new Date(s.toDate) : ''),
+                      filter: { type: 'dateRange', getValue: (s) => s.toDate || null },
+                    },
+                    {
+                      id: 'openingBalance',
+                      header: 'Opening',
+                      headerText: 'Opening Balance',
+                      // Desktop table previously rendered the raw number
+                      // (e.g. `12.3456789` from float math); mobile cards
+                      // used `formatMoney`. Same column should respect the
+                      // org's currency formatter on both surfaces.
+                      cell: (s) => formatMoney(Number(s.openingBalance ?? 0)),
+                      exportValue: (s) => s.openingBalance ?? 0,
+                      filter: { type: 'numberRange', getValue: (s) => s.openingBalance ?? 0 },
+                    },
+                    {
+                      id: 'income',
+                      header: 'Income',
+                      headerText: 'Income',
+                      cell: (s) => formatMoney(Number(s.income ?? 0)),
+                      exportValue: (s) => s.income ?? 0,
+                    },
+                    {
+                      id: 'withdrawals',
+                      header: 'Withdrawals',
+                      headerText: 'Withdrawals',
+                      cell: (s) => formatMoney(Number(s.withdrawals ?? 0)),
+                      exportValue: (s) => s.withdrawals ?? 0,
+                    },
+                    {
+                      id: 'expenses',
+                      header: 'Expenses',
+                      headerText: 'Expenses',
+                      cell: (s) => formatMoney(Number(s.expenses ?? 0)),
+                      exportValue: (s) => s.expenses ?? 0,
+                    },
+                    {
+                      id: 'closingBalance',
+                      header: 'Closing',
+                      headerText: 'Closing Balance',
+                      cell: (s) => formatMoney(Number(s.closingBalance ?? 0)),
+                      exportValue: (s) => s.closingBalance ?? 0,
+                      filter: { type: 'numberRange', getValue: (s) => s.closingBalance ?? 0 },
+                    },
+                  ]}
+                  mobileCard={(statement) => {
+                    const familyName = getFamilyName(statement.familyId)
+                    const familyId = statement.familyId
+                    const isExpanded = expandedStatement === statement._id
+                    const transactions = statementDetails[statement._id] || []
+                    return (
+                      <Card compact className="hover:bg-app-subtle transition-colors">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 flex-1 min-w-0">
+                            <div>
+                              <div className="text-xs text-fg-muted">Statement #</div>
+                              <div className="font-medium text-fg truncate">
+                                {statement.statementNumber}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-fg-muted">Family</div>
+                              {familyName !== 'N/A' ? (
+                                <Link
+                                  href={`/families/${familyId}`}
+                                  className="focus-ring font-medium text-accent hover:text-accent-hover hover:underline rounded"
+                                >
+                                  {familyName}
+                                </Link>
+                              ) : (
+                                <div className="font-medium text-fg-muted">N/A</div>
+                              )}
+                            </div>
+                            <div className="col-span-2 sm:col-span-1">
+                              <div className="text-xs text-fg-muted">Period</div>
+                              <div className="text-sm">
+                                {new Date(statement.fromDate).toLocaleDateString()} —{' '}
+                                {new Date(statement.toDate).toLocaleDateString()}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-fg-muted">Opening Balance</div>
+                              <div className="font-medium">
+                                {formatMoney(statement.openingBalance)}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-fg-muted">Closing Balance</div>
+                              <div className="font-bold text-base sm:text-lg text-fg">
+                                {formatMoney(statement.closingBalance)}
+                              </div>
                             </div>
                           </div>
+                          <div className="flex flex-wrap gap-1 lg:ml-4">
+                            <button
+                              onClick={() => fetchStatementDetails(statement._id)}
+                              className="focus-ring inline-flex items-center gap-1 px-3 py-2 text-sm text-accent hover:text-accent-hover hover:bg-accent/10 rounded-lg"
+                              aria-expanded={isExpanded}
+                            >
+                              {isExpanded ? (
+                                <ChevronUpIcon className="h-5 w-5" aria-hidden="true" />
+                              ) : (
+                                <ChevronDownIcon className="h-5 w-5" aria-hidden="true" />
+                              )}
+                              {isExpanded ? 'Hide' : 'View'} Details
+                            </button>
+                            <button
+                              onClick={() => handlePrint(statement)}
+                              aria-label={`Print statement ${statement.statementNumber}`}
+                              title="Print"
+                              className="focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full text-fg hover:bg-fg/5"
+                            >
+                              <PrinterIcon className="h-5 w-5" aria-hidden="true" />
+                            </button>
+                            <button
+                              onClick={() => handlePrint(statement)}
+                              aria-label={`Save statement ${statement.statementNumber} as PDF`}
+                              title="Save as PDF"
+                              className="focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full text-green-700 hover:bg-green-50"
+                            >
+                              <DocumentArrowDownIcon className="h-5 w-5" aria-hidden="true" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-sm">
                           <div>
-                            <div className="text-xs text-fg-muted">Opening Balance</div>
-                            <div className="font-medium">{formatMoney(statement.openingBalance)}</div>
+                            <span className="text-fg-muted">Income: </span>
+                            <span className="font-medium text-green-700">
+                              {formatMoney(statement.income)}
+                            </span>
                           </div>
                           <div>
-                            <div className="text-xs text-fg-muted">Closing Balance</div>
-                            <div className="font-bold text-base sm:text-lg text-fg">
-                              {formatMoney(statement.closingBalance)}
-                            </div>
+                            <span className="text-fg-muted">Withdrawals: </span>
+                            <span className="font-medium text-orange-700">
+                              {formatMoney(statement.withdrawals)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-fg-muted">Expenses: </span>
+                            <span className="font-medium text-red-700">
+                              {formatMoney(statement.expenses)}
+                            </span>
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-1 lg:ml-4">
-                          <button
-                            onClick={() => fetchStatementDetails(statement._id)}
-                            className="focus-ring inline-flex items-center gap-1 px-3 py-2 text-sm text-accent hover:text-accent-hover hover:bg-accent/10 rounded-lg"
-                            aria-expanded={isExpanded}
-                          >
-                            {isExpanded ? (
-                              <ChevronUpIcon className="h-5 w-5" aria-hidden="true" />
-                            ) : (
-                              <ChevronDownIcon className="h-5 w-5" aria-hidden="true" />
-                            )}
-                            {isExpanded ? 'Hide' : 'View'} Details
-                          </button>
-                          <button
-                            onClick={() => handlePrint(statement)}
-                            aria-label={`Print statement ${statement.statementNumber}`}
-                            title="Print"
-                            className="focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full text-fg hover:bg-fg/5"
-                          >
-                            <PrinterIcon className="h-5 w-5" aria-hidden="true" />
-                          </button>
-                          <button
-                            onClick={() => handlePrint(statement)}
-                            aria-label={`Save statement ${statement.statementNumber} as PDF`}
-                            title="Save as PDF"
-                            className="focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full text-green-700 hover:bg-green-50"
-                          >
-                            <DocumentArrowDownIcon className="h-5 w-5" aria-hidden="true" />
-                          </button>
-                        </div>
-                      </div>
 
-                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-sm">
-                        <div>
-                          <span className="text-fg-muted">Income: </span>
-                          <span className="font-medium text-green-700">{formatMoney(statement.income)}</span>
-                        </div>
-                        <div>
-                          <span className="text-fg-muted">Withdrawals: </span>
-                          <span className="font-medium text-orange-700">{formatMoney(statement.withdrawals)}</span>
-                        </div>
-                        <div>
-                          <span className="text-fg-muted">Expenses: </span>
-                          <span className="font-medium text-red-700">{formatMoney(statement.expenses)}</span>
-                        </div>
-                      </div>
-
-                      {isExpanded && transactions.length > 0 && (
-                        <div className="mt-6 pt-6 border-t border-border animate-ui-fade">
-                          <h3 className="font-semibold mb-4 text-fg">Transaction Details</h3>
-                          <DataView
-                            tableId="statement-transactions"
-                            rows={transactions}
-                            columns={statementTxColumns}
-                            rowKey={(_t, i) => String(i)}
-                            exportFileName={`statement-${statement.statementNumber || statement._id}-transactions`}
-                            pageSize={10}
-                            globalSearch={{ placeholder: 'Search…' }}
-                            mobileCard={(t) => (
-                              <div className="surface-card p-3 text-sm">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="text-fg">{t.description}</div>
-                                  <div
-                                    className={`font-medium tabular ${
-                                      t.amount >= 0
-                                        ? 'text-green-700 dark:text-green-400'
-                                        : 'text-red-700 dark:text-red-400'
-                                    }`}
-                                  >
-                                    {formatMoney(t.amount)}
+                        {isExpanded && transactions.length > 0 && (
+                          <div className="mt-6 pt-6 border-t border-border animate-ui-fade">
+                            <h3 className="font-semibold mb-4 text-fg">Transaction Details</h3>
+                            <DataView
+                              tableId="statement-transactions"
+                              rows={transactions}
+                              columns={statementTxColumns}
+                              rowKey={(_t, i) => String(i)}
+                              exportFileName={`statement-${statement.statementNumber || statement._id}-transactions`}
+                              pageSize={10}
+                              globalSearch={{ placeholder: 'Search…' }}
+                              mobileCard={(t) => (
+                                <div className="surface-card p-3 text-sm">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="text-fg">{t.description}</div>
+                                    <div
+                                      className={`font-medium tabular ${
+                                        t.amount >= 0
+                                          ? 'text-green-700 dark:text-green-400'
+                                          : 'text-red-700 dark:text-red-400'
+                                      }`}
+                                    >
+                                      {formatMoney(t.amount)}
+                                    </div>
+                                  </div>
+                                  <div className="mt-1 flex justify-between text-xs text-fg-muted">
+                                    <span>{t.type}</span>
+                                    <span className="tabular">
+                                      {new Date(t.date).toLocaleDateString()}
+                                    </span>
                                   </div>
                                 </div>
-                                <div className="mt-1 flex justify-between text-xs text-fg-muted">
-                                  <span>{t.type}</span>
-                                  <span className="tabular">
-                                    {new Date(t.date).toLocaleDateString()}
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )
-                }}
-                empty={
-                  <EmptyState
-                    icon={<DocumentTextIcon className="h-10 w-10" />}
-                    title="No statements for last month"
-                    description="Generate monthly statements for all your families in one click, or create a single statement for a specific family."
-                    cta={{ label: 'Generate Statement', onClick: () => setShowModal(true) }}
-                    secondaryCta={{
-                      label: 'Generate Monthly Batch',
-                      onClick: async () => {
-                        setAutoGenerating(true)
-                        try {
-                          const res = await fetch('/api/statements/auto-generate', { method: 'POST' })
-                          if (!res.ok) {
+                              )}
+                            />
+                          </div>
+                        )}
+                      </Card>
+                    )
+                  }}
+                  empty={
+                    <EmptyState
+                      icon={<DocumentTextIcon className="h-10 w-10" />}
+                      title="No statements for last month"
+                      description="Generate monthly statements for all your families in one click, or create a single statement for a specific family."
+                      cta={{ label: 'Generate Statement', onClick: () => setShowModal(true) }}
+                      secondaryCta={{
+                        label: 'Generate Monthly Batch',
+                        onClick: async () => {
+                          setAutoGenerating(true)
+                          try {
+                            const res = await fetch('/api/statements/auto-generate', {
+                              method: 'POST',
+                            })
+                            if (!res.ok) {
+                              const result = await res.json().catch(() => ({}))
+                              toast.error(result.error || 'Failed to generate statements.')
+                              return
+                            }
                             const result = await res.json().catch(() => ({}))
-                            toast.error(result.error || 'Failed to generate statements.')
-                            return
+                            toast.success(`Successfully generated ${result.generated} statements.`)
+                            fetchData()
+                          } catch {
+                            toast.error('Network error.')
+                          } finally {
+                            setAutoGenerating(false)
                           }
-                          const result = await res.json().catch(() => ({}))
-                          toast.success(`Successfully generated ${result.generated} statements.`)
-                          fetchData()
-                        } catch {
-                          toast.error('Network error.')
-                        } finally {
-                          setAutoGenerating(false)
-                        }
-                      },
-                    }}
-                  />
-                }
-              />
-            </div>
-          )}
-        </div>
+                        },
+                      }}
+                    />
+                  }
+                />
+              </div>
+            )}
+          </Card>
         )}
 
         {/* Generate Single Statement */}
-        <Modal open={showModal} onClose={() => setShowModal(false)} title="Generate Statement" maxWidth="max-w-md">
+        <Modal
+          open={showModal}
+          onClose={() => setShowModal(false)}
+          title="Generate Statement"
+          maxWidth="max-w-md"
+        >
           <form onSubmit={handleGenerate} className="space-y-4" noValidate>
             <Input
               label="Search families"
@@ -1093,10 +1125,14 @@ export default function StatementsView({
           {emailResult && (
             <div
               className={`mb-4 p-4 rounded-lg ${
-                emailResult.failed > 0 ? 'bg-yellow-50 border border-yellow-200' : 'bg-green-50 border border-green-200'
+                emailResult.failed > 0
+                  ? 'bg-yellow-50 border border-yellow-200'
+                  : 'bg-green-50 border border-green-200'
               }`}
             >
-              <p className={`font-semibold ${emailResult.failed > 0 ? 'text-yellow-800' : 'text-green-800'}`}>
+              <p
+                className={`font-semibold ${emailResult.failed > 0 ? 'text-yellow-800' : 'text-green-800'}`}
+              >
                 Sent: {emailResult.sent} · Failed: {emailResult.failed}
               </p>
               {emailResult.errors.length > 0 && (
@@ -1182,7 +1218,9 @@ export default function StatementsView({
                       type="email"
                       autoComplete="email"
                       value={emailFormData.email}
-                      onChange={(e) => setEmailFormData({ ...emailFormData, email: e.target.value })}
+                      onChange={(e) =>
+                        setEmailFormData({ ...emailFormData, email: e.target.value })
+                      }
                     />
                     <Input
                       label="Gmail App Password"
@@ -1190,13 +1228,17 @@ export default function StatementsView({
                       autoComplete="current-password"
                       placeholder="Leave empty to keep current password"
                       value={emailFormData.password}
-                      onChange={(e) => setEmailFormData({ ...emailFormData, password: e.target.value })}
+                      onChange={(e) =>
+                        setEmailFormData({ ...emailFormData, password: e.target.value })
+                      }
                     />
                     <Input
                       label="From Name"
                       type="text"
                       value={emailFormData.fromName}
-                      onChange={(e) => setEmailFormData({ ...emailFormData, fromName: e.target.value })}
+                      onChange={(e) =>
+                        setEmailFormData({ ...emailFormData, fromName: e.target.value })
+                      }
                     />
                     <label className="flex items-center gap-2 text-sm text-fg">
                       <input

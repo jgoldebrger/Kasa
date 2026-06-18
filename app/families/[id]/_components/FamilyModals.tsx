@@ -10,6 +10,7 @@ import { convertToHebrewDate } from '@/lib/hebrew-date'
 import { invalidate as invalidateCache } from '@/lib/client-cache'
 import { normalizePlanId } from '@/lib/payment-plan-display'
 import { Modal } from '@/app/components/ui/Modal'
+import { Button, Input, Select, Textarea } from '@/app/components/ui'
 
 const StripePaymentForm = dynamic(() => import('@/app/components/StripePaymentForm'), {
   ssr: false,
@@ -145,583 +146,515 @@ export default function FamilyModals() {
     }
   }
 
+  const resetMemberForm = () => {
+    setMemberForm({
+      firstName: '',
+      hebrewFirstName: '',
+      lastName: '',
+      hebrewLastName: '',
+      birthDate: '',
+      hebrewBirthDate: '',
+      gender: '',
+      weddingDate: '',
+      spouseName: '',
+      spouseFirstName: '',
+      spouseHebrewName: '',
+      spouseFatherHebrewName: '',
+      spouseCellPhone: '',
+      phone: '',
+      email: '',
+      address: '',
+      city: '',
+      state: '',
+      zip: '',
+    })
+  }
+
+  const closeMemberModal = () => {
+    setShowMemberModal(false)
+    setEditingMember(null)
+    resetMemberForm()
+  }
+
   return (
     <>
       {showMemberModal && isAdmin && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="surface-card rounded-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-border">
-            <h2 className="text-2xl font-bold mb-2 text-fg">
-              {editingMember ? 'Edit Child' : 'Add Child'}
-            </h2>
-            <p className="text-sm text-fg-muted mb-6">Add a child to the family</p>
-            <form
-              onSubmit={async (e) => {
-                if (memberSubmitting) return
-                setMemberSubmitting(true)
-                try {
-                  await (editingMember ? handleUpdateMember : handleAddMember)(e)
-                } finally {
-                  setMemberSubmitting(false)
+        <Modal
+          open
+          title={editingMember ? 'Edit Child' : 'Add Child'}
+          description="Add a child to the family"
+          onClose={closeMemberModal}
+          maxWidth="max-w-md"
+        >
+          <form
+            onSubmit={async (e) => {
+              if (memberSubmitting) return
+              setMemberSubmitting(true)
+              try {
+                await (editingMember ? handleUpdateMember : handleAddMember)(e)
+              } finally {
+                setMemberSubmitting(false)
+              }
+            }}
+            className="space-y-4"
+          >
+            <Input
+              label="First Name"
+              type="text"
+              required
+              value={memberForm.firstName}
+              onChange={(e) => setMemberForm({ ...memberForm, firstName: e.target.value })}
+              onBlur={(e) => {
+                if (e.target.value) {
+                  setMemberForm({ ...memberForm, firstName: capitalizeName(e.target.value) })
                 }
               }}
-              className="space-y-5"
+              placeholder="Enter first name"
+            />
+            <Input
+              label="First Name (Hebrew)"
+              type="text"
+              required
+              dir="rtl"
+              lang="he"
+              inputMode="text"
+              value={memberForm.hebrewFirstName}
+              onChange={(e) => setMemberForm({ ...memberForm, hebrewFirstName: e.target.value })}
+              onKeyDown={(e) =>
+                handleHebrewInput(e, (value) =>
+                  setMemberForm((prev) => ({
+                    ...prev,
+                    hebrewFirstName:
+                      typeof value === 'function' ? value(prev.hebrewFirstName) : value,
+                  })),
+                )
+              }
+              className="text-right font-hebrew"
+              placeholder="שם פרטי בעברית"
+              style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
+            />
+            {editingMember && (
+              <Input
+                label="Last Name"
+                type="text"
+                required
+                value={memberForm.lastName}
+                onChange={(e) => setMemberForm({ ...memberForm, lastName: e.target.value })}
+                onBlur={(e) => {
+                  if (e.target.value) {
+                    setMemberForm({ ...memberForm, lastName: capitalizeName(e.target.value) })
+                  }
+                }}
+                placeholder="Enter last name"
+              />
+            )}
+            {editingMember && (
+              <Input
+                label="Last Name (Hebrew)"
+                type="text"
+                required
+                dir="rtl"
+                lang="he"
+                inputMode="text"
+                value={memberForm.hebrewLastName}
+                onChange={(e) => setMemberForm({ ...memberForm, hebrewLastName: e.target.value })}
+                onKeyDown={(e) =>
+                  handleHebrewInput(e, (value) =>
+                    setMemberForm((prev) => ({
+                      ...prev,
+                      hebrewLastName:
+                        typeof value === 'function' ? value(prev.hebrewLastName) : value,
+                    })),
+                  )
+                }
+                className="text-right font-hebrew"
+                placeholder="שם משפחה בעברית"
+                style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
+              />
+            )}
+            <Input
+              label="Birth Date (Gregorian)"
+              type="date"
+              required
+              value={memberForm.birthDate}
+              onChange={(e) => {
+                const gregorianDate = e.target.value
+                if (gregorianDate) {
+                  const dateObj = new Date(gregorianDate)
+                  const hebrewDate = convertToHebrewDate(dateObj)
+                  setMemberForm({
+                    ...memberForm,
+                    birthDate: gregorianDate,
+                    hebrewBirthDate: hebrewDate,
+                  })
+                } else {
+                  setMemberForm({ ...memberForm, birthDate: gregorianDate })
+                }
+              }}
+              hint="Hebrew date will be auto-calculated in the background"
+            />
+            {editingMember && (
+              <Input
+                label="Hebrew Birth Date"
+                type="text"
+                value={memberForm.hebrewBirthDate}
+                onChange={(e) => setMemberForm({ ...memberForm, hebrewBirthDate: e.target.value })}
+                placeholder="Hebrew birth date"
+                hint="Used for Bar/Bat Mitzvah date (13th Hebrew birthday)"
+              />
+            )}
+            <Select
+              label="Gender"
+              value={memberForm.gender}
+              onChange={(e) => setMemberForm({ ...memberForm, gender: e.target.value as any })}
+              required
             >
-              <div>
-                <label className="block text-sm font-medium mb-2 text-fg">First Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={memberForm.firstName}
-                  onChange={(e) => setMemberForm({ ...memberForm, firstName: e.target.value })}
-                  onBlur={(e) => {
-                    if (e.target.value) {
-                      setMemberForm({ ...memberForm, firstName: capitalizeName(e.target.value) })
-                    }
-                  }}
-                  className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all"
-                  placeholder="Enter first name"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2 text-fg">
-                  First Name (Hebrew) *
-                </label>
-                <input
-                  type="text"
-                  required
-                  dir="rtl"
-                  lang="he"
-                  inputMode="text"
-                  value={memberForm.hebrewFirstName}
-                  onChange={(e) =>
-                    setMemberForm({ ...memberForm, hebrewFirstName: e.target.value })
-                  }
-                  onKeyDown={(e) =>
-                    handleHebrewInput(e, (value) =>
-                      setMemberForm((prev) => ({
-                        ...prev,
-                        hebrewFirstName:
-                          typeof value === 'function' ? value(prev.hebrewFirstName) : value,
-                      })),
-                    )
-                  }
-                  className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all text-right font-hebrew"
-                  placeholder="שם פרטי בעברית"
-                  style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
-                />
-              </div>
-              {editingMember && (
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">Last Name *</label>
-                  <input
+              <option value="">Select Gender</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </Select>
+            {editingMember && (
+              <div className="border-t border-border pt-4">
+                <p className="mb-3 text-sm font-semibold text-fg">
+                  Marriage Information (Auto-converts to new family)
+                </p>
+                <div className="space-y-4">
+                  <Input
+                    label="Wedding Date"
+                    type="date"
+                    value={memberForm.weddingDate}
+                    onChange={(e) => setMemberForm({ ...memberForm, weddingDate: e.target.value })}
+                    hint="When set, this child will be automatically converted to a new family on the wedding date and removed from current family"
+                  />
+                  <Input
+                    label="Spouse Name (Optional)"
                     type="text"
-                    required
-                    value={memberForm.lastName}
-                    onChange={(e) => setMemberForm({ ...memberForm, lastName: e.target.value })}
+                    value={memberForm.spouseName}
+                    onChange={(e) => setMemberForm({ ...memberForm, spouseName: e.target.value })}
                     onBlur={(e) => {
                       if (e.target.value) {
-                        setMemberForm({ ...memberForm, lastName: capitalizeName(e.target.value) })
+                        setMemberForm({
+                          ...memberForm,
+                          spouseName: capitalizeName(e.target.value),
+                        })
                       }
                     }}
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all"
-                    placeholder="Enter last name"
+                    placeholder="Enter spouse's full name"
+                    hint="Spouse will be added as a member of the new family"
                   />
                 </div>
-              )}
-              {editingMember && (
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">
-                    Last Name (Hebrew) *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    dir="rtl"
-                    lang="he"
-                    inputMode="text"
-                    value={memberForm.hebrewLastName}
-                    onChange={(e) =>
-                      setMemberForm({ ...memberForm, hebrewLastName: e.target.value })
-                    }
-                    onKeyDown={(e) =>
-                      handleHebrewInput(e, (value) =>
-                        setMemberForm((prev) => ({
-                          ...prev,
-                          hebrewLastName:
-                            typeof value === 'function' ? value(prev.hebrewLastName) : value,
-                        })),
-                      )
-                    }
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all text-right font-hebrew"
-                    placeholder="שם משפחה בעברית"
-                    style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
-                  />
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium mb-2 text-fg">
-                  Birth Date (Gregorian) *
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={memberForm.birthDate}
-                  onChange={(e) => {
-                    const gregorianDate = e.target.value
-                    // Auto-calculate Hebrew date from Gregorian date (but don't show it in form)
-                    if (gregorianDate) {
-                      const dateObj = new Date(gregorianDate)
-                      const hebrewDate = convertToHebrewDate(dateObj)
-                      setMemberForm({
-                        ...memberForm,
-                        birthDate: gregorianDate,
-                        hebrewBirthDate: hebrewDate,
-                      })
-                    } else {
-                      setMemberForm({ ...memberForm, birthDate: gregorianDate })
-                    }
-                  }}
-                  className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all"
-                />
-                <p className="text-xs text-fg-muted mt-1">
-                  Hebrew date will be auto-calculated in the background
-                </p>
               </div>
-              {editingMember && (
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">
-                    Hebrew Birth Date
-                  </label>
-                  <input
-                    type="text"
-                    value={memberForm.hebrewBirthDate}
-                    onChange={(e) =>
-                      setMemberForm({ ...memberForm, hebrewBirthDate: e.target.value })
-                    }
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all"
-                    placeholder="Hebrew birth date"
-                  />
-                  <p className="text-xs text-fg-muted mt-1">
-                    Hebrew date - Used for Bar/Bat Mitzvah date (13th Hebrew birthday)
-                  </p>
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium mb-2 text-fg">Gender *</label>
-                <select
-                  value={memberForm.gender}
-                  onChange={(e) => setMemberForm({ ...memberForm, gender: e.target.value as any })}
-                  className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all"
-                  required
-                >
-                  <option value="">Select Gender</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                </select>
-              </div>
-              {editingMember && (
-                <>
-                  <div className="border-t pt-4 mt-4">
-                    <p className="text-sm font-semibold text-fg mb-3">
-                      Marriage Information (Auto-converts to new family)
-                    </p>
-                    <div>
-                      <label className="block text-sm font-medium mb-2 text-fg">Wedding Date</label>
-                      <input
-                        type="date"
-                        value={memberForm.weddingDate}
-                        onChange={(e) =>
-                          setMemberForm({ ...memberForm, weddingDate: e.target.value })
-                        }
-                        className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all"
-                        placeholder="Select wedding date"
-                      />
-                      <p className="text-xs text-fg-muted mt-1">
-                        When set, this child will be automatically converted to a new family on the
-                        wedding date and removed from current family
-                      </p>
-                    </div>
-                    <div className="mt-4">
-                      <label className="block text-sm font-medium mb-2 text-fg">
-                        Spouse Name (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={memberForm.spouseName}
-                        onChange={(e) =>
-                          setMemberForm({ ...memberForm, spouseName: e.target.value })
-                        }
-                        onBlur={(e) => {
-                          if (e.target.value) {
-                            setMemberForm({
-                              ...memberForm,
-                              spouseName: capitalizeName(e.target.value),
-                            })
-                          }
-                        }}
-                        className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all"
-                        placeholder="Enter spouse's full name"
-                      />
-                      <p className="text-xs text-fg-muted mt-1">
-                        Spouse will be added as a member of the new family
-                      </p>
-                    </div>
-                  </div>
-                </>
-              )}
-              <div className="flex gap-4 justify-end pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowMemberModal(false)
-                    setEditingMember(null)
-                    setMemberForm({
-                      firstName: '',
-                      hebrewFirstName: '',
-                      lastName: '',
-                      hebrewLastName: '',
-                      birthDate: '',
-                      hebrewBirthDate: '',
-                      gender: '',
-                      weddingDate: '',
-                      spouseName: '',
-                      spouseFirstName: '',
-                      spouseHebrewName: '',
-                      spouseFatherHebrewName: '',
-                      spouseCellPhone: '',
-                      phone: '',
-                      email: '',
-                      address: '',
-                      city: '',
-                      state: '',
-                      zip: '',
-                    })
-                  }}
-                  className="px-6 py-2 border border-border rounded-xl hover:bg-app-subtle transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={memberSubmitting}
-                  className="px-6 py-2 bg-accent text-accent-fg rounded-xl hover:shadow-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none"
-                >
-                  {memberSubmitting ? 'Saving…' : editingMember ? 'Update Child' : 'Add Child'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            )}
+            <div className="flex justify-end gap-3 pt-2">
+              <Button type="button" variant="secondary" onClick={closeMemberModal}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={memberSubmitting}>
+                {editingMember ? 'Update Child' : 'Add Child'}
+              </Button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {showInfoModal && isAdmin && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="surface-card rounded-2xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-border">
-            <h2 className="text-2xl font-bold mb-4 text-fg">Edit Family Information</h2>
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault()
-                if (infoSubmitting) return
-                setInfoSubmitting(true)
-                try {
-                  const res = await fetch(`/api/families/${params.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      ...infoForm,
-                      weddingDate: infoForm.weddingDate
-                        ? new Date(infoForm.weddingDate).toISOString()
-                        : undefined,
-                      paymentPlanId: infoForm.paymentPlanId || null,
-                    }),
-                  })
-                  const updated = await res.json().catch(() => null)
-                  if (res.ok) {
-                    if (updated && typeof updated === 'object') {
-                      setData((prev) => {
-                        if (!prev) return prev
-                        const paymentPlanId =
-                          updated.paymentPlanId != null
-                            ? normalizePlanId(updated.paymentPlanId)
-                            : null
-                        return {
-                          ...prev,
-                          family: { ...prev.family, ...updated, paymentPlanId },
-                        }
+        <Modal
+          open
+          title="Edit Family Information"
+          onClose={() => setShowInfoModal(false)}
+          maxWidth="max-w-4xl"
+        >
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault()
+              if (infoSubmitting) return
+              setInfoSubmitting(true)
+              try {
+                const res = await fetch(`/api/families/${params.id}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    ...infoForm,
+                    weddingDate: infoForm.weddingDate
+                      ? new Date(infoForm.weddingDate).toISOString()
+                      : undefined,
+                    paymentPlanId: infoForm.paymentPlanId || null,
+                  }),
+                })
+                const updated = await res.json().catch(() => null)
+                if (res.ok) {
+                  if (updated && typeof updated === 'object') {
+                    setData((prev) => {
+                      if (!prev) return prev
+                      const paymentPlanId =
+                        updated.paymentPlanId != null
+                          ? normalizePlanId(updated.paymentPlanId)
+                          : null
+                      return {
+                        ...prev,
+                        family: { ...prev.family, ...updated, paymentPlanId },
+                      }
+                    })
+                  }
+                  invalidateCache(/^\/api\/families/)
+                  setShowInfoModal(false)
+                  fetchFamilyDetails()
+                }
+              } catch (error) {
+                console.error('Error updating family info:', error)
+              } finally {
+                setInfoSubmitting(false)
+              }
+            }}
+            className="space-y-6"
+          >
+            {/* Basic Information */}
+            <div>
+              <h3 className="text-lg font-semibold mb-4 text-fg">Basic Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-fg">Family Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={infoForm.name}
+                    onChange={(e) => setInfoForm({ ...infoForm, name: e.target.value })}
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-fg">
+                    Family Name (Hebrew)
+                  </label>
+                  <input
+                    type="text"
+                    dir="rtl"
+                    lang="he"
+                    value={infoForm.hebrewName}
+                    onChange={(e) => setInfoForm({ ...infoForm, hebrewName: e.target.value })}
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none text-right"
+                    style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-fg">Wedding Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={infoForm.weddingDate}
+                    onChange={(e) => setInfoForm({ ...infoForm, weddingDate: e.target.value })}
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-fg">Payment Plan</label>
+                  <select
+                    value={infoForm.paymentPlanId}
+                    onChange={(e) => setInfoForm({ ...infoForm, paymentPlanId: e.target.value })}
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
+                  >
+                    <option value="">Select a plan</option>
+                    {paymentPlans.map((plan: { _id: string; name: string }) => (
+                      <option key={plan._id} value={normalizePlanId(plan._id)}>
+                        {plan.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Husband Information */}
+            <div>
+              <h3 className="text-lg font-semibold mb-4 text-fg">Husband Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-fg">First Name</label>
+                  <input
+                    type="text"
+                    value={infoForm.husbandFirstName}
+                    onChange={(e) => setInfoForm({ ...infoForm, husbandFirstName: e.target.value })}
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-fg">Hebrew Name</label>
+                  <input
+                    type="text"
+                    dir="rtl"
+                    lang="he"
+                    value={infoForm.husbandHebrewName}
+                    onChange={(e) =>
+                      setInfoForm({ ...infoForm, husbandHebrewName: e.target.value })
+                    }
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none text-right"
+                    style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-fg">
+                    Father's Hebrew Name
+                  </label>
+                  <input
+                    type="text"
+                    dir="rtl"
+                    lang="he"
+                    value={infoForm.husbandFatherHebrewName}
+                    onChange={(e) =>
+                      setInfoForm({ ...infoForm, husbandFatherHebrewName: e.target.value })
+                    }
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none text-right"
+                    style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-fg">Cell Phone</label>
+                  <input
+                    type="tel"
+                    value={infoForm.husbandCellPhone}
+                    onChange={(e) => setInfoForm({ ...infoForm, husbandCellPhone: e.target.value })}
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Wife Information */}
+            <div>
+              <h3 className="text-lg font-semibold mb-4 text-fg">Wife Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-fg">First Name</label>
+                  <input
+                    type="text"
+                    value={infoForm.wifeFirstName}
+                    onChange={(e) => setInfoForm({ ...infoForm, wifeFirstName: e.target.value })}
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-fg">Hebrew Name</label>
+                  <input
+                    type="text"
+                    dir="rtl"
+                    lang="he"
+                    value={infoForm.wifeHebrewName}
+                    onChange={(e) => setInfoForm({ ...infoForm, wifeHebrewName: e.target.value })}
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none text-right"
+                    style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-fg">
+                    Father's Hebrew Name
+                  </label>
+                  <input
+                    type="text"
+                    dir="rtl"
+                    lang="he"
+                    value={infoForm.wifeFatherHebrewName}
+                    onChange={(e) =>
+                      setInfoForm({ ...infoForm, wifeFatherHebrewName: e.target.value })
+                    }
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none text-right"
+                    style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-fg">Cell Phone</label>
+                  <input
+                    type="tel"
+                    value={infoForm.wifeCellPhone}
+                    onChange={(e) => setInfoForm({ ...infoForm, wifeCellPhone: e.target.value })}
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Information */}
+            <div>
+              <h3 className="text-lg font-semibold mb-4 text-fg">Contact Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2 text-fg">Email</label>
+                  <input
+                    type="email"
+                    value={infoForm.email}
+                    onChange={(e) => setInfoForm({ ...infoForm, email: e.target.value })}
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
+                    placeholder="family@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-fg">Phone</label>
+                  <input
+                    type="tel"
+                    value={infoForm.phone}
+                    onChange={(e) => setInfoForm({ ...infoForm, phone: e.target.value })}
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
+                    placeholder="(555) 123-4567"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-fg">ZIP Code</label>
+                  <input
+                    type="text"
+                    value={infoForm.zip}
+                    onChange={(e) => setInfoForm({ ...infoForm, zip: e.target.value })}
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
+                    placeholder="12345"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2 text-fg">Street Address</label>
+                  <input
+                    type="text"
+                    value={infoForm.street || infoForm.address}
+                    onChange={(e) =>
+                      setInfoForm({
+                        ...infoForm,
+                        street: e.target.value,
+                        address: e.target.value,
                       })
                     }
-                    invalidateCache(/^\/api\/families/)
-                    setShowInfoModal(false)
-                    fetchFamilyDetails()
-                  }
-                } catch (error) {
-                  console.error('Error updating family info:', error)
-                } finally {
-                  setInfoSubmitting(false)
-                }
-              }}
-              className="space-y-6"
-            >
-              {/* Basic Information */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4 text-fg">Basic Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">Family Name *</label>
-                    <input
-                      type="text"
-                      required
-                      value={infoForm.name}
-                      onChange={(e) => setInfoForm({ ...infoForm, name: e.target.value })}
-                      className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">
-                      Family Name (Hebrew)
-                    </label>
-                    <input
-                      type="text"
-                      dir="rtl"
-                      lang="he"
-                      value={infoForm.hebrewName}
-                      onChange={(e) => setInfoForm({ ...infoForm, hebrewName: e.target.value })}
-                      className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none text-right"
-                      style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">Wedding Date *</label>
-                    <input
-                      type="date"
-                      required
-                      value={infoForm.weddingDate}
-                      onChange={(e) => setInfoForm({ ...infoForm, weddingDate: e.target.value })}
-                      className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">Payment Plan</label>
-                    <select
-                      value={infoForm.paymentPlanId}
-                      onChange={(e) => setInfoForm({ ...infoForm, paymentPlanId: e.target.value })}
-                      className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                    >
-                      <option value="">Select a plan</option>
-                      {paymentPlans.map((plan: { _id: string; name: string }) => (
-                        <option key={plan._id} value={normalizePlanId(plan._id)}>
-                          {plan.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
+                    placeholder="123 Main Street"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-fg">City</label>
+                  <input
+                    type="text"
+                    value={infoForm.city}
+                    onChange={(e) => setInfoForm({ ...infoForm, city: e.target.value })}
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
+                    placeholder="New York"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-fg">State</label>
+                  <input
+                    type="text"
+                    value={infoForm.state}
+                    onChange={(e) => setInfoForm({ ...infoForm, state: e.target.value })}
+                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
+                    placeholder="NY"
+                  />
                 </div>
               </div>
+            </div>
 
-              {/* Husband Information */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4 text-fg">Husband Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">First Name</label>
-                    <input
-                      type="text"
-                      value={infoForm.husbandFirstName}
-                      onChange={(e) =>
-                        setInfoForm({ ...infoForm, husbandFirstName: e.target.value })
-                      }
-                      className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">Hebrew Name</label>
-                    <input
-                      type="text"
-                      dir="rtl"
-                      lang="he"
-                      value={infoForm.husbandHebrewName}
-                      onChange={(e) =>
-                        setInfoForm({ ...infoForm, husbandHebrewName: e.target.value })
-                      }
-                      className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none text-right"
-                      style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">
-                      Father's Hebrew Name
-                    </label>
-                    <input
-                      type="text"
-                      dir="rtl"
-                      lang="he"
-                      value={infoForm.husbandFatherHebrewName}
-                      onChange={(e) =>
-                        setInfoForm({ ...infoForm, husbandFatherHebrewName: e.target.value })
-                      }
-                      className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none text-right"
-                      style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">Cell Phone</label>
-                    <input
-                      type="tel"
-                      value={infoForm.husbandCellPhone}
-                      onChange={(e) =>
-                        setInfoForm({ ...infoForm, husbandCellPhone: e.target.value })
-                      }
-                      className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Wife Information */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4 text-fg">Wife Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">First Name</label>
-                    <input
-                      type="text"
-                      value={infoForm.wifeFirstName}
-                      onChange={(e) => setInfoForm({ ...infoForm, wifeFirstName: e.target.value })}
-                      className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">Hebrew Name</label>
-                    <input
-                      type="text"
-                      dir="rtl"
-                      lang="he"
-                      value={infoForm.wifeHebrewName}
-                      onChange={(e) => setInfoForm({ ...infoForm, wifeHebrewName: e.target.value })}
-                      className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none text-right"
-                      style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">
-                      Father's Hebrew Name
-                    </label>
-                    <input
-                      type="text"
-                      dir="rtl"
-                      lang="he"
-                      value={infoForm.wifeFatherHebrewName}
-                      onChange={(e) =>
-                        setInfoForm({ ...infoForm, wifeFatherHebrewName: e.target.value })
-                      }
-                      className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none text-right"
-                      style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">Cell Phone</label>
-                    <input
-                      type="tel"
-                      value={infoForm.wifeCellPhone}
-                      onChange={(e) => setInfoForm({ ...infoForm, wifeCellPhone: e.target.value })}
-                      className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Contact Information */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4 text-fg">Contact Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-2 text-fg">Email</label>
-                    <input
-                      type="email"
-                      value={infoForm.email}
-                      onChange={(e) => setInfoForm({ ...infoForm, email: e.target.value })}
-                      className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                      placeholder="family@example.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">Phone</label>
-                    <input
-                      type="tel"
-                      value={infoForm.phone}
-                      onChange={(e) => setInfoForm({ ...infoForm, phone: e.target.value })}
-                      className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                      placeholder="(555) 123-4567"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">ZIP Code</label>
-                    <input
-                      type="text"
-                      value={infoForm.zip}
-                      onChange={(e) => setInfoForm({ ...infoForm, zip: e.target.value })}
-                      className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                      placeholder="12345"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-2 text-fg">Street Address</label>
-                    <input
-                      type="text"
-                      value={infoForm.street || infoForm.address}
-                      onChange={(e) =>
-                        setInfoForm({
-                          ...infoForm,
-                          street: e.target.value,
-                          address: e.target.value,
-                        })
-                      }
-                      className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                      placeholder="123 Main Street"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">City</label>
-                    <input
-                      type="text"
-                      value={infoForm.city}
-                      onChange={(e) => setInfoForm({ ...infoForm, city: e.target.value })}
-                      className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                      placeholder="New York"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-fg">State</label>
-                    <input
-                      type="text"
-                      value={infoForm.state}
-                      onChange={(e) => setInfoForm({ ...infoForm, state: e.target.value })}
-                      className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                      placeholder="NY"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-4 justify-end pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowInfoModal(false)}
-                  className="px-6 py-2 border border-border rounded-xl hover:bg-app-subtle transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={infoSubmitting}
-                  className="px-6 py-2 bg-accent text-accent-fg rounded-xl hover:shadow-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none"
-                >
-                  {infoSubmitting ? 'Saving…' : 'Save Info'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button type="button" variant="secondary" onClick={() => setShowInfoModal(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={infoSubmitting}>
+                Save Info
+              </Button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {showPaymentModal && isAdmin && (
@@ -938,7 +871,7 @@ export default function FamilyModals() {
                               <span className="font-medium">{card.cardType.toUpperCase()}</span>
                               <span>•••• {card.last4}</span>
                               {card.isDefault && (
-                                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                                <span className="rounded bg-success/10 px-2 py-1 text-xs text-success">
                                   Default
                                 </span>
                               )}
@@ -1118,12 +1051,12 @@ export default function FamilyModals() {
                   </>
                 )}
                 {paymentForm.useSavedCard && paymentForm.selectedSavedCardId && (
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg mt-3">
-                    <p className="text-sm text-green-800 mb-2">
+                  <div className="mt-3 rounded-lg border border-success/20 bg-success/10 p-4">
+                    <p className="mb-2 text-sm text-success">
                       Ready to charge saved card. Click "Add Payment" below to process.
                     </p>
                     {paymentForm.paymentFrequency === 'monthly' && (
-                      <p className="text-xs text-green-700">
+                      <p className="text-xs text-success">
                         This will be set up as a monthly recurring payment.
                       </p>
                     )}
@@ -1134,7 +1067,7 @@ export default function FamilyModals() {
 
             {/* Check Fields */}
             {paymentForm.paymentMethod === 'check' && (
-              <div className="space-y-3 p-4 bg-green-50 rounded-lg border border-green-200">
+              <div className="space-y-3 rounded-lg border border-success/20 bg-success/10 p-4">
                 <h4 className="font-medium text-fg mb-2">Check Information</h4>
                 <div>
                   <label className="block text-sm font-medium mb-1">Check Number *</label>
@@ -1190,24 +1123,20 @@ export default function FamilyModals() {
               />
             </div>
             {!(paymentForm.paymentMethod === 'credit_card' && useStripe) && (
-              <div className="flex gap-4 justify-end">
-                <button
+              <div className="flex justify-end gap-3">
+                <Button
                   type="button"
+                  variant="secondary"
                   onClick={() => {
                     setShowPaymentModal(false)
                     setUseStripe(false)
                   }}
-                  className="px-4 py-2 border rounded"
                 >
                   Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={modalSubmitting === 'payment'}
-                  className="px-4 py-2 bg-accent text-white rounded disabled:opacity-50"
-                >
-                  {modalSubmitting === 'payment' ? 'Saving…' : 'Add Payment'}
-                </button>
+                </Button>
+                <Button type="submit" loading={modalSubmitting === 'payment'}>
+                  Add Payment
+                </Button>
               </div>
             )}
           </form>
@@ -1215,75 +1144,58 @@ export default function FamilyModals() {
       )}
 
       {showEmailModal && isAdmin && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-surface rounded-lg p-6 max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4">Email Configuration</h2>
-            <p className="text-sm text-fg-muted mb-4">
-              Configure email settings to send statements via email.
+        <Modal
+          open
+          title="Email Configuration"
+          description="Configure email settings to send statements via email."
+          onClose={() => setShowEmailModal(false)}
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-4">
+            <Input
+              label="Gmail Address"
+              type="email"
+              required
+              value={emailFormData.email}
+              onChange={(e) => setEmailFormData({ ...emailFormData, email: e.target.value })}
+              placeholder="your-email@gmail.com"
+            />
+            <Input
+              label="Gmail App Password"
+              type="password"
+              required
+              value={emailFormData.password}
+              onChange={(e) => setEmailFormData({ ...emailFormData, password: e.target.value })}
+              placeholder="16-character app password"
+            />
+            <p className="text-xs text-fg-muted">
+              Generate an app password from{' '}
+              <a
+                href="https://myaccount.google.com/apppasswords"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent underline"
+              >
+                Google Account Settings
+              </a>
             </p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Gmail Address *</label>
-                <input
-                  type="email"
-                  required
-                  value={emailFormData.email}
-                  onChange={(e) => setEmailFormData({ ...emailFormData, email: e.target.value })}
-                  placeholder="your-email@gmail.com"
-                  className="w-full border rounded px-3 py-2"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Gmail App Password *</label>
-                <input
-                  type="password"
-                  required
-                  value={emailFormData.password}
-                  onChange={(e) => setEmailFormData({ ...emailFormData, password: e.target.value })}
-                  placeholder="16-character app password"
-                  className="w-full border rounded px-3 py-2"
-                />
-                <p className="text-xs text-fg-muted mt-1">
-                  Generate an app password from{' '}
-                  <a
-                    href="https://myaccount.google.com/apppasswords"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-accent underline"
-                  >
-                    Google Account Settings
-                  </a>
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">From Name</label>
-                <input
-                  type="text"
-                  value={emailFormData.fromName}
-                  onChange={(e) => setEmailFormData({ ...emailFormData, fromName: e.target.value })}
-                  placeholder="Kasa Family Management"
-                  className="w-full border rounded px-3 py-2"
-                />
-              </div>
-              <div className="flex gap-4 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setShowEmailModal(false)}
-                  className="px-4 py-2 border rounded"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveEmailConfig}
-                  className="px-4 py-2 bg-purple-600 text-white rounded"
-                >
-                  Save & Continue
-                </button>
-              </div>
+            <Input
+              label="From Name"
+              type="text"
+              value={emailFormData.fromName}
+              onChange={(e) => setEmailFormData({ ...emailFormData, fromName: e.target.value })}
+              placeholder="Kasa Family Management"
+            />
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="secondary" onClick={() => setShowEmailModal(false)}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={handleSaveEmailConfig}>
+                Save & Continue
+              </Button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {showEventModal && isAdmin && (
@@ -1294,80 +1206,58 @@ export default function FamilyModals() {
           maxWidth="max-w-md"
         >
           <form onSubmit={(e) => guardedSubmit('event', handleAddEvent, e)} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Event Type *</label>
-              <select
-                value={eventForm.eventType}
-                onChange={(e) => updateEventAmount(e.target.value)}
-                className="w-full border rounded px-3 py-2"
-              >
-                {lifecycleEventTypes.length === 0 ? (
-                  <option value="">Loading event types...</option>
-                ) : (
-                  lifecycleEventTypes.map((eventType) => (
-                    <option key={eventType._id} value={eventType.type}>
-                      {eventType.name} - {formatMoney(eventType.amount)}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Amount *</label>
-              <input
-                type="number"
-                required
-                value={eventForm.amount}
-                onChange={(e) =>
-                  setEventForm({ ...eventForm, amount: parseFloat(e.target.value) || 0 })
-                }
-                className="w-full border rounded px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Event Date *</label>
-              <input
-                type="date"
-                required
-                value={eventForm.eventDate}
-                onChange={(e) => setEventForm({ ...eventForm, eventDate: e.target.value })}
-                className="w-full border rounded px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Year *</label>
-              <input
-                type="number"
-                required
-                value={eventForm.year}
-                onChange={(e) => setEventForm({ ...eventForm, year: parseInt(e.target.value) })}
-                className="w-full border rounded px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Notes</label>
-              <textarea
-                value={eventForm.notes}
-                onChange={(e) => setEventForm({ ...eventForm, notes: e.target.value })}
-                className="w-full border rounded px-3 py-2"
-                rows={3}
-              />
-            </div>
-            <div className="flex gap-4 justify-end">
-              <button
-                type="button"
-                onClick={() => setShowEventModal(false)}
-                className="px-4 py-2 border rounded"
-              >
+            <Select
+              label="Event Type"
+              value={eventForm.eventType}
+              onChange={(e) => updateEventAmount(e.target.value)}
+              required
+            >
+              {lifecycleEventTypes.length === 0 ? (
+                <option value="">Loading event types...</option>
+              ) : (
+                lifecycleEventTypes.map((eventType) => (
+                  <option key={eventType._id} value={eventType.type}>
+                    {eventType.name} - {formatMoney(eventType.amount)}
+                  </option>
+                ))
+              )}
+            </Select>
+            <Input
+              label="Amount"
+              type="number"
+              required
+              value={eventForm.amount}
+              onChange={(e) =>
+                setEventForm({ ...eventForm, amount: parseFloat(e.target.value) || 0 })
+              }
+            />
+            <Input
+              label="Event Date"
+              type="date"
+              required
+              value={eventForm.eventDate}
+              onChange={(e) => setEventForm({ ...eventForm, eventDate: e.target.value })}
+            />
+            <Input
+              label="Year"
+              type="number"
+              required
+              value={eventForm.year}
+              onChange={(e) => setEventForm({ ...eventForm, year: parseInt(e.target.value) })}
+            />
+            <Textarea
+              label="Notes"
+              value={eventForm.notes}
+              onChange={(e) => setEventForm({ ...eventForm, notes: e.target.value })}
+              rows={3}
+            />
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="secondary" onClick={() => setShowEventModal(false)}>
                 Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={modalSubmitting === 'event'}
-                className="px-4 py-2 bg-accent text-white rounded disabled:opacity-50"
-              >
-                {modalSubmitting === 'event' ? 'Saving…' : 'Add Event'}
-              </button>
+              </Button>
+              <Button type="submit" loading={modalSubmitting === 'event'}>
+                Add Event
+              </Button>
             </div>
           </form>
         </Modal>
@@ -1387,76 +1277,56 @@ export default function FamilyModals() {
             onSubmit={(e) => guardedSubmit('withdrawal', handleSaveWithdrawal, e)}
             className="space-y-4"
           >
-            <div>
-              <label className="block text-sm font-medium mb-1">Amount *</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                required
-                value={withdrawalForm.amount}
-                onChange={(e) =>
-                  setWithdrawalForm({
-                    ...withdrawalForm,
-                    amount: parseFloat(e.target.value) || 0,
-                  })
-                }
-                className="w-full border rounded px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Withdrawal Date *</label>
-              <input
-                type="date"
-                required
-                value={withdrawalForm.withdrawalDate}
-                onChange={(e) =>
-                  setWithdrawalForm({ ...withdrawalForm, withdrawalDate: e.target.value })
-                }
-                className="w-full border rounded px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Reason</label>
-              <input
-                type="text"
-                value={withdrawalForm.reason}
-                onChange={(e) => setWithdrawalForm({ ...withdrawalForm, reason: e.target.value })}
-                className="w-full border rounded px-3 py-2"
-                placeholder="e.g. Refund, Adjustment"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Notes</label>
-              <textarea
-                value={withdrawalForm.notes}
-                onChange={(e) => setWithdrawalForm({ ...withdrawalForm, notes: e.target.value })}
-                className="w-full border rounded px-3 py-2"
-                rows={3}
-              />
-            </div>
-            <div className="flex gap-4 justify-end">
-              <button
+            <Input
+              label="Amount"
+              type="number"
+              step="0.01"
+              min="0.01"
+              required
+              value={withdrawalForm.amount}
+              onChange={(e) =>
+                setWithdrawalForm({
+                  ...withdrawalForm,
+                  amount: parseFloat(e.target.value) || 0,
+                })
+              }
+            />
+            <Input
+              label="Withdrawal Date"
+              type="date"
+              required
+              value={withdrawalForm.withdrawalDate}
+              onChange={(e) =>
+                setWithdrawalForm({ ...withdrawalForm, withdrawalDate: e.target.value })
+              }
+            />
+            <Input
+              label="Reason"
+              type="text"
+              value={withdrawalForm.reason}
+              onChange={(e) => setWithdrawalForm({ ...withdrawalForm, reason: e.target.value })}
+              placeholder="e.g. Refund, Adjustment"
+            />
+            <Textarea
+              label="Notes"
+              value={withdrawalForm.notes}
+              onChange={(e) => setWithdrawalForm({ ...withdrawalForm, notes: e.target.value })}
+              rows={3}
+            />
+            <div className="flex justify-end gap-3">
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => {
                   setShowWithdrawalModal(false)
                   setEditingWithdrawal(null)
                 }}
-                className="px-4 py-2 border rounded"
               >
                 Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={modalSubmitting === 'withdrawal'}
-                className="px-4 py-2 bg-accent text-white rounded disabled:opacity-50"
-              >
-                {modalSubmitting === 'withdrawal'
-                  ? 'Saving…'
-                  : editingWithdrawal
-                    ? 'Save Changes'
-                    : 'Add Withdrawal'}
-              </button>
+              </Button>
+              <Button type="submit" loading={modalSubmitting === 'withdrawal'}>
+                {editingWithdrawal ? 'Save Changes' : 'Add Withdrawal'}
+              </Button>
             </div>
           </form>
         </Modal>

@@ -2,14 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import type { Stripe, StripeElementsOptions } from '@stripe/stripe-js'
-import {
-  Elements,
-  CardElement,
-  useStripe,
-  useElements
-} from '@stripe/react-stripe-js'
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { toMinorUnits } from '@/lib/money'
+import { Button, Alert } from '@/app/components/ui'
 
 // Lazy-load @stripe/stripe-js so the Stripe SDK isn't bundled into the
 // initial JS for users who never see a credit-card form. The promise is
@@ -48,7 +44,7 @@ function PaymentForm({
   paymentFrequency = 'one-time',
   memberId,
   onSuccess,
-  onError
+  onError,
 }: StripePaymentFormProps) {
   const stripe = useStripe()
   const elements = useElements()
@@ -74,7 +70,9 @@ function PaymentForm({
         if (thisRequest !== requestId) return
 
         if (!res.ok) {
-          const errorData = await res.json().catch(() => ({ error: `HTTP ${res.status}: ${res.statusText}` }))
+          const errorData = await res
+            .json()
+            .catch(() => ({ error: `HTTP ${res.status}: ${res.statusText}` }))
           console.error('Payment intent creation failed:', errorData)
           onError(errorData.error || `Server error: ${res.status} ${res.statusText}`)
           return
@@ -123,14 +121,11 @@ function PaymentForm({
 
     try {
       // Confirm payment with Stripe
-      const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
-        clientSecret,
-        {
-          payment_method: {
-            card: cardElement,
-          }
-        }
-      )
+      const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: cardElement,
+        },
+      })
 
       if (confirmError) {
         onError(confirmError.message || 'Payment failed')
@@ -154,8 +149,8 @@ function PaymentForm({
               body: JSON.stringify({
                 paymentMethodId: paymentIntent.payment_method as string,
                 paymentIntentId: paymentIntent.id,
-                setAsDefault: true
-              })
+                setAsDefault: true,
+              }),
             })
             if (saveRes.ok) {
               const saved = await saveRes.json()
@@ -188,9 +183,11 @@ function PaymentForm({
               type,
               notes,
               paymentFrequency,
-              savedPaymentMethodId: savedPaymentMethodId || (saveCard && paymentIntent.payment_method ? 'will_be_saved' : undefined),
-              memberId: memberId || undefined
-            })
+              savedPaymentMethodId:
+                savedPaymentMethodId ||
+                (saveCard && paymentIntent.payment_method ? 'will_be_saved' : undefined),
+              memberId: memberId || undefined,
+            }),
           })
 
           if (res.ok) {
@@ -201,16 +198,15 @@ function PaymentForm({
             }
           } else {
             const errData = await res.json().catch(() => ({}))
-            console.error(
-              '[stripe-form] confirm-payment failed AFTER successful charge',
-              { status: res.status, err: errData?.error },
-            )
+            console.error('[stripe-form] confirm-payment failed AFTER successful charge', {
+              status: res.status,
+              err: errData?.error,
+            })
           }
         } catch (confirmErr) {
-          console.error(
-            '[stripe-form] confirm-payment network error AFTER successful charge',
-            { err: confirmErr },
-          )
+          console.error('[stripe-form] confirm-payment network error AFTER successful charge', {
+            err: confirmErr,
+          })
         }
         // Stripe captured the funds; webhook will reconcile the ledger.
         // Surface this to the caller as success so the user isn't told
@@ -245,22 +241,21 @@ function PaymentForm({
   return (
     <div className="space-y-4">
       <div className="p-4 bg-app-subtle rounded-lg border border-border">
-        <label className="block text-sm font-medium mb-2 text-fg">
-          Card Details
-        </label>
+        <label className="block text-sm font-medium mb-2 text-fg">Card Details</label>
         <div className="p-3 border border-border rounded-lg bg-surface">
           <CardElement options={cardElementOptions} />
         </div>
       </div>
-      
-      <button
+
+      <Button
         type="button"
+        className="w-full"
         onClick={handleSubmit}
         disabled={!stripe || processing || !clientSecret}
-        className="w-full bg-accent text-accent-fg px-6 py-3 rounded-xl hover:shadow-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+        loading={processing}
       >
-        {processing ? 'Processing...' : `Pay ${format(amount)}`}
-      </button>
+        {processing ? 'Processing…' : `Pay ${format(amount)}`}
+      </Button>
     </div>
   )
 }
@@ -281,11 +276,10 @@ export default function StripePaymentForm(props: StripePaymentFormProps) {
 
   if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
     return (
-      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p className="text-yellow-800">
-          Stripe is not configured. Please set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY in your environment variables.
-        </p>
-      </div>
+      <Alert variant="warning">
+        Stripe is not configured. Please set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY in your environment
+        variables.
+      </Alert>
     )
   }
 
@@ -295,4 +289,3 @@ export default function StripePaymentForm(props: StripePaymentFormProps) {
     </Elements>
   )
 }
-

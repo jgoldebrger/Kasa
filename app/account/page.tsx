@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { Button, Input, PageHeader, SkeletonRows } from '@/app/components/ui'
+import { Button, Card, Input, PageHeader, SkeletonRows } from '@/app/components/ui'
 import { useToast } from '@/app/components/Toast'
 import { invalidate as invalidateCache } from '@/lib/client-cache'
 import TwoFactorSection from './TwoFactorSection'
@@ -128,12 +128,12 @@ export default function AccountPage() {
         <PageHeader title="Your account" subtitle="Update your profile and security settings." />
 
         {loading || !profile ? (
-          <div className="surface-card rounded-2xl shadow-xl p-6 border border-border">
+          <Card>
             <SkeletonRows count={4} />
-          </div>
+          </Card>
         ) : (
           <div className="space-y-6">
-            <section className="surface-card rounded-2xl shadow-xl p-6 border border-border">
+            <Card>
               <h2 className="text-base font-semibold text-fg mb-4">Profile</h2>
               <form onSubmit={handleSaveProfile} className="space-y-4" noValidate>
                 <Input
@@ -156,9 +156,9 @@ export default function AccountPage() {
                   </Button>
                 </div>
               </form>
-            </section>
+            </Card>
 
-            <section className="surface-card rounded-2xl shadow-xl p-6 border border-border">
+            <Card>
               <h2 className="text-base font-semibold text-fg mb-4">Change password</h2>
               <form onSubmit={handleChangePassword} className="space-y-4" noValidate>
                 <Input
@@ -192,12 +192,9 @@ export default function AccountPage() {
                   </Button>
                 </div>
               </form>
-            </section>
+            </Card>
 
-            <TwoFactorSection
-              enabled={profile.twoFactorEnabled}
-              onChange={refresh}
-            />
+            <TwoFactorSection enabled={profile.twoFactorEnabled} onChange={refresh} />
           </div>
         )}
       </div>
