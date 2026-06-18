@@ -32,6 +32,9 @@ export default function NotificationsBell() {
   const toast = useToast()
   const t = useT()
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const buttonRef = useRef<HTMLButtonElement | null>(null)
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const [panelStyle, setPanelStyle] = useState<React.CSSProperties | null>(null)
   const idleScheduledRef = useRef(false)
   const { begin, invalidate, isStale } = useRequestGeneration()
 
@@ -75,6 +78,35 @@ export default function NotificationsBell() {
     }
   }, [fetchNotifs, hasFetched])
 
+  const updatePanelPosition = useCallback(() => {
+    const button = buttonRef.current
+    if (!button) return
+    const rect = button.getBoundingClientRect()
+    const isRtl = document.documentElement.dir === 'rtl'
+    const margin = 8
+    const width = Math.min(256, window.innerWidth - margin * 2)
+    const insetInlineEnd = isRtl
+      ? Math.max(margin, rect.left)
+      : Math.max(margin, window.innerWidth - rect.right)
+    setPanelStyle({
+      position: 'fixed',
+      bottom: window.innerHeight - rect.top + margin,
+      width,
+      insetInlineEnd,
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    updatePanelPosition()
+    window.addEventListener('resize', updatePanelPosition)
+    window.addEventListener('scroll', updatePanelPosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePanelPosition)
+      window.removeEventListener('scroll', updatePanelPosition, true)
+    }
+  }, [open, updatePanelPosition])
+
   useEffect(() => {
     scheduleIdlePrefetch()
   }, [scheduleIdlePrefetch])
@@ -86,27 +118,34 @@ export default function NotificationsBell() {
 
   useEffect(() => {
     if (!hasFetched) return
-    const interval = setInterval(() => {
-      void fetchNotifs()
-    }, open ? 60_000 : 5 * 60_000)
+    const interval = setInterval(
+      () => {
+        void fetchNotifs()
+      },
+      open ? 60_000 : 5 * 60_000,
+    )
     return () => clearInterval(interval)
   }, [fetchNotifs, open, hasFetched])
 
-  useOrgChanged(useCallback(() => {
-    invalidate()
-    setItems([])
-    setUnread(0)
-    setOpen(false)
-    setHasFetched(false)
-    setFetchError(false)
-    idleScheduledRef.current = false
-    void fetchNotifs()
-  }, [fetchNotifs, invalidate]))
+  useOrgChanged(
+    useCallback(() => {
+      invalidate()
+      setItems([])
+      setUnread(0)
+      setOpen(false)
+      setHasFetched(false)
+      setFetchError(false)
+      idleScheduledRef.current = false
+      void fetchNotifs()
+    }, [fetchNotifs, invalidate]),
+  )
 
   useEffect(() => {
     if (!open) return
     const onClick = (e: MouseEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (containerRef.current?.contains(target) || panelRef.current?.contains(target)) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', onClick)
     return () => document.removeEventListener('mousedown', onClick)
@@ -129,12 +168,16 @@ export default function NotificationsBell() {
   return (
     <div ref={containerRef} className="relative">
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (!open) updatePanelPosition()
+          setOpen((v) => !v)
+        }}
         onMouseEnter={scheduleIdlePrefetch}
         aria-label={t('nav.notifications')}
         title={t('nav.notifications')}
-        className="focus-ring relative inline-flex h-9 w-9 items-center justify-center rounded-md text-fg-muted hover:bg-fg/5 hover:text-fg transition-colors"
+        className="focus-ring relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-fg-muted hover:bg-fg/5 hover:text-fg transition-colors"
       >
         <BellIcon className="h-[18px] w-[18px]" aria-hidden="true" />
         {unread > 0 && (
@@ -147,8 +190,12 @@ export default function NotificationsBell() {
         )}
       </button>
 
-      {open && (
-        <div className="absolute bottom-full mb-2 right-0 z-40 w-80 sm:w-96 max-h-[70vh] overflow-hidden rounded-lg border border-border bg-surface shadow-xl">
+      {open && panelStyle && (
+        <div
+          ref={panelRef}
+          className="z-50 max-h-[70vh] overflow-hidden rounded-lg border border-border bg-surface shadow-xl"
+          style={panelStyle}
+        >
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
             <h3 className="text-sm font-semibold text-fg">{t('nav.notifications')}</h3>
             {unread > 0 && (
@@ -183,11 +230,16 @@ export default function NotificationsBell() {
                   const body = (
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className={`text-sm ${n.read ? 'text-fg-muted' : 'font-medium text-fg'}`}>
+                        <p
+                          className={`text-sm ${n.read ? 'text-fg-muted' : 'font-medium text-fg'}`}
+                        >
                           {n.title}
                         </p>
                         {!n.read && (
-                          <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-accent" aria-hidden="true" />
+                          <span
+                            className="mt-1 h-2 w-2 shrink-0 rounded-full bg-accent"
+                            aria-hidden="true"
+                          />
                         )}
                       </div>
                       {n.body && (
@@ -202,7 +254,8 @@ export default function NotificationsBell() {
                     if (!n.read) void markRead([n._id])
                     setOpen(false)
                   }
-                  const safeLink = n.link && n.link.startsWith('/') && !n.link.startsWith('//') ? n.link : null
+                  const safeLink =
+                    n.link && n.link.startsWith('/') && !n.link.startsWith('//') ? n.link : null
                   return (
                     <li key={n._id}>
                       {safeLink ? (

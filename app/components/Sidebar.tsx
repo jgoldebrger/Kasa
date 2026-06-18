@@ -52,7 +52,12 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
     { href: '/tasks', label: t('nav.tasks'), icon: ClipboardDocumentListIcon, adminOnly: true },
     { href: '/calculations', label: t('nav.calculations'), icon: CalculatorIcon, adminOnly: true },
     { href: '/events', label: t('nav.events'), icon: CalendarIcon, adminOnly: true },
-    { href: '/projections', label: t('nav.projections'), icon: ChartBarSquareIcon, adminOnly: true },
+    {
+      href: '/projections',
+      label: t('nav.projections'),
+      icon: ChartBarSquareIcon,
+      adminOnly: true,
+    },
     { href: '/reports', label: t('nav.reports'), icon: PresentationChartBarIcon, adminOnly: true },
     { href: '/statements', label: t('nav.statements'), icon: DocumentTextIcon, adminOnly: true },
     { href: '/settings', label: t('nav.settings'), icon: CogIcon, adminOnly: true },
@@ -60,16 +65,14 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
 
   return (
     <aside
-      className="h-full w-64 bg-surface border-e border-border flex flex-col"
+      className="h-full w-64 min-w-0 overflow-x-hidden bg-surface border-e border-border flex flex-col"
       aria-label={t('nav.primary')}
     >
       <div className="px-5 h-16 border-b border-border flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
           <OrgLogo size={32} fallbackChar={branding.name?.[0] || 'K'} />
           <div className="leading-tight min-w-0">
-            <h1 className="text-sm font-semibold text-fg truncate">
-              {branding.name || 'Kasa'}
-            </h1>
+            <h1 className="text-sm font-semibold text-fg truncate">{branding.name || 'Kasa'}</h1>
             <p className="text-[11px] text-fg-muted truncate">{t('nav.tagline')}</p>
           </div>
         </div>
@@ -81,7 +84,12 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
             className="focus-ring -me-1 inline-flex min-h-[var(--touch-target)] min-w-[var(--touch-target)] items-center justify-center rounded-md text-fg-muted hover:bg-fg/5 hover:text-fg md:hidden"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <path
+                d="M6 6l12 12M18 6L6 18"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
         )}
@@ -94,7 +102,7 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
       )}
 
       {user && (
-        <div className="px-3 pt-2">
+        <div className="min-w-0 px-3 pt-2">
           <GlobalSearch />
         </div>
       )}
@@ -156,39 +164,41 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
           </Link>
         )}
         {user && (
-          <div className="flex items-center gap-2.5 px-2 py-2 rounded-md border border-border bg-app-subtle">
+          <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-app-subtle px-2 py-2">
             <Link
               href="/account"
               onClick={onClose}
-              className="focus-ring flex items-center gap-2.5 flex-1 min-w-0 rounded-md -m-0.5 p-0.5 hover:bg-fg/5"
+              className="focus-ring flex min-w-0 flex-1 items-center gap-2 rounded-md p-0.5 hover:bg-fg/5"
               title={t('nav.account')}
             >
-              <div className="w-8 h-8 rounded-md bg-accent text-accent-fg flex items-center justify-center text-xs font-semibold shrink-0">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent text-xs font-semibold text-accent-fg">
                 {user.name?.[0]?.toUpperCase() || <UserCircleIcon className="h-4 w-4" />}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-fg truncate">{user.name}</p>
-                <p className="text-[11px] text-fg-muted truncate">{user.email}</p>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-fg">{user.name}</p>
+                <p className="truncate text-[11px] text-fg-muted">{user.email}</p>
               </div>
             </Link>
-            <NotificationsBell />
-            <ThemeToggle />
-            <button
-              onClick={() => {
-                clearCache()
-                if (typeof navigator !== 'undefined' && navigator.serviceWorker?.controller) {
-                  navigator.serviceWorker.controller.postMessage({
-                    type: 'CLEAR_ORG_CACHES',
-                  })
-                }
-                signOut({ callbackUrl: '/login' })
-              }}
-              aria-label={t('nav.signOut')}
-              title={t('nav.signOut')}
-              className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-md text-fg-muted hover:bg-fg/5 hover:text-fg transition-colors"
-            >
-              <ArrowRightOnRectangleIcon className="h-[18px] w-[18px]" aria-hidden="true" />
-            </button>
+            <div className="flex shrink-0 items-center gap-0.5">
+              <NotificationsBell />
+              <ThemeToggle />
+              <button
+                onClick={() => {
+                  clearCache()
+                  if (typeof navigator !== 'undefined' && navigator.serviceWorker?.controller) {
+                    navigator.serviceWorker.controller.postMessage({
+                      type: 'CLEAR_ORG_CACHES',
+                    })
+                  }
+                  signOut({ callbackUrl: '/login' })
+                }}
+                aria-label={t('nav.signOut')}
+                title={t('nav.signOut')}
+                className="focus-ring inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-fg-muted transition-colors hover:bg-fg/5 hover:text-fg"
+              >
+                <ArrowRightOnRectangleIcon className="h-[18px] w-[18px]" aria-hidden="true" />
+              </button>
+            </div>
           </div>
         )}
         <LegalFooterLinks layout="stacked" className="px-1 pt-1 text-xs" />

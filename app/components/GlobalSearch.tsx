@@ -359,7 +359,7 @@ export default function GlobalSearch({
   const searchAriaLabel = 'Search. Shortcuts: slash or Control+K'
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative min-w-0">
       {variant === 'icon' ? (
         <button
           type="button"
@@ -374,20 +374,20 @@ export default function GlobalSearch({
         <button
           type="button"
           onClick={openSearch}
-          className="focus-ring inline-flex w-full max-w-[180px] items-center gap-2 rounded-md border border-border bg-app-subtle px-2.5 py-1.5 text-xs text-fg-muted hover:bg-fg/5 hover:text-fg"
+          className="focus-ring inline-flex w-full min-w-0 items-center gap-2 rounded-md border border-border bg-app-subtle px-2.5 py-1.5 text-xs text-fg-muted hover:bg-fg/5 hover:text-fg"
           aria-label={searchAriaLabel}
           title="Search (/ or Ctrl+K)"
         >
           <MagnifyingGlassIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
 
-          <span className="flex-1 truncate text-left">Search…</span>
+          <span className="min-w-0 flex-1 truncate text-start">Search…</span>
 
           <kbd className="shrink-0 rounded bg-fg/10 px-1 py-0.5 font-mono text-[10px]">⌘K</kbd>
         </button>
       )}
 
       {open && !mobileFullscreen && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-2 w-[min(92vw,420px)] overflow-hidden rounded-lg border border-border bg-surface shadow-xl sm:left-auto sm:right-0">
+        <div className="absolute inset-x-0 top-full z-50 mt-2 overflow-hidden rounded-lg border border-border bg-surface shadow-xl">
           {searchPanel}
         </div>
       )}

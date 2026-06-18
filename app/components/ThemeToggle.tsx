@@ -70,7 +70,7 @@ export default function ThemeToggle({ className = '' }: { className?: string }) 
       onClick={cycle}
       aria-label={label}
       title={label}
-      className={`focus-ring inline-flex h-9 w-9 items-center justify-center rounded-md text-fg-muted hover:bg-fg/5 hover:text-fg transition-colors ${className}`}
+      className={`focus-ring inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-fg-muted hover:bg-fg/5 hover:text-fg transition-colors ${className}`}
     >
       {mounted ? (
         <Icon className="h-5 w-5" aria-hidden="true" />

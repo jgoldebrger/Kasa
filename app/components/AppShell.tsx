@@ -20,9 +20,7 @@ const FULLSCREEN_PATHS = [
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || ''
-  const isFullscreen = FULLSCREEN_PATHS.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`),
-  )
+  const isFullscreen = FULLSCREEN_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -62,7 +60,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           the right edge instead of needing a parallel `right-0` class. */}
       <div
         id="primary-sidebar-desktop"
-        className="fixed inset-y-0 start-0 z-40 hidden w-64 md:block"
+        className="fixed inset-y-0 start-0 z-40 hidden w-64 min-w-0 overflow-x-hidden md:block"
       >
         <Sidebar />
       </div>
