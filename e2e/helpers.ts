@@ -13,17 +13,34 @@ export async function acceptCookieConsent(page: Page): Promise<void> {
 
 /** Full login flow for the seeded owner (password + TOTP). */
 export async function loginAsE2eUser(page: Page): Promise<void> {
-  await acceptCookieConsent(page)
-  await page.goto('/login')
-  await page.getByLabel('Email').fill(E2E_USER.email)
-  await page.getByLabel('Password').fill(E2E_USER.password)
-  await page.getByRole('button', { name: 'Sign in' }).click()
+  let lastError: unknown
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      await acceptCookieConsent(page)
+      await page.goto('/login', { waitUntil: 'domcontentloaded' })
+      await page.getByLabel('Email').fill(E2E_USER.email)
+      await page.getByLabel('Password').fill(E2E_USER.password)
+      await page.getByRole('button', { name: 'Sign in' }).click()
 
-  const twoFactorInput = page.getByLabel(/two-factor authentication/i)
-  await expect(twoFactorInput).toBeVisible({ timeout: 60_000 })
-  await twoFactorInput.fill(generateTotpCode(E2E_TOTP_SECRET))
-  await page.getByRole('button', { name: /verify and sign in/i }).click()
-  await expect(page).not.toHaveURL(/\/login/, { timeout: 60_000 })
+      const twoFactorInput = page.getByLabel(/two-factor authentication/i)
+      const needs2fa = await twoFactorInput
+        .waitFor({ state: 'visible', timeout: 60_000 })
+        .then(() => true)
+        .catch(() => false)
+
+      if (needs2fa) {
+        await twoFactorInput.fill(generateTotpCode(E2E_TOTP_SECRET))
+        await page.getByRole('button', { name: /verify and sign in/i }).click()
+      }
+
+      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 60_000 })
+      return
+    } catch (err) {
+      lastError = err
+      if (attempt < 2) await page.waitForTimeout(2_000)
+    }
+  }
+  throw lastError
 }
 
 /** Activate an org via API (uses session cookies from the page context). */

@@ -108,6 +108,10 @@ function resolveTsImport(importPath: string): string | null {
   return fs.readFileSync(full, 'utf8')
 }
 
+function stripTsComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+}
+
 /** Follow thin re-export chain (route → api-handlers → route-logic) for auth hints. */
 function resolveAuthContent(fileContent: string): string {
   let combined = fileContent
@@ -117,6 +121,7 @@ function resolveAuthContent(fileContent: string): string {
     const fromMatch = current.match(/from\s+['"]([^'"]+)['"]/)
     if (!fromMatch) break
     const importPath = fromMatch[1]
+    if (importPath === '@/lib/api/handler' || importPath.endsWith('/api/handler')) break
     if (seen.has(importPath)) break
     seen.add(importPath)
     const next = resolveTsImport(importPath)
@@ -157,6 +162,7 @@ function classifyAuth(
   auth: AuthMode
   minRole?: 'member' | 'admin' | 'owner'
 } {
+  const content = stripTsComments(fileContent)
   if (apiPath.includes(':...nextauth') || apiPath.includes('[...nextauth]')) {
     return { auth: 'nextauth' }
   }
@@ -170,8 +176,8 @@ function classifyAuth(
     return { auth: 'platform-admin' }
   }
 
-  const handlerAuths = [...fileContent.matchAll(HANDLER_AUTH_RE)].map((m) => m[1])
-  const minRoleMatch = fileContent.match(HANDLER_MIN_ROLE_RE)
+  const handlerAuths = [...content.matchAll(HANDLER_AUTH_RE)].map((m) => m[1])
+  const minRoleMatch = content.match(HANDLER_MIN_ROLE_RE)
 
   if (handlerAuths.includes('public')) {
     return { auth: 'public' }
@@ -195,22 +201,21 @@ function classifyAuth(
     }
   }
 
-  if (fileContent.includes('isCronRequest') && !fileContent.includes('requireOrg(request')) {
+  if (content.includes('isCronRequest') && !content.includes('requireOrg(request')) {
     return { auth: 'cron' }
   }
-  if (fileContent.includes('requireOrgOrCron')) {
-    const admin =
-      fileContent.includes("minRole: 'admin'") || fileContent.includes('minRole: "admin"')
+  if (content.includes('requireOrgOrCron')) {
+    const admin = content.includes("minRole: 'admin'") || content.includes('minRole: "admin"')
     return { auth: 'org-or-cron', minRole: admin ? 'admin' : 'member' }
   }
-  if (fileContent.includes('requireOrg')) {
+  if (content.includes('requireOrg')) {
     const admin =
-      fileContent.includes("minRole: 'admin'") ||
-      fileContent.includes('minRole: "admin"') ||
-      fileContent.includes('{ minRole: admin')
+      content.includes("minRole: 'admin'") ||
+      content.includes('minRole: "admin"') ||
+      content.includes('{ minRole: admin')
     return { auth: 'org', minRole: admin ? 'admin' : 'member' }
   }
-  if (fileContent.includes('requireSession')) {
+  if (content.includes('requireSession')) {
     return { auth: 'session' }
   }
 
@@ -242,7 +247,13 @@ function scanFile(file: string): ApiRouteEntry[] {
   for (const method of methods) {
     const block = methodBlocks.get(method) ?? authContent
     const { auth, minRole } = classifyAuth(block, apiPath)
-    const effectiveAuth = auth === 'org' && fileAuth.auth !== 'org' ? fileAuth.auth : auth
+    const blockHasHandlerAuth = HANDLER_AUTH_RE.test(stripTsComments(block))
+    HANDLER_AUTH_RE.lastIndex = 0
+    const effectiveAuth = blockHasHandlerAuth
+      ? auth
+      : auth === 'org' && fileAuth.auth !== 'org'
+        ? fileAuth.auth
+        : auth
     const effectiveMinRole =
       effectiveAuth === 'org' || effectiveAuth === 'org-or-cron'
         ? (minRole ?? fileAuth.minRole ?? 'member')
