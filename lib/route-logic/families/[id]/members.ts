@@ -8,6 +8,7 @@ import {
 } from '@/lib/models'
 import { calculateBarMitzvahDate, hasReachedBarMitzvahAge } from '@/lib/hebrew-date'
 import { getYearInTimeZone } from '@/lib/date-utils'
+import { scheduleYearlyCalculationRefresh } from '@/lib/calculations'
 import { audit } from '@/lib/audit'
 import { hasMinRole } from '@/lib/auth-helpers'
 import { family as familySchemas } from '@/lib/schemas'
@@ -184,6 +185,7 @@ export const POST = handler({
             notes: `Auto-added: ${evType.name} for ${firstName} ${lastName} (child added)`,
             organizationId: ctx!.organizationId,
           })
+          scheduleYearlyCalculationRefresh(eventYear, ctx!.organizationId)
           console.log(
             `Added "${evType.name}" event for new child ${firstName} ${lastName} (year ${eventYear})`,
           )
@@ -241,6 +243,7 @@ export const POST = handler({
               notes: `Auto-added: ${evType.name} for ${firstName} ${lastName} (date: ${barMitzvahDate.toLocaleDateString()})`,
               organizationId: ctx!.organizationId,
             })
+            scheduleYearlyCalculationRefresh(eventYear, ctx!.organizationId)
             member.barMitzvahEventAdded = true
             await member.save()
             console.log(

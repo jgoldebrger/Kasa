@@ -6,8 +6,13 @@ import {
   PaymentPlan,
   LifecycleEvent,
 } from '@/lib/models'
-import { convertToHebrewDate, calculateBarMitzvahDate, hasReachedBarMitzvahAge } from '@/lib/hebrew-date'
+import {
+  convertToHebrewDate,
+  calculateBarMitzvahDate,
+  hasReachedBarMitzvahAge,
+} from '@/lib/hebrew-date'
 import { getYearInTimeZone } from '@/lib/date-utils'
+import { scheduleYearlyCalculationRefresh } from '@/lib/calculations'
 import { softDeleteOne } from '@/lib/recycle-bin'
 import { family as familySchemas } from '@/lib/schemas'
 import { checkRateLimit } from '@/lib/rate-limit'
@@ -43,9 +48,25 @@ export const PUT = handler({
     const id = params.id as string
     const memberId = params.memberId as string
     const {
-      firstName, hebrewFirstName, lastName, hebrewLastName, birthDate: birthDateObj, hebrewBirthDate, gender,
-      weddingDate, spouseName, spouseFirstName, spouseHebrewName, spouseFatherHebrewName,
-      spouseCellPhone, phone, email, address, city, state, zip
+      firstName,
+      hebrewFirstName,
+      lastName,
+      hebrewLastName,
+      birthDate: birthDateObj,
+      hebrewBirthDate,
+      gender,
+      weddingDate,
+      spouseName,
+      spouseFirstName,
+      spouseHebrewName,
+      spouseFatherHebrewName,
+      spouseCellPhone,
+      phone,
+      email,
+      address,
+      city,
+      state,
+      zip,
     } = body
 
     // Auto-calculate Hebrew date if not provided
@@ -131,12 +152,12 @@ export const PUT = handler({
     if (zip !== undefined) {
       updateData.zip = zip || null
     }
-    
+
     // Mongoose automatically converts string IDs to ObjectIds, so we don't need explicit conversion
     const member = await FamilyMember.findOneAndUpdate(
       { _id: memberId, familyId: id, organizationId: ctx!.organizationId },
       { $set: updateData },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     )
 
     if (!member) {
@@ -200,6 +221,7 @@ export const PUT = handler({
               notes: `Auto-added: ${evType.name} for ${firstName} ${lastName} (date: ${barMitzvahDate.toLocaleDateString()})`,
               organizationId: ctx!.organizationId,
             })
+            scheduleYearlyCalculationRefresh(eventYear, ctx!.organizationId)
             member.barMitzvahEventAdded = true
             await member.save()
             console.log(
@@ -255,4 +277,3 @@ export const DELETE = handler({
     return { data: { message: 'Member moved to recycle bin' } }
   },
 })
-

@@ -1,7 +1,7 @@
 import { hasMinRole } from '@/lib/auth-helpers'
 import { handler } from '@/lib/api/handler'
 import { Family, FamilyMember, YearlyCalculation, Organization } from '@/lib/models'
-import { calculateYearlyBalance } from '@/lib/calculations'
+import { calculateYearlyBalance, calculateYearlyExpenses } from '@/lib/calculations'
 import { getYearInTimeZone } from '@/lib/date-utils'
 
 /**
@@ -24,7 +24,9 @@ export const GET = handler({
   auth: 'org',
   name: 'GET /api/dashboard-stats',
   fn: async ({ ctx, request }) => {
-    const org = await Organization.findById(ctx!.organizationId).select('timezone').lean<{ timezone?: string }>()
+    const org = await Organization.findById(ctx!.organizationId)
+      .select('timezone')
+      .lean<{ timezone?: string }>()
 
     const { searchParams } = new URL(request.url)
     const compute = searchParams.get('compute') === '1'
@@ -57,8 +59,13 @@ export const GET = handler({
     if (isAdmin) {
       if (calcDoc) {
         calculatedIncome = calcDoc.calculatedIncome ?? 0
-        calculatedExpenses = calcDoc.calculatedExpenses ?? 0
-        balance = calcDoc.balance ?? calculatedIncome - calculatedExpenses
+        const expenseData = await calculateYearlyExpenses(
+          year,
+          ctx!.organizationId,
+          calcDoc.extraExpense ?? 0,
+        )
+        calculatedExpenses = expenseData.calculatedExpenses
+        balance = calculatedIncome - calculatedExpenses
       } else if (compute) {
         try {
           const computed = await calculateYearlyBalance(year, ctx!.organizationId)

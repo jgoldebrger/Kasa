@@ -212,7 +212,7 @@
   "dashboard.openTasks": "Open tasks",
   "dashboard.balance": "Balance",
   "dashboard.paymentsReceived": "Payments Received",
-  "dashboard.totalExpenses": "Lifecycle Expenses",
+  "dashboard.totalExpenses": "Lifecycle Expenses (This Year)",
   "dashboard.totalFamilies": "Total Families",
   "dashboard.totalMembers": "Total Members",
   "dashboard.tasks": "Tasks",

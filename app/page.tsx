@@ -3,6 +3,7 @@ import { requireServerOrgContext } from '@/lib/auth-server'
 import { hasMinRole } from '@/lib/auth-helpers'
 import connectDB from '@/lib/database'
 import { Family, FamilyMember, YearlyCalculation } from '@/lib/models'
+import { calculateYearlyExpenses } from '@/lib/calculations'
 import { loadSetupProgress } from '@/lib/organizations/setup-progress-data'
 import DashboardView from './DashboardView'
 import Loading from './loading'
@@ -28,8 +29,13 @@ async function fetchInitialDashboardData(organizationId: string, includeFinancia
   let balance = 0
   if (includeFinancials && calcDoc) {
     calculatedIncome = calcDoc.calculatedIncome ?? 0
-    calculatedExpenses = calcDoc.calculatedExpenses ?? 0
-    balance = calcDoc.balance ?? calculatedIncome - calculatedExpenses
+    const expenseData = await calculateYearlyExpenses(
+      year,
+      organizationId,
+      calcDoc.extraExpense ?? 0,
+    )
+    calculatedExpenses = expenseData.calculatedExpenses
+    balance = calculatedIncome - calculatedExpenses
   }
   // Note: we intentionally do NOT fall back to calculateYearlyBalance() here.
   // That helper kicks off ~6 sequential Mongo reads and would block first
