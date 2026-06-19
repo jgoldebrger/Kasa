@@ -84,7 +84,7 @@ describe.sequential('route-logic search/org domain coverage', () => {
     process.env.PLATFORM_ADMIN_EMAILS = ''
     ctx = await seedApiRouteFixtures()
     process.env.PLATFORM_ADMIN_EMAILS = ctx.email
-        process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
+    process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
     process.env.KASA_TEST_STRIPE_FAMILY = ctx.fixtures.familyId
     bindSession(ctx)
   })
@@ -132,7 +132,9 @@ describe.sequential('route-logic search/org domain coverage', () => {
       const { GET } = await import('@/lib/route-logic/search')
 
       bindSession(ctx, 'member')
-      const memberRes = await GET(orgJsonReq('/api/search', 'GET', undefined, { query: `?q=${last4}` }))
+      const memberRes = await GET(
+        orgJsonReq('/api/search', 'GET', undefined, { query: `?q=${last4}` }),
+      )
       const memberBody = await memberRes.json()
       expect(memberBody.items.every((i: { type: string }) => i.type !== 'payment')).toBe(true)
 
@@ -141,7 +143,9 @@ describe.sequential('route-logic search/org domain coverage', () => {
       const shortBody = await shortRes.json()
       expect(shortBody.items.every((i: { type: string }) => i.type !== 'payment')).toBe(true)
 
-      const cardRes = await GET(orgJsonReq('/api/search', 'GET', undefined, { query: `?q=${last4}` }))
+      const cardRes = await GET(
+        orgJsonReq('/api/search', 'GET', undefined, { query: `?q=${last4}` }),
+      )
       const cardBody = await cardRes.json()
       const cardHit = cardBody.items.find((i: { type: string }) => i.type === 'payment')
       expect(cardHit?.sublabel).toContain(`••${last4}`)
@@ -167,18 +171,19 @@ describe.sequential('route-logic search/org domain coverage', () => {
         hebrewFirstName: 'יעקב',
         hebrewLastName: stamp,
       })
-      await FamilyMember.updateOne(
-        { _id: member._id },
-        { $set: { firstName: '', lastName: '' } },
-      )
+      await FamilyMember.updateOne({ _id: member._id }, { $set: { firstName: '', lastName: '' } })
       const { GET } = await import('@/lib/route-logic/search')
 
-      const famRes = await GET(orgJsonReq('/api/search', 'GET', undefined, { query: `?q=${stamp}` }))
+      const famRes = await GET(
+        orgJsonReq('/api/search', 'GET', undefined, { query: `?q=${stamp}` }),
+      )
       const famBody = await famRes.json()
       const familyHit = famBody.items.find((i: { type: string }) => i.type === 'family')
       expect(familyHit?.sublabel).toContain(`משפחת ${stamp}`)
 
-      const memRes = await GET(orgJsonReq('/api/search', 'GET', undefined, { query: `?q=${stamp}` }))
+      const memRes = await GET(
+        orgJsonReq('/api/search', 'GET', undefined, { query: `?q=${stamp}` }),
+      )
       const memBody = await memRes.json()
       const memberHit = memBody.items.find((i: { type: string }) => i.type === 'member')
       expect(memberHit?.label).toContain(stamp)
@@ -265,7 +270,9 @@ describe.sequential('route-logic search/org domain coverage', () => {
       expect(noop.status).toBe(200)
       expect((await noop.json()).noop).toBe(true)
 
-      await PATCH(orgJsonReq('/api/organizations/current', 'PATCH', { currency: 'USD', locale: 'en-US' }))
+      await PATCH(
+        orgJsonReq('/api/organizations/current', 'PATCH', { currency: 'USD', locale: 'en-US' }),
+      )
     })
   })
 
@@ -298,8 +305,9 @@ describe.sequential('route-logic search/org domain coverage', () => {
       expect(row?.familyName).toBe(deletedFam.name)
 
       const pag = await import('@/lib/pagination')
-      const orphanSpy = vi.spyOn(pag, 'collectCompoundCursorPages').mockImplementationOnce(
-        async () => [
+      const orphanSpy = vi
+        .spyOn(pag, 'collectCompoundCursorPages')
+        .mockImplementationOnce(async () => [
           {
             _id: new Types.ObjectId(),
             eventType: 'orphan_event',
@@ -307,8 +315,7 @@ describe.sequential('route-logic search/org domain coverage', () => {
             year: y,
             amount: 10,
           },
-        ],
-      )
+        ])
       const res2 = await GET(orgJsonReq('/api/events', 'GET'))
       orphanSpy.mockRestore()
       const rows2 = await res2.json()
@@ -344,7 +351,7 @@ describe.sequential('route-logic search/org domain coverage', () => {
       )
       const adminBody = await adminRes.json()
       expect(adminBody.calculatedIncome).toBe(500)
-      expect(adminBody.balance).toBe(400)
+      expect(adminBody.balance).toBe(adminBody.calculatedIncome - adminBody.calculatedExpenses)
 
       bindSession(ctx, 'member')
       mockAuth.mockResolvedValueOnce({
@@ -362,7 +369,7 @@ describe.sequential('route-logic search/org domain coverage', () => {
       bindSession(ctx)
     })
 
-    it('uses balance fallback when YearlyCalculation doc omits balance field', async () => {
+    it('derives balance from income minus live expenses when balance field omitted', async () => {
       bindSession(ctx, 'admin')
       const { YearlyCalculation } = await import('@/lib/models')
       const y = year() + 50
@@ -379,7 +386,8 @@ describe.sequential('route-logic search/org domain coverage', () => {
         orgJsonReq('/api/dashboard-stats', 'GET', undefined, { query: `?year=${y}` }),
       )
       const body = await res.json()
-      expect(body.balance).toBe(150)
+      expect(body.calculatedIncome).toBe(200)
+      expect(body.balance).toBe(body.calculatedIncome - body.calculatedExpenses)
       await YearlyCalculation.deleteMany({ organizationId: ctx.orgId, year: y })
     })
   })
@@ -462,12 +470,12 @@ describe.sequential('route-logic search/org domain coverage', () => {
 
       const after = await GET(orgJsonReq('/api/notifications', 'GET'))
       const afterBody = await after.json()
-      expect(afterBody.items.find((n: { _id: string }) => n._id === perUser._id.toString())?.read).toBe(
-        true,
-      )
-      expect(afterBody.items.find((n: { _id: string }) => n._id === orgWide._id.toString())?.read).toBe(
-        true,
-      )
+      expect(
+        afterBody.items.find((n: { _id: string }) => n._id === perUser._id.toString())?.read,
+      ).toBe(true)
+      expect(
+        afterBody.items.find((n: { _id: string }) => n._id === orgWide._id.toString())?.read,
+      ).toBe(true)
 
       await Notification.deleteMany({ _id: { $in: [perUser._id, orgWide._id] } })
     })
