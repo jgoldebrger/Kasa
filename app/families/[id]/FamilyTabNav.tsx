@@ -1,18 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { ChevronRightIcon } from '@heroicons/react/24/outline'
 import { useFamilyDetail } from './FamilyDetailContext'
 import { FAMILY_TABS, familyTabHref, resolveFamilyTabLabel } from './_lib/constants'
 import { useT } from '@/lib/client/i18n'
-
-function BreadcrumbSeparator() {
-  return (
-    <li aria-hidden="true" className="flex shrink-0 items-center">
-      <ChevronRightIcon className="h-3.5 w-3.5 rtl:rotate-180" />
-    </li>
-  )
-}
 
 export default function FamilyTabNav() {
   const { familyId, activeTab, isAdmin } = useFamilyDetail()

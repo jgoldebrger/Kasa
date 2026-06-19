@@ -1,8 +1,5 @@
 import type { APIRequestContext } from '@playwright/test'
-import {
-  ADMIN_ONLY_ROUTES,
-  MEMBER_ALLOWED_ROUTES,
-} from '../auth/roles'
+import { ADMIN_ONLY_ROUTES, MEMBER_ALLOWED_ROUTES } from '../auth/roles'
 import { getCatalogRoutes, type ApiRouteEntry } from '../catalog'
 import { buildMatrixFixtures } from './api-matrix'
 import { defaultRouteFixtures, resolveRoutePath } from './route-fixtures'
@@ -25,9 +22,7 @@ function memberDeniedAdmin(status: number): boolean {
   return status < 200 || status >= 300
 }
 
-const MEMBER_ALLOWED_PATHS = new Set(
-  MEMBER_ALLOWED_ROUTES.map((r) => r.path.split('?')[0]!),
-)
+const MEMBER_ALLOWED_PATHS = new Set(MEMBER_ALLOWED_ROUTES.map((r) => r.path.split('?')[0]!))
 
 function adminCatalogGetRoutes(): ApiRouteEntry[] {
   return getCatalogRoutes(
@@ -43,11 +38,7 @@ function adminCatalogGetRoutes(): ApiRouteEntry[] {
 function adminCatalogMutatingRoutes(): ApiRouteEntry[] {
   return getCatalogRoutes(
     (r) =>
-      r.csrf &&
-      r.tenantScoped &&
-      r.auth === 'org' &&
-      r.minRole === 'admin' &&
-      r.method !== 'GET',
+      r.csrf && r.tenantScoped && r.auth === 'org' && r.minRole === 'admin' && r.method !== 'GET',
   ).slice(0, 12)
 }
 
@@ -73,9 +64,7 @@ export async function probeMemberDeniedAdminRoutes(
       check: 'member-denied-admin',
       status,
       passed,
-      detail: passed
-        ? `Member denied (${status})`
-        : `Member accessed admin route (${status})`,
+      detail: passed ? `Member denied (${status})` : `Member accessed admin route (${status})`,
     })
   }
 
@@ -105,7 +94,6 @@ export async function probeMemberAllowedRoutes(
   memberRequest: APIRequestContext,
 ): Promise<RbacProbeResult[]> {
   const results: RbacProbeResult[] = []
-  const fixtures = await buildMatrixFixtures(memberRequest)
 
   for (const route of MEMBER_ALLOWED_ROUTES) {
     const res = await mutateRequest(memberRequest, {
@@ -152,9 +140,7 @@ export async function probeOwnerAdminRoutes(
       check: 'owner-admin-get',
       status,
       passed,
-      detail: passed
-        ? `Owner admin GET ok (${status})`
-        : `Owner denied admin GET (${status})`,
+      detail: passed ? `Owner admin GET ok (${status})` : `Owner denied admin GET (${status})`,
     })
   }
 

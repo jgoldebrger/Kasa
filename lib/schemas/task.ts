@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { email, isoDate, nonEmptyString, objectId, optionalString, trimmedName } from './common'
+import { isoDate, objectId, optionalString, trimmedName } from './common'
 
 export const taskBody = z.object({
   title: trimmedName,

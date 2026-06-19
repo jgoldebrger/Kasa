@@ -14,7 +14,7 @@
  */
 
 import connectDB from '@/lib/database'
-import { CycleConfig, Family, PaymentPlan, CycleCharge, Organization } from '@/lib/models'
+import { CycleConfig, PaymentPlan, CycleCharge, Organization } from '@/lib/models'
 import { familyBatches } from '@/lib/org-pagination'
 import { cycleYearFor } from '@/lib/jobs'
 import { logError } from '@/lib/log'
@@ -50,7 +50,9 @@ export async function runCycleRolloverForOrg(
     .select('cycleCalendar')
     .lean<any>()
 
-  const org = await Organization.findById(organizationId).select('timezone').lean<{ timezone?: string }>()
+  const org = await Organization.findById(organizationId)
+    .select('timezone')
+    .lean<{ timezone?: string }>()
 
   const calendar: 'gregorian' | 'hebrew' =
     config?.cycleCalendar === 'hebrew' ? 'hebrew' : 'gregorian'
@@ -106,50 +108,48 @@ export async function runCycleRolloverForOrg(
   for await (const families of familyBatches(organizationId, {
     select: '_id paymentPlanId',
   })) {
-  for (const family of families) {
-    const familyId = String(family._id)
-    try {
-      const plan = await getPlan(
-        family.paymentPlanId ? String(family.paymentPlanId) : null,
-      )
-      if (!plan || plan.yearlyPrice <= 0) {
-        result.noPlan += 1
-        continue
-      }
-
-      // Rely on the partial unique index for idempotency. A duplicate
-      // means we already charged this family for this cycleYear (the
-      // cron re-ran, an admin re-triggered, etc.) and we silently skip.
+    for (const family of families) {
+      const familyId = String(family._id)
       try {
-        await CycleCharge.create({
+        const plan = await getPlan(family.paymentPlanId ? String(family.paymentPlanId) : null)
+        if (!plan || plan.yearlyPrice <= 0) {
+          result.noPlan += 1
+          continue
+        }
+
+        // Rely on the partial unique index for idempotency. A duplicate
+        // means we already charged this family for this cycleYear (the
+        // cron re-ran, an admin re-triggered, etc.) and we silently skip.
+        try {
+          await CycleCharge.create({
+            organizationId,
+            familyId,
+            cycleYear,
+            calendar,
+            chargeDate,
+            amount: plan.yearlyPrice,
+            planId: family.paymentPlanId,
+            planName: plan.name,
+            notes: `Annual membership dues — cycle ${cycleYear}`,
+          })
+          result.charged += 1
+        } catch (err: any) {
+          if (err?.code === 11000) {
+            result.skipped += 1
+          } else {
+            throw err
+          }
+        }
+      } catch (err: any) {
+        result.errors.push({ familyId, error: err?.message || String(err) })
+        logError(err, {
+          module: 'cycle-rollover',
           organizationId,
           familyId,
           cycleYear,
-          calendar,
-          chargeDate,
-          amount: plan.yearlyPrice,
-          planId: family.paymentPlanId,
-          planName: plan.name,
-          notes: `Annual membership dues — cycle ${cycleYear}`,
         })
-        result.charged += 1
-      } catch (err: any) {
-        if (err?.code === 11000) {
-          result.skipped += 1
-        } else {
-          throw err
-        }
       }
-    } catch (err: any) {
-      result.errors.push({ familyId, error: err?.message || String(err) })
-      logError(err, {
-        module: 'cycle-rollover',
-        organizationId,
-        familyId,
-        cycleYear,
-      })
     }
-  }
   }
 
   return result

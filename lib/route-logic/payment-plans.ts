@@ -1,6 +1,6 @@
 import { Types } from 'mongoose'
 import { handler } from '@/lib/api/handler'
-import { PaymentPlan, Family } from '@/lib/models'
+import { PaymentPlan } from '@/lib/models'
 import { audit } from '@/lib/audit'
 import { payment as paymentSchemas } from '@/lib/schemas'
 import { checkRateLimit } from '@/lib/rate-limit'

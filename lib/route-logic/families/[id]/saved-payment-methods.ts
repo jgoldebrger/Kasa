@@ -103,7 +103,6 @@ export const POST = handler({
 
     const stripe = getStripe()
 
-    let piMetadataOk = false
     try {
       const intent = await stripe.paymentIntents.retrieve(paymentIntentId)
       if (intent.status !== 'succeeded') {
@@ -130,16 +129,10 @@ export const POST = handler({
       if (!piFam || piFam !== String(id)) {
         return { status: 403, data: { error: 'PaymentIntent does not belong to this family' } }
       }
-      piMetadataOk = true
     } catch (err: any) {
       console.error('[saved-payment-methods] PI verification failed:', err?.message)
       return { status: 400, data: { error: 'Could not verify PaymentIntent' } }
     }
-    /* v8 ignore next 3 — every try path returns or sets piMetadataOk before this guard */
-    if (!piMetadataOk) {
-      return { status: 403, data: { error: 'PaymentIntent verification failed' } }
-    }
-
     const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId)
 
     if (!paymentMethod.card) {

@@ -33,7 +33,8 @@ export const GET = handler({
     }
 
     const requests = await collectCompoundCursorPages(
-      (filter, limit) => InviteRequest.find(filter).sort({ createdAt: -1, _id: -1 }).limit(limit).lean(),
+      (filter, limit) =>
+        InviteRequest.find(filter).sort({ createdAt: -1, _id: -1 }).limit(limit).lean(),
       query,
       'createdAt',
       -1,
@@ -103,7 +104,8 @@ export const PATCH = handler({
 
     if (action === 'reject') {
       req.status = 'rejected'
-      req.rejectReason = typeof body.rejectReason === 'string' ? body.rejectReason.slice(0, 500) : ''
+      req.rejectReason =
+        typeof body.rejectReason === 'string' ? body.rejectReason.slice(0, 500) : ''
       req.reviewedById = new Types.ObjectId(userId)
       req.reviewedAt = new Date()
       req.signupCode = undefined
@@ -132,7 +134,7 @@ export const PATCH = handler({
 
     const signupUrl = `${baseUrl}/signup?code=${signupCode}`
 
-    let emailResult: { sent: boolean; reason?: string; error?: string } = { sent: false, reason: 'not attempted' }
+    let emailResult: { sent: boolean; reason?: string; error?: string }
     if (isPlatformEmailConfigured()) {
       emailResult = await sendPlatformEmail({
         to: req.email,

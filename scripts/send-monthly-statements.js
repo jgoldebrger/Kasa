@@ -8,6 +8,10 @@ const API_URL = process.env.API_URL || 'http://localhost:3000'
 const CRON_SECRET = process.env.CRON_SECRET
 const API_PATH = '/api/jobs/send-monthly-statements'
 
+function safeLogLine(value) {
+  return String(value ?? '').replace(/[\r\n]/g, ' ')
+}
+
 if (!CRON_SECRET) {
   console.error('CRON_SECRET env var is required')
   process.exit(1)
@@ -17,7 +21,7 @@ function sendMonthlyStatements() {
   return new Promise((resolve, reject) => {
     const url = new URL(API_PATH, API_URL)
     const protocol = url.protocol === 'https:' ? https : http
-    
+
     const options = {
       hostname: url.hostname,
       port: url.port || (url.protocol === 'https:' ? 443 : 80),
@@ -25,8 +29,8 @@ function sendMonthlyStatements() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-cron-secret': CRON_SECRET
-      }
+        'x-cron-secret': CRON_SECRET,
+      },
     }
 
     const req = protocol.request(options, (res) => {
@@ -48,11 +52,14 @@ function sendMonthlyStatements() {
             }
             if (result.errors && result.errors.length > 0) {
               console.log('   Errors:')
-              result.errors.forEach(err => console.log(`     - ${err}`))
+              result.errors.forEach((err) => console.log(`     - ${safeLogLine(err)}`))
             }
             resolve(result)
           } else {
-            console.error('❌ Error sending monthly statements:', result.error || result)
+            console.error(
+              '❌ Error sending monthly statements:',
+              safeLogLine(result.error || JSON.stringify(result)),
+            )
             reject(new Error(result.error || 'Failed to send statements'))
           }
         } catch (error) {
@@ -63,7 +70,7 @@ function sendMonthlyStatements() {
     })
 
     req.on('error', (error) => {
-      console.error('❌ Request error:', error)
+      console.error('❌ Request error:', safeLogLine(error.message))
       reject(error)
     })
 
@@ -73,7 +80,7 @@ function sendMonthlyStatements() {
 
 // Run the script
 console.log('📧 Starting monthly statement email sending...')
-console.log(`   API URL: ${API_URL}`)
+console.log(`   API host: ${safeLogLine(new URL(API_URL).host)}`)
 console.log(`   Time: ${new Date().toISOString()}`)
 
 sendMonthlyStatements()
@@ -82,7 +89,6 @@ sendMonthlyStatements()
     process.exit(0)
   })
   .catch((error) => {
-    console.error('❌ Script failed:', error.message)
+    console.error('❌ Script failed:', safeLogLine(error.message))
     process.exit(1)
   })
-

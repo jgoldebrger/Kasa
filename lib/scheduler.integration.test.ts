@@ -38,7 +38,6 @@ function mockPeriod(closingBalance: number): StatementPeriodAggregates {
 
 describe('generateMonthlyStatements (integration)', () => {
   const ownerId = new mongoose.Types.ObjectId()
-  const userId = new mongoose.Types.ObjectId()
   let orgId: string
   let familyId: mongoose.Types.ObjectId
 
@@ -195,7 +194,9 @@ describe('generateMonthlyStatements (integration)', () => {
     expect(result.year).toBe(period.year)
     expect(result.month).toBe(period.month)
 
-    const row = await Statement.findOne({ organizationId: orgId, familyId }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+    const row = (await Statement.findOne({ organizationId: orgId, familyId }).lean()) as
+      | import('@/lib/test/type-helpers').LeanDoc
+      | null
     expect(row).toBeTruthy()
     expect((row!.fromDate as Date).getTime()).toBe(period.fromDate.getTime())
     expect((row!.toDate as Date).getTime()).toBe(period.toDate.getTime())
@@ -254,9 +255,13 @@ describe('generateMonthlyStatements (integration)', () => {
       error: 'balance lookup failed',
     })
 
-    const rows = await Statement.find({ organizationId: orgId }).lean() as import('@/lib/test/type-helpers').LeanDoc[]
+    const rows = (await Statement.find({
+      organizationId: orgId,
+    }).lean()) as import('@/lib/test/type-helpers').LeanDoc[]
     expect(rows).toHaveLength(1)
-    expect(String((rows[0] as import('@/lib/test/type-helpers').LeanDoc).familyId)).toBe(String(good._id))
+    expect(String((rows[0] as import('@/lib/test/type-helpers').LeanDoc).familyId)).toBe(
+      String(good._id),
+    )
   })
 
   it('records an error when duplicate-key races without a persisted row', async () => {

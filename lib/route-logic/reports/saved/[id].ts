@@ -3,7 +3,6 @@
  * DELETE /api/reports/saved/:id — delete a saved report
  */
 
-import { z } from 'zod'
 import { Types } from 'mongoose'
 import { handler } from '@/lib/api/handler'
 import { SavedReport } from '@/lib/models'

@@ -118,7 +118,7 @@ export default function TaxReceiptsPanel() {
   )
 
   useEffect(() => {
-    const gen = begin()
+    begin()
     void fetchRows(year)
     return () => {
       invalidate()

@@ -8,9 +8,9 @@ import {
   saveStorageState,
   type AuthRole,
 } from '../auth'
-import { attachTrafficCapture, resetTrafficLog, snapshotSession } from '../helpers/capture'
+import { attachTrafficCapture, snapshotSession } from '../helpers/capture'
 import { playwrightLaunchOptions } from '../helpers/proxy'
-import { initReportRun, recordFinding } from '../reports/writer'
+import { recordFinding } from '../reports/writer'
 import { findingFromTest } from '../reports/types'
 
 type SecurityFixtures = {
@@ -38,7 +38,9 @@ export const test = base.extend<SecurityFixtures>({
       storageState: authStoragePath('owner'),
       ignoreHTTPSErrors: launchOpts.ignoreHTTPSErrors,
       baseURL: secConfig.baseUrl,
-      recordHar: secConfig.captureHar ? { path: `security/reports/output/har-${Date.now()}.har` } : undefined,
+      recordHar: secConfig.captureHar
+        ? { path: `security/reports/output/har-${Date.now()}.har` }
+        : undefined,
     })
     const page = await context.newPage()
     attachTrafficCapture(page)
@@ -93,16 +95,11 @@ export function assertSecurityPassed(
   detail: string,
   severity?: 'critical' | 'high' | 'medium' | 'low',
 ): void {
-  recordFinding(
-    findingFromTest({ title, category, passed, detail, severity }),
-  )
+  recordFinding(findingFromTest({ title, category, passed, detail, severity }))
   expect(passed, detail).toBeTruthy()
 }
 
-export async function bootstrapAuthRole(
-  page: Page,
-  role: AuthRole,
-): Promise<void> {
+export async function bootstrapAuthRole(page: Page, role: AuthRole): Promise<void> {
   const config = getSecurityConfig()
   ensureAuthDir()
   if (role === 'guest') return
@@ -112,7 +109,7 @@ export async function bootstrapAuthRole(
       ? config.owner
       : role === 'member'
         ? config.member
-        : config.platformAdmin ?? config.owner
+        : (config.platformAdmin ?? config.owner)
 
   await loginViaUi(page, creds)
   await saveStorageState(page.context(), role)

@@ -9,7 +9,6 @@
  */
 
 import { Payment, Withdrawal, LifecycleEventPayment, CycleCharge } from '@/lib/models'
-import { UNBOUNDED_LIST_CAP } from '@/lib/schemas/common'
 import { calculateFamilyBalance } from '@/lib/calculations'
 import { sanitizePaymentNotes } from '@/lib/payments/sanitize'
 import { loadAllByIdCursor } from '@/lib/org-pagination'
@@ -56,65 +55,59 @@ export interface StatementPeriodAggregates {
 export async function loadStatementPeriod(
   input: StatementPeriodInputs,
 ): Promise<StatementPeriodAggregates> {
-  const { organizationId, familyId, fromDate, toDate, openingBalance } = input
+  const { organizationId, familyId, fromDate, toDate } = input
 
   const orgFamilyFilter = { organizationId, familyId }
 
   const [payments, priorPeriodRefunds, withdrawals, lifecycleEvents, cycleCharges] =
     await Promise.all([
-    loadAllByIdCursor<any>(
-      (filter, limit) =>
-        Payment.find(filter)
-          .sort({ paymentDate: 1, _id: 1 })
-          .limit(limit)
-          .lean<any[]>()
-          .then((rows) =>
-            rows.map((p) => ({
-              ...p,
-              netAmount: Math.max(0, Number(p.amount || 0) - Number(p.refundedAmount || 0)),
-            })),
-          ),
-      { ...orgFamilyFilter, paymentDate: { $gte: fromDate, $lte: toDate } },
-    ),
-    loadAllByIdCursor<any>(
-      (filter, limit) =>
-        Payment.find(filter)
-          .select('amount refundedAmount refundedAt type notes paymentDate')
-          .sort({ refundedAt: 1, _id: 1 })
-          .limit(limit)
-          .lean<any[]>(),
-      {
-        ...orgFamilyFilter,
-        paymentDate: { $lt: fromDate },
-        refundedAt: { $gte: fromDate, $lte: toDate },
-        refundedAmount: { $gt: 0 },
-      },
-    ),
-    loadAllByIdCursor<any>(
-      (filter, limit) =>
-        Withdrawal.find(filter)
-          .sort({ withdrawalDate: 1, _id: 1 })
-          .limit(limit)
-          .lean<any[]>(),
-      { ...orgFamilyFilter, withdrawalDate: { $gte: fromDate, $lte: toDate } },
-    ),
-    loadAllByIdCursor<any>(
-      (filter, limit) =>
-        LifecycleEventPayment.find(filter)
-          .sort({ eventDate: 1, _id: 1 })
-          .limit(limit)
-          .lean<any[]>(),
-      { ...orgFamilyFilter, eventDate: { $gte: fromDate, $lte: toDate } },
-    ),
-    loadAllByIdCursor<any>(
-      (filter, limit) =>
-        CycleCharge.find(filter)
-          .sort({ chargeDate: 1, _id: 1 })
-          .limit(limit)
-          .lean<any[]>(),
-      { ...orgFamilyFilter, chargeDate: { $gte: fromDate, $lte: toDate } },
-    ),
-  ])
+      loadAllByIdCursor<any>(
+        (filter, limit) =>
+          Payment.find(filter)
+            .sort({ paymentDate: 1, _id: 1 })
+            .limit(limit)
+            .lean<any[]>()
+            .then((rows) =>
+              rows.map((p) => ({
+                ...p,
+                netAmount: Math.max(0, Number(p.amount || 0) - Number(p.refundedAmount || 0)),
+              })),
+            ),
+        { ...orgFamilyFilter, paymentDate: { $gte: fromDate, $lte: toDate } },
+      ),
+      loadAllByIdCursor<any>(
+        (filter, limit) =>
+          Payment.find(filter)
+            .select('amount refundedAmount refundedAt type notes paymentDate')
+            .sort({ refundedAt: 1, _id: 1 })
+            .limit(limit)
+            .lean<any[]>(),
+        {
+          ...orgFamilyFilter,
+          paymentDate: { $lt: fromDate },
+          refundedAt: { $gte: fromDate, $lte: toDate },
+          refundedAmount: { $gt: 0 },
+        },
+      ),
+      loadAllByIdCursor<any>(
+        (filter, limit) =>
+          Withdrawal.find(filter).sort({ withdrawalDate: 1, _id: 1 }).limit(limit).lean<any[]>(),
+        { ...orgFamilyFilter, withdrawalDate: { $gte: fromDate, $lte: toDate } },
+      ),
+      loadAllByIdCursor<any>(
+        (filter, limit) =>
+          LifecycleEventPayment.find(filter)
+            .sort({ eventDate: 1, _id: 1 })
+            .limit(limit)
+            .lean<any[]>(),
+        { ...orgFamilyFilter, eventDate: { $gte: fromDate, $lte: toDate } },
+      ),
+      loadAllByIdCursor<any>(
+        (filter, limit) =>
+          CycleCharge.find(filter).sort({ chargeDate: 1, _id: 1 }).limit(limit).lean<any[]>(),
+        { ...orgFamilyFilter, chargeDate: { $gte: fromDate, $lte: toDate } },
+      ),
+    ])
 
   // Net refunds out of income to stay consistent with `calculateFamilyBalance`.
   // Using gross `amount` here caused the statement's closing balance to drift
@@ -136,11 +129,7 @@ export async function loadStatementPeriod(
   // Derive closing from the same balance helper used everywhere else so
   // refunds on pre-period payments (refundedAt inside this window) are
   // reflected even though their paymentDate falls before fromDate.
-  const { balance: closingBalance } = await calculateFamilyBalance(
-    familyId,
-    organizationId,
-    toDate,
-  )
+  const { balance: closingBalance } = await calculateFamilyBalance(familyId, organizationId, toDate)
 
   return {
     payments,
@@ -163,9 +152,7 @@ export async function loadStatementPeriod(
  * charges are emitted with negative `amount` so the PDF column lines
  * up with the closing-balance formula above.
  */
-export function buildTransactionList(
-  period: StatementPeriodAggregates,
-): {
+export function buildTransactionList(period: StatementPeriodAggregates): {
   type: 'payment' | 'withdrawal' | 'event' | 'cycle-charge'
   date: Date
   description: string
@@ -208,7 +195,8 @@ export function buildTransactionList(
     ...period.lifecycleEvents.map((e) => ({
       type: 'event' as const,
       date: e.eventDate,
-      description: `${e.eventType} (${Number(e.amount || 0).toFixed(2)})${e.notes ? ` — ${e.notes}` : ''}`.trim(),
+      description:
+        `${e.eventType} (${Number(e.amount || 0).toFixed(2)})${e.notes ? ` — ${e.notes}` : ''}`.trim(),
       amount: 0,
       notes: e.notes || '',
     })),

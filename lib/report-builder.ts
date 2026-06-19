@@ -20,7 +20,7 @@
  */
 
 import { Types } from 'mongoose'
-import { Family, FamilyMember, Payment, LifecycleEventPayment, PaymentPlan, Organization } from './models'
+import { Family, Payment, LifecycleEventPayment, PaymentPlan, Organization } from './models'
 import { netPaymentAmount } from './money'
 import { UNBOUNDED_LIST_CAP } from './schemas/common'
 import { validateDateRange } from './validate-date-range'
@@ -86,9 +86,7 @@ export const REPORT_SOURCES: ReportSourceDef[] = [
       { id: 'month', label: 'Month', type: 'string' },
       { id: 'planName', label: 'Plan', type: 'string' },
     ],
-    measures: [
-      { id: 'amount', label: 'Amount', type: 'number' },
-    ],
+    measures: [{ id: 'amount', label: 'Amount', type: 'number' }],
   },
   {
     id: 'events',
@@ -100,9 +98,7 @@ export const REPORT_SOURCES: ReportSourceDef[] = [
       { id: 'year', label: 'Year', type: 'string' },
       { id: 'month', label: 'Month', type: 'string' },
     ],
-    measures: [
-      { id: 'amount', label: 'Amount', type: 'number' },
-    ],
+    measures: [{ id: 'amount', label: 'Amount', type: 'number' }],
   },
   {
     id: 'members',
@@ -151,11 +147,9 @@ async function familyInfoById(
   const rows: any[] = []
   for (let i = 0; i < unique.length; i += UNBOUNDED_LIST_CAP) {
     const chunk = unique.slice(i, i + UNBOUNDED_LIST_CAP)
-    const batch = await Family.find(
-      { _id: { $in: chunk }, organizationId: orgId },
-      null,
-      { includeDeleted: true },
-    )
+    const batch = await Family.find({ _id: { $in: chunk }, organizationId: orgId }, null, {
+      includeDeleted: true,
+    })
       .select('_id name paymentPlanId')
       .lean<any[]>()
     rows.push(...batch)
@@ -188,10 +182,7 @@ async function loadRows(
     const [rows, planDocs] = await Promise.all([
       collectCompoundCursorPages(
         (filter, limit) =>
-          Payment.find(filter)
-            .sort({ paymentDate: 1, _id: 1 })
-            .limit(limit)
-            .lean<any[]>(),
+          Payment.find(filter).sort({ paymentDate: 1, _id: 1 }).limit(limit).lean<any[]>(),
         filter,
         'paymentDate',
         1,
@@ -206,9 +197,7 @@ async function loadRows(
         { organizationId: orgId },
       ),
     ])
-    const planNameById = new Map(
-      planDocs.map((pl) => [String(pl._id), pl.name || '(unnamed)']),
-    )
+    const planNameById = new Map(planDocs.map((pl) => [String(pl._id), pl.name || '(unnamed)']))
     const familyById = await familyInfoById(
       orgId,
       rows.map((p) => (p.familyId ? String(p.familyId) : '')).filter(Boolean),
@@ -224,7 +213,7 @@ async function loadRows(
         method: p.paymentMethod || '(unknown)',
         year: date ? String(getYearInTimeZone(timezone, date)) : '(no date)',
         month: date ? yearMonthInTimeZone(date, timezone) : '(no date)',
-        planName: planId ? planNameById.get(planId) ?? '(unknown plan)' : '(none)',
+        planName: planId ? (planNameById.get(planId) ?? '(unknown plan)') : '(none)',
       }
     })
   }
@@ -303,8 +292,7 @@ async function loadRows(
   }
   const [rows, planDocs] = await Promise.all([
     collectCompoundCursorPages(
-      (filter, limit) =>
-        Family.find(filter).sort({ name: 1, _id: 1 }).limit(limit).lean<any[]>(),
+      (filter, limit) => Family.find(filter).sort({ name: 1, _id: 1 }).limit(limit).lean<any[]>(),
       filter,
       'name',
       1,
@@ -319,14 +307,12 @@ async function loadRows(
       { organizationId: orgId },
     ),
   ])
-  const planNameById = new Map(
-    planDocs.map((pl) => [String(pl._id), pl.name || '(unnamed)']),
-  )
+  const planNameById = new Map(planDocs.map((pl) => [String(pl._id), pl.name || '(unnamed)']))
   return rows.map((f) => {
     const wd = f.weddingDate ? new Date(f.weddingDate) : null
     const planId = f.paymentPlanId ? String(f.paymentPlanId) : null
     return {
-      planName: planId ? planNameById.get(planId) ?? '(unknown plan)' : '(none)',
+      planName: planId ? (planNameById.get(planId) ?? '(unknown plan)') : '(none)',
       weddingYear: wd ? String(wd.getFullYear()) : '(unknown)',
       emailOptOut: f.emailOptOut ? 'opted out' : 'subscribed',
     }
@@ -382,7 +368,9 @@ export async function runReport(
     toDate.setUTCHours(23, 59, 59, 999)
   }
 
-  const org = await Organization.findById(organizationId).select('timezone').lean<{ timezone?: string | null }>()
+  const org = await Organization.findById(organizationId)
+    .select('timezone')
+    .lean<{ timezone?: string | null }>()
   const rows = await loadRows(config.source, orgId, fromDate, toDate, org?.timezone)
 
   const aggregate: Aggregate = config.aggregate || 'count'

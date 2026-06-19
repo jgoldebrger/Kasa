@@ -3,7 +3,6 @@
  * POST /api/reports/saved — create a new saved report (current user is creator)
  */
 
-import { z } from 'zod'
 import { handler } from '@/lib/api/handler'
 import { SavedReport } from '@/lib/models'
 import { audit } from '@/lib/audit'
@@ -29,7 +28,8 @@ export const GET = handler({
     }
 
     const rows = await collectCompoundCursorPages(
-      (filter, limit) => SavedReport.find(filter).sort({ updatedAt: -1, _id: -1 }).limit(limit).lean<any[]>(),
+      (filter, limit) =>
+        SavedReport.find(filter).sort({ updatedAt: -1, _id: -1 }).limit(limit).lean<any[]>(),
       { organizationId: ctx!.organizationId },
       'updatedAt',
       -1,

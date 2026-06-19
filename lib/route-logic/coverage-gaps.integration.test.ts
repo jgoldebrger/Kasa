@@ -2,14 +2,12 @@
  * Targeted lib/route-logic line-coverage gaps not hit elsewhere.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
-import { Types } from 'mongoose'
 import { NextRequest } from 'next/server'
 import {
   seedApiRouteFixtures,
   teardownApiRouteFixtures,
   type ApiTestContext,
 } from '@/lib/test/api-route-fixtures'
-import { generateTotpCode } from '@/lib/totp'
 
 const mockAuth = vi.hoisted(() => vi.fn())
 const mockCookieGet = vi.hoisted(() => vi.fn())

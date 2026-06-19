@@ -3,14 +3,12 @@ import { setNodeEnv } from '@/lib/test/type-helpers'
  * lib/route-logic line-coverage gaps not hit by api-routes / route-logic-finish.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
-import { Types } from 'mongoose'
 import { NextRequest } from 'next/server'
 import {
   seedApiRouteFixtures,
   teardownApiRouteFixtures,
   type ApiTestContext,
 } from '@/lib/test/api-route-fixtures'
-import { generateTotpCode } from '@/lib/totp'
 
 const mockAuth = vi.hoisted(() => vi.fn())
 const mockCookieGet = vi.hoisted(() => vi.fn())
@@ -92,8 +90,8 @@ async function withRateLimitBlocked<T>(fn: () => Promise<T>): Promise<T> {
   const rateLimit = await import('@/lib/rate-limit')
   const spy = vi.spyOn(rateLimit, 'checkRateLimit').mockResolvedValue({
     allowed: false,
-        remaining: 0,
-        resetAt: 0,
+    remaining: 0,
+    resetAt: 0,
   })
   try {
     return await fn()
@@ -112,7 +110,7 @@ describe.sequential('route-logic coverage gaps', () => {
     process.env.PLATFORM_ADMIN_EMAILS = ''
     ctx = await seedApiRouteFixtures()
     process.env.PLATFORM_ADMIN_EMAILS = ctx.email
-        process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
+    process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
     process.env.KASA_TEST_STRIPE_FAMILY = ctx.fixtures.familyId
     bindSession(ctx)
   })
@@ -150,8 +148,11 @@ describe.sequential('route-logic coverage gaps', () => {
       })
 
       expect(
-        (await GET(orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?resourceType=123bad' })))
-          .status,
+        (
+          await GET(
+            orgJsonReq('/api/audit-log', 'GET', undefined, { query: '?resourceType=123bad' }),
+          )
+        ).status,
       ).toBe(400)
 
       const y0 = year()
@@ -205,8 +206,11 @@ describe.sequential('route-logic coverage gaps', () => {
         'utf8',
       ).toString('base64url')
       expect(
-        (await GET(orgJsonReq('/api/audit-log', 'GET', undefined, { query: `?cursor=${badOidCursor}` })))
-          .status,
+        (
+          await GET(
+            orgJsonReq('/api/audit-log', 'GET', undefined, { query: `?cursor=${badOidCursor}` }),
+          )
+        ).status,
       ).toBe(400)
 
       const auditMod = await import('@/lib/models')
@@ -236,7 +240,9 @@ describe.sequential('route-logic coverage gaps', () => {
         expect((await GET(orgJsonReq('/api/calculations', 'GET'))).status).toBe(429)
       })
 
-      const one = await GET(orgJsonReq('/api/calculations', 'GET', undefined, { query: `?year=${y}` }))
+      const one = await GET(
+        orgJsonReq('/api/calculations', 'GET', undefined, { query: `?year=${y}` }),
+      )
       expect(one.status).toBe(200)
 
       for (let i = 0; i < 3; i++) {
@@ -252,17 +258,30 @@ describe.sequential('route-logic coverage gaps', () => {
 
       await withRateLimitBlocked(async () => {
         expect(
-          (await POST(orgJsonReq('/api/calculations', 'POST', { year: y, extraDonation: 0, extraExpense: 0 })))
-            .status,
+          (
+            await POST(
+              orgJsonReq('/api/calculations', 'POST', {
+                year: y,
+                extraDonation: 0,
+                extraExpense: 0,
+              }),
+            )
+          ).status,
         ).toBe(429)
       })
 
       const calcMod = await import('@/lib/calculations')
-      const spy = vi.spyOn(calcMod, 'calculateAndSaveYear').mockRejectedValueOnce(new Error('get fail'))
+      const spy = vi
+        .spyOn(calcMod, 'calculateAndSaveYear')
+        .mockRejectedValueOnce(new Error('get fail'))
       try {
-        expect((await GET(orgJsonReq('/api/calculations', 'GET', undefined, { query: `?year=${y + 1}` }))).status).toBe(
-          500,
-        )
+        expect(
+          (
+            await GET(
+              orgJsonReq('/api/calculations', 'GET', undefined, { query: `?year=${y + 1}` }),
+            )
+          ).status,
+        ).toBe(500)
       } finally {
         spy.mockRestore()
       }
@@ -304,7 +323,9 @@ describe.sequential('route-logic coverage gaps', () => {
       } as never)
 
       const { GET, POST } = await import('@/lib/route-logic/notifications')
-      const list = await GET(orgJsonReq('/api/notifications', 'GET', undefined, { query: '?unreadOnly=true' }))
+      const list = await GET(
+        orgJsonReq('/api/notifications', 'GET', undefined, { query: '?unreadOnly=true' }),
+      )
       expect(list.status).toBe(200)
       const body = await list.json()
       expect(body.items.every((n: { kind: string }) => n.kind !== adminKind)).toBe(true)
@@ -359,12 +380,17 @@ describe.sequential('route-logic coverage gaps', () => {
       bindSession(ctx)
 
       const realCount = OrgMembership.countDocuments.bind(OrgMembership)
-      const countSpy = vi.spyOn(OrgMembership, 'countDocuments').mockImplementation(async (filter: any) => {
-        if (filter?.role === 'owner') return 1
-        return realCount(filter)
-      })
+      const countSpy = vi
+        .spyOn(OrgMembership, 'countDocuments')
+        .mockImplementation(async (filter: any) => {
+          if (filter?.role === 'owner') return 1
+          return realCount(filter)
+        })
       try {
-        await OrgMembership.updateOne({ _id: ctx.fixtures.memberMembershipId }, { $set: { role: 'owner' } })
+        await OrgMembership.updateOne(
+          { _id: ctx.fixtures.memberMembershipId },
+          { $set: { role: 'owner' } },
+        )
         expect(
           (
             await PATCH(
@@ -391,35 +417,58 @@ describe.sequential('route-logic coverage gaps', () => {
 
         await withRateLimitBlocked(async () => {
           expect(
-            (await DELETE(orgJsonReq(`/api/org-members?id=${ctx.fixtures.memberMembershipId}`, 'DELETE'))).status,
+            (
+              await DELETE(
+                orgJsonReq(`/api/org-members?id=${ctx.fixtures.memberMembershipId}`, 'DELETE'),
+              )
+            ).status,
           ).toBe(429)
         })
 
         expect(
-          (await DELETE(orgJsonReq(`/api/org-members?id=${ctx.fixtures.memberMembershipId}`, 'DELETE'))).status,
+          (
+            await DELETE(
+              orgJsonReq(`/api/org-members?id=${ctx.fixtures.memberMembershipId}`, 'DELETE'),
+            )
+          ).status,
         ).toBe(400)
       } finally {
         countSpy.mockRestore()
-        await OrgMembership.updateOne({ _id: ctx.fixtures.memberMembershipId }, { $set: { role: 'member' } })
+        await OrgMembership.updateOne(
+          { _id: ctx.fixtures.memberMembershipId },
+          { $set: { role: 'member' } },
+        )
       }
 
       let ownerChecks = 0
-      const raceSpy = vi.spyOn(OrgMembership, 'countDocuments').mockImplementation(async (filter: any) => {
-        if (filter?.role === 'owner') {
-          ownerChecks++
-          if (ownerChecks >= 2) return 0
-        }
-        return realCount(filter)
-      })
-      const createSpy = vi.spyOn(OrgMembership, 'create').mockRejectedValueOnce(new Error('revert failed'))
+      const raceSpy = vi
+        .spyOn(OrgMembership, 'countDocuments')
+        .mockImplementation(async (filter: any) => {
+          if (filter?.role === 'owner') {
+            ownerChecks++
+            if (ownerChecks >= 2) return 0
+          }
+          return realCount(filter)
+        })
+      const createSpy = vi
+        .spyOn(OrgMembership, 'create')
+        .mockRejectedValueOnce(new Error('revert failed'))
       try {
-        await OrgMembership.updateOne({ _id: ctx.fixtures.memberMembershipId }, { $set: { role: 'owner' } })
-        const res = await DELETE(orgJsonReq(`/api/org-members?id=${ctx.fixtures.memberMembershipId}`, 'DELETE'))
+        await OrgMembership.updateOne(
+          { _id: ctx.fixtures.memberMembershipId },
+          { $set: { role: 'owner' } },
+        )
+        const res = await DELETE(
+          orgJsonReq(`/api/org-members?id=${ctx.fixtures.memberMembershipId}`, 'DELETE'),
+        )
         expect(res.status).toBe(409)
       } finally {
         createSpy.mockRestore()
         raceSpy.mockRestore()
-        await OrgMembership.updateOne({ _id: ctx.fixtures.memberMembershipId }, { $set: { role: 'member' } })
+        await OrgMembership.updateOne(
+          { _id: ctx.fixtures.memberMembershipId },
+          { $set: { role: 'member' } },
+        )
       }
 
       await OrgMembership.deleteOne({ _id: adminMembership._id })
@@ -497,7 +546,9 @@ describe.sequential('route-logic coverage gaps', () => {
       const email = `pending-${Date.now()}@example.com`
       await InviteRequest.create({ email, name: 'Pending User', status: 'pending' })
       const { POST } = await import('@/lib/route-logic/auth/request-invite')
-      const res = await POST(publicJsonReq('/api/auth/request-invite', 'POST', { email, name: 'Pending' }))
+      const res = await POST(
+        publicJsonReq('/api/auth/request-invite', 'POST', { email, name: 'Pending' }),
+      )
       expect(res.status).toBe(200)
       expect((await res.json()).ok).toBe(true)
 
@@ -510,8 +561,7 @@ describe.sequential('route-logic coverage gaps', () => {
       const prevSmtp = process.env.PLATFORM_SMTP_URL
       const prevEnv = process.env.NODE_ENV
       delete process.env.PLATFORM_SMTP_URL
-      setNodeEnv('production'
-)
+      setNodeEnv('production')
       const { POST: forgot } = await import('@/lib/route-logic/auth/reset-password')
       const forgotRes = await forgot(
         publicJsonReq('/api/auth/reset-password', 'POST', { email: ctx.email }),
@@ -519,8 +569,7 @@ describe.sequential('route-logic coverage gaps', () => {
       expect(forgotRes.status).toBe(200)
       if (prevSmtp) process.env.PLATFORM_SMTP_URL = prevSmtp
       else delete process.env.PLATFORM_SMTP_URL
-      if (prevEnv) setNodeEnv(prevEnv
-)
+      if (prevEnv) setNodeEnv(prevEnv)
 
       const { PUT: reset } = await import('@/lib/route-logic/auth/reset-password')
       await withRateLimitBlocked(async () => {
@@ -622,91 +671,101 @@ describe.sequential('route-logic coverage gaps', () => {
       name: string
       run: () => Promise<Response>
     }> = [
-        {
-          name: 'email-config GET',
-          run: async () => {
-            const { GET } = await import('@/lib/route-logic/email-config')
-            return GET(orgJsonReq('/api/email-config', 'GET'))
-          },
+      {
+        name: 'email-config GET',
+        run: async () => {
+          const { GET } = await import('@/lib/route-logic/email-config')
+          return GET(orgJsonReq('/api/email-config', 'GET'))
         },
-        {
-          name: 'email-config PUT',
-          run: async () => {
-            const { PUT } = await import('@/lib/route-logic/email-config')
-            return PUT(orgJsonReq('/api/email-config', 'PUT', { email: 'a@b.com', password: 'x', fromName: 'X' }))
-          },
+      },
+      {
+        name: 'email-config PUT',
+        run: async () => {
+          const { PUT } = await import('@/lib/route-logic/email-config')
+          return PUT(
+            orgJsonReq('/api/email-config', 'PUT', {
+              email: 'a@b.com',
+              password: 'x',
+              fromName: 'X',
+            }),
+          )
         },
-                {
-          name: 'dues-recommendation',
-          run: async () => {
-            const { GET } = await import('@/lib/route-logic/dues-recommendation')
-            return GET(orgJsonReq('/api/dues-recommendation', 'GET'))
-          },
+      },
+      {
+        name: 'dues-recommendation',
+        run: async () => {
+          const { GET } = await import('@/lib/route-logic/dues-recommendation')
+          return GET(orgJsonReq('/api/dues-recommendation', 'GET'))
         },
-        {
-          name: 'events',
-          run: async () => {
-            const { GET } = await import('@/lib/route-logic/events')
-            return GET(orgJsonReq('/api/events', 'GET'))
-          },
+      },
+      {
+        name: 'events',
+        run: async () => {
+          const { GET } = await import('@/lib/route-logic/events')
+          return GET(orgJsonReq('/api/events', 'GET'))
         },
-        {
-          name: 'payments list',
-          run: async () => {
-            const { GET } = await import('@/lib/route-logic/payments')
-            return GET(orgJsonReq('/api/payments', 'GET'))
-          },
+      },
+      {
+        name: 'payments list',
+        run: async () => {
+          const { GET } = await import('@/lib/route-logic/payments')
+          return GET(orgJsonReq('/api/payments', 'GET'))
         },
-        {
-          name: 'statements list',
-          run: async () => {
-            const { GET } = await import('@/lib/route-logic/statements')
-            return GET(orgJsonReq('/api/statements', 'GET'))
-          },
+      },
+      {
+        name: 'statements list',
+        run: async () => {
+          const { GET } = await import('@/lib/route-logic/statements')
+          return GET(orgJsonReq('/api/statements', 'GET'))
         },
-        {
-          name: 'search',
-          run: async () => {
-            const { GET } = await import('@/lib/route-logic/search')
-            return GET(orgJsonReq('/api/search', 'GET', undefined, { query: '?q=test' }))
-          },
+      },
+      {
+        name: 'search',
+        run: async () => {
+          const { GET } = await import('@/lib/route-logic/search')
+          return GET(orgJsonReq('/api/search', 'GET', undefined, { query: '?q=test' }))
         },
-        {
-          name: 'tax-receipts',
-          run: async () => {
-            const { GET } = await import('@/lib/route-logic/tax-receipts')
-            return GET(orgJsonReq('/api/tax-receipts', 'GET', undefined, { query: `?year=${year()}` }))
-          },
+      },
+      {
+        name: 'tax-receipts',
+        run: async () => {
+          const { GET } = await import('@/lib/route-logic/tax-receipts')
+          return GET(
+            orgJsonReq('/api/tax-receipts', 'GET', undefined, { query: `?year=${year()}` }),
+          )
         },
-                {
-          name: 'tasks list',
-          run: async () => {
-            const { GET } = await import('@/lib/route-logic/tasks')
-            return GET(orgJsonReq('/api/tasks', 'GET'))
-          },
+      },
+      {
+        name: 'tasks list',
+        run: async () => {
+          const { GET } = await import('@/lib/route-logic/tasks')
+          return GET(orgJsonReq('/api/tasks', 'GET'))
         },
-        {
-          name: 'cycle-config GET',
-          run: async () => {
-            const { GET } = await import('@/lib/route-logic/cycle-config')
-            return GET(orgJsonReq('/api/cycle-config', 'GET'))
-          },
+      },
+      {
+        name: 'cycle-config GET',
+        run: async () => {
+          const { GET } = await import('@/lib/route-logic/cycle-config')
+          return GET(orgJsonReq('/api/cycle-config', 'GET'))
         },
-        {
-          name: 'payment-plans GET',
-          run: async () => {
-            const { GET } = await import('@/lib/route-logic/payment-plans')
-            return GET(orgJsonReq('/api/payment-plans', 'GET'))
-          },
+      },
+      {
+        name: 'payment-plans GET',
+        run: async () => {
+          const { GET } = await import('@/lib/route-logic/payment-plans')
+          return GET(orgJsonReq('/api/payment-plans', 'GET'))
         },
-        {
-          name: 'send-file-email',
-          run: async () => {
-            const { POST } = await import('@/lib/route-logic/send-file-email')
-            return POST(orgJsonReq('/api/send-file-email', 'POST', { to: 'a@b.com', subject: 's', body: 'b' }))
-          },
+      },
+      {
+        name: 'send-file-email',
+        run: async () => {
+          const { POST } = await import('@/lib/route-logic/send-file-email')
+          return POST(
+            orgJsonReq('/api/send-file-email', 'POST', { to: 'a@b.com', subject: 's', body: 'b' }),
+          )
         },
-      ]
+      },
+    ]
 
     it.each(rateLimitCases.map((c) => [c.name, c.run] as const))(
       '%s returns 429 when rate limited',
@@ -723,7 +782,9 @@ describe.sequential('route-logic coverage gaps', () => {
     it('email-config GET returns 500 when findOne throws', async () => {
       bindSession(ctx)
       const { EmailConfig } = await import('@/lib/models')
-      const spy = vi.spyOn(EmailConfig, 'findOne').mockRejectedValueOnce(new Error('email cfg fail'))
+      const spy = vi
+        .spyOn(EmailConfig, 'findOne')
+        .mockRejectedValueOnce(new Error('email cfg fail'))
       try {
         const { GET } = await import('@/lib/route-logic/email-config')
         expect((await GET(orgJsonReq('/api/email-config', 'GET'))).status).toBe(500)
@@ -735,7 +796,9 @@ describe.sequential('route-logic coverage gaps', () => {
     it('dashboard-stats returns partial payload when calc throws with compute=1', async () => {
       bindSession(ctx)
       const calcMod = await import('@/lib/calculations')
-      const spy = vi.spyOn(calcMod, 'calculateYearlyBalance').mockRejectedValueOnce(new Error('dash calc fail'))
+      const spy = vi
+        .spyOn(calcMod, 'calculateYearlyBalance')
+        .mockRejectedValueOnce(new Error('dash calc fail'))
       try {
         const { GET } = await import('@/lib/route-logic/dashboard-stats')
         const res = await GET(

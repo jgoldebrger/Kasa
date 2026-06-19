@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { E2E_ORGS, E2E_FIXTURES } from '../seed'
-import { ensureAlphaOrg, familyLink, clickSidebar } from '../helpers'
+import { ensureAlphaOrg, clickSidebar } from '../helpers'
 
 const NAV_ROUTES: Array<{ label: RegExp; path: RegExp; expectText?: RegExp }> = [
   { label: /^Dashboard$/i, path: /^\/$|\/dashboard/, expectText: /dashboard|families|members/i },
@@ -43,7 +43,9 @@ test.describe('primary navigation', () => {
 
   test('report builder page loads', async ({ page }) => {
     await page.goto('/reports/builder')
-    await expect(page.getByRole('heading', { name: /report builder|custom report/i }).first()).toBeVisible({
+    await expect(
+      page.getByRole('heading', { name: /report builder|custom report/i }).first(),
+    ).toBeVisible({
       timeout: 30_000,
     })
   })

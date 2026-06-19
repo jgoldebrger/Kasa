@@ -1,4 +1,4 @@
-import { test, expect, assertSecurityPassed } from '../playwright/fixtures'
+import { test, assertSecurityPassed } from '../playwright/fixtures'
 import {
   probeMemberAllowedRoutes,
   probeMemberDeniedAdminMutations,

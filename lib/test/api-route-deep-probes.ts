@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server'
 import type { ApiRouteEntry } from '../../security/catalog/types'
-import { UPLOAD_FIXTURES } from '../../security/payloads/upload'
 import {
   buildImportProbeRequest,
   importProbeLabels,

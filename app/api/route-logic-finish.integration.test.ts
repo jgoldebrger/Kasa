@@ -1469,7 +1469,6 @@ describe.sequential('route-logic finish coverage', () => {
     })
 
     it('creates email config on org without one and sends a test email', async () => {
-      const { encrypt } = await import('@/lib/encryption')
       const { EmailConfig } = await import('@/lib/models')
       await EmailConfig.deleteMany({ organizationId: ctx.betaOrgId })
 

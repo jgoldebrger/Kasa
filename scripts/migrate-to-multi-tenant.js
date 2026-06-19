@@ -62,8 +62,12 @@ const SKIP_BACKFILL = !!args['skip-backfill']
 const FORCE_BACKFILL = !!args.backfill
 
 if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
-  console.error('ERROR: --email and --password are required (or set ADMIN_EMAIL / ADMIN_PASSWORD env vars).')
-  console.error('Example: node scripts/migrate-to-multi-tenant.js --email=admin@kasa.local --password=ChangeMe123!')
+  console.error(
+    'ERROR: --email and --password are required (or set ADMIN_EMAIL / ADMIN_PASSWORD env vars).',
+  )
+  console.error(
+    'Example: node scripts/migrate-to-multi-tenant.js --email=admin@kasa.local --password=ChangeMe123!',
+  )
   process.exit(1)
 }
 
@@ -89,15 +93,6 @@ async function main() {
   // include the field we care about for this migration.
   const { Schema, Types } = mongoose
 
-  const minimal = (extra = {}) =>
-    new Schema(
-      {
-        organizationId: { type: Types.ObjectId, ref: 'Organization', index: true },
-        ...extra,
-      },
-      { strict: false, timestamps: true }
-    )
-
   // Identity-layer schemas (must be complete enough to upsert)
   const User = mongoose.model(
     'User',
@@ -108,8 +103,8 @@ async function main() {
         name: { type: String, required: true },
         lastActiveOrganizationId: { type: Types.ObjectId, ref: 'Organization' },
       },
-      { timestamps: true }
-    )
+      { timestamps: true },
+    ),
   )
 
   const Organization = mongoose.model(
@@ -120,8 +115,8 @@ async function main() {
         slug: { type: String, required: true, unique: true, lowercase: true },
         ownerId: { type: Types.ObjectId, ref: 'User', required: true },
       },
-      { timestamps: true }
-    )
+      { timestamps: true },
+    ),
   )
 
   const OrgMembership = mongoose.model(
@@ -132,8 +127,8 @@ async function main() {
         organizationId: { type: Types.ObjectId, ref: 'Organization', required: true },
         role: { type: String, enum: ['owner', 'admin', 'member'], required: true },
       },
-      { timestamps: true }
-    )
+      { timestamps: true },
+    ),
   )
 
   // Domain collections (strict:false so we just touch organizationId and leave the rest alone)
@@ -188,7 +183,7 @@ async function main() {
   const membership = await OrgMembership.findOneAndUpdate(
     { userId: user._id, organizationId: org._id },
     { userId: user._id, organizationId: org._id, role: 'owner' },
-    { upsert: true, new: true }
+    { upsert: true, new: true },
   )
   console.log(`  Membership: ${membership._id} (role=${membership.role})`)
 

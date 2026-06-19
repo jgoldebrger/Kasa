@@ -21,7 +21,11 @@ vi.mock('next/headers', () => ({
 const API_ORIGIN = 'http://localhost:3000'
 let ctx: ApiTestContext
 
-function bindSession(c: ApiTestContext, role: 'owner' | 'admin' | 'member' = 'owner', orgId?: string) {
+function bindSession(
+  c: ApiTestContext,
+  role: 'owner' | 'admin' | 'member' = 'owner',
+  orgId?: string,
+) {
   mockAuth.mockResolvedValue({
     user: {
       id: c.userId,
@@ -76,8 +80,8 @@ async function withRateLimitBlocked<T>(fn: () => Promise<T>): Promise<T> {
   const rateLimit = await import('@/lib/rate-limit')
   const spy = vi.spyOn(rateLimit, 'checkRateLimit').mockResolvedValue({
     allowed: false,
-        remaining: 0,
-        resetAt: 0,
+    remaining: 0,
+    resetAt: 0,
   })
   try {
     return await fn()
@@ -113,7 +117,7 @@ describe.sequential('route-logic documents/email domain coverage', () => {
     process.env.PLATFORM_ADMIN_EMAILS = ''
     ctx = await seedApiRouteFixtures()
     process.env.PLATFORM_ADMIN_EMAILS = ctx.email
-        process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
+    process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
     process.env.KASA_TEST_STRIPE_FAMILY = ctx.fixtures.familyId
     bindSession(ctx)
     await seedEmailConfig()
@@ -164,8 +168,11 @@ describe.sequential('route-logic documents/email domain coverage', () => {
       const { POST: testPost } = await import('@/lib/route-logic/email-config/test')
       await withRateLimitBlocked(async () => {
         expect(
-          (await testPost(orgJsonReq('/api/email-config/test', 'POST', {}, { orgId: ctx.betaOrgId })))
-            .status,
+          (
+            await testPost(
+              orgJsonReq('/api/email-config/test', 'POST', {}, { orgId: ctx.betaOrgId }),
+            )
+          ).status,
         ).toBe(429)
       })
 
@@ -178,9 +185,10 @@ describe.sequential('route-logic documents/email domain coverage', () => {
       await EmailConfig.deleteMany({ organizationId: ctx.betaOrgId })
 
       const { POST: testPost } = await import('@/lib/route-logic/email-config/test')
-      expect((await testPost(orgJsonReq('/api/email-config/test', 'POST', {}, { orgId: ctx.betaOrgId }))).status).toBe(
-        400,
-      )
+      expect(
+        (await testPost(orgJsonReq('/api/email-config/test', 'POST', {}, { orgId: ctx.betaOrgId })))
+          .status,
+      ).toBe(400)
 
       await EmailConfig.create({
         organizationId: ctx.betaOrgId,
@@ -189,9 +197,10 @@ describe.sequential('route-logic documents/email domain coverage', () => {
         fromName: 'Bad',
         isActive: true,
       })
-      expect((await testPost(orgJsonReq('/api/email-config/test', 'POST', {}, { orgId: ctx.betaOrgId }))).status).toBe(
-        500,
-      )
+      expect(
+        (await testPost(orgJsonReq('/api/email-config/test', 'POST', {}, { orgId: ctx.betaOrgId })))
+          .status,
+      ).toBe(500)
       await EmailConfig.deleteMany({ organizationId: ctx.betaOrgId })
     })
   })
@@ -243,7 +252,9 @@ describe.sequential('route-logic documents/email domain coverage', () => {
       const { POST } = await import('@/lib/route-logic/tax-receipts/email')
 
       await withRateLimitBlocked(async () => {
-        expect((await POST(orgJsonReq('/api/tax-receipts/email', 'POST', { year: year() }))).status).toBe(429)
+        expect(
+          (await POST(orgJsonReq('/api/tax-receipts/email', 'POST', { year: year() }))).status,
+        ).toBe(429)
       })
 
       const { EmailJob } = await import('@/lib/models')
@@ -257,7 +268,9 @@ describe.sequential('route-logic documents/email domain coverage', () => {
         totalFamilies: 1,
         pending: [new Types.ObjectId(ctx.fixtures.familyId)],
       })
-      expect((await POST(orgJsonReq('/api/tax-receipts/email', 'POST', { year: year() }))).status).toBe(409)
+      expect(
+        (await POST(orgJsonReq('/api/tax-receipts/email', 'POST', { year: year() }))).status,
+      ).toBe(409)
       await EmailJob.deleteMany({ organizationId: ctx.orgId, kind: 'tax-receipts' })
 
       const emailJobs = await import('@/lib/email-jobs')
@@ -275,9 +288,10 @@ describe.sequential('route-logic documents/email domain coverage', () => {
     it('zip rejects bad year, missing org, empty year, and stream errors', async () => {
       bindSession(ctx)
       const { GET } = await import('@/lib/route-logic/tax-receipts/zip')
-      expect((await GET(orgJsonReq('/api/tax-receipts/zip', 'GET', undefined, { query: '?year=abc' }))).status).toBe(
-        400,
-      )
+      expect(
+        (await GET(orgJsonReq('/api/tax-receipts/zip', 'GET', undefined, { query: '?year=abc' })))
+          .status,
+      ).toBe(400)
 
       const { Organization } = await import('@/lib/models')
       const orgSpy = vi.spyOn(Organization, 'findById').mockReturnValueOnce({
@@ -286,13 +300,21 @@ describe.sequential('route-logic documents/email domain coverage', () => {
         }),
       } as never)
       expect(
-        (await GET(orgJsonReq('/api/tax-receipts/zip', 'GET', undefined, { query: `?year=${year()}` }))).status,
+        (
+          await GET(
+            orgJsonReq('/api/tax-receipts/zip', 'GET', undefined, { query: `?year=${year()}` }),
+          )
+        ).status,
       ).toBe(404)
       orgSpy.mockRestore()
 
       const emptyYear = year() + 70
       expect(
-        (await GET(orgJsonReq('/api/tax-receipts/zip', 'GET', undefined, { query: `?year=${emptyYear}` }))).status,
+        (
+          await GET(
+            orgJsonReq('/api/tax-receipts/zip', 'GET', undefined, { query: `?year=${emptyYear}` }),
+          )
+        ).status,
       ).toBe(400)
 
       const { Payment } = await import('@/lib/models')
@@ -308,13 +330,21 @@ describe.sequential('route-logic documents/email domain coverage', () => {
         paymentMethod: 'cash',
       })
       expect(
-        (await GET(orgJsonReq('/api/tax-receipts/zip', 'GET', undefined, { query: `?year=${zeroNetYear}` }))).status,
+        (
+          await GET(
+            orgJsonReq('/api/tax-receipts/zip', 'GET', undefined, {
+              query: `?year=${zeroNetYear}`,
+            }),
+          )
+        ).status,
       ).toBe(400)
       const zipMod = await import('@/lib/zip')
       const streamSpy = vi.spyOn(zipMod, 'streamZip').mockImplementation(async function* () {
         throw new Error('zip stream fail')
       })
-      const streamFail = await GET(orgJsonReq('/api/tax-receipts/zip', 'GET', undefined, { query: `?year=${year()}` }))
+      const streamFail = await GET(
+        orgJsonReq('/api/tax-receipts/zip', 'GET', undefined, { query: `?year=${year()}` }),
+      )
       expect([200, 400, 500]).toContain(streamFail.status)
       streamSpy.mockRestore()
       await Payment.deleteOne({ _id: refundedOnly._id })
@@ -343,7 +373,9 @@ describe.sequential('route-logic documents/email domain coverage', () => {
         weddingDate: new Date('2014-01-01'),
       })
       const res = await GET(
-        orgJsonReq(`/api/tax-receipts/${noPay._id}/pdf`, 'GET', undefined, { query: `?year=${year() + 70}` }),
+        orgJsonReq(`/api/tax-receipts/${noPay._id}/pdf`, 'GET', undefined, {
+          query: `?year=${year() + 70}`,
+        }),
         { params: { familyId: noPay._id.toString() } },
       )
       expect(res.status).toBe(400)
@@ -376,13 +408,19 @@ describe.sequential('route-logic documents/email domain coverage', () => {
         errors: [],
       } as never)
       expect(
-        (await POST(orgJsonReq('/api/tax-receipts/email/worker', 'POST', { jobId: job._id.toString() }))).status,
+        (
+          await POST(
+            orgJsonReq('/api/tax-receipts/email/worker', 'POST', { jobId: job._id.toString() }),
+          )
+        ).status,
       ).toBe(403)
       findSpy.mockRestore()
       await EmailJob.deleteOne({ _id: job._id })
 
       const taxMod = await import('@/lib/tax-receipts/send-receipt')
-      const sendSpy = vi.spyOn(taxMod, 'sendOneFamilyTaxReceipt').mockResolvedValue({ ok: true, email: null })
+      const sendSpy = vi
+        .spyOn(taxMod, 'sendOneFamilyTaxReceipt')
+        .mockResolvedValue({ ok: true, email: null })
       const fetchSpy = vi.fn().mockRejectedValue(new Error('continuation network fail'))
       vi.stubGlobal('fetch', fetchSpy)
       try {
@@ -502,13 +540,15 @@ describe.sequential('route-logic documents/email domain coverage', () => {
     it('send-monthly-emails tolerates sweep failure and empty family list', async () => {
       bindSession(ctx)
       const emailJobs = await import('@/lib/email-jobs')
-      const sweepSpy = vi.spyOn(emailJobs, 'sweepStaleEmailJobs').mockRejectedValueOnce(new Error('sweep boom'))
+      const sweepSpy = vi
+        .spyOn(emailJobs, 'sweepStaleEmailJobs')
+        .mockRejectedValueOnce(new Error('sweep boom'))
       const { POST } = await import('@/lib/route-logic/statements/send-monthly-emails')
       const swept = await POST(orgJsonReq('/api/statements/send-monthly-emails', 'POST', {}))
       expect([200, 202, 409]).toContain(swept.status)
       sweepSpy.mockRestore()
 
-      const { EmailConfig, Family, EmailJob } = await import('@/lib/models')
+      const { Family, EmailJob } = await import('@/lib/models')
       await EmailJob.deleteMany({ organizationId: ctx.betaOrgId, kind: 'statements' })
       await Family.updateMany({ organizationId: ctx.betaOrgId }, { $unset: { email: 1 } })
       await seedEmailConfig(ctx.betaOrgId)
@@ -559,7 +599,9 @@ describe.sequential('route-logic documents/email domain coverage', () => {
 
       const { GET } = await import('@/lib/route-logic/statements/send-emails/status')
       const res = await GET(
-        orgJsonReq('/api/statements/send-emails/status', 'GET', undefined, { query: `?jobId=${job._id}` }),
+        orgJsonReq('/api/statements/send-emails/status', 'GET', undefined, {
+          query: `?jobId=${job._id}`,
+        }),
       )
       expect(res.status).toBe(200)
       const body = await res.json()
@@ -574,7 +616,9 @@ describe.sequential('route-logic documents/email domain coverage', () => {
       await seedEmailConfig()
       const { Family, EmailJob } = await import('@/lib/models')
       const sendMod = await import('@/lib/statements/send-statement')
-      const sendSpy = vi.spyOn(sendMod, 'sendOneFamilyStatement').mockResolvedValue({ ok: true, email: null })
+      const sendSpy = vi
+        .spyOn(sendMod, 'sendOneFamilyStatement')
+        .mockResolvedValue({ ok: true, email: null })
 
       const prevCron = process.env.CRON_SECRET
       delete process.env.CRON_SECRET
@@ -626,7 +670,9 @@ describe.sequential('route-logic documents/email domain coverage', () => {
       await seedEmailConfig()
       const { Family, EmailJob } = await import('@/lib/models')
       const sendMod = await import('@/lib/statements/send-statement')
-      const sendSpy = vi.spyOn(sendMod, 'sendOneFamilyStatement').mockResolvedValue({ ok: true, email: null })
+      const sendSpy = vi
+        .spyOn(sendMod, 'sendOneFamilyStatement')
+        .mockResolvedValue({ ok: true, email: null })
       vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch rejected')))
 
       try {
@@ -652,7 +698,9 @@ describe.sequential('route-logic documents/email domain coverage', () => {
         })
         bindSession(ctx)
         const { POST } = await import('@/lib/route-logic/statements/send-emails/worker')
-        await POST(orgJsonReq('/api/statements/send-emails/worker', 'POST', { jobId: job._id.toString() }))
+        await POST(
+          orgJsonReq('/api/statements/send-emails/worker', 'POST', { jobId: job._id.toString() }),
+        )
         await new Promise((r) => setTimeout(r, 60))
         await EmailJob.deleteOne({ _id: job._id })
         await Family.deleteMany({ _id: { $in: ids.map((f) => f._id) } })
@@ -692,14 +740,25 @@ describe.sequential('route-logic documents/email domain coverage', () => {
     it('rejects partial year/month and invalid hebrew month', async () => {
       bindSession(ctx)
       const { Organization } = await import('@/lib/models')
-      await Organization.updateOne({ _id: ctx.orgId }, { $set: { monthlyStatementCalendar: 'hebrew' } })
+      await Organization.updateOne(
+        { _id: ctx.orgId },
+        { $set: { monthlyStatementCalendar: 'hebrew' } },
+      )
 
       const { GET } = await import('@/lib/route-logic/statements/auto-generate')
       expect(
-        (await GET(orgJsonReq('/api/statements/auto-generate', 'GET', undefined, { query: '?year=2020' }))).status,
+        (
+          await GET(
+            orgJsonReq('/api/statements/auto-generate', 'GET', undefined, { query: '?year=2020' }),
+          )
+        ).status,
       ).toBe(400)
       expect(
-        (await GET(orgJsonReq('/api/statements/auto-generate', 'GET', undefined, { query: '?month=1' }))).status,
+        (
+          await GET(
+            orgJsonReq('/api/statements/auto-generate', 'GET', undefined, { query: '?month=1' }),
+          )
+        ).status,
       ).toBe(400)
       expect(
         (
@@ -711,7 +770,10 @@ describe.sequential('route-logic documents/email domain coverage', () => {
         ).status,
       ).toBe(400)
 
-      await Organization.updateOne({ _id: ctx.orgId }, { $set: { monthlyStatementCalendar: 'gregorian' } })
+      await Organization.updateOne(
+        { _id: ctx.orgId },
+        { $set: { monthlyStatementCalendar: 'gregorian' } },
+      )
 
       await withRateLimitBlocked(async () => {
         expect((await GET(orgJsonReq('/api/statements/auto-generate', 'GET'))).status).toBe(429)

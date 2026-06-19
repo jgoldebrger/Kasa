@@ -1,4 +1,4 @@
-import { Statement, Family, Organization, nextCounter } from '@/lib/models'
+import { Statement, Organization, nextCounter } from '@/lib/models'
 import { familyBatches } from '@/lib/org-pagination'
 import { calculateFamilyBalance } from '@/lib/calculations'
 import { loadStatementPeriod, statementSnapshotFromPeriod } from '@/lib/statements/period'
@@ -95,7 +95,11 @@ export const POST = handler({
               openingBalance,
             })
             const refreshed = await Statement.findOneAndUpdate(
-              { _id: existingStatement._id, organizationId: ctx!.organizationId, familyId: family._id },
+              {
+                _id: existingStatement._id,
+                organizationId: ctx!.organizationId,
+                familyId: family._id,
+              },
               { $set: statementSnapshotFromPeriod(openingBalance, period) },
               { new: true },
             )

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { HDate } from '@hebcal/core'
 import { startOfDayInTimeZone } from './date-utils'
 import {
@@ -140,10 +140,7 @@ describe('cycleConfigMatchesSchedule', () => {
     for (let d = 1; d <= 30; d++) {
       const candidate = new HDate(d, month, year).greg()
       const today = new HDate(startOfDayInTimeZone('UTC', candidate))
-      if (
-        today.getMonth() === month &&
-        today.getDate() < today.daysInMonth()
-      ) {
+      if (today.getMonth() === month && today.getDate() < today.daysInMonth()) {
         ref = candidate
         hebrewDay = today.getDate()
         break

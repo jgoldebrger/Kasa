@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { verifyApiCsrf } from './csrf'
 
 describe('verifyApiCsrf', () => {
@@ -29,7 +29,9 @@ describe('verifyApiCsrf', () => {
     })
     const res = verifyApiCsrf(req)
     expect(res?.status).toBe(403)
-    await expect(res?.json()).resolves.toMatchObject({ error: expect.stringContaining('Cross-site') })
+    await expect(res?.json()).resolves.toMatchObject({
+      error: expect.stringContaining('Cross-site'),
+    })
   })
 
   it('blocks POST without origin or referer', async () => {
@@ -85,7 +87,9 @@ describe('verifyApiCsrf', () => {
     })
     const res = verifyApiCsrf(req)
     expect(res?.status).toBe(403)
-    await expect(res?.json()).resolves.toMatchObject({ error: expect.stringContaining('Cross-site') })
+    await expect(res?.json()).resolves.toMatchObject({
+      error: expect.stringContaining('Cross-site'),
+    })
   })
 
   it('blocks POST when Referer is malformed', async () => {

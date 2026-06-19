@@ -110,10 +110,20 @@ function ownerCookieHeader(): string {
   return state.cookies.map((c) => `${c.name}=${c.value}`).join('; ')
 }
 
-/** Node fetch without Origin/Referer — Playwright injects those automatically. */
-async function fetchWithoutOrigin(method: string, url: string, body?: unknown): Promise<number> {
+function resolveProbeUrl(url: string): string {
   const config = getSecurityConfig()
   const fullUrl = url.startsWith('http') ? url : `${config.baseUrl}${url}`
+  const parsed = new URL(fullUrl)
+  const base = new URL(config.baseUrl)
+  if (parsed.origin !== base.origin) {
+    throw new Error(`Refusing cross-origin probe URL: ${parsed.origin}`)
+  }
+  return fullUrl
+}
+
+/** Node fetch without Origin/Referer — Playwright injects those automatically. */
+async function fetchWithoutOrigin(method: string, url: string, body?: unknown): Promise<number> {
+  const fullUrl = resolveProbeUrl(url)
   const headers: Record<string, string> = {
     cookie: ownerCookieHeader(),
     'content-type': 'application/json',

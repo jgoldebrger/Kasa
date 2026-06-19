@@ -2,7 +2,6 @@
  * Remaining lib/route-logic line-coverage gaps: rate limits (429) and branch edges.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
-import { Types } from 'mongoose'
 import { NextRequest } from 'next/server'
 import {
   seedApiRouteFixtures,

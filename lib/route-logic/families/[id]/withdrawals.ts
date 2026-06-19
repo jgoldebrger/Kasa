@@ -3,12 +3,9 @@ import { Withdrawal, Family } from '@/lib/models'
 import { audit } from '@/lib/audit'
 import { handler } from '@/lib/api/handler'
 import { z } from 'zod'
-import { isoDate, moneyAmount, optionalString, UNBOUNDED_LIST_CAP } from '@/lib/schemas'
+import { isoDate, moneyAmount, optionalString } from '@/lib/schemas'
 import { checkRateLimit } from '@/lib/rate-limit'
-import {
-  familyLedgerListQuery,
-  listFamilyLedger,
-} from '@/lib/family-ledger-list'
+import { familyLedgerListQuery, listFamilyLedger } from '@/lib/family-ledger-list'
 
 const LEDGER_CACHE_HEADERS = {
   'Cache-Control': 'private, max-age=15, stale-while-revalidate=60',
@@ -42,10 +39,7 @@ export const GET = handler({
 
     const baseFilter = { familyId: id, organizationId: ctx!.organizationId }
     const loadPage = (filter: Record<string, unknown>, limit: number) =>
-      Withdrawal.find(filter)
-        .sort({ withdrawalDate: -1, _id: -1 })
-        .limit(limit)
-        .lean()
+      Withdrawal.find(filter).sort({ withdrawalDate: -1, _id: -1 }).limit(limit).lean()
 
     const effectiveQuery = {
       limit: query.limit ?? 0,
@@ -59,9 +53,7 @@ export const GET = handler({
         'withdrawalDate',
         -1,
         (last) => ({
-          v: last.withdrawalDate
-            ? new Date(last.withdrawalDate as string | Date).getTime()
-            : null,
+          v: last.withdrawalDate ? new Date(last.withdrawalDate as string | Date).getTime() : null,
           id: String(last._id),
         }),
         effectiveQuery,

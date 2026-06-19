@@ -940,12 +940,10 @@ export default function SettingsView({
     if (activeTab !== 'activity') return
     if (hasFetchedAuditRef.current) return
     hasFetchedAuditRef.current = true
-    let cancelled = false
     void fetchAuditPage(null)
     void fetchAuditUsers()
     return () => {
-      cancelled = true
-      if (cancelled) hasFetchedAuditRef.current = false
+      hasFetchedAuditRef.current = false
     }
   }, [activeTab, fetchAuditPage, fetchAuditUsers])
 

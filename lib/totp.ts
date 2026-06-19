@@ -92,11 +92,7 @@ function hotp(secret: Buffer, counter: number): string {
  * companion `recordTotpStep` cache so the same code can't be replayed
  * inside the same skew window.
  */
-export function verifyTotpStep(
-  secret: string,
-  code: string,
-  windowSteps = 1,
-): number | null {
+export function verifyTotpStep(secret: string, code: string, windowSteps = 1): number | null {
   if (!secret || !code) return null
   const normalized = code.replace(/\D/g, '')
   if (normalized.length !== DIGITS) return null
@@ -161,9 +157,8 @@ export function generateBackupCodes(count = 10): string[] {
   const alphabet = '23456789ABCDEFGHJKMNPQRSTUVWXYZ' // omit 0, O, 1, I, L
   const codes: string[] = []
   for (let i = 0; i < count; i++) {
-    const bytes = crypto.randomBytes(8)
     let s = ''
-    for (let j = 0; j < 8; j++) s += alphabet[bytes[j] % alphabet.length]
+    for (let j = 0; j < 8; j++) s += alphabet[crypto.randomInt(alphabet.length)]
     codes.push(`${s.slice(0, 4)}-${s.slice(4)}`)
   }
   return codes

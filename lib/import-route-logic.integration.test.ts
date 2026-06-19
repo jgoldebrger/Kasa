@@ -23,7 +23,12 @@ function importRequest(form: FormData): NextRequest {
   })
 }
 
-function csvForm(type: string, content: string, filename: string, extra?: Record<string, string>): FormData {
+function csvForm(
+  type: string,
+  content: string,
+  filename: string,
+  extra?: Record<string, string>,
+): FormData {
   const form = new FormData()
   form.set('type', type)
   form.set('file', new Blob([content], { type: 'text/csv' }), filename)
@@ -171,9 +176,7 @@ describe('import route-logic branches', () => {
   it('accepts header-only CSV with zero imports', async () => {
     await seedOrg()
     const { POST } = await import('./route-logic/import')
-    const res = await POST(
-      importRequest(csvForm('families', 'name,weddingDate\n', 'empty.csv')),
-    )
+    const res = await POST(importRequest(csvForm('families', 'name,weddingDate\n', 'empty.csv')))
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.imported).toBe(0)
@@ -224,7 +227,11 @@ describe('import route-logic branches', () => {
     const { Family } = await import('./models')
     const res = await POST(
       importRequest(
-        csvForm('families', IMPORT_CSV_FIXTURES.families.content, IMPORT_CSV_FIXTURES.families.filename),
+        csvForm(
+          'families',
+          IMPORT_CSV_FIXTURES.families.content,
+          IMPORT_CSV_FIXTURES.families.filename,
+        ),
       ),
     )
     expect(res.status).toBe(200)
@@ -242,7 +249,11 @@ describe('import route-logic branches', () => {
     const { FamilyMember } = await import('./models')
     const res = await POST(
       importRequest(
-        csvForm('members', IMPORT_CSV_FIXTURES.members.content, IMPORT_CSV_FIXTURES.members.filename),
+        csvForm(
+          'members',
+          IMPORT_CSV_FIXTURES.members.content,
+          IMPORT_CSV_FIXTURES.members.filename,
+        ),
       ),
     )
     expect(res.status).toBe(200)
@@ -256,8 +267,7 @@ describe('import route-logic branches', () => {
     await seedOrg()
     const family = await seedMarkerFamily()
     const { POST } = await import('./route-logic/import')
-    const csv =
-      'firstName,lastName,birthDate,gender\nBound,Member,2013-01-15,male'
+    const csv = 'firstName,lastName,birthDate,gender\nBound,Member,2013-01-15,male'
     const res = await POST(
       importRequest(csvForm('members', csv, 'bound.csv', { familyId: family._id.toString() })),
     )
@@ -272,7 +282,11 @@ describe('import route-logic branches', () => {
     const { Payment } = await import('./models')
     const res = await POST(
       importRequest(
-        csvForm('payments', IMPORT_CSV_FIXTURES.payments.content, IMPORT_CSV_FIXTURES.payments.filename),
+        csvForm(
+          'payments',
+          IMPORT_CSV_FIXTURES.payments.content,
+          IMPORT_CSV_FIXTURES.payments.filename,
+        ),
       ),
     )
     expect(res.status).toBe(200)
@@ -297,7 +311,10 @@ describe('import route-logic branches', () => {
     )
     expect(res.status).toBe(200)
     expect((await res.json()).imported).toBeGreaterThanOrEqual(1)
-    const ev = await LifecycleEventPayment.findOne({ organizationId: orgId, eventType: 'bar_mitzvah' })
+    const ev = await LifecycleEventPayment.findOne({
+      organizationId: orgId,
+      eventType: 'bar_mitzvah',
+    })
     expect(ev).toBeTruthy()
   })
 
@@ -370,13 +387,16 @@ describe('import route-logic branches', () => {
     const res = await POST(req)
     expect(res.status).toBe(200)
     expect((await res.json()).imported).toBeGreaterThanOrEqual(1)
-    const count = await Family.countDocuments({ organizationId: orgId, name: /Xlsx Import Family/i })
+    const count = await Family.countDocuments({
+      organizationId: orgId,
+      name: /Xlsx Import Family/i,
+    })
     expect(count).toBeGreaterThanOrEqual(1)
   })
 
   it('imports lifecycle event amount from org event type when amount column omitted', async () => {
     await seedOrg()
-    const family = await seedMarkerFamily()
+    await seedMarkerFamily()
     const { POST } = await import('./route-logic/import')
     const csv = 'familyName,eventType,eventDate\nAPI Route Marker Family,bar_mitzvah,2024-08-01'
     const res = await POST(importRequest(csvForm('lifecycle-events', csv, 'le-no-amt.csv')))
@@ -425,7 +445,11 @@ describe('import route-logic branches', () => {
     expect(res.status).toBe(200)
     expect((await res.json()).imported).toBe(1)
     const { FamilyMember } = await import('./models')
-    const m = await FamilyMember.findOne({ organizationId: orgId, familyId: family._id, firstName: 'Email' })
+    const m = await FamilyMember.findOne({
+      organizationId: orgId,
+      familyId: family._id,
+      firstName: 'Email',
+    })
     expect(m).toBeTruthy()
   })
 
@@ -446,7 +470,11 @@ describe('import route-logic branches', () => {
     await seedOrg()
     const { POST } = await import('./route-logic/import')
     const form = new FormData()
-    form.set('file', new Blob([IMPORT_CSV_FIXTURES.families.content], { type: 'text/csv' }), 'f.csv')
+    form.set(
+      'file',
+      new Blob([IMPORT_CSV_FIXTURES.families.content], { type: 'text/csv' }),
+      'f.csv',
+    )
     const res = await POST(importRequest(form))
     expect(res.status).toBe(400)
   })
@@ -619,7 +647,8 @@ describe('import route-logic branches', () => {
     const spy = vi
       .spyOn(LifecycleEventPayment, 'create')
       .mockRejectedValueOnce(new Error('Lifecycle DB error'))
-    const csv = 'familyName,eventType,eventDate,amount\nAPI Route Marker Family,bar_mitzvah,2024-08-01,100'
+    const csv =
+      'familyName,eventType,eventDate,amount\nAPI Route Marker Family,bar_mitzvah,2024-08-01,100'
     try {
       const res = await POST(importRequest(csvForm('lifecycle-events', csv, 'le-throw.csv')))
       expect(res.status).toBe(200)
@@ -762,7 +791,11 @@ describe('import route-logic branches', () => {
     expect(res.status).toBe(200)
     expect((await res.json()).imported).toBe(1)
     const { FamilyMember } = await import('./models')
-    const m = await FamilyMember.findOne({ organizationId: orgId, familyId: family._id, firstName: 'Both' })
+    const m = await FamilyMember.findOne({
+      organizationId: orgId,
+      familyId: family._id,
+      firstName: 'Both',
+    })
     expect(m).toBeTruthy()
   })
 })

@@ -23,11 +23,11 @@ const RENDER: Record<string, string> = {
   Button: "React.createElement(Component, null, 'Label')",
   Textarea: "React.createElement(Component, { 'aria-label': 'smoke' })",
   Input: "React.createElement(Component, { 'aria-label': 'smoke' })",
-  Select: "React.createElement(Component, { 'aria-label': 'smoke' }, React.createElement('option', null, 'a'))",
+  Select:
+    "React.createElement(Component, { 'aria-label': 'smoke' }, React.createElement('option', null, 'a'))",
   Modal:
     "React.createElement(Component, { open: false, onClose: () => {}, title: 'Smoke', children: 'body' })",
-  Tabs:
-    "React.createElement(Component, { items: [{ id: 'a', label: 'Tab' }], activeId: 'a', onChange: () => {} })",
+  Tabs: "React.createElement(Component, { items: [{ id: 'a', label: 'Tab' }], activeId: 'a', onChange: () => {} })",
   EmptyState: "React.createElement(Component, { title: 'Empty' })",
   PageHeader: "React.createElement(Component, { title: 'Smoke' })",
   Tooltip: "React.createElement(Component, { content: 'Tip', children: 'Hover' })",
@@ -90,7 +90,6 @@ function main() {
   for (const source of targets) {
     const out = source.replace(/\.tsx$/, '.smoke.test.tsx')
     const next = generate(source)
-    if (fs.existsSync(out) && fs.readFileSync(out, 'utf8') === next) continue
     fs.writeFileSync(out, next, 'utf8')
     written++
   }
@@ -103,7 +102,9 @@ function main() {
     }
   }
 
-  console.log(`Smoke tests: ${written} written (${targets.length} UI targets, ${SKIP.size} skipped).`)
+  console.log(
+    `Smoke tests: ${written} written (${targets.length} UI targets, ${SKIP.size} skipped).`,
+  )
 }
 
 main()

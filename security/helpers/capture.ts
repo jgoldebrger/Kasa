@@ -53,12 +53,6 @@ function createEmptyLog(): TrafficLog {
   return { startedAt: new Date().toISOString(), requests: [], responses: [], sessions: [] }
 }
 
-function headersToRecord(headers: Array<{ name: string; value: string }>): Record<string, string> {
-  const out: Record<string, string> = {}
-  for (const h of headers) out[h.name.toLowerCase()] = h.value
-  return out
-}
-
 let seq = 0
 
 /** Attach request/response listeners to a page for security auditing. */
@@ -82,8 +76,7 @@ export function attachTrafficCapture(page: Page, opts?: { maxBodyPreview?: numbe
 
   page.on('response', async (res: Response) => {
     const req = res.request()
-    const requestId =
-      pending.get(req.url() + req.method()) ?? `req-${seq}`
+    const requestId = pending.get(req.url() + req.method()) ?? `req-${seq}`
     let bodyPreview: string | undefined
     let bodySize: number | undefined
     try {

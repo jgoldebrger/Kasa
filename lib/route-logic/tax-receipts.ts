@@ -16,14 +16,10 @@
  */
 
 import { z } from 'zod'
-import { Types } from 'mongoose'
 import { handler } from '@/lib/api/handler'
 import { Payment } from '@/lib/models'
 import { yearParam } from '@/lib/schemas'
-import {
-  membershipDuesYearFilter,
-  netMembershipPaymentAmount,
-} from '@/lib/tax-receipts/queries'
+import { membershipDuesYearFilter, netMembershipPaymentAmount } from '@/lib/tax-receipts/queries'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { loadAllByIdCursor, familyBatches } from '@/lib/org-pagination'
 
@@ -50,7 +46,6 @@ export const GET = handler({
     }
 
     const year = query.year
-    const orgId = new Types.ObjectId(String(ctx!.organizationId))
 
     // Year membership via `Payment.year` (org-timezone-stamped at charge
     // time) with a paymentDate fallback for legacy rows — NOT a UTC
@@ -70,10 +65,13 @@ export const GET = handler({
       return { data: [] }
     }
 
-    const byFamily = new Map<string, {
-      totalPaid: number
-      payments: { date: string; method: string; amount: number; notes: string }[]
-    }>()
+    const byFamily = new Map<
+      string,
+      {
+        totalPaid: number
+        payments: { date: string; method: string; amount: number; notes: string }[]
+      }
+    >()
     for (const p of payments) {
       const amt = netMembershipPaymentAmount(p)
       if (amt <= 0) continue

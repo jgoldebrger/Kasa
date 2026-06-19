@@ -1,4 +1,3 @@
-import { Types } from 'mongoose'
 import bcrypt from 'bcryptjs'
 import { setupMongo } from './mongo-memory'
 
@@ -64,10 +63,7 @@ export function resolveRoutePath(template: string, fixtures: RouteFixtureIds): s
   return resolved.join('/')
 }
 
-export function extractRouteParams(
-  template: string,
-  resolvedPath: string,
-): Record<string, string> {
+export function extractRouteParams(template: string, resolvedPath: string): Record<string, string> {
   const tParts = template.split('/').filter(Boolean)
   const rParts = resolvedPath.split('/').filter(Boolean)
   const params: Record<string, string> = {}
@@ -99,7 +95,6 @@ export function defaultRouteQuery(template: string, signupCode: string): string 
   if (template.includes('/tax-receipts/') && template.endsWith('/pdf')) return `?year=${year}`
   return ''
 }
-
 
 export async function seedApiRouteFixtures(): Promise<ApiTestContext> {
   await setupMongo()

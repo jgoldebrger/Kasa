@@ -53,7 +53,6 @@ export async function testOrgSwitchRateLimit(
   request: APIRequestContext,
   orgId: string,
 ): Promise<RateLimitResult> {
-  const config = getSecurityConfig()
   const histogram: Record<number, number> = {}
   let rateLimited = false
   const total = 35

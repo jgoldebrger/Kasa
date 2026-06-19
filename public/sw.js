@@ -79,6 +79,7 @@ self.addEventListener('activate', (event) => {
 })
 
 self.addEventListener('message', (event) => {
+  if (event.origin && event.origin !== self.location.origin) return
   const type = event.data?.type
   // The page can tell us to skip waiting after the user clicks "reload"
   // in our update toast. Wired up from app/components/PwaInit.tsx.

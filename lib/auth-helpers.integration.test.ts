@@ -409,7 +409,7 @@ describe('auth-helpers (integration)', () => {
 
   describe('createPersonalOrganization', () => {
     it('creates org, owner membership, and sets lastActiveOrganizationId', async () => {
-      const { User, Organization, OrgMembership } = await import('./models')
+      const { User, OrgMembership } = await import('./models')
       const user = await User.create({
         email: `new-user-${Date.now()}@example.com`,
         hashedPassword: 'hash',

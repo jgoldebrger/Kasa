@@ -1,8 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const loaderMocks = vi.hoisted(() => ({
   connectDB: vi.fn(async () => undefined),
-  orgLean: vi.fn(async () => ({ timezone: 'UTC', barMitzvahAutoAssignPlanId: null }) as Record<string, unknown>),
+  orgLean: vi.fn(
+    async () => ({ timezone: 'UTC', barMitzvahAutoAssignPlanId: null }) as Record<string, unknown>,
+  ),
   lifecycleEvents: [] as Array<{ _id: string; type: string; name: string; amount: number }>,
   familyCount: 50,
   bmCount: 0,
@@ -272,9 +274,7 @@ describe('DEFAULT_DUES_FORECAST_YEARS', () => {
 describe('loadDuesRecommendation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    loaderMocks.lifecycleEvents = [
-      { _id: 'ev-wed', type: 'wedding', name: 'Wedding', amount: 200 },
-    ]
+    loaderMocks.lifecycleEvents = [{ _id: 'ev-wed', type: 'wedding', name: 'Wedding', amount: 200 }]
     loaderMocks.familyCount = 40
     loaderMocks.bmCount = 3
     loaderMocks.newFamiliesAgg = [{ count: 10 }, { count: 5 }]

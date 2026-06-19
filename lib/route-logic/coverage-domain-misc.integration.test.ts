@@ -121,8 +121,6 @@ async function withCompoundCursorSpy(fn: () => Promise<void>) {
 }
 
 describe.sequential('route-logic auth/org/misc domain coverage', () => {
-  const year = () => new Date().getFullYear()
-
   beforeAll(async () => {
     process.env.CRON_SECRET = process.env.CRON_SECRET || 'test-cron-secret'
     process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'sk_test'

@@ -18,7 +18,6 @@ import { PAYMENT_PUBLIC_SELECT, serializePaymentPublic } from '@/lib/payments/se
 import { sanitizeStripeErrorMessage } from '@/lib/payments/sanitize'
 import { enforceMemberChargeGate } from '@/lib/billing/feature-gate'
 import { payment as paymentSchemas } from '@/lib/schemas'
-import { ZodError } from 'zod'
 import { scheduleYearlyCalculationRefresh } from '@/lib/calculations'
 import Stripe from 'stripe'
 import https from 'https'
@@ -39,12 +38,6 @@ function getStripe() {
 }
 
 const MAX_CHARGE = 100_000
-
-/* v8 ignore start — body schema validation is handled by handler(); kept for parity with other payment routes */
-function validationIssues(err: ZodError) {
-  return err.issues.map((i) => ({ path: i.path.map(String).join('.'), message: i.message }))
-}
-/* v8 ignore stop */
 
 // POST - Charge a saved payment method
 export const POST = handler({

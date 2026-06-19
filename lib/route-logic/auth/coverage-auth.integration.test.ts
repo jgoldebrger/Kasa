@@ -2,7 +2,6 @@
  * Auth route-logic coverage — tests live under lib/route-logic/auth/ per domain scope.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
-import { Types } from 'mongoose'
 import { NextRequest } from 'next/server'
 import {
   seedApiRouteFixtures,

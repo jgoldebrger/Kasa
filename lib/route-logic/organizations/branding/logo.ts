@@ -33,9 +33,7 @@ export const GET = handler({
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    const org = await Organization.findById(ctx!.organizationId)
-      .select('branding')
-      .lean<any>()
+    const org = await Organization.findById(ctx!.organizationId).select('branding').lean<any>()
 
     const dataUrl: string | null = org?.branding?.logoDataUrl ?? null
     if (!dataUrl) {
@@ -47,7 +45,7 @@ export const GET = handler({
       return NextResponse.json({ error: 'Malformed logo' }, { status: 500 })
     }
 
-    const mime = `image/${match[1].toLowerCase().replace('+xml', '+xml')}`
+    const mime = `image/${match[1].toLowerCase()}`
     const buf = Buffer.from(match[2], 'base64')
 
     return new NextResponse(buf, {

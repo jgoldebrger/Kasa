@@ -29,7 +29,10 @@ function handlerToLogicPath(handlerFile: string): string {
 }
 
 function logicImportPath(logicFile: string): string {
-  const rel = path.relative(path.join(ROOT, 'lib'), logicFile).replace(/\\/g, '/').replace(/\.ts$/, '')
+  const rel = path
+    .relative(path.join(ROOT, 'lib'), logicFile)
+    .replace(/\\/g, '/')
+    .replace(/\.ts$/, '')
   return `@/lib/${rel}`
 }
 
@@ -57,14 +60,21 @@ function main() {
     }
 
     const logicFile = handlerToLogicPath(handlerFile)
-    if (fs.existsSync(logicFile)) {
-      console.warn('Logic file exists, skip:', logicFile)
-      skipped++
-      continue
+    try {
+      fs.mkdirSync(path.dirname(logicFile), { recursive: true })
+      fs.writeFileSync(logicFile, content, { flag: 'wx' })
+    } catch (err: unknown) {
+      const code =
+        err && typeof err === 'object' && 'code' in err
+          ? (err as NodeJS.ErrnoException).code
+          : undefined
+      if (code === 'EEXIST') {
+        console.warn('Logic file exists, skip:', logicFile)
+        skipped++
+        continue
+      }
+      throw err
     }
-
-    fs.mkdirSync(path.dirname(logicFile), { recursive: true })
-    fs.writeFileSync(logicFile, content, 'utf8')
 
     const exportNames = collectExportNames(content)
     const importFrom = logicImportPath(logicFile)
