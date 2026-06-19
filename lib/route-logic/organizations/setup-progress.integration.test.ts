@@ -74,9 +74,10 @@ describe('GET /api/organizations/setup-progress', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.complete).toBe(true)
-    expect(body.completed).toBe(5)
-    expect(body.total).toBe(5)
-    expect(body.steps).toHaveLength(5)
+    expect(body.completed).toBe(7)
+    expect(body.total).toBe(7)
+    expect(body.steps).toHaveLength(7)
+    expect(body.canDismiss).toBe(true)
     expect(body.steps.every((s: { done: boolean }) => s.done)).toBe(true)
     expect(body.steps.find((s: { id: string }) => s.id === 'paymentPlans')?.href).toBe(
       '/settings?tab=paymentPlans',
@@ -96,12 +97,17 @@ describe('GET /api/organizations/setup-progress', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.complete).toBe(false)
-    expect(body.completed).toBeLessThan(5)
-    const byId = Object.fromEntries(body.steps.map((s: { id: string; done: boolean }) => [s.id, s.done]))
+    expect(body.completed).toBeLessThan(7)
+    expect(body.canDismiss).toBe(false)
+    const byId = Object.fromEntries(
+      body.steps.map((s: { id: string; done: boolean }) => [s.id, s.done]),
+    )
     expect(byId.firstFamily).toBe(true)
     expect(byId.paymentPlans).toBe(false)
     expect(byId.eventTypes).toBe(false)
     expect(byId.email).toBe(false)
+    expect(byId.cycle).toBe(false)
+    expect(byId.stripeConnect).toBe(false)
     expect(byId.firstPayment).toBe(false)
   })
 

@@ -19,23 +19,15 @@ import { sanitizeStripeErrorMessage } from '@/lib/payments/sanitize'
 import { enforceMemberChargeGate } from '@/lib/billing/feature-gate'
 import { payment as paymentSchemas } from '@/lib/schemas'
 import { scheduleYearlyCalculationRefresh } from '@/lib/calculations'
-import Stripe from 'stripe'
-import https from 'https'
-
-const httpsAgent = new https.Agent({
-  rejectUnauthorized: process.env.NODE_ENV === 'production',
-})
-
-function getStripe() {
-  const apiKey = process.env.STRIPE_SECRET_KEY
-  if (!apiKey) {
-    throw new Error('STRIPE_SECRET_KEY is not configured')
-  }
-  return new Stripe(apiKey, {
-    apiVersion: '2025-10-29.clover',
-    httpAgent: httpsAgent,
-  })
-}
+import {
+  connectRequestOptions,
+  getOrgStripeConnect,
+  getPlatformStripe,
+  isLegacyPlatformPaymentMethod,
+  ORG_CONNECT_SELECT,
+  ORG_CONNECT_WITH_TIMEZONE_SELECT,
+  type OrgStripeConnectFields,
+} from '@/lib/stripe/client'
 
 const MAX_CHARGE = 100_000
 
@@ -105,6 +97,21 @@ export const POST = handler({
         return { status: 404, data: { error: 'Saved payment method not found' } }
       }
 
+      if (isLegacyPlatformPaymentMethod(savedPaymentMethod)) {
+        return {
+          status: 400,
+          data: {
+            error:
+              'This card was saved before Stripe Connect onboarding and cannot be charged. Ask the family to re-enter their card.',
+          },
+        }
+      }
+
+      const org = await Organization.findById(ctx!.organizationId)
+        .select(ORG_CONNECT_WITH_TIMEZONE_SELECT)
+        .lean<OrgStripeConnectFields & { timezone?: string }>()
+      const connect = getOrgStripeConnect(org)
+
       // Tenant guard for memberId: must point at a member of THIS family
       // in THIS org. Without this check, an admin could attribute the
       // ledger row to a member belonging to a different family / tenant.
@@ -144,7 +151,10 @@ export const POST = handler({
         dayBucket,
       ])
 
-      const stripe = getStripe()
+      const stripe = getPlatformStripe()
+      if (!stripe) {
+        throw new Error('STRIPE_SECRET_KEY is not configured')
+      }
       const paymentIntent = await stripe.paymentIntents.create(
         {
           amount: amountMinor,
@@ -165,7 +175,7 @@ export const POST = handler({
             savedPaymentMethodId: savedPaymentMethodId,
           },
         },
-        { idempotencyKey },
+        connectRequestOptions(connect, { idempotencyKey }),
       )
       stripePaymentIntentIdForCatch = paymentIntent.id
 
@@ -242,9 +252,6 @@ export const POST = handler({
       // tax receipts and yearly income reports.
       let orgTz: string | undefined
       try {
-        const org = await Organization.findById(ctx!.organizationId)
-          .select('timezone')
-          .lean<{ timezone?: string }>()
         orgTz = org?.timezone
       } catch {
         /* fall back to server-local year below */

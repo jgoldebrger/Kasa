@@ -1,19 +1,19 @@
 import { Types } from 'mongoose'
 import { handler } from '@/lib/api/handler'
-import { SavedPaymentMethod, Family } from '@/lib/models'
+import { SavedPaymentMethod, Family, Organization } from '@/lib/models'
+import {
+  connectRequestOptions,
+  getOrgStripeConnect,
+  getPlatformStripe,
+  isStripeConnectEnabled,
+  ORG_CONNECT_SELECT,
+  type OrgStripeConnectFields,
+} from '@/lib/stripe/client'
 import { audit } from '@/lib/audit'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { loadAllByIdCursor } from '@/lib/org-pagination'
 import { payment as paymentSchemas } from '@/lib/schemas'
-import Stripe from 'stripe'
-import https from 'https'
 
-// Create HTTPS agent that handles SSL certificates properly
-const httpsAgent = new https.Agent({
-  rejectUnauthorized: process.env.NODE_ENV === 'production',
-})
-
-// Initialize Stripe only when API key is available (lazy initialization)
 function publicSavedPaymentMethod(
   doc: { toObject?: () => Record<string, unknown> } & Record<string, unknown>,
 ) {
@@ -21,17 +21,6 @@ function publicSavedPaymentMethod(
   delete obj.stripePaymentMethodId
   delete obj.organizationId
   return obj
-}
-
-function getStripe() {
-  const apiKey = process.env.STRIPE_SECRET_KEY
-  if (!apiKey) {
-    throw new Error('STRIPE_SECRET_KEY is not configured')
-  }
-  return new Stripe(apiKey, {
-    apiVersion: '2025-10-29.clover',
-    httpAgent: httpsAgent,
-  })
 }
 
 // GET - Get all saved payment methods for a family
@@ -101,10 +90,21 @@ export const POST = handler({
       return { status: 404, data: { error: 'Family not found' } }
     }
 
-    const stripe = getStripe()
+    const org = await Organization.findById(ctx!.organizationId)
+      .select(ORG_CONNECT_SELECT)
+      .lean<OrgStripeConnectFields>()
+    const connect = getOrgStripeConnect(org)
+
+    const stripe = getPlatformStripe()
+    if (!stripe) {
+      return { status: 500, data: { error: 'Stripe is not configured' } }
+    }
 
     try {
-      const intent = await stripe.paymentIntents.retrieve(paymentIntentId)
+      const intent = await stripe.paymentIntents.retrieve(
+        paymentIntentId,
+        connectRequestOptions(connect),
+      )
       if (intent.status !== 'succeeded') {
         return { status: 400, data: { error: 'PaymentIntent has not succeeded' } }
       }
@@ -133,7 +133,10 @@ export const POST = handler({
       console.error('[saved-payment-methods] PI verification failed:', err?.message)
       return { status: 400, data: { error: 'Could not verify PaymentIntent' } }
     }
-    const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId)
+    const paymentMethod = await stripe.paymentMethods.retrieve(
+      paymentMethodId,
+      connectRequestOptions(connect),
+    )
 
     if (!paymentMethod.card) {
       return { status: 400, data: { error: 'Invalid payment method' } }
@@ -155,6 +158,9 @@ export const POST = handler({
     if (existing) {
       existing.isDefault = setAsDefault || false
       existing.isActive = true
+      if (isStripeConnectEnabled()) {
+        existing.legacyPlatformAccount = false
+      }
       await existing.save()
       return { data: publicSavedPaymentMethod(existing) }
     }
@@ -170,6 +176,7 @@ export const POST = handler({
       isDefault: setAsDefault || false,
       isActive: true,
       organizationId: ctx!.organizationId,
+      ...(isStripeConnectEnabled() ? { legacyPlatformAccount: false } : {}),
     })
 
     await audit({

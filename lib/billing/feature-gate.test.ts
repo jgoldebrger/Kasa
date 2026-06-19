@@ -9,12 +9,15 @@ import {
 describe('billing feature gate', () => {
   const prevStripeKey = process.env.STRIPE_SECRET_KEY
   const prevStarterPrice = process.env.STRIPE_PRICE_STARTER
+  const prevConnect = process.env.STRIPE_CONNECT_ENABLED
 
   afterEach(() => {
     if (prevStripeKey === undefined) delete process.env.STRIPE_SECRET_KEY
     else process.env.STRIPE_SECRET_KEY = prevStripeKey
     if (prevStarterPrice === undefined) delete process.env.STRIPE_PRICE_STARTER
     else process.env.STRIPE_PRICE_STARTER = prevStarterPrice
+    if (prevConnect === undefined) delete process.env.STRIPE_CONNECT_ENABLED
+    else process.env.STRIPE_CONNECT_ENABLED = prevConnect
   })
 
   it('treats active and trialing as subscribed', () => {
@@ -42,21 +45,30 @@ describe('billing feature gate', () => {
     }
   })
 
+  it('blocks member charges without Connect onboarding when Connect enabled', () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test'
+    process.env.STRIPE_PRICE_STARTER = 'price_starter_test'
+    process.env.STRIPE_CONNECT_ENABLED = 'true'
+    const result = assertCanChargeMembers({
+      subscriptionStatus: 'active',
+      stripeConnectChargesEnabled: false,
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.status).toBe(402)
+      expect(result.error).toMatch(/Stripe Connect onboarding/i)
+    }
+  })
+
   it('caps families by plan tier when enforced', () => {
     process.env.STRIPE_SECRET_KEY = 'sk_test'
     process.env.STRIPE_PRICE_STARTER = 'price_starter_test'
 
-    const atCap = assertCanAddFamily(
-      { subscriptionStatus: 'active', planTier: 'starter' },
-      75,
-    )
+    const atCap = assertCanAddFamily({ subscriptionStatus: 'active', planTier: 'starter' }, 75)
     expect(atCap.ok).toBe(false)
     if (!atCap.ok) expect(atCap.status).toBe(403)
 
-    const underCap = assertCanAddFamily(
-      { subscriptionStatus: 'active', planTier: 'starter' },
-      74,
-    )
+    const underCap = assertCanAddFamily({ subscriptionStatus: 'active', planTier: 'starter' }, 74)
     expect(underCap.ok).toBe(true)
 
     const institution = assertCanAddFamily(

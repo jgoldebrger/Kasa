@@ -19,6 +19,7 @@ type RequestRow = {
   id: string
   email: string
   name: string
+  orgName: string | null
   message: string
   status: 'pending' | 'approved' | 'rejected'
   signupCode: string | null
@@ -127,7 +128,11 @@ export default function InviteRequestsAdminPage() {
           toast.success('Approved. Email delivery failed — copy the signup link below.')
         }
       } else {
-        toast.success('Request rejected.')
+        if (data?.email?.sent) {
+          toast.success('Rejected and notified the requester.')
+        } else {
+          toast.success('Request rejected.')
+        }
       }
       await load()
     } catch (err: any) {
@@ -226,7 +231,12 @@ export default function InviteRequestsAdminPage() {
             <Card key={row.id} compact className="flex flex-col gap-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="font-semibold text-fg">{row.name}</div>
+                  {row.orgName && (
+                    <div className="text-lg font-semibold text-fg mb-0.5">{row.orgName}</div>
+                  )}
+                  <div className={`font-semibold text-fg ${row.orgName ? 'text-sm' : ''}`}>
+                    {row.name}
+                  </div>
                   <div className="text-sm text-fg-muted">{row.email}</div>
                   <div className="text-xs text-fg-subtle mt-1">
                     Requested {new Date(row.createdAt).toLocaleString()}

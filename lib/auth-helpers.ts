@@ -184,11 +184,18 @@ export async function requireOrg(
  * Create a fresh personal organization for a brand-new user and assign them
  * as owner. Called from the signup flow.
  */
-export async function createPersonalOrganization(userId: string, userName: string) {
+export async function createPersonalOrganization(
+  userId: string,
+  userName: string,
+  orgName?: string,
+) {
   await connectDB()
 
+  const displayName = (orgName?.trim() || 'Personal workspace').slice(0, 200)
+  const slugSource = orgName?.trim() || userName
+
   const baseSlug =
-    userName
+    slugSource
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
@@ -202,7 +209,7 @@ export async function createPersonalOrganization(userId: string, userName: strin
   }
 
   const org = await Organization.create({
-    name: 'Personal workspace',
+    name: displayName,
     slug,
     ownerId: userId,
   })

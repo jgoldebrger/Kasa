@@ -17,22 +17,19 @@ import { enforceMemberChargeGate } from '@/lib/billing/feature-gate'
 import { addMonthsClamped, getYearInTimeZone } from '@/lib/date-utils'
 import { scheduleYearlyCalculationRefresh } from '@/lib/calculations'
 import { payment as paymentSchemas } from '@/lib/schemas'
-import Stripe from 'stripe'
-import https from 'https'
+import {
+  connectRequestOptions,
+  getOrgStripeConnect,
+  getPlatformStripe,
+  isStripeConnectEnabled,
+  ORG_CONNECT_SELECT,
+  ORG_CONNECT_WITH_TIMEZONE_SELECT,
+  type OrgStripeConnectFields,
+} from '@/lib/stripe/client'
 
 if (!process.env.STRIPE_SECRET_KEY) {
   console.error('STRIPE_SECRET_KEY is not set in environment variables')
 }
-
-const httpsAgent = new https.Agent({
-  rejectUnauthorized: process.env.NODE_ENV === 'production',
-})
-
-const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
-      httpAgent: httpsAgent,
-    })
-  : null
 
 export const POST = handler({
   auth: 'org',
@@ -40,6 +37,7 @@ export const POST = handler({
   body: paymentSchemas.confirmPaymentBody,
   name: 'POST /api/stripe/confirm-payment',
   fn: async ({ ctx, body, request }) => {
+    const stripe = getPlatformStripe()
     if (!stripe) {
       return {
         status: 500,
@@ -157,7 +155,15 @@ export const POST = handler({
       )
     }
 
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
+    const org = await Organization.findById(ctx!.organizationId)
+      .select(ORG_CONNECT_WITH_TIMEZONE_SELECT)
+      .lean<OrgStripeConnectFields & { timezone?: string }>()
+    const connect = getOrgStripeConnect(org)
+
+    const paymentIntent = await stripe.paymentIntents.retrieve(
+      paymentIntentId,
+      connectRequestOptions(connect),
+    )
 
     // Ownership guard: the PaymentIntent's metadata must identify the
     // caller's org. Without this, an admin who knows any succeeded
@@ -216,6 +222,7 @@ export const POST = handler({
     if (paymentIntent.payment_method) {
       const paymentMethod = await stripe.paymentMethods.retrieve(
         paymentIntent.payment_method as string,
+        connectRequestOptions(connect),
       )
 
       if (paymentMethod.card) {
@@ -245,6 +252,7 @@ export const POST = handler({
               isDefault: true,
               isActive: true,
               organizationId: ctx!.organizationId,
+              ...(isStripeConnectEnabled() ? { legacyPlatformAccount: false } : {}),
             })
             actualSavedPaymentMethodId = saved._id.toString()
           } catch (err) {
@@ -275,9 +283,6 @@ export const POST = handler({
     //      file under the *new* year via getFullYear().
     let orgTz: string | undefined
     try {
-      const org = await Organization.findById(ctx!.organizationId)
-        .select('timezone')
-        .lean<{ timezone?: string }>()
       orgTz = org?.timezone
     } catch {
       /* fall back to server-local year below */

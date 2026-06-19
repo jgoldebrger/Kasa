@@ -12,6 +12,7 @@ const FULLSCREEN_PATHS = [
   '/invite',
   '/reset-password',
   '/request-invite',
+  '/setup',
   '/privacy',
   '/terms',
   '/subprocessors',

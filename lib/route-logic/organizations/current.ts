@@ -36,7 +36,7 @@ export const GET = handler({
 
     const org = await Organization.findById(ctx!.organizationId)
       .select(
-        '_id name slug currency locale planTier subscriptionStatus trialEndsAt currentPeriodEnd stripeCustomerId',
+        '_id name slug currency locale planTier subscriptionStatus trialEndsAt currentPeriodEnd stripeCustomerId setupCompletedAt',
       )
       .lean<{
         _id: any
@@ -49,6 +49,7 @@ export const GET = handler({
         trialEndsAt?: Date | null
         currentPeriodEnd?: Date | null
         stripeCustomerId?: string | null
+        setupCompletedAt?: Date | null
       }>()
     if (!org) return { status: 404, data: { error: 'Organization not found' } }
 
@@ -64,6 +65,7 @@ export const GET = handler({
         trialEndsAt: org.trialEndsAt?.toISOString() ?? null,
         currentPeriodEnd: org.currentPeriodEnd?.toISOString() ?? null,
         stripeCustomerId: org.stripeCustomerId ?? null,
+        setupCompletedAt: org.setupCompletedAt?.toISOString() ?? null,
       },
       headers: {
         'Cache-Control': 'private, max-age=60, stale-while-revalidate=600',
@@ -73,6 +75,7 @@ export const GET = handler({
 })
 
 const patchBody = z.object({
+  name: z.string().trim().min(2).max(200).optional(),
   currency: z
     .string()
     .trim()
@@ -90,7 +93,6 @@ const patchBody = z.object({
     .max(32)
     .regex(/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/, 'Invalid locale')
     .optional(),
-  // Renaming the org happens elsewhere; intentionally not allowed here.
 })
 
 export const PATCH = handler({
@@ -110,6 +112,12 @@ export const PATCH = handler({
     }
 
     const update: Record<string, unknown> = {}
+    if (body.name !== undefined) {
+      if (ctx!.role !== 'owner') {
+        return { status: 403, data: { error: 'Only owners can rename the organization' } }
+      }
+      update.name = body.name
+    }
     if (body.currency) update.currency = body.currency
     if (body.locale) update.locale = body.locale
 
@@ -122,8 +130,8 @@ export const PATCH = handler({
       { $set: update },
       { new: true },
     )
-      .select('currency locale')
-      .lean<{ currency?: string; locale?: string }>()
+      .select('name currency locale')
+      .lean<{ name?: string; currency?: string; locale?: string }>()
     if (!updated) return { status: 404, data: { error: 'Organization not found' } }
 
     await audit({
@@ -138,6 +146,7 @@ export const PATCH = handler({
 
     return {
       data: {
+        name: updated.name || '',
         currency: (updated.currency || 'USD').toUpperCase(),
         locale: updated.locale || 'en-US',
       },

@@ -72,12 +72,40 @@ const stripeMocks = vi.hoisted(() => {
     })),
   }
 
+  const accounts = {
+    create: vi.fn(async () => ({
+      id: 'acct_probe_mock',
+      charges_enabled: false,
+      payouts_enabled: false,
+      details_submitted: false,
+      requirements: { currently_due: [], past_due: [], disabled_reason: null },
+    })),
+    retrieve: vi.fn(async (id: string) => ({
+      id,
+      charges_enabled: true,
+      payouts_enabled: true,
+      details_submitted: true,
+      requirements: { currently_due: [], past_due: [], disabled_reason: null },
+    })),
+    createLoginLink: vi.fn(async (id: string) => ({
+      url: `https://connect.stripe.com/express/login/${id}`,
+    })),
+  }
+
+  const accountLinks = {
+    create: vi.fn(async () => ({
+      url: 'https://connect.stripe.com/setup/s/acct_probe_mock',
+    })),
+  }
+
   const StripeCtor = vi.fn(function Stripe(this: unknown) {
     return {
       webhooks: { constructEvent },
       paymentIntents,
       paymentMethods,
       charges,
+      accounts,
+      accountLinks,
     }
   })
 
@@ -166,4 +194,3 @@ vi.mock('@/lib/platform-admin', async (importOriginal) => {
     assertPlatformAdminTwoFactor: vi.fn(async () => null),
   }
 })
-

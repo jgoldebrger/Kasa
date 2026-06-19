@@ -1,37 +1,19 @@
 import { NextResponse } from 'next/server'
 import { handler } from '@/lib/api/handler'
-import { Family, RecurringPayment } from '@/lib/models'
+import { Family, RecurringPayment, Organization } from '@/lib/models'
 import { buildIdempotencyKey, resolveStripeCurrency, toMinorUnits } from '@/lib/money'
 import { getOrgCurrency } from '@/lib/money.server'
 import { enforceMemberChargeGate } from '@/lib/billing/feature-gate'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
 import { payment as paymentSchemas } from '@/lib/schemas'
-import Stripe from 'stripe'
-import https from 'https'
-
-if (!process.env.STRIPE_SECRET_KEY) {
-  console.error('STRIPE_SECRET_KEY is not set in environment variables')
-}
-
-const httpsAgent = new https.Agent({
-  rejectUnauthorized: process.env.NODE_ENV === 'production',
-})
-
-let stripe: Stripe | null = null
-
-if (process.env.STRIPE_SECRET_KEY) {
-  try {
-    stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      maxNetworkRetries: 2,
-      timeout: 30000,
-      httpAgent: httpsAgent,
-    })
-  } catch (error) {
-    /* v8 ignore next — Stripe SDK constructor failure; suite uses a hoisted mock that cannot throw here */
-    console.error('Failed to initialize Stripe:', error)
-  }
-}
+import {
+  connectRequestOptions,
+  getOrgStripeConnect,
+  getPlatformStripe,
+  ORG_CONNECT_SELECT,
+  type OrgStripeConnectFields,
+} from '@/lib/stripe/client'
 
 export const POST = handler({
   auth: 'org',
@@ -39,6 +21,7 @@ export const POST = handler({
   body: paymentSchemas.createPaymentIntentBody,
   name: 'POST /api/stripe/create-payment-intent',
   fn: async ({ ctx, body, request }) => {
+    const stripe = getPlatformStripe()
     if (!stripe) {
       return NextResponse.json(
         {
@@ -79,6 +62,11 @@ export const POST = handler({
     const orgCurrency = await getOrgCurrency(ctx!.organizationId)
     const stripeCurrency = resolveStripeCurrency(orgCurrency)
 
+    const org = await Organization.findById(ctx!.organizationId)
+      .select(ORG_CONNECT_SELECT)
+      .lean<OrgStripeConnectFields>()
+    const connect = getOrgStripeConnect(org)
+
     const idempotencyKey = buildIdempotencyKey([
       'pi-create',
       ctx!.organizationId,
@@ -101,7 +89,7 @@ export const POST = handler({
           enabled: true,
         },
       },
-      { idempotencyKey },
+      connectRequestOptions(connect, { idempotencyKey }),
     )
 
     // Audit trail for every admin-initiated PI. The amount comes from
@@ -148,6 +136,7 @@ export const POST = handler({
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
       currency: stripeCurrency,
+      ...(connect?.stripeAccountId ? { stripeAccountId: connect.stripeAccountId } : {}),
     })
   },
 })

@@ -1,10 +1,7 @@
 import { Types } from 'mongoose'
 import { Organization, Family } from '@/lib/models'
-import {
-  ACTIVE_SUBSCRIPTION_STATUSES,
-  familyCapForTier,
-  type PlanTier,
-} from '@/lib/billing/plans'
+import { ACTIVE_SUBSCRIPTION_STATUSES, familyCapForTier, type PlanTier } from '@/lib/billing/plans'
+import { isStripeConnectEnabled } from '@/lib/stripe/client'
 
 export interface OrgBillingSnapshot {
   planTier?: PlanTier | null
@@ -13,14 +10,15 @@ export interface OrgBillingSnapshot {
   currentPeriodEnd?: Date | null
   stripeCustomerId?: string | null
   subscriptionId?: string | null
+  stripeConnectAccountId?: string | null
+  stripeConnectChargesEnabled?: boolean | null
+  stripeConnectOnboardingStatus?: string | null
 }
 
-export type FeatureGateResult =
-  | { ok: true }
-  | { ok: false; error: string; status: number }
+export type FeatureGateResult = { ok: true } | { ok: false; error: string; status: number }
 
 const BILLING_FIELDS =
-  'planTier subscriptionStatus trialEndsAt currentPeriodEnd stripeCustomerId subscriptionId'
+  'planTier subscriptionStatus trialEndsAt currentPeriodEnd stripeCustomerId subscriptionId stripeConnectAccountId stripeConnectChargesEnabled stripeConnectOnboardingStatus'
 
 /**
  * True when platform billing should be enforced. Requires both the Stripe
@@ -29,9 +27,7 @@ const BILLING_FIELDS =
  * existing integration-test fixtures working).
  */
 export function isBillingEnforced(): boolean {
-  return Boolean(
-    process.env.STRIPE_SECRET_KEY?.trim() && process.env.STRIPE_PRICE_STARTER?.trim(),
-  )
+  return Boolean(process.env.STRIPE_SECRET_KEY?.trim() && process.env.STRIPE_PRICE_STARTER?.trim())
 }
 
 export function hasActiveSubscription(billing: OrgBillingSnapshot): boolean {
@@ -41,13 +37,23 @@ export function hasActiveSubscription(billing: OrgBillingSnapshot): boolean {
 
 export function assertCanChargeMembers(billing: OrgBillingSnapshot): FeatureGateResult {
   if (!isBillingEnforced()) return { ok: true }
-  if (hasActiveSubscription(billing)) return { ok: true }
-  return {
-    ok: false,
-    status: 402,
-    error:
-      'An active Kasa platform subscription is required before charging member cards. Subscribe from Settings → Billing or visit /pricing.',
+  if (!hasActiveSubscription(billing)) {
+    return {
+      ok: false,
+      status: 402,
+      error:
+        'An active Kasa platform subscription is required before charging member cards. Subscribe from Settings → Billing or visit /pricing.',
+    }
   }
+  if (isStripeConnectEnabled() && !billing.stripeConnectChargesEnabled) {
+    return {
+      ok: false,
+      status: 402,
+      error:
+        'Complete Stripe Connect onboarding before charging member cards. Go to Settings → Billing to connect your payout account.',
+    }
+  }
+  return { ok: true }
 }
 
 export function assertCanAddFamily(

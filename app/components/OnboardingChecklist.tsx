@@ -18,6 +18,8 @@ interface SetupProgressResponse {
   completed: number
   total: number
   complete: boolean
+  requiredComplete?: boolean
+  canDismiss?: boolean
 }
 
 const DISMISS_KEY_PREFIX = 'kasa.onboarding.dismissed.'
@@ -26,6 +28,8 @@ const STEP_LABEL_KEYS: Record<SetupProgressStepId, MessageKey> = {
   paymentPlans: 'onboarding.step.paymentPlans',
   eventTypes: 'onboarding.step.eventTypes',
   email: 'onboarding.step.email',
+  cycle: 'onboarding.step.cycle',
+  stripeConnect: 'onboarding.step.stripeConnect',
   firstFamily: 'onboarding.step.firstFamily',
   firstPayment: 'onboarding.step.firstPayment',
 }
@@ -160,7 +164,7 @@ export default function OnboardingChecklist({
   if (error || !progress || progress.complete) return null
 
   const showFull = expanded || !dismissed
-  const { completed, total, steps } = progress
+  const { completed, total, steps, canDismiss = false } = progress
 
   if (!showFull) {
     return (
@@ -213,14 +217,16 @@ export default function OnboardingChecklist({
                       .replace('{total}', String(total))}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handleDismiss}
-              className="focus-ring shrink-0 p-1.5 rounded-md text-fg-muted hover:text-fg hover:bg-fg/5 transition-colors min-h-[var(--touch-target)] min-w-[var(--touch-target)] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
-              aria-label={t('onboarding.dismissAria')}
-            >
-              <XMarkIcon className="h-4 w-4" aria-hidden="true" />
-            </button>
+            {canDismiss && (
+              <button
+                type="button"
+                onClick={handleDismiss}
+                className="focus-ring shrink-0 p-1.5 rounded-md text-fg-muted hover:text-fg hover:bg-fg/5 transition-colors min-h-[var(--touch-target)] min-w-[var(--touch-target)] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
+                aria-label={t('onboarding.dismissAria')}
+              >
+                <XMarkIcon className="h-4 w-4" aria-hidden="true" />
+              </button>
+            )}
           </div>
           <ol className="mt-4 divide-y divide-border rounded-md border border-border bg-app-subtle overflow-hidden">
             {steps.map((step, i) => (
@@ -244,6 +250,11 @@ export default function OnboardingChecklist({
                   </span>
                   <span className={`flex-1 truncate ${step.done ? 'line-through' : ''}`}>
                     {stepLabels[step.id]}
+                    {step.optional && (
+                      <span className="ms-1.5 text-xs font-normal text-fg-subtle">
+                        ({t('onboarding.optional')})
+                      </span>
+                    )}
                   </span>
                   {!step.done && (
                     <ChevronRightIcon

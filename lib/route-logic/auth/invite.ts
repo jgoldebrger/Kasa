@@ -2,7 +2,6 @@ import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
 import { Types } from 'mongoose'
 import { Invite, OrgMembership, User, Organization } from '@/lib/models'
-import { createPersonalOrganization } from '@/lib/auth-helpers'
 import { auth } from '@/app/auth'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
@@ -237,8 +236,6 @@ export const PUT = handler({
       const hashedPassword = await bcrypt.hash(password, 12)
       const user = await User.create({ email: invite.email, hashedPassword, name })
       userId = user._id.toString()
-
-      await createPersonalOrganization(userId, name)
     }
 
     const marked = await Invite.findOneAndUpdate(

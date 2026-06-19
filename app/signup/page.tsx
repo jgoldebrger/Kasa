@@ -24,7 +24,7 @@ const REASON_KEYS: Record<InvalidReason, MessageKey> = {
 
 type CodeState =
   | { kind: 'loading' }
-  | { kind: 'valid'; email: string; name: string }
+  | { kind: 'valid'; email: string; name: string; orgName: string | null }
   | { kind: 'invalid'; reason: InvalidReason }
 
 function SignupForm() {
@@ -52,7 +52,12 @@ function SignupForm() {
         }
         const data = await res.json().catch(() => ({}))
         if (data?.valid) {
-          setCodeState({ kind: 'valid', email: data.email, name: data.name })
+          setCodeState({
+            kind: 'valid',
+            email: data.email,
+            name: data.name,
+            orgName: data.orgName || null,
+          })
         } else {
           setCodeState({ kind: 'invalid', reason: data?.reason || 'error' })
         }
@@ -112,7 +117,8 @@ function SignupForm() {
             code={code}
             initialName={codeState.name}
             email={codeState.email}
-            onSuccess={async (pw) => {
+            orgName={codeState.orgName}
+            onSuccess={async (pw, welcomeOrgName) => {
               const signInRes = await signIn('credentials', {
                 email: codeState.email,
                 password: pw,
@@ -122,6 +128,9 @@ function SignupForm() {
                 toast.error(t('signup.autoLoginFailed'))
                 router.push('/login')
                 return
+              }
+              if (welcomeOrgName) {
+                toast.success(t('signup.welcomeOrg').replace('{orgName}', welcomeOrgName))
               }
               router.push('/')
               router.refresh()
@@ -137,12 +146,14 @@ function ValidSignupForm({
   code,
   email,
   initialName,
+  orgName,
   onSuccess,
 }: {
   code: string
   email: string
   initialName: string
-  onSuccess: (password: string) => Promise<void>
+  orgName: string | null
+  onSuccess: (password: string, orgName: string | null) => Promise<void>
 }) {
   const toast = useToast()
   const t = useT()
@@ -172,7 +183,7 @@ function ValidSignupForm({
           else toast.error(msg)
           return
         }
-        await onSuccess(values.password)
+        await onSuccess(values.password, data.orgName || orgName || null)
       } catch {
         toast.error(t('common.networkError'))
       }

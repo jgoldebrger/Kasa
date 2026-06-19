@@ -45,6 +45,15 @@ export default function PricingPage() {
           </nav>
         </header>
 
+        <p className="mb-8">
+          <Link
+            href={isSignedIn ? '/' : '/welcome'}
+            className="text-sm text-fg-muted hover:text-fg transition-colors"
+          >
+            ← {t('pricing.backToHome')}
+          </Link>
+        </p>
+
         <section className="text-center max-w-3xl mx-auto mb-14">
           <h1 className="text-4xl font-semibold tracking-tight text-fg text-pretty mb-4">
             {t('pricing.hero.title')}

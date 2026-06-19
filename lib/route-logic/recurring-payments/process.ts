@@ -11,23 +11,17 @@ import { addMonthsClamped, getYearInTimeZone, startOfDayInTimeZone } from '@/lib
 import { checkRateLimit } from '@/lib/rate-limit'
 import { enforceMemberChargeGate } from '@/lib/billing/feature-gate'
 import { scheduleYearlyCalculationRefreshForPayment } from '@/lib/calculations'
-import Stripe from 'stripe'
-import https from 'https'
-
-const httpsAgent = new https.Agent({
-  rejectUnauthorized: process.env.NODE_ENV === 'production',
-})
-
-function getStripe() {
-  const apiKey = process.env.STRIPE_SECRET_KEY
-  if (!apiKey) {
-    throw new Error('STRIPE_SECRET_KEY is not configured')
-  }
-  return new Stripe(apiKey, {
-    apiVersion: '2025-10-29.clover',
-    httpAgent: httpsAgent,
-  })
-}
+import {
+  connectRequestOptions,
+  getOrgStripeConnect,
+  getPlatformStripe,
+  isLegacyPlatformPaymentMethod,
+  isStripeConnectEnabled,
+  ORG_CONNECT_SELECT,
+  ORG_CONNECT_WITH_TIMEZONE_SELECT,
+  type OrgStripeConnectFields,
+} from '@/lib/stripe/client'
+import type Stripe from 'stripe'
 
 // POST - Process all due recurring payments for one organization.
 // Accepts an admin session OR a cron secret + ?organizationId=<id>.
@@ -61,8 +55,9 @@ export const POST = handler({
     // doesn't bill an Asia/Jerusalem org for tomorrow's recurring
     // payment overnight. Org `timezone` defaults to 'UTC'.
     const org = await Organization.findById(ctx!.organizationId)
-      .select('timezone')
-      .lean<{ timezone?: string }>()
+      .select(ORG_CONNECT_WITH_TIMEZONE_SELECT)
+      .lean<OrgStripeConnectFields & { timezone?: string }>()
+    const connect = getOrgStripeConnect(org)
     const today = startOfDayInTimeZone(org?.timezone)
 
     const results: any[] = []
@@ -125,6 +120,33 @@ export const POST = handler({
             continue
           }
 
+          // Connect migration: skip (do not advance schedule) when the org
+          // has not finished Connect onboarding or the saved card still
+          // references a platform-scoped PaymentMethod. pm_ ids cannot be
+          // migrated across Stripe accounts — the family must re-save.
+          if (isStripeConnectEnabled()) {
+            if (!connect) {
+              results.push({
+                recurringPaymentId: recurringPayment._id.toString(),
+                familyName: family?.name || 'Unknown',
+                status: 'skipped',
+                error:
+                  'Recurring billing paused — complete Stripe Connect onboarding in Settings → Billing.',
+              })
+              continue
+            }
+            if (isLegacyPlatformPaymentMethod(savedPaymentMethod)) {
+              results.push({
+                recurringPaymentId: recurringPayment._id.toString(),
+                familyName: family?.name || 'Unknown',
+                status: 'skipped',
+                error:
+                  'Recurring billing paused — saved card must be re-entered after Connect onboarding.',
+              })
+              continue
+            }
+          }
+
           // Atomic "claim" of the next billing period. We pre-advance
           // `nextPaymentDate` before charging so a concurrent cron run
           // skips this row instead of double-charging. If the charge
@@ -158,7 +180,10 @@ export const POST = handler({
             stripeCurrency,
           ])
 
-          const stripe = getStripe()
+          const stripe = getPlatformStripe()
+          if (!stripe) {
+            throw new Error('STRIPE_SECRET_KEY is not configured')
+          }
           let paymentIntent: Stripe.PaymentIntent
           try {
             paymentIntent = await stripe.paymentIntents.create(
@@ -185,7 +210,7 @@ export const POST = handler({
                   billingPeriod: billingPeriodKey,
                 },
               },
-              { idempotencyKey },
+              connectRequestOptions(connect, { idempotencyKey }),
             )
           } catch (chargeErr) {
             // Roll back our claim so the next cron tick can retry.
@@ -447,7 +472,7 @@ export const GET = handler({
           .populate({
             path: 'savedPaymentMethodId',
             select:
-              'last4 cardType expiryMonth expiryYear nameOnCard isDefault isActive organizationId',
+              'last4 cardType expiryMonth expiryYear nameOnCard isDefault isActive organizationId legacyPlatformAccount',
             match: { organizationId: ctx!.organizationId },
           })
           .sort({ nextPaymentDate: 1, _id: 1 })

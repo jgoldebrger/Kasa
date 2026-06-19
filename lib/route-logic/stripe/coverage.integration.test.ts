@@ -103,9 +103,7 @@ describe.sequential('stripe route-logic coverage', () => {
       delete process.env.STRIPE_WEBHOOK_SECRET
       vi.resetModules()
       const { POST } = await import('@/lib/route-logic/stripe/webhook')
-      const res = await POST(
-        webhookReq({ id: `evt_503_${Date.now()}`, type: 'ping', data: {} }),
-      )
+      const res = await POST(webhookReq({ id: `evt_503_${Date.now()}`, type: 'ping', data: {} }))
       expect(res.status).toBe(503)
       process.env.STRIPE_SECRET_KEY = prevKey ?? 'sk_test'
       process.env.STRIPE_WEBHOOK_SECRET = prevWh ?? 'whsec_test'
@@ -305,14 +303,20 @@ describe.sequential('stripe route-logic coverage', () => {
     it('skips payment_intent handlers when metadata or family is missing', async () => {
       const { POST } = await import('@/lib/route-logic/stripe/webhook')
 
-      for (const type of ['payment_intent.succeeded', 'payment_intent.canceled', 'payment_intent.payment_failed'] as const) {
+      for (const type of [
+        'payment_intent.succeeded',
+        'payment_intent.canceled',
+        'payment_intent.payment_failed',
+      ] as const) {
         expect(
           (
             await POST(
               webhookReq({
                 id: `evt_${type}_nometa_${Date.now()}`,
                 type,
-                data: { object: { id: `pi_nometatype${type.length}`, amount: 100, currency: 'usd' } },
+                data: {
+                  object: { id: `pi_nometatype${type.length}`, amount: 100, currency: 'usd' },
+                },
               }),
             )
           ).status,
@@ -355,13 +359,17 @@ describe.sequential('stripe route-logic coverage', () => {
         stripePaymentIntentId: piId,
       })
 
-      const findSpy = vi.spyOn(Payment, 'findOne').mockImplementation(async (...args: unknown[]) => {
-        const opts = args[2] as { includeDeleted?: boolean } | undefined
-        if (opts?.includeDeleted) {
-          throw new Error('db blip')
-        }
-        return (Payment.findOne as typeof Payment.findOne).bind(Payment)(...(args as Parameters<typeof Payment.findOne>))
-      })
+      const findSpy = vi
+        .spyOn(Payment, 'findOne')
+        .mockImplementation(async (...args: unknown[]) => {
+          const opts = args[2] as { includeDeleted?: boolean } | undefined
+          if (opts?.includeDeleted) {
+            throw new Error('db blip')
+          }
+          return (Payment.findOne as typeof Payment.findOne).bind(Payment)(
+            ...(args as Parameters<typeof Payment.findOne>),
+          )
+        })
       const deleteSpy = vi
         .spyOn(StripeWebhookEvent, 'deleteOne')
         .mockRejectedValueOnce(new Error('delete failed'))
@@ -460,7 +468,10 @@ describe.sequential('stripe route-logic coverage', () => {
     it('creates PI without active recurring (ratioVsRecurring stays null)', async () => {
       bindSession(ctx)
       const { RecurringPayment } = await import('@/lib/models')
-      await RecurringPayment.deleteMany({ organizationId: ctx.orgId, familyId: ctx.fixtures.familyId })
+      await RecurringPayment.deleteMany({
+        organizationId: ctx.orgId,
+        familyId: ctx.fixtures.familyId,
+      })
       const { POST } = await import('@/lib/route-logic/stripe/create-payment-intent')
       const res = await POST(
         orgJsonReq('/api/stripe/create-payment-intent', 'POST', {
@@ -570,7 +581,10 @@ describe.sequential('stripe route-logic coverage', () => {
       const piMonthly = `pi_monthly${Date.now()}`
       const { Payment, RecurringPayment, SavedPaymentMethod } = await import('@/lib/models')
       await Payment.deleteMany({ stripePaymentIntentId: piMonthly })
-      await RecurringPayment.deleteMany({ organizationId: ctx.orgId, familyId: ctx.fixtures.familyId })
+      await RecurringPayment.deleteMany({
+        organizationId: ctx.orgId,
+        familyId: ctx.fixtures.familyId,
+      })
 
       vi.mocked(client.paymentIntents.retrieve).mockResolvedValueOnce({
         id: piMonthly,
@@ -628,7 +642,10 @@ describe.sequential('stripe route-logic coverage', () => {
       )
       expect(updateRec.status).toBe(200)
       await Payment.deleteMany({ stripePaymentIntentId: { $in: [piMonthly, piMonthly2] } })
-      await RecurringPayment.deleteMany({ organizationId: ctx.orgId, familyId: ctx.fixtures.familyId })
+      await RecurringPayment.deleteMany({
+        organizationId: ctx.orgId,
+        familyId: ctx.fixtures.familyId,
+      })
       await SavedPaymentMethod.updateMany(
         { _id: ctx.fixtures.savedPaymentMethodId },
         { $set: { isActive: true } },
@@ -688,6 +705,84 @@ describe.sequential('stripe route-logic coverage', () => {
       )
       expect(okMember.status).toBe(200)
       await Payment.deleteMany({ stripePaymentIntentId: { $in: [piId, withMember] } })
+    })
+  })
+
+  describe('stripe connect', () => {
+    it('returns connect disabled when STRIPE_CONNECT_ENABLED is off', async () => {
+      const prev = process.env.STRIPE_CONNECT_ENABLED
+      delete process.env.STRIPE_CONNECT_ENABLED
+      vi.resetModules()
+      bindSession(ctx)
+      const { GET } = await import('@/lib/route-logic/stripe/connect/status')
+      const res = await GET(orgJsonReq('/api/stripe/connect/status', 'GET'))
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.connectEnabled).toBe(false)
+      process.env.STRIPE_CONNECT_ENABLED = prev
+      vi.resetModules()
+    })
+
+    it('onboards Express account and syncs account.updated webhook', async () => {
+      const prev = process.env.STRIPE_CONNECT_ENABLED
+      process.env.STRIPE_CONNECT_ENABLED = 'true'
+      vi.resetModules()
+      bindSession(ctx, 'owner')
+
+      const { Organization } = await import('@/lib/models')
+      await Organization.findByIdAndUpdate(ctx.orgId, {
+        $set: {
+          stripeConnectAccountId: null,
+          stripeConnectOnboardingStatus: 'not_started',
+          stripeConnectChargesEnabled: false,
+          stripeConnectPayoutsEnabled: false,
+          stripeConnectDetailsSubmitted: false,
+        },
+      })
+
+      const { POST: onboard } = await import('@/lib/route-logic/stripe/connect/onboard')
+      const onboardRes = await onboard(orgJsonReq('/api/stripe/connect/onboard', 'POST'))
+      expect(onboardRes.status).toBe(200)
+      const onboardBody = await onboardRes.json()
+      expect(onboardBody.url).toMatch(/stripe\.com/)
+
+      const orgAfter = await Organization.findById(ctx.orgId).lean<{
+        stripeConnectAccountId?: string | null
+      }>()
+      expect(orgAfter?.stripeConnectAccountId).toBe('acct_probe_mock')
+
+      const { POST: webhook } = await import('@/lib/route-logic/stripe/webhook')
+      const accountEvent = {
+        id: `evt_acct_upd_${Date.now()}`,
+        type: 'account.updated',
+        data: {
+          object: {
+            id: 'acct_probe_mock',
+            charges_enabled: true,
+            payouts_enabled: true,
+            details_submitted: true,
+            requirements: { currently_due: [], past_due: [], disabled_reason: null },
+          },
+        },
+      }
+      expect((await webhook(webhookReq(accountEvent))).status).toBe(200)
+
+      const orgSynced = await Organization.findById(ctx.orgId).lean<{
+        stripeConnectChargesEnabled?: boolean
+        stripeConnectOnboardingStatus?: string
+      }>()
+      expect(orgSynced?.stripeConnectChargesEnabled).toBe(true)
+      expect(orgSynced?.stripeConnectOnboardingStatus).toBe('complete')
+
+      const { GET: status } = await import('@/lib/route-logic/stripe/connect/status')
+      const statusRes = await status(orgJsonReq('/api/stripe/connect/status', 'GET'))
+      expect(statusRes.status).toBe(200)
+      const statusBody = await statusRes.json()
+      expect(statusBody.connectEnabled).toBe(true)
+      expect(statusBody.stripeConnectOnboardingStatus).toBe('complete')
+
+      process.env.STRIPE_CONNECT_ENABLED = prev
+      vi.resetModules()
     })
   })
 })

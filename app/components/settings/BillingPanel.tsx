@@ -8,6 +8,7 @@ import { Button, SkeletonRows } from '@/app/components/ui'
 import { useToast } from '@/app/components/Toast'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { PLAN_DEFINITIONS } from '@/lib/billing/plans'
+import StripeConnectPanel from '@/app/components/settings/StripeConnectPanel'
 
 export interface BillingSnapshot {
   planTier?: string | null
@@ -101,8 +102,7 @@ export default function BillingPanel({
     }
   }, [toast])
 
-  const planName =
-    PLAN_DEFINITIONS.find((p) => p.tier === billing?.planTier)?.name ?? 'None'
+  const planName = PLAN_DEFINITIONS.find((p) => p.tier === billing?.planTier)?.name ?? 'None'
 
   if (loading) {
     return <SkeletonRows count={4} />
@@ -128,7 +128,9 @@ export default function BillingPanel({
           </div>
           <div>
             <dt className="text-fg-muted">Status</dt>
-            <dd className="font-medium text-fg capitalize">{formatStatus(billing?.subscriptionStatus)}</dd>
+            <dd className="font-medium text-fg capitalize">
+              {formatStatus(billing?.subscriptionStatus)}
+            </dd>
           </div>
           <div>
             <dt className="text-fg-muted">Trial ends</dt>
@@ -170,6 +172,8 @@ export default function BillingPanel({
           Only the organization owner can start or change the platform subscription.
         </p>
       )}
+
+      <StripeConnectPanel canManage={canManage} isOwner={isOwner} />
     </div>
   )
 }

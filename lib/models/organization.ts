@@ -5,6 +5,8 @@ const OrganizationSchema = new Schema(
     name: { type: String, required: true },
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
     ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    // Set when the owner completes the first-run setup wizard (/setup).
+    setupCompletedAt: { type: Date, default: null },
     // Per-org custom branding. Logo is stored as a data URL on the doc itself
     // (capped at ~200KB after server-side resize) to avoid taking on a blob
     // storage dependency. See lib/branding.ts and /api/organizations/branding.
@@ -93,6 +95,18 @@ const OrganizationSchema = new Schema(
     // Platform subscription billing (Kasa → org). Distinct from member
     // card charges handled by /api/stripe/*. Synced from Stripe
     // `customer.subscription.*` webhooks; checkout seeds stripeCustomerId.
+    // Stripe Connect (Express) — member dues settle to the org's connected
+    // account when STRIPE_CONNECT_ENABLED=true. Platform subscription billing
+    // continues to use stripeCustomerId on the platform account.
+    stripeConnectAccountId: { type: String, default: null, index: true, sparse: true },
+    stripeConnectOnboardingStatus: {
+      type: String,
+      enum: ['not_started', 'pending', 'complete', 'restricted'],
+      default: 'not_started',
+    },
+    stripeConnectChargesEnabled: { type: Boolean, default: false },
+    stripeConnectPayoutsEnabled: { type: Boolean, default: false },
+    stripeConnectDetailsSubmitted: { type: Boolean, default: false },
     stripeCustomerId: { type: String, default: null, index: true, sparse: true },
     subscriptionId: { type: String, default: null, index: true, sparse: true },
     planTier: {

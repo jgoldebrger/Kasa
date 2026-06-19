@@ -1,7 +1,11 @@
 import crypto from 'crypto'
 import { Types } from 'mongoose'
 import { InviteRequest } from '@/lib/models'
-import { sendPlatformEmail, isPlatformEmailConfigured } from '@/lib/platform-email'
+import {
+  sendPlatformEmail,
+  isPlatformEmailConfigured,
+  sendInviteRequestRejectionEmail,
+} from '@/lib/platform-email'
 import { escapeHtml } from '@/lib/html-escape'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { collectCompoundCursorPages } from '@/lib/pagination'
@@ -52,6 +56,7 @@ export const GET = handler({
           id: r._id.toString(),
           email: r.email,
           name: r.name,
+          orgName: r.orgName?.trim() || null,
           message: r.message,
           status: r.status,
           signupCode: r.signupCode || null,
@@ -103,15 +108,31 @@ export const PATCH = handler({
     const userId = session!.user.id
 
     if (action === 'reject') {
-      req.status = 'rejected'
-      req.rejectReason =
+      const rejectReason =
         typeof body.rejectReason === 'string' ? body.rejectReason.slice(0, 500) : ''
+      req.status = 'rejected'
+      req.rejectReason = rejectReason
       req.reviewedById = new Types.ObjectId(userId)
       req.reviewedAt = new Date()
       req.signupCode = undefined
       req.signupCodeExpiresAt = undefined
       await req.save()
-      return { data: { ok: true, status: req.status } }
+
+      let emailResult: { sent: boolean; reason?: string; error?: string } = {
+        sent: false,
+        reason: 'not attempted',
+      }
+      if (isPlatformEmailConfigured()) {
+        emailResult = await sendInviteRequestRejectionEmail({
+          to: req.email,
+          name: req.name,
+          rejectReason,
+        })
+      } else {
+        emailResult = { sent: false, reason: 'platform SMTP not configured' }
+      }
+
+      return { data: { ok: true, status: req.status, email: emailResult } }
     }
 
     if (req.usedAt) {

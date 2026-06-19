@@ -47,7 +47,14 @@ export const GET = handler({
     ) {
       return { data: { valid: false } }
     }
-    return { data: { valid: true, email: req.email, name: req.name } }
+    return {
+      data: {
+        valid: true,
+        email: req.email,
+        name: req.name,
+        orgName: req.orgName?.trim() || null,
+      },
+    }
   },
 })
 
@@ -96,8 +103,11 @@ export const POST = handler({
     const hashedPassword = await bcrypt.hash(body.password, 12)
     const user = await User.create({ email, hashedPassword, name: body.name })
 
+    const orgName = req.orgName?.trim() || undefined
+    let createdOrgName: string | undefined
     try {
-      await createPersonalOrganization(user._id.toString(), body.name)
+      const org = await createPersonalOrganization(user._id.toString(), body.name, orgName)
+      createdOrgName = org.name
     } catch (orgErr) {
       logError(orgErr, { module: 'signup', phase: 'createPersonalOrganization' })
     }
@@ -116,6 +126,6 @@ export const POST = handler({
       request,
     })
 
-    return { data: { ok: true, email } }
+    return { data: { ok: true, email, orgName: createdOrgName || orgName || null } }
   },
 })

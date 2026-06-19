@@ -39,10 +39,10 @@ export interface SendResult {
 export function isPlatformEmailConfigured(): boolean {
   return Boolean(
     process.env.PLATFORM_SMTP_HOST &&
-      process.env.PLATFORM_SMTP_PORT &&
-      process.env.PLATFORM_SMTP_USER &&
-      process.env.PLATFORM_SMTP_PASS &&
-      process.env.PLATFORM_SMTP_FROM,
+    process.env.PLATFORM_SMTP_PORT &&
+    process.env.PLATFORM_SMTP_USER &&
+    process.env.PLATFORM_SMTP_PASS &&
+    process.env.PLATFORM_SMTP_FROM,
   )
 }
 
@@ -98,7 +98,9 @@ export async function notifyPlatformAdminsOfInviteRequest(
 ): Promise<void> {
   const admins = getPlatformAdminEmails()
   if (admins.length === 0) {
-    console.warn('[request-invite] PLATFORM_ADMIN_EMAILS not configured; admin notification not sent.')
+    console.warn(
+      '[request-invite] PLATFORM_ADMIN_EMAILS not configured; admin notification not sent.',
+    )
     return
   }
 
@@ -148,4 +150,43 @@ export async function notifyPlatformAdminsOfInviteRequest(
       )
     }
   }
+}
+
+export interface InviteRequestRejectionEmail {
+  to: string
+  name: string
+  rejectReason?: string
+}
+
+/**
+ * Notify a visitor that their signup request was rejected.
+ */
+export async function sendInviteRequestRejectionEmail(
+  input: InviteRequestRejectionEmail,
+): Promise<SendResult> {
+  if (!isPlatformEmailConfigured()) {
+    return { sent: false, reason: 'platform SMTP not configured' }
+  }
+
+  const reasonBlock = input.rejectReason?.trim()
+  const reasonText = reasonBlock ? `\n\nReason: ${reasonBlock}\n` : ''
+  const reasonHtml = reasonBlock ? `<p><strong>Reason:</strong> ${escapeHtml(reasonBlock)}</p>` : ''
+
+  return sendPlatformEmail({
+    to: input.to,
+    subject: 'Update on your Kasa invitation request',
+    text:
+      `Hi ${input.name},\n\n` +
+      `Thank you for your interest in Kasa. After reviewing your request, we're unable to approve access at this time.${reasonText}\n` +
+      `If you believe this was a mistake, you can reply to this email or submit a new request later.\n`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; line-height: 1.6; color: #222;">
+        <h2 style="margin: 0 0 12px;">Update on your invitation request</h2>
+        <p>Hi ${escapeHtml(input.name)},</p>
+        <p>Thank you for your interest in Kasa. After reviewing your request, we're unable to approve access at this time.</p>
+        ${reasonHtml}
+        <p style="color:#888;font-size:12px;margin-top:30px;">If you believe this was a mistake, you can reply to this email or submit a new request later.</p>
+      </div>
+    `,
+  })
 }

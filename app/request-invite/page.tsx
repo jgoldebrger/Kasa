@@ -16,6 +16,7 @@ export default function RequestInvitePage() {
 
   const schema = z.object({
     name: z.string().trim().min(2, t('requestInvite.validation.nameMin')).max(100),
+    orgName: z.string().trim().min(2, t('requestInvite.validation.orgNameMin')).max(200),
     email: z.string().trim().toLowerCase().email(t('requestInvite.validation.email')),
     message: z
       .string()
@@ -27,7 +28,7 @@ export default function RequestInvitePage() {
 
   const form = useFormState({
     schema,
-    initialValues: { name: '', email: '', message: '' },
+    initialValues: { name: '', orgName: '', email: '', message: '' },
     onSubmit: async (values) => {
       try {
         const res = await fetch('/api/auth/request-invite', {
@@ -95,6 +96,16 @@ export default function RequestInvitePage() {
                 autoComplete="name"
                 placeholder={t('signup.namePlaceholder')}
                 {...form.register('name')}
+              />
+
+              <Input
+                label={t('requestInvite.orgNameLabel')}
+                type="text"
+                required
+                autoComplete="organization"
+                placeholder={t('requestInvite.orgNamePlaceholder')}
+                hint={t('requestInvite.orgNameHint')}
+                {...form.register('orgName')}
               />
 
               <Input

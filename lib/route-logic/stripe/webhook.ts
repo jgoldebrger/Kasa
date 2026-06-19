@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import https from 'https'
 import connectDB from '@/lib/database'
 import { Payment, Task, Family, Organization, StripeWebhookEvent } from '@/lib/models'
 import { audit } from '@/lib/audit'
@@ -18,6 +17,7 @@ import {
   handleCheckoutSessionCompleted,
   syncSubscriptionToOrganization,
 } from '@/lib/billing/subscription-webhook'
+import { getPlatformStripe, syncOrgConnectFieldsFromAccount } from '@/lib/stripe/client'
 
 // Stripe webhook event retention: how long after we first process an
 // event.id we keep the dedup record. Stripe retries for up to ~3 days
@@ -36,6 +36,7 @@ const DEDUP_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
  *   - `payment_intent.payment_failed` → open a Task so admins can chase
  *   - `checkout.session.completed`      → seed org stripeCustomerId
  *   - `customer.subscription.*`         → sync org planTier / status
+ *   - `account.updated`                 → sync Connect onboarding flags
  *
  * The body MUST be read as a raw buffer (not parsed JSON) for signature
  * verification, hence the manual `request.text()` + utf-8 conversion.
@@ -44,19 +45,13 @@ const DEDUP_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
  * Stripe to retry forever on receipts created outside Kasa.
  */
 
-const httpsAgent = new https.Agent({
-  rejectUnauthorized: process.env.NODE_ENV === 'production',
-})
-
-const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
-      httpAgent: httpsAgent,
-      maxNetworkRetries: 2,
-      timeout: 30000,
-    })
-  : null
-
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET
+
+/** Connect events include `event.account` — scope Stripe API lookups. */
+function webhookRequestOptions(event: Stripe.Event): Stripe.RequestOptions | undefined {
+  if (!event.account) return undefined
+  return { stripeAccount: event.account }
+}
 
 async function formatOrgMoney(organizationId: string, amount: number): Promise<string> {
   const moneyCtx = await getOrgMoneyContext(String(organizationId))
@@ -64,6 +59,7 @@ async function formatOrgMoney(organizationId: string, amount: number): Promise<s
 }
 
 export async function POST(request: NextRequest) {
+  const stripe = getPlatformStripe()
   if (!stripe || !WEBHOOK_SECRET) {
     console.error('[stripe/webhook] Missing STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET')
     return NextResponse.json({ error: 'Stripe webhook not configured' }, { status: 503 })
@@ -110,17 +106,17 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
       case 'charge.refunded': {
         const charge = event.data.object as Stripe.Charge
-        await handleChargeRefunded(charge)
+        await handleChargeRefunded(charge, event)
         break
       }
       case 'charge.dispute.created': {
         const dispute = event.data.object as Stripe.Dispute
-        await handleDisputeCreated(dispute)
+        await handleDisputeCreated(dispute, event)
         break
       }
       case 'charge.dispute.closed': {
         const dispute = event.data.object as Stripe.Dispute
-        await handleDisputeClosed(dispute)
+        await handleDisputeClosed(dispute, event)
         break
       }
       case 'payment_intent.succeeded': {
@@ -140,12 +136,12 @@ export async function POST(request: NextRequest) {
       }
       case 'charge.dispute.funds_withdrawn': {
         const dispute = event.data.object as Stripe.Dispute
-        await handleDisputeFundsWithdrawn(dispute)
+        await handleDisputeFundsWithdrawn(dispute, event)
         break
       }
       case 'charge.dispute.funds_reinstated': {
         const dispute = event.data.object as Stripe.Dispute
-        await handleDisputeFundsReinstated(dispute)
+        await handleDisputeFundsReinstated(dispute, event)
         break
       }
       case 'checkout.session.completed': {
@@ -162,6 +158,11 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription
         await syncSubscriptionToOrganization(subscription)
+        break
+      }
+      case 'account.updated': {
+        const account = event.data.object as Stripe.Account
+        await handleAccountUpdated(account)
         break
       }
       default:
@@ -183,18 +184,13 @@ export async function POST(request: NextRequest) {
     // refund webhook hitting a brief Mongo outage was lost forever
     // even though Stripe was willing to retry. Sentry still captures
     // the underlying error for human follow-up.
-    return NextResponse.json(
-      { received: false, error: 'handler-error' },
-      { status: 500 },
-    )
+    return NextResponse.json({ received: false, error: 'handler-error' }, { status: 500 })
   }
 }
 
-async function handleChargeRefunded(charge: Stripe.Charge) {
+async function handleChargeRefunded(charge: Stripe.Charge, event: Stripe.Event) {
   const paymentIntentId =
-    typeof charge.payment_intent === 'string'
-      ? charge.payment_intent
-      : charge.payment_intent?.id
+    typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id
   if (!paymentIntentId) return
 
   // Look through soft-deleted Payment rows too. If an admin trashed
@@ -205,11 +201,9 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
   // though Stripe has fully refunded it. The compound unique partial
   // index excludes deletedAt:null rows, so it's safe to find a
   // soft-deleted row by PI alone.
-  const payment = await Payment.findOne(
-    { stripePaymentIntentId: paymentIntentId },
-    null,
-    { includeDeleted: true },
-  )
+  const payment = await Payment.findOne({ stripePaymentIntentId: paymentIntentId }, null, {
+    includeDeleted: true,
+  })
   if (!payment) return
 
   // `amount_refunded` is cumulative for the charge. Only update
@@ -252,12 +246,15 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
 async function syncPaymentRefundFromStripeCharge(
   payment: InstanceType<typeof Payment>,
   chargeId: string,
+  event: Stripe.Event,
   disputeStatus?: string,
 ): Promise<void> {
+  const stripe = getPlatformStripe()
   if (!stripe) return
+  const requestOpts = webhookRequestOptions(event)
   let charge: Stripe.Charge
   try {
-    charge = await stripe.charges.retrieve(chargeId)
+    charge = await stripe.charges.retrieve(chargeId, requestOpts)
   } catch {
     return
   }
@@ -278,14 +275,16 @@ async function syncPaymentRefundFromStripeCharge(
   scheduleYearlyCalculationRefreshForPayment(payment)
 }
 
-async function handleDisputeCreated(dispute: Stripe.Dispute) {
+async function handleDisputeCreated(dispute: Stripe.Dispute, event: Stripe.Event) {
   const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge?.id
+  const stripe = getPlatformStripe()
   if (!chargeId || !stripe) return
 
   // Resolve charge → payment_intent so we can find our Payment row.
   let paymentIntentId: string | undefined
+  const requestOpts = webhookRequestOptions(event)
   try {
-    const charge = await stripe.charges.retrieve(chargeId)
+    const charge = await stripe.charges.retrieve(chargeId, requestOpts)
     paymentIntentId =
       typeof charge.payment_intent === 'string'
         ? charge.payment_intent
@@ -297,11 +296,9 @@ async function handleDisputeCreated(dispute: Stripe.Dispute) {
 
   // Include soft-deleted payments — see comment in handleChargeRefunded.
   // A dispute against a trashed Payment must still be tracked.
-  const payment = await Payment.findOne(
-    { stripePaymentIntentId: paymentIntentId },
-    null,
-    { includeDeleted: true },
-  )
+  const payment = await Payment.findOne({ stripePaymentIntentId: paymentIntentId }, null, {
+    includeDeleted: true,
+  })
   if (!payment) return
 
   payment.disputedAt = new Date()
@@ -361,13 +358,15 @@ async function handleDisputeCreated(dispute: Stripe.Dispute) {
   })
 }
 
-async function handleDisputeClosed(dispute: Stripe.Dispute) {
+async function handleDisputeClosed(dispute: Stripe.Dispute, event: Stripe.Event) {
   const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge?.id
+  const stripe = getPlatformStripe()
   if (!chargeId || !stripe) return
 
   let paymentIntentId: string | undefined
+  const requestOpts = webhookRequestOptions(event)
   try {
-    const charge = await stripe.charges.retrieve(chargeId)
+    const charge = await stripe.charges.retrieve(chargeId, requestOpts)
     paymentIntentId =
       typeof charge.payment_intent === 'string'
         ? charge.payment_intent
@@ -377,11 +376,9 @@ async function handleDisputeClosed(dispute: Stripe.Dispute) {
   }
   if (!paymentIntentId) return
 
-  const payment = await Payment.findOne(
-    { stripePaymentIntentId: paymentIntentId },
-    null,
-    { includeDeleted: true },
-  )
+  const payment = await Payment.findOne({ stripePaymentIntentId: paymentIntentId }, null, {
+    includeDeleted: true,
+  })
   if (!payment) return
 
   payment.disputeStatus = dispute.status || 'closed'
@@ -401,10 +398,10 @@ async function handleDisputeClosed(dispute: Stripe.Dispute) {
     // is only the disputed slice, so a prior partial refund plus a lost
     // chargeback would under-state `refundedAmount` if we stamped
     // `dispute.amount` alone.
-    await syncPaymentRefundFromStripeCharge(payment, chargeId, dispute.status || 'lost')
+    await syncPaymentRefundFromStripeCharge(payment, chargeId, event, dispute.status || 'lost')
     return
   } else if (dispute.status === 'won') {
-    await syncPaymentRefundFromStripeCharge(payment, chargeId, dispute.status || 'won')
+    await syncPaymentRefundFromStripeCharge(payment, chargeId, event, dispute.status || 'won')
     return
   }
   await payment.save()
@@ -418,13 +415,15 @@ async function handleDisputeClosed(dispute: Stripe.Dispute) {
  * `funds_reinstated`. We mirror it into `refundedAmount` so the family
  * balance reflects reality in real time.
  */
-async function handleDisputeFundsWithdrawn(dispute: Stripe.Dispute) {
+async function handleDisputeFundsWithdrawn(dispute: Stripe.Dispute, event: Stripe.Event) {
   const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge?.id
+  const stripe = getPlatformStripe()
   if (!chargeId || !stripe) return
 
   let paymentIntentId: string | undefined
+  const requestOpts = webhookRequestOptions(event)
   try {
-    const charge = await stripe.charges.retrieve(chargeId)
+    const charge = await stripe.charges.retrieve(chargeId, requestOpts)
     paymentIntentId =
       typeof charge.payment_intent === 'string'
         ? charge.payment_intent
@@ -434,16 +433,15 @@ async function handleDisputeFundsWithdrawn(dispute: Stripe.Dispute) {
   }
   if (!paymentIntentId) return
 
-  const payment = await Payment.findOne(
-    { stripePaymentIntentId: paymentIntentId },
-    null,
-    { includeDeleted: true },
-  )
+  const payment = await Payment.findOne({ stripePaymentIntentId: paymentIntentId }, null, {
+    includeDeleted: true,
+  })
   if (!payment) return
 
   await syncPaymentRefundFromStripeCharge(
     payment,
     chargeId,
+    event,
     dispute.status || 'funds_withdrawn',
   )
 }
@@ -453,13 +451,15 @@ async function handleDisputeFundsWithdrawn(dispute: Stripe.Dispute) {
  * the merchant wins. Mirror the updated `charge.amount_refunded` so the
  * family balance stops reflecting a withdrawal that was reversed.
  */
-async function handleDisputeFundsReinstated(dispute: Stripe.Dispute) {
+async function handleDisputeFundsReinstated(dispute: Stripe.Dispute, event: Stripe.Event) {
   const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge?.id
+  const stripe = getPlatformStripe()
   if (!chargeId || !stripe) return
 
   let paymentIntentId: string | undefined
+  const requestOpts = webhookRequestOptions(event)
   try {
-    const charge = await stripe.charges.retrieve(chargeId)
+    const charge = await stripe.charges.retrieve(chargeId, requestOpts)
     paymentIntentId =
       typeof charge.payment_intent === 'string'
         ? charge.payment_intent
@@ -469,14 +469,12 @@ async function handleDisputeFundsReinstated(dispute: Stripe.Dispute) {
   }
   if (!paymentIntentId) return
 
-  const payment = await Payment.findOne(
-    { stripePaymentIntentId: paymentIntentId },
-    null,
-    { includeDeleted: true },
-  )
+  const payment = await Payment.findOne({ stripePaymentIntentId: paymentIntentId }, null, {
+    includeDeleted: true,
+  })
   if (!payment) return
 
-  await syncPaymentRefundFromStripeCharge(payment, chargeId, dispute.status || 'won')
+  await syncPaymentRefundFromStripeCharge(payment, chargeId, event, dispute.status || 'won')
 }
 
 /**
@@ -569,9 +567,7 @@ async function handlePaymentIntentSucceeded(intent: Stripe.PaymentIntent) {
   // outage with retries flowing into January) booking the payment
   // under the wrong calendar year throws off the yearly-calculation
   // snapshot and the org's tax receipts for that family.
-  const paidAt = typeof intent.created === 'number'
-    ? new Date(intent.created * 1000)
-    : new Date()
+  const paidAt = typeof intent.created === 'number' ? new Date(intent.created * 1000) : new Date()
 
   // Derive `year` in the org's wall-clock timezone — same fix shape
   // as confirm-payment and charge-saved-card. Without this, a card
@@ -646,8 +642,7 @@ async function handlePaymentIntentFailed(intent: Stripe.PaymentIntent) {
     organizationId,
     title: `Recurring charge failed: ${formattedAmount}`,
     description:
-      `Stripe could not charge ${family.name || 'family'}'s saved card. ` +
-      `Reason: ${errMsg}.`,
+      `Stripe could not charge ${family.name || 'family'}'s saved card. ` + `Reason: ${errMsg}.`,
     dueDate: new Date(),
     email: family.email || 'admin@kasa.com',
     status: 'pending',
@@ -662,6 +657,27 @@ async function handlePaymentIntentFailed(intent: Stripe.PaymentIntent) {
     body: errMsg,
     link: '/tasks',
     metadata: { paymentIntentId: intent.id, familyId },
+  })
+}
+
+async function handleAccountUpdated(account: Stripe.Account) {
+  const org = await Organization.findOne({ stripeConnectAccountId: account.id })
+  if (!org) return
+
+  syncOrgConnectFieldsFromAccount(org, account)
+  await org.save()
+
+  await audit({
+    organizationId: org._id?.toString(),
+    action: 'stripe.connect.account_updated',
+    resourceType: 'Organization',
+    resourceId: org._id,
+    metadata: {
+      stripeConnectAccountId: account.id,
+      chargesEnabled: org.stripeConnectChargesEnabled,
+      payoutsEnabled: org.stripeConnectPayoutsEnabled,
+      onboardingStatus: org.stripeConnectOnboardingStatus,
+    },
   })
 }
 

@@ -146,6 +146,11 @@ export async function seedApiRouteFixtures(): Promise<ApiTestContext> {
     timezone: 'UTC',
     currency: 'USD',
     locale: 'en-US',
+    stripeConnectAccountId: 'acct_test_api_route_seed',
+    stripeConnectOnboardingStatus: 'complete',
+    stripeConnectChargesEnabled: true,
+    stripeConnectPayoutsEnabled: true,
+    stripeConnectDetailsSubmitted: true,
   })
 
   const betaOrg = await Organization.create({

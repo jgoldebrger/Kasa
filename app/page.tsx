@@ -1,8 +1,9 @@
 import { Suspense } from 'react'
+import { redirect } from 'next/navigation'
 import { requireServerOrgContext } from '@/lib/auth-server'
 import { hasMinRole } from '@/lib/auth-helpers'
 import connectDB from '@/lib/database'
-import { Family, FamilyMember, YearlyCalculation } from '@/lib/models'
+import { Organization, Family, FamilyMember, YearlyCalculation } from '@/lib/models'
 import { calculateYearlyExpenses } from '@/lib/calculations'
 import { loadSetupProgress } from '@/lib/organizations/setup-progress-data'
 import DashboardView from './DashboardView'
@@ -66,6 +67,17 @@ async function fetchInitialDashboardData(organizationId: string, includeFinancia
 
 async function DashboardServer() {
   const ctx = await requireServerOrgContext()
+
+  if (hasMinRole(ctx.role, 'owner')) {
+    await connectDB()
+    const org = await Organization.findById(ctx.organizationId)
+      .select('setupCompletedAt')
+      .lean<{ setupCompletedAt?: Date | null }>()
+    if (!org?.setupCompletedAt) {
+      redirect('/setup')
+    }
+  }
+
   const showFinancials = hasMinRole(ctx.role, 'admin')
   try {
     const data = await fetchInitialDashboardData(ctx.organizationId, showFinancials)

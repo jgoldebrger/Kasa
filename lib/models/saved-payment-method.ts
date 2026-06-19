@@ -1,17 +1,29 @@
 import mongoose, { Schema } from 'mongoose'
 
-const SavedPaymentMethodSchema = new Schema({
-  organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
-  familyId: { type: Schema.Types.ObjectId, ref: 'Family', required: true },
-  stripePaymentMethodId: { type: String, required: true }, // Stripe payment method ID
-  last4: { type: String, required: true }, // Last 4 digits
-  cardType: { type: String, required: true }, // Visa, Mastercard, etc.
-  expiryMonth: { type: Number, required: true },
-  expiryYear: { type: Number, required: true },
-  nameOnCard: String,
-  isDefault: { type: Boolean, default: false },
-  isActive: { type: Boolean, default: true },
-}, { timestamps: true })
+const SavedPaymentMethodSchema = new Schema(
+  {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: true,
+      index: true,
+    },
+    familyId: { type: Schema.Types.ObjectId, ref: 'Family', required: true },
+    stripePaymentMethodId: { type: String, required: true }, // Stripe payment method ID
+    last4: { type: String, required: true }, // Last 4 digits
+    cardType: { type: String, required: true }, // Visa, Mastercard, etc.
+    expiryMonth: { type: Number, required: true },
+    expiryYear: { type: Number, required: true },
+    nameOnCard: String,
+    isDefault: { type: Boolean, default: false },
+    isActive: { type: Boolean, default: true },
+    // When Stripe Connect is enabled, cards saved on the platform account
+    // before migration cannot be charged (pm_ ids are account-scoped). New
+    // cards saved after Connect onboarding set this to false.
+    legacyPlatformAccount: { type: Boolean, default: true },
+  },
+  { timestamps: true },
+)
 // Family payment-methods list filters by `{ organizationId, familyId,
 // isActive }`. Without this index every charge-saved-card call did a
 // per-org scan.
@@ -25,4 +37,6 @@ SavedPaymentMethodSchema.index(
   { unique: true, partialFilterExpression: { isActive: true } },
 )
 
-export const SavedPaymentMethod = mongoose.models.SavedPaymentMethod || mongoose.model('SavedPaymentMethod', SavedPaymentMethodSchema)
+export const SavedPaymentMethod =
+  mongoose.models.SavedPaymentMethod ||
+  mongoose.model('SavedPaymentMethod', SavedPaymentMethodSchema)

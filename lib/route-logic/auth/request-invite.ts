@@ -18,7 +18,10 @@ export const POST = handler({
   auth: 'public',
   name: 'POST /api/auth/request-invite',
   fn: async ({ request }) => {
-    const ipVerdict = await checkRateLimit(request, 'request-invite', { limit: 5, windowMs: 15 * 60_000 })
+    const ipVerdict = await checkRateLimit(request, 'request-invite', {
+      limit: 5,
+      windowMs: 15 * 60_000,
+    })
     if (!ipVerdict.allowed) {
       return { status: 429, data: { error: 'Too many requests. Try again later.' } }
     }
@@ -31,14 +34,16 @@ export const POST = handler({
     const email = typeof body.email === 'string' ? body.email.toLowerCase().trim() : ''
     const name = typeof body.name === 'string' ? body.name.trim() : ''
     const message = typeof body.message === 'string' ? body.message.trim().slice(0, 1000) : ''
-    const orgName =
-      typeof body.orgName === 'string' ? body.orgName.trim().slice(0, 200) : ''
+    const orgName = typeof body.orgName === 'string' ? body.orgName.trim().slice(0, 200) : ''
 
     if (!name || name.length < 2 || name.length > 100) {
       return { status: 400, data: { error: 'Name must be 2-100 characters' } }
     }
     if (!EMAIL_RE.test(email) || email.length > 254) {
       return { status: 400, data: { error: 'Invalid email address' } }
+    }
+    if (!orgName || orgName.length < 2) {
+      return { status: 400, data: { error: 'Organization name must be 2-200 characters' } }
     }
 
     // Per-email cap so an attacker rotating IPs can't churn requests for
@@ -71,13 +76,14 @@ export const POST = handler({
     if (existing) {
       if (existing.status === 'pending') {
         existing.name = name
+        existing.orgName = orgName
         existing.message = message
         await existing.save()
       }
       return { data: { ok: true } }
     }
 
-    await InviteRequest.create({ email, name, message, status: 'pending' })
+    await InviteRequest.create({ email, name, orgName, message, status: 'pending' })
 
     await notifyPlatformAdminsOfInviteRequest({
       name,
