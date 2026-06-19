@@ -217,9 +217,26 @@ function LoginForm() {
   )
 }
 
+function LoginFallback() {
+  return (
+    <div
+      className="min-h-screen flex items-center justify-center p-4 bg-app"
+      aria-busy="true"
+      aria-label="Loading sign in"
+    >
+      <div className="w-full max-w-sm space-y-4">
+        <div className="h-10 w-10 rounded-lg bg-app-subtle mx-auto" />
+        <div className="h-8 rounded-md bg-app-subtle" />
+        <div className="h-10 rounded-md bg-app-subtle" />
+        <div className="h-10 rounded-md bg-app-subtle" />
+      </div>
+    </div>
+  )
+}
+
 export default function LoginPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<LoginFallback />}>
       <LoginForm />
     </Suspense>
   )

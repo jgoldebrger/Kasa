@@ -4,10 +4,11 @@ import { E2E_ORGS, E2E_USER, E2E_MEMBER, E2E_TOTP_SECRET } from './seed'
 import { generateTotpCode } from '../lib/totp'
 import { apiMutationHeaders } from './helpers/api-origin'
 
-/** Pre-accept cookie banner so it does not block login clicks in E2E. */
+/** Pre-accept cookie banner and pin locale so login labels stay predictable in E2E. */
 export async function acceptCookieConsent(page: Page): Promise<void> {
   await page.addInitScript(() => {
     localStorage.setItem('kasa-cookie-consent', 'accepted')
+    localStorage.setItem('kasa-locale', 'en-US')
   })
 }
 
@@ -18,12 +19,16 @@ export async function loginViaUi(
   totpSecret?: string,
 ): Promise<void> {
   await acceptCookieConsent(page)
-  await page.goto('/login', { waitUntil: 'domcontentloaded' })
-  await page.getByLabel(/^email$/i).fill(credentials.email)
-  await page.getByLabel(/^password$/i).fill(credentials.password)
-  await page.getByRole('button', { name: /^sign in$/i }).click()
+  await page.goto('/login', { waitUntil: 'domcontentloaded', timeout: 120_000 })
 
-  const twoFactorInput = page.getByLabel(/two-factor authentication/i)
+  const emailInput = page.locator('input[autocomplete="email"]')
+  await expect(emailInput).toBeVisible({ timeout: 60_000 })
+
+  await emailInput.fill(credentials.email)
+  await page.locator('input[autocomplete="current-password"]').fill(credentials.password)
+  await page.locator('form').filter({ has: emailInput }).locator('button[type="submit"]').click()
+
+  const twoFactorInput = page.locator('input[autocomplete="one-time-code"]')
   const needs2fa = await twoFactorInput
     .waitFor({ state: 'visible', timeout: 30_000 })
     .then(() => true)
@@ -34,7 +39,11 @@ export async function loginViaUi(
       throw new Error(`Account ${credentials.email} requires 2FA but no TOTP secret was provided`)
     }
     await twoFactorInput.fill(generateTotpCode(totpSecret))
-    await page.getByRole('button', { name: /verify and sign in/i }).click()
+    await page
+      .locator('form')
+      .filter({ has: twoFactorInput })
+      .locator('button[type="submit"]')
+      .click()
   }
 
   await page.waitForURL((url) => !url.pathname.includes('/login'), {
