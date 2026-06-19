@@ -6,7 +6,7 @@ import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
 import type { ReactNode } from 'react'
 import { DataView, EmptyState, SkeletonRows, Button, Card } from '@/app/components/ui'
 import { calculateHebrewAge, convertToHebrewDate } from '@/lib/hebrew-date'
-import { buildMemberColumns, computeMemberDisplay, planColorForNumber } from '../_lib/helpers'
+import { buildMemberColumns, computeMemberDisplay } from '../_lib/helpers'
 import { paymentColumnsFor, paymentMobileCard } from '../_lib/helpers'
 import { useFamilyDetail } from '../FamilyDetailContext'
 
@@ -39,12 +39,10 @@ function InfoField({
 function MembersTabContent(props: FamilyDetailContextValue) {
   const {
     params,
-    familyId,
     isAdmin,
     formatMoney,
     data,
     paymentPlans,
-    statements,
     setShowMemberModal,
     setEditingMember,
     viewingMemberId,

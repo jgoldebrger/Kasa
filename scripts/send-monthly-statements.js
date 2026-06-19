@@ -70,7 +70,7 @@ function sendMonthlyStatements() {
     })
 
     req.on('error', (error) => {
-      console.error('❌ Request error:', safeLogLine(error.message))
+      console.error('❌ Request error')
       reject(error)
     })
 
@@ -88,7 +88,7 @@ sendMonthlyStatements()
     console.log('✅ Script completed successfully')
     process.exit(0)
   })
-  .catch((error) => {
-    console.error('❌ Script failed:', safeLogLine(error.message))
+  .catch(() => {
+    console.error('❌ Script failed')
     process.exit(1)
   })

@@ -5,7 +5,7 @@ import { useState } from 'react'
 import dynamic from 'next/dynamic'
 import TaskFormModal from '@/app/components/tasks/TaskFormModal'
 import { useFamilyDetail } from '../FamilyDetailContext'
-import { capitalizeName, formatPhone, handleHebrewInput, validateEmail } from '../_lib/helpers'
+import { capitalizeName, handleHebrewInput } from '../_lib/helpers'
 import { convertToHebrewDate } from '@/lib/hebrew-date'
 import { invalidate as invalidateCache } from '@/lib/client-cache'
 import { normalizePlanId } from '@/lib/payment-plan-display'
@@ -24,7 +24,6 @@ const StripePaymentForm = dynamic(() => import('@/app/components/StripePaymentFo
 export default function FamilyModals() {
   const {
     params,
-    familyId,
     activeTab,
     toast,
     isAdmin,
@@ -33,8 +32,6 @@ export default function FamilyModals() {
     setData,
     paymentPlans,
     lifecycleEventTypes,
-    statements,
-    loading,
     showEmailModal,
     setShowEmailModal,
     emailFormData,

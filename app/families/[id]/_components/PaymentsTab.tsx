@@ -10,10 +10,8 @@ import { useFamilyDetail } from '../FamilyDetailContext'
 function PaymentsTabContent(props: FamilyDetailContextValue) {
   const {
     params,
-    familyId,
     formatMoney,
     data,
-    loading,
     setShowPaymentModal,
     paymentForm,
     setPaymentForm,

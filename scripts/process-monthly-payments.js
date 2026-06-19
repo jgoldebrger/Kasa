@@ -8,10 +8,6 @@ const API_URL = process.env.API_URL || 'http://localhost:3000'
 const CRON_SECRET = process.env.CRON_SECRET
 const ENDPOINT = '/api/jobs/process-recurring-payments'
 
-function safeLogLine(value) {
-  return String(value ?? '').replace(/[\r\n]/g, ' ')
-}
-
 if (!CRON_SECRET) {
   console.error('CRON_SECRET env var is required')
   process.exit(1)
@@ -69,7 +65,7 @@ processMonthlyPayments()
     console.log(JSON.stringify(result, null, 2))
     process.exit(0)
   })
-  .catch((error) => {
-    console.error('Error processing monthly payments:', safeLogLine(error.message))
+  .catch(() => {
+    console.error('Error processing monthly payments')
     process.exit(1)
   })

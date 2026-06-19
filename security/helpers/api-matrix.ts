@@ -1,8 +1,5 @@
-import fs from 'fs'
 import type { APIRequestContext } from '@playwright/test'
 import { getCatalogRoutes, isProtectedRoute, routeKey, type ApiRouteEntry } from '../catalog'
-import { authStoragePath } from '../auth/bootstrap'
-import { getSecurityConfig } from '../config'
 import { IDOR_SAFE_STATUSES } from '../payloads/idor-vectors'
 import { NON_MEMBER_ORG_ID } from './idor'
 import { mutateRequest, withOrgHeader } from './request-mutation'
@@ -103,39 +100,6 @@ export async function probeOwnerGetReachable(
   return results
 }
 
-function ownerCookieHeader(): string {
-  const state = JSON.parse(fs.readFileSync(authStoragePath('owner'), 'utf8')) as {
-    cookies: Array<{ name: string; value: string; domain: string; path: string }>
-  }
-  return state.cookies.map((c) => `${c.name}=${c.value}`).join('; ')
-}
-
-function resolveProbeUrl(url: string): string {
-  const config = getSecurityConfig()
-  const fullUrl = url.startsWith('http') ? url : `${config.baseUrl}${url}`
-  const parsed = new URL(fullUrl)
-  const base = new URL(config.baseUrl)
-  if (parsed.origin !== base.origin) {
-    throw new Error(`Refusing cross-origin probe URL: ${parsed.origin}`)
-  }
-  return fullUrl
-}
-
-/** Node fetch without Origin/Referer — Playwright injects those automatically. */
-async function fetchWithoutOrigin(method: string, url: string, body?: unknown): Promise<number> {
-  const fullUrl = resolveProbeUrl(url)
-  const headers: Record<string, string> = {
-    cookie: ownerCookieHeader(),
-    'content-type': 'application/json',
-  }
-  const init: RequestInit = { method, headers }
-  if (body !== undefined && method !== 'GET' && method !== 'HEAD') {
-    init.body = JSON.stringify(body)
-  }
-  const res = await fetch(fullUrl, init)
-  return res.status
-}
-
 export async function probeCsrfMatrix(
   request: APIRequestContext,
   routes: ApiRouteEntry[],
@@ -151,7 +115,14 @@ export async function probeCsrfMatrix(
 
     const status =
       vector === 'missing-origin'
-        ? await fetchWithoutOrigin(route.method, path, body)
+        ? (
+            await mutateRequest(request, {
+              method: route.method,
+              path,
+              data: body,
+              stripOrigin: true,
+            })
+          ).status()
         : (
             await mutateRequest(request, {
               method: route.method,
