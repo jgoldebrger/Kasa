@@ -1,4 +1,4 @@
-import { FAMILY_LEDGER_DEFAULT_LIMIT } from '@/lib/family-ledger-list'
+import { FAMILY_LEDGER_DEFAULT_LIMIT } from '@/lib/family-ledger-constants'
 
 export type LedgerPage<T> = {
   items: T[]

@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/app/auth'
 import connectDB from '@/lib/database'
 import { User } from '@/lib/models'
+import {
+  PLATFORM_ADMIN_2FA_REQUIRED_CODE,
+  PLATFORM_ADMIN_2FA_REQUIRED_MESSAGE,
+} from '@/lib/platform-admin-constants'
 
-export const PLATFORM_ADMIN_2FA_REQUIRED_CODE = 'PLATFORM_ADMIN_2FA_REQUIRED'
-
-export const PLATFORM_ADMIN_2FA_REQUIRED_MESSAGE =
-  'Two-factor authentication is required for platform admin access. Enable 2FA in your account settings at /account.'
-
+export { PLATFORM_ADMIN_2FA_REQUIRED_CODE, PLATFORM_ADMIN_2FA_REQUIRED_MESSAGE }
 /**
  * "SaaS owner" / platform-admin gate.
  *
@@ -47,9 +47,7 @@ export interface PlatformAdminCtx {
   name: string
 }
 
-export async function assertPlatformAdminTwoFactor(
-  userId: string,
-): Promise<NextResponse | null> {
+export async function assertPlatformAdminTwoFactor(userId: string): Promise<NextResponse | null> {
   await connectDB()
   const user = await User.findById(userId)
     .select('twoFactorEnabled')

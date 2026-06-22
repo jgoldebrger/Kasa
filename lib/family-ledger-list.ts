@@ -9,8 +9,9 @@ import {
   type CompoundCursor,
 } from '@/lib/pagination'
 
-/** Default page size for family ledger tab loads. */
-export const FAMILY_LEDGER_DEFAULT_LIMIT = 50
+import { FAMILY_LEDGER_DEFAULT_LIMIT } from '@/lib/family-ledger-constants'
+
+export { FAMILY_LEDGER_DEFAULT_LIMIT }
 
 export const familyLedgerListQuery = z.object({
   limit: paginationLimit,

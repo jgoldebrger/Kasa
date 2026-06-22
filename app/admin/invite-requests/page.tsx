@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState, useCallback } from 'react'
 import { useToast, useConfirm } from '@/app/components/Toast'
-import { PLATFORM_ADMIN_2FA_REQUIRED_CODE } from '@/lib/platform-admin'
+import { PLATFORM_ADMIN_2FA_REQUIRED_CODE } from '@/lib/platform-admin-constants'
 import {
   Alert,
   Badge,
