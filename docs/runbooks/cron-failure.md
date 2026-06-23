@@ -15,13 +15,13 @@ Cron entry points live under `/api/jobs/*` (see `vercel.json`). Each route:
 - Writes per-batch audit rows to the `JobRun` collection
 - Chunks large org lists and may self-call for the next cursor
 
-| Job | Path | Typical symptom |
-| --- | ---- | ---------------- |
-| Cycle rollover | `/api/jobs/cycle-rollover` | Wrong cycle year on orgs |
-| Generate statements | `/api/jobs/generate-monthly-statements` | Missing monthly statements |
-| Process recurring | `/api/jobs/process-recurring-payments` | Saved cards not charged |
-| Send statements | `/api/jobs/send-monthly-statements` | Families did not receive PDF email |
-| Wedding converter | `/api/jobs/wedding-converter` | Children not converted to families |
+| Job                 | Path                                    | Typical symptom                    |
+| ------------------- | --------------------------------------- | ---------------------------------- |
+| Cycle rollover      | `/api/jobs/cycle-rollover`              | Wrong cycle year on orgs           |
+| Generate statements | `/api/jobs/generate-monthly-statements` | Missing monthly statements         |
+| Process recurring   | `/api/jobs/process-recurring-payments`  | Saved cards not charged            |
+| Send statements     | `/api/jobs/send-monthly-statements`     | Families did not receive PDF email |
+| Wedding converter   | `/api/jobs/wedding-converter`           | Children not converted to families |
 
 CLI equivalents exist for some jobs (`npm run generate-statements`, etc.) but production should use the API routes with `CRON_SECRET`.
 
@@ -45,13 +45,14 @@ Look for `status: 'failed'`, `lastError`, and `errors[]`.
 
 ### 4. Common root causes
 
-| Symptom | Likely cause | Fix |
-| ------- | ------------ | --- |
-| `401 Unauthorized` | `CRON_SECRET` mismatch or missing in Vercel env | Align secret; redeploy |
-| `429 Too many requests` | Rate limit hit (`checkRateLimit` on cron scope) | Wait for window; investigate duplicate triggers |
-| Lock skipped (200 but no work) | Another instance holds `JobLock` for the same tick | Wait for TTL (~15 min) or inspect `joblocks` collection |
-| `500` + Mongo errors | Atlas outage, IP block, bad URI | Fix connectivity; see [db-restore.md](./db-restore.md) |
-| Job ran but org skipped | Org automation disabled or schedule day mismatch | Check org **Settings → Automation** and calendar day config |
+| Symptom                                | Likely cause                                                 | Fix                                                                                                                                                  |
+| -------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401 Unauthorized`                     | `CRON_SECRET` mismatch or missing in Vercel env              | Align secret; redeploy                                                                                                                               |
+| `401` + HTML `Authentication Required` | Vercel Deployment Protection blocking internal HTTP (legacy) | `process-recurring-payments` now calls billing logic in-process; redeploy latest. Or disable protection / use automation bypass for other self-calls |
+| `429 Too many requests`                | Rate limit hit (`checkRateLimit` on cron scope)              | Wait for window; investigate duplicate triggers                                                                                                      |
+| Lock skipped (200 but no work)         | Another instance holds `JobLock` for the same tick           | Wait for TTL (~15 min) or inspect `joblocks` collection                                                                                              |
+| `500` + Mongo errors                   | Atlas outage, IP block, bad URI                              | Fix connectivity; see [db-restore.md](./db-restore.md)                                                                                               |
+| Job ran but org skipped                | Org automation disabled or schedule day mismatch             | Check org **Settings → Automation** and calendar day config                                                                                          |
 
 ## Manual replay
 

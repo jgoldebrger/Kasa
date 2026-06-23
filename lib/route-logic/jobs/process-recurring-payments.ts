@@ -4,6 +4,7 @@ import { acquireCronLock } from '@/lib/cron-lock'
 import { JobLock } from '@/lib/models'
 import { logError } from '@/lib/log'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { processRecurringPaymentsForOrg } from '@/lib/recurring-payments/process-org'
 
 const JOB_NAME = 'process-recurring-payments'
 const JOB_PATH = '/api/jobs/process-recurring-payments'
@@ -12,9 +13,8 @@ const JOB_PATH = '/api/jobs/process-recurring-payments'
  * Cron-triggered. Iterates organizations in batches and charges any
  * due RecurringPayment rows via Stripe per org.
  *
- * Delegates to the existing per-org route via internal HTTP using
- * `CRON_SECRET`. Re-uses the Stripe + payment-record + failure-task
- * logic already in that handler.
+ * Calls `processRecurringPaymentsForOrg` in-process (no HTTP hop) so
+ * Vercel Deployment Protection cannot block internal self-calls.
  */
 export const POST = handler({
   auth: 'cron',
@@ -30,19 +30,7 @@ export const POST = handler({
     }
 
     const cursor = new URL(request.url).searchParams.get('cursor')
-    const secret = process.env.CRON_SECRET!
-    const base = selfUrl(request, '')
 
-    // Chain-wide distributed lock. Only the *first* batch (cursor=null)
-    // acquires the lock; continuation batches inherit it implicitly. We
-    // intentionally do NOT release the lock at the end of batch 1 — that
-    // was the original bug, since it allowed a concurrent Vercel retry to
-    // start a parallel chain while the first one was mid-flight, leading
-    // to two cron chains racing over the same due RecurringPayment rows.
-    // Instead, the *final* batch (hasMore === false) deletes the lock by
-    // its deterministic (jobName, lockKey) tuple. Crashed/aborted chains
-    // are cleaned up by the JobLock TTL index (we use a generous 1h TTL
-    // so even long chains don't expire mid-run).
     const lockKey = new Date().toISOString().slice(0, 10)
     if (!cursor) {
       const lock = await acquireCronLock(JOB_NAME, lockKey, { ttlMs: 60 * 60 * 1000 })
@@ -54,8 +42,6 @@ export const POST = handler({
           },
         }
       }
-      // Note: we intentionally let `lock` go out of scope without releasing
-      // it. The lock row in Mongo persists; final-batch cleanup is by key.
     }
 
     let releaseLock = false
@@ -65,29 +51,12 @@ export const POST = handler({
         cursor,
         selfUrl: selfUrl(request, JOB_PATH),
         perOrg: async (organizationId) => {
-          const u = new URL('/api/recurring-payments/process', base)
-          u.searchParams.set('organizationId', organizationId)
-          const res = await fetch(u.toString(), {
-            method: 'POST',
-            headers: {
-              'x-cron-secret': secret,
-              'content-type': 'application/json',
-            },
-            body: '{}',
-          })
-          if (!res.ok) {
-            const text = await res.text().catch(() => '')
-            throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`)
-          }
+          await processRecurringPaymentsForOrg(organizationId)
         },
       })
-      // Final batch in the chain — release the lock so the next day's
-      // tick (or a same-day retry after legitimate failure) can run.
       if (!result.hasMore) releaseLock = true
       return { data: result }
     } catch (err: any) {
-      // On exception, release the lock so an operator can retry instead
-      // of waiting out the TTL.
       releaseLock = true
       logError(err, { module: 'jobs', job: JOB_NAME })
       throw err
