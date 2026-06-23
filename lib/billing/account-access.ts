@@ -30,6 +30,8 @@ export const SUBSCRIPTION_EXEMPT_API_PREFIXES = [
   '/api/billing/',
   '/api/organizations/current',
   '/api/organizations/setup',
+  '/api/stripe/connect/',
+  '/api/notifications',
   '/api/stripe/webhook',
   '/api/auth/',
 ] as const

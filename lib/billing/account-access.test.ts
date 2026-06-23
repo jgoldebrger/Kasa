@@ -27,10 +27,12 @@ describe('platform account access', () => {
     expect(isSubscriptionExemptPage('/families')).toBe(false)
   })
 
-  it('exempts billing and org-switch APIs only', () => {
+  it('exempts billing, connect, and notification APIs', () => {
     expect(isSubscriptionExemptApi('/api/billing/checkout')).toBe(true)
     expect(isSubscriptionExemptApi('/api/organizations/current')).toBe(true)
     expect(isSubscriptionExemptApi('/api/organizations')).toBe(true)
+    expect(isSubscriptionExemptApi('/api/stripe/connect/status')).toBe(true)
+    expect(isSubscriptionExemptApi('/api/notifications')).toBe(true)
     expect(isSubscriptionExemptApi('/api/organizations/branding')).toBe(false)
     expect(isSubscriptionExemptApi('/api/families')).toBe(false)
   })

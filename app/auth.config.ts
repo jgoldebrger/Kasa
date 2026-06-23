@@ -12,6 +12,7 @@ const PUBLIC_PATHS = [
   '/privacy',
   '/terms',
   '/subprocessors',
+  '/manifest.webmanifest',
 ]
 
 // Public APIs that don't require a session.

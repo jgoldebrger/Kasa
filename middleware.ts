@@ -91,6 +91,6 @@ export const config = {
   matcher: [
     // Match everything except Next.js internals, static assets, and favicon.
     // The authorized() callback in auth.config decides which paths require auth.
-    '/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.json|robots\\.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|robots\\.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 }

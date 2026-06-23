@@ -29,7 +29,10 @@ export default function NotificationsBell() {
   const [loading, setLoading] = useState(false)
   const [fetchError, setFetchError] = useState(false)
   const [hasFetched, setHasFetched] = useState(false)
+  const [subscriptionGated, setSubscriptionGated] = useState(false)
   const toast = useToast()
+  const toastRef = useRef(toast)
+  toastRef.current = toast
   const t = useT()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
@@ -45,9 +48,14 @@ export default function NotificationsBell() {
       setFetchError(false)
       const res = await fetch('/api/notifications')
       if (isStale(gen)) return
+      if (res.status === 402) {
+        setSubscriptionGated(true)
+        setHasFetched(true)
+        return
+      }
       if (!res.ok) {
         setFetchError(true)
-        toast.error('Could not load notifications.')
+        toastRef.current.error('Could not load notifications.')
         return
       }
       const data = await res.json().catch(() => ({}))
@@ -58,15 +66,15 @@ export default function NotificationsBell() {
     } catch {
       if (!isStale(gen)) {
         setFetchError(true)
-        toast.error('Could not load notifications.')
+        toastRef.current.error('Could not load notifications.')
       }
     } finally {
       if (!isStale(gen)) setLoading(false)
     }
-  }, [begin, isStale, toast])
+  }, [begin, isStale])
 
   const scheduleIdlePrefetch = useCallback(() => {
-    if (idleScheduledRef.current || hasFetched) return
+    if (idleScheduledRef.current || hasFetched || subscriptionGated) return
     idleScheduledRef.current = true
     const run = () => {
       void fetchNotifs()
@@ -76,7 +84,7 @@ export default function NotificationsBell() {
     } else {
       window.setTimeout(run, 3000)
     }
-  }, [fetchNotifs, hasFetched])
+  }, [fetchNotifs, hasFetched, subscriptionGated])
 
   const updatePanelPosition = useCallback(() => {
     const button = buttonRef.current
@@ -117,7 +125,7 @@ export default function NotificationsBell() {
   }, [open, hasFetched, fetchNotifs])
 
   useEffect(() => {
-    if (!hasFetched) return
+    if (!hasFetched || subscriptionGated) return
     const interval = setInterval(
       () => {
         void fetchNotifs()
@@ -125,7 +133,7 @@ export default function NotificationsBell() {
       open ? 60_000 : 5 * 60_000,
     )
     return () => clearInterval(interval)
-  }, [fetchNotifs, open, hasFetched])
+  }, [fetchNotifs, open, hasFetched, subscriptionGated])
 
   useOrgChanged(
     useCallback(() => {
@@ -135,6 +143,7 @@ export default function NotificationsBell() {
       setOpen(false)
       setHasFetched(false)
       setFetchError(false)
+      setSubscriptionGated(false)
       idleScheduledRef.current = false
       void fetchNotifs()
     }, [fetchNotifs, invalidate]),

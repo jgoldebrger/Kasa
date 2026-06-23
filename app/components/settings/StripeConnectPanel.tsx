@@ -38,6 +38,7 @@ export default function StripeConnectPanel({ canManage, isOwner }: StripeConnect
   const connectReturnHandledRef = useRef(false)
   const [status, setStatus] = useState<ConnectStatusPayload | null>(null)
   const [loading, setLoading] = useState(true)
+  const [subscriptionGated, setSubscriptionGated] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
 
   const refresh = useCallback(async () => {
@@ -45,10 +46,16 @@ export default function StripeConnectPanel({ canManage, isOwner }: StripeConnect
     try {
       const res = await fetch('/api/stripe/connect/status')
       const body = await res.json().catch(() => ({}))
+      if (res.status === 402) {
+        setSubscriptionGated(true)
+        setStatus(null)
+        return
+      }
       if (!res.ok) {
         toastRef.current.error(body.error || 'Could not load payout account status.')
         return
       }
+      setSubscriptionGated(false)
       setStatus(body as ConnectStatusPayload)
     } catch {
       toastRef.current.error('Could not load payout account status.')
@@ -118,6 +125,23 @@ export default function StripeConnectPanel({ canManage, isOwner }: StripeConnect
 
   if (loading) {
     return <SkeletonRows count={3} />
+  }
+
+  if (subscriptionGated) {
+    return (
+      <div className="surface-card p-6">
+        <div className="flex items-start gap-3">
+          <BanknotesIcon className="h-6 w-6 text-fg-muted shrink-0" aria-hidden="true" />
+          <div>
+            <h2 className="text-lg font-semibold text-fg">Member dues payouts</h2>
+            <p className="text-sm text-fg-muted mt-1">
+              Subscribe to a Kasa platform plan above before connecting Stripe for member card
+              payments.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (!status?.connectEnabled) {
