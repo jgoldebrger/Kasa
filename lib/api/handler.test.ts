@@ -308,6 +308,31 @@ describe('handler', () => {
     })
   })
 
+  it('skips platform admin 2FA when platformAdminTwoFactor is false', async () => {
+    const { requireSession } = await import('@/lib/auth-helpers')
+    const { isPlatformAdminEmail, assertPlatformAdminTwoFactor } =
+      await import('@/lib/platform-admin')
+    vi.mocked(requireSession).mockResolvedValue({
+      user: { id: 'u1', email: 'admin@example.com' },
+    } as any)
+    vi.mocked(isPlatformAdminEmail).mockReturnValue(true)
+    vi.mocked(assertPlatformAdminTwoFactor).mockResolvedValue(
+      NextResponse.json({ error: '2FA required' }, { status: 403 }),
+    )
+
+    const { handler } = await import('./handler')
+    const route = handler({
+      auth: 'admin',
+      platformAdminTwoFactor: false,
+      noDb: true,
+      fn: async () => ({ data: { ok: true } }),
+    })
+
+    const res = await route(sameOriginRequest('http://localhost/api/admin/organizations'))
+    expect(assertPlatformAdminTwoFactor).not.toHaveBeenCalled()
+    await expect(res.json()).resolves.toEqual({ ok: true })
+  })
+
   it('passes org-or-cron context when cron+org auth succeeds', async () => {
     const { requireOrgOrCron } = await import('@/lib/auth-cron')
     const ctx = mockOrgContext({

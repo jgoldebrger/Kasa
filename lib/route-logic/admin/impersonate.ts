@@ -14,6 +14,7 @@ export const dynamic = 'force-dynamic'
 
 export const GET = handler({
   auth: 'admin',
+  platformAdminTwoFactor: false,
   name: 'GET /api/admin/impersonate',
   fn: async ({ session }) => {
     const orgId = await readImpersonationOrgId(session!.user.id)
@@ -39,6 +40,7 @@ export const GET = handler({
 
 export const DELETE = handler({
   auth: 'admin',
+  platformAdminTwoFactor: false,
   name: 'DELETE /api/admin/impersonate',
   fn: async ({ session, request }) => {
     const orgId = await readImpersonationOrgId(session!.user.id)

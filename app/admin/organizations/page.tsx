@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/app/components/Toast'
-import { PLATFORM_ADMIN_2FA_REQUIRED_CODE } from '@/lib/platform-admin-constants'
 import {
   Alert,
   Badge,
@@ -94,10 +93,6 @@ export default function OrganizationsAdminPage() {
         method: 'POST',
       })
       const data = await res.json().catch(() => ({}))
-      if (res.status === 403 && data.code === PLATFORM_ADMIN_2FA_REQUIRED_CODE) {
-        toast.error('Enable two-factor authentication on your account first.')
-        return
-      }
       if (!res.ok) {
         toast.error(data.error || 'Could not enter support mode.')
         return
@@ -117,8 +112,7 @@ export default function OrganizationsAdminPage() {
       <div className="max-w-3xl mx-auto px-4 py-10">
         <Alert variant="danger" title="Access denied">
           This page is only available to platform administrators listed in{' '}
-          <code className="text-xs">PLATFORM_ADMIN_EMAILS</code> with two-factor authentication
-          enabled.
+          <code className="text-xs">PLATFORM_ADMIN_EMAILS</code>.
         </Alert>
       </div>
     )

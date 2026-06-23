@@ -80,6 +80,11 @@ export interface HandlerOptions<TBody, TQuery> {
   name?: string
   /** For `auth: 'cron'`: job name for per-job HMAC token verification. */
   cronJobName?: string
+  /**
+   * For `auth: 'admin'`: require TOTP on the platform admin account (default true).
+   * Set false for lower-risk read/support routes (e.g. org list).
+   */
+  platformAdminTwoFactor?: boolean
   fn: (input: HandlerCtx<TBody, TQuery>) => Promise<HandlerReturn>
 }
 
@@ -156,8 +161,10 @@ export function handler<TBody = unknown, TQuery = unknown>(opts: HandlerOptions<
           if (!isPlatformAdminEmail(r.user.email)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
           }
-          const tfaBlock = await assertPlatformAdminTwoFactor(r.user.id)
-          if (tfaBlock) return tfaBlock
+          if (opts.platformAdminTwoFactor !== false) {
+            const tfaBlock = await assertPlatformAdminTwoFactor(r.user.id)
+            if (tfaBlock) return tfaBlock
+          }
           session = r
           break
         }

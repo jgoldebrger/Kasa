@@ -29,6 +29,7 @@ function encodeCursor(id: string): string {
 
 export const GET = handler({
   auth: 'admin',
+  platformAdminTwoFactor: false,
   name: 'GET /api/admin/organizations',
   fn: async ({ request }) => {
     const rateVerdict = await checkRateLimit(request, 'admin-organizations-list', {
