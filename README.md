@@ -1,10 +1,12 @@
 # Kasa — Multi-Tenant Family Financial SaaS
 
-Multi-tenant SaaS for tracking age-based membership payments and lifecycle
-events (Chasena, Bar Mitzvah, births, etc.) across many family
-organizations. Each organization owns its own families, members,
-payments, statements and settings; users can belong to multiple
-organizations with role-based access.
+Multi-tenant SaaS for kehilla treasurers: age-based membership dues,
+lifecycle events (Chasuna, Bar Mitzvah, births, etc.), statements, and
+yearly P&L. Each organization owns its own families, members,
+payments, and settings; users can belong to multiple organizations with
+role-based access.
+
+**Public routes:** `/overview` · `/pricing` · `/help` · `/trust` · `/terms` · `/privacy` · `/dpa`
 
 ---
 
@@ -12,14 +14,15 @@ organizations with role-based access.
 
 | Layer        | Choice                                                                 |
 | ------------ | ---------------------------------------------------------------------- |
-| Framework    | Next.js 14 (App Router) + React 18 + TypeScript                        |
+| Framework    | Next.js 15 (App Router) + React 18 + TypeScript                        |
 | Styling      | Tailwind CSS                                                           |
-| Auth         | NextAuth (Auth.js v5 beta) — credentials provider, JWT sessions        |
+| Auth         | NextAuth (Auth.js v5 beta) — credentials provider, JWT sessions, 2FA   |
 | Database     | MongoDB (Mongoose 7) — shared schema, per-row `organizationId` scoping |
-| Payments     | Stripe (`@stripe/react-stripe-js`, server SDK)                         |
+| Payments     | Stripe — platform subscriptions + optional Connect for org dues        |
 | Email        | Nodemailer (per-org SMTP + platform-level SMTP for system mail)        |
 | PDF          | `pdf-lib`                                                              |
 | Hebrew dates | `@hebcal/core`                                                         |
+| i18n         | en-US, en-GB, he-IL, yi, fr-FR, es-MX (RTL-ready)                      |
 
 ---
 
@@ -65,10 +68,14 @@ PLATFORM_SMTP_USER=youraccount@gmail.com
 PLATFORM_SMTP_PASS=<app-password>
 PLATFORM_SMTP_FROM="Kasa Platform <youraccount@gmail.com>"
 
-# Stripe (optional)
+# Stripe (optional — member card payments + platform subscriptions)
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_STARTER=price_...
+STRIPE_PRICE_COMMUNITY=price_...
+# Optional: free trial days for new platform subscriptions (0 = disabled)
+STRIPE_SUBSCRIPTION_TRIAL_DAYS=14
 
 # Set to true when behind a trusted reverse proxy so the rate limiter
 # can read client IP from X-Forwarded-For / X-Real-IP. On Vercel this
@@ -85,12 +92,64 @@ npm run dev
 
 ### 5. First-time setup
 
-- `/login` first request → no users exist → use `/request-invite` to ask
-  for an invite. A platform admin receives an email and approves it in
-  the admin panel, which issues an invite code → use the code on
-  `/signup` to create the first account and its personal workspace.
-- Or, for an existing legacy single-tenant DB, run the multi-tenant
-  migration once (see **Migration** below).
+- Visit `/welcome` or `/request-invite` to ask for early access. A platform
+  admin receives an email and approves the request in `/admin/invite-requests`,
+  which issues an invite code → use the code on `/signup` to create an account
+  and organization.
+- Organization owners complete the setup wizard at `/setup` (payment plans,
+  email, optional Stripe Connect, first family).
+- Or, for an existing legacy single-tenant DB, run the multi-tenant migration
+  once (see **Migration** below).
+
+---
+
+## Platform billing (Kasa → organization)
+
+Organizations subscribe to Kasa on a monthly plan. When `STRIPE_SECRET_KEY` and
+`STRIPE_PRICE_STARTER` are both set, billing enforcement is active: workspaces
+without an active subscription are gated to `/pricing` and exempt settings pages.
+
+| Tier        | Family cap | Price (list) |
+| ----------- | ---------- | ------------ |
+| Starter     | 75         | $49/mo       |
+| Community   | 300        | $149/mo      |
+| Institution | Unlimited  | Custom       |
+
+- Checkout and customer portal: **Settings → Billing** or `/pricing`
+- Webhook sync: `customer.subscription.*` events update org tier and status
+- Family caps enforced per tier; Institution sales handled manually via
+  `support@kasa.com` + custom Stripe price
+
+See `lib/billing/` and [Stripe money flow](docs/STRIPE_MONEY_FLOW.md).
+
+---
+
+## Customer-facing pages
+
+Public routes for prospects, compliance, and support:
+
+| Route            | Purpose                                       |
+| ---------------- | --------------------------------------------- |
+| `/welcome`       | Marketing landing page                        |
+| `/overview`      | Sales one-pager (features, pricing, security) |
+| `/pricing`       | Subscription plans                            |
+| `/help`          | Help center for treasurers                    |
+| `/trust`         | Trust & security summary                      |
+| `/terms`         | Terms of Service                              |
+| `/privacy`       | Privacy Policy                                |
+| `/dpa`           | Data Processing Addendum (GDPR)               |
+| `/subprocessors` | Third-party subprocessors                     |
+
+**Data export:** organization owners and admins can download a full JSON export
+from **Settings → Data export** (`GET /api/organizations/export`) for backup,
+migration, or GDPR portability. SMTP passwords and user password hashes are
+redacted.
+
+**Legal note:** Terms, Privacy, and DPA are production-ready drafts. Have
+qualified counsel review before broad external marketing.
+
+**Enterprise SSO:** not implemented. See [docs/sso-evaluation.md](docs/sso-evaluation.md)
+for a build-vs-buy assessment when an Institution customer requires SAML/OIDC.
 
 ---
 
@@ -336,40 +395,52 @@ npm start    # serves on port 3000
 
 ### Pre-deploy checklist
 
+- **Vercel Deployment Protection** is **off for Production** (or limited to
+  preview deployments only). When enabled on production, unauthenticated
+  requests — including `/manifest.webmanifest` — return 401 and flood the
+  browser console. Real customers cannot access a password-gated deployment.
 - `MONGODB_URI` does **not** contain `tlsAllowInvalidCertificates` /
   `tlsInsecure` (the connection helper strips them in prod and warns,
   but fix the source).
-- `NEXTAUTH_SECRET`, `AUTH_SECRET`, `ENCRYPTION_KEY` are real 32+ byte
-  random values (not the dev placeholders).
+- `NEXTAUTH_SECRET`, `AUTH_SECRET`, `ENCRYPTION_KEY`, and `CRON_SECRET` are
+  real 32+ byte random values (not the dev placeholders).
 - `NEXTAUTH_URL` is your real public origin.
 - Atlas Network Access whitelists your deploy egress IPs.
 - Stripe is switched to live keys; webhook secret matches the live
   endpoint — see [Stripe money flow & live webhook checklist](docs/STRIPE_MONEY_FLOW.md#live-webhook-setup-checklist).
+- Platform subscription price IDs (`STRIPE_PRICE_STARTER`, etc.) are set if
+  billing enforcement is desired.
 - NextAuth stays on the pinned beta unless the [upgrade policy](docs/NEXTAUTH_UPGRADE_POLICY.md) says otherwise.
 - Rate limiting is already distributed via MongoDB — safe for multiple
   Node instances out of the box. For sub-millisecond checks at very high
   QPS, consider swapping `lib/rate-limit.ts` for Redis / Upstash.
+- `SENTRY_DSN` configured for production error monitoring (recommended).
 
 ### Operations docs
 
 | Doc                                                                | Purpose                                                                          |
 | ------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
 | [docs/STRIPE_MONEY_FLOW.md](docs/STRIPE_MONEY_FLOW.md)             | Platform Stripe account, PCI (SAQ A), org expectations vs Connect, live webhooks |
+| [docs/sso-evaluation.md](docs/sso-evaluation.md)                   | Enterprise SSO (SAML/OIDC) assessment — not yet implemented                      |
 | [docs/NEXTAUTH_UPGRADE_POLICY.md](docs/NEXTAUTH_UPGRADE_POLICY.md) | Beta pin, monitoring, when to upgrade `next-auth`                                |
 | [docs/NEXTAUTH_V5_MIGRATION.md](docs/NEXTAUTH_V5_MIGRATION.md)     | v5 architecture, env vars, full migration notes                                  |
+| [docs/runbooks/](docs/runbooks/)                                   | Deploy/rollback, DB restore, cron failure, Stripe webhook replay                 |
 
 ### Post-deploy smoke test
 
 1. `curl https://your-domain/api/health` → `{"status":"ok",...}` with Mongo up.
-2. Visit `/` from incognito → redirected to `/login`.
-3. `curl https://your-domain/api/families` (no cookie) → 401 JSON.
-4. Log in as admin → your org's data loads.
-5. Create a second account via `/request-invite` → admin approval →
-   `/signup`; verify the new account sees an empty workspace.
-6. Invite the second account into your org from
-   **Settings → Members**; verify both can now see shared data.
-7. Trigger a password reset; verify the reset link works once and is
-   one-time-use.
+2. `curl -I https://your-domain/manifest.webmanifest` → **200** (not 401 from
+   Vercel Deployment Protection).
+3. Visit `/welcome` from incognito → marketing page loads without a Vercel SSO gate.
+4. `curl https://your-domain/api/families` (no cookie) → 401 JSON.
+5. Log in as admin → your org's data loads; **Settings → Billing** shows subscription.
+6. Create a second account via `/request-invite` → admin approval → `/signup`;
+   verify the new account sees an empty workspace.
+7. Invite the second account into your org from **Settings → Members**; verify
+   both can see shared data.
+8. **Settings → Data export** → JSON download succeeds for admins.
+9. Trigger a password reset; verify the reset link works once and is one-time-use.
+10. Public pages load: `/trust`, `/privacy`, `/help`, `/overview`.
 
 ---
 
@@ -377,6 +448,12 @@ npm start    # serves on port 3000
 
 **Port 3000 in use** — `npm run dev` will pick the next free port; or
 edit the `dev` script in `package.json`.
+
+**Service worker / manifest 401 errors** — if the console shows
+`Manifest fetch failed, code 401` with `_vercel_sso_nonce` in response
+headers, **Vercel Deployment Protection** is blocking static assets. Disable
+it for Production in **Vercel → Project → Settings → Deployment Protection**,
+or restrict it to preview deployments only. This is not a Kasa auth bug.
 
 **Service worker showing blank page** — a stale dev SW was the cause.
 `public/sw.js` is now a self-unregistering stub; clear site data once
@@ -446,15 +523,23 @@ KASA/
 ├── app/
 │   ├── api/
 │   │   ├── **/route.ts          Thin re-exports (100% line coverage gate)
-│   │   └── (auth, families, payments, statements, …)
+│   │   └── (auth, families, payments, statements, billing, …)
 │   ├── components/              Shared React components
+│   ├── help/                    Public help center
+│   ├── overview/                Sales / product one-pager
+│   ├── trust/                   Trust & security page
+│   ├── terms/ privacy/ dpa/     Legal & compliance pages
 │   ├── (pages)                  /login, /signup, /families, /tasks, …
 │   ├── auth.ts                  NextAuth options
 │   ├── auth.config.ts           Session strategy / callbacks
-│   └── middleware.ts            CSRF + CSP nonce injection
+│   └── layout.tsx               Root layout + subscription gate
 ├── lib/
 │   ├── api-handlers/            Thin re-exports → route-logic (mirrors app/api)
 │   ├── route-logic/             API route implementations (mirrors app/api)
+│   ├── billing/                 Platform subscription plans, feature gates
+│   ├── help/                    Help center article content
+│   ├── legal/                   Legal contacts, subprocessors list
+│   ├── org-export.ts            Full-tenant JSON export for GDPR / backup
 │   ├── auth-helpers.ts          requireSession / requireOrg
 │   ├── audit.ts                 Audit log helper
 │   ├── calculations.ts          Income / expense / balance engine
@@ -462,15 +547,19 @@ KASA/
 │   ├── database.ts              Mongoose connection
 │   ├── encryption.ts            AES-256-GCM helpers
 │   ├── html-escape.ts           XSS-safe templating helper
-│   ├── models.ts                All Mongoose schemas + indexes
+│   ├── models/                  Mongoose schemas + indexes
 │   ├── platform-admin.ts        PLATFORM_ADMIN_EMAILS check
 │   ├── platform-email.ts        Platform SMTP sender
 │   ├── rate-limit.ts            MongoDB-backed distributed rate limiter
-│   ├── scheduler.ts             Cron orchestration helpers
 │   └── …
-├── public/                      Static assets + self-destruct sw.js
+├── docs/
+│   ├── runbooks/                Ops runbooks
+│   ├── sso-evaluation.md        Enterprise SSO planning doc
+│   └── …
+├── public/                      Static assets, manifest, service worker
 ├── scripts/                     CLI cron + migration utilities
-├── middleware.ts                CSRF + CSP (prod)
+├── security/                    API route catalog + security test suite
+├── middleware.ts                NextAuth + CSRF + CSP (prod)
 ├── next.config.js               Headers, modularizeImports, etc.
 └── package.json
 ```
