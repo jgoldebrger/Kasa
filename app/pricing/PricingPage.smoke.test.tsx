@@ -42,6 +42,7 @@ const mockPlans: PublicPlan[] = [
     priceLabel: '$49/mo',
     interval: 'month',
     available: true,
+    trialDays: 14,
   },
   {
     tier: 'community',
@@ -52,6 +53,7 @@ const mockPlans: PublicPlan[] = [
     priceLabel: '$149/mo',
     interval: 'month',
     available: true,
+    trialDays: 14,
   },
   {
     tier: 'institution',
@@ -62,6 +64,7 @@ const mockPlans: PublicPlan[] = [
     priceLabel: 'Custom',
     interval: null,
     available: true,
+    trialDays: 0,
   },
 ]
 
