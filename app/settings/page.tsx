@@ -6,12 +6,8 @@ import SettingsLoading from './loading'
 export const dynamic = 'force-dynamic'
 
 async function SettingsServer() {
-  const ctx = await requireServerOrgContext({ minRole: 'admin' })
-  const initialCurrentRole = (ctx.role ?? null) as
-    | 'owner'
-    | 'admin'
-    | 'member'
-    | null
+  const ctx = await requireServerOrgContext({ minRole: 'admin', skipSubscriptionGate: true })
+  const initialCurrentRole = (ctx.role ?? null) as 'owner' | 'admin' | 'member' | null
 
   return <SettingsView initialCurrentRole={initialCurrentRole} />
 }

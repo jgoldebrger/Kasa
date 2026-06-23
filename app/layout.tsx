@@ -11,6 +11,7 @@ import PwaInit from './components/PwaInit'
 import CookieNotice from './components/CookieNotice'
 import OrgShellProviders from './components/OrgShellProviders'
 import { getCachedAuth, getServerOrgContext } from '@/lib/auth-server'
+import { enforceLayoutSubscriptionGate } from '@/lib/billing/layout-subscription-gate'
 import { loadServerOrgShell } from '@/lib/server-org-shell'
 import { OrgRoleProvider } from '@/lib/client/useOrgRole'
 import { headers, cookies } from 'next/headers'
@@ -69,6 +70,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // the session this request, both calls share a single NextAuth invocation.
   const session = await getCachedAuth()
   const orgCtx = await getServerOrgContext()
+  await enforceLayoutSubscriptionGate(orgCtx)
   const orgShell = orgCtx ? await loadServerOrgShell(orgCtx.organizationId) : null
 
   // Pull the per-request CSP nonce that middleware set on the request

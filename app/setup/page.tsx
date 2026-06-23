@@ -8,7 +8,7 @@ import SetupWizard from './SetupWizard'
 export const dynamic = 'force-dynamic'
 
 export default async function SetupPage() {
-  const ctx = await requireServerOrgContext()
+  const ctx = await requireServerOrgContext({ skipSubscriptionGate: true })
 
   if (!hasMinRole(ctx.role, 'owner')) {
     redirect('/')

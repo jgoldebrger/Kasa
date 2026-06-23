@@ -7,6 +7,10 @@ import { auth } from '@/app/auth'
 import connectDB from '@/lib/database'
 import { OrgMembership, User } from '@/lib/models'
 import { ACTIVE_ORG_COOKIE, type Role, hasMinRole } from '@/lib/auth-helpers'
+import {
+  enforcePlatformAccountAccess,
+  platformAccessRedirectPath,
+} from '@/lib/billing/account-access'
 
 /**
  * Per-request memoized `auth()`. Use this from layout.tsx + every server
@@ -98,11 +102,19 @@ export const getServerOrgContext = cache(async (): Promise<ServerOrgContext | nu
  */
 export async function requireServerOrgContext(options?: {
   minRole?: Role
+  /** Allow pages like /setup and /settings (billing) without a subscription. */
+  skipSubscriptionGate?: boolean
 }): Promise<ServerOrgContext> {
   const ctx = await getServerOrgContext()
   if (!ctx) redirect('/login')
   if (options?.minRole && !hasMinRole(ctx.role, options.minRole)) {
     redirect('/')
+  }
+  if (!options?.skipSubscriptionGate) {
+    const gate = await enforcePlatformAccountAccess(ctx.organizationId)
+    if (!gate.ok) {
+      redirect(platformAccessRedirectPath(ctx.role))
+    }
   }
   return ctx
 }

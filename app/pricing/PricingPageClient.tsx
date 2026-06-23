@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { ButtonLink, Card, Skeleton } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
@@ -13,15 +14,19 @@ export interface PricingPageClientProps {
 
 export default function PricingPageClient({ initialPlans }: PricingPageClientProps) {
   const { data: session, status } = useSession()
+  const searchParams = useSearchParams()
   const t = useT()
   const isSignedIn = Boolean(session?.user?.id)
   const sessionLoading = status === 'loading'
+  const subscribeRequired = searchParams.get('subscribe') === 'required'
+  const contactOwner = searchParams.get('contact') === 'owner'
+  const homeHref = subscribeRequired ? '/settings?tab=billing' : isSignedIn ? '/' : '/welcome'
 
   return (
     <div className="min-h-screen bg-app">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
         <header className="flex items-center justify-between mb-12">
-          <Link href={isSignedIn ? '/' : '/welcome'} className="flex items-center gap-2.5">
+          <Link href={homeHref} className="flex items-center gap-2.5">
             <div className="w-8 h-8 bg-accent text-accent-fg rounded-md flex items-center justify-center font-semibold text-sm">
               K
             </div>
@@ -37,9 +42,11 @@ export default function PricingPageClient({ initialPlans }: PricingPageClientPro
                 <ButtonLink href="/settings?tab=billing" variant="ghost" size="sm">
                   {t('pricing.billing')}
                 </ButtonLink>
-                <ButtonLink href="/" size="sm">
-                  {t('nav.dashboard')}
-                </ButtonLink>
+                {!subscribeRequired && (
+                  <ButtonLink href="/" size="sm">
+                    {t('nav.dashboard')}
+                  </ButtonLink>
+                )}
               </>
             ) : (
               <ButtonLink href="/login" size="sm">
@@ -50,13 +57,21 @@ export default function PricingPageClient({ initialPlans }: PricingPageClientPro
         </header>
 
         <p className="mb-8">
-          <Link
-            href={isSignedIn ? '/' : '/welcome'}
-            className="text-sm text-fg-muted hover:text-fg transition-colors"
-          >
-            ← {t('pricing.backToHome')}
+          <Link href={homeHref} className="text-sm text-fg-muted hover:text-fg transition-colors">
+            ← {subscribeRequired ? t('pricing.backToBilling') : t('pricing.backToHome')}
           </Link>
         </p>
+
+        {subscribeRequired && (
+          <div
+            className="mb-8 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-fg"
+            role="status"
+          >
+            {contactOwner
+              ? t('pricing.subscriptionRequiredMember')
+              : t('pricing.subscriptionRequiredOwner')}
+          </div>
+        )}
 
         <section className="text-center max-w-3xl mx-auto mb-14">
           <h1 className="text-4xl font-semibold tracking-tight text-fg text-pretty mb-4">

@@ -71,9 +71,11 @@ export default middleware((req) => {
   // because a benign page URL like `/?ref=/api/foo` would otherwise
   // suppress the CSP via a false-positive substring match on `/api/`.
   const pathname = req.nextUrl.pathname
+  const requestHeaders = new Headers(req.headers)
+  requestHeaders.set('x-pathname', pathname)
+
   if (IS_PROD && !pathname.startsWith('/api/')) {
     const nonce = generateNonce()
-    const requestHeaders = new Headers(req.headers)
     requestHeaders.set('x-nonce', nonce)
 
     const res = NextResponse.next({ request: { headers: requestHeaders } })
@@ -82,7 +84,7 @@ export default middleware((req) => {
   }
 
   // The `authorized` callback in auth.config handles auth redirects.
-  return undefined as any
+  return NextResponse.next({ request: { headers: requestHeaders } })
 })
 
 export const config = {

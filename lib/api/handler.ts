@@ -33,6 +33,7 @@ import {
   type OrgContext,
   type Role,
 } from '@/lib/auth-helpers'
+import { enforcePlatformAccountAccess, isSubscriptionExemptApi } from '@/lib/billing/account-access'
 import { assertPlatformAdminTwoFactor, isPlatformAdminEmail } from '@/lib/platform-admin'
 import { isCronRequest, requireOrgOrCron } from '@/lib/auth-cron'
 import { verifyCronJob } from '@/lib/auth-cron-job'
@@ -176,6 +177,18 @@ export function handler<TBody = unknown, TQuery = unknown>(opts: HandlerOptions<
 
       // --- db --------------------------------------------------------------
       if (!opts.noDb) await connectDB()
+
+      // Block org API calls when billing is enforced and the workspace has no
+      // active platform subscription (owners subscribe via /pricing or Settings).
+      if (opts.auth === 'org' && ctx) {
+        const apiPath = new URL(request.url).pathname
+        if (!isSubscriptionExemptApi(apiPath)) {
+          const gate = await enforcePlatformAccountAccess(ctx.organizationId)
+          if (!gate.ok) {
+            return NextResponse.json({ error: gate.error }, { status: gate.status })
+          }
+        }
+      }
 
       // --- body parse ------------------------------------------------------
       let body: TBody = undefined as unknown as TBody
