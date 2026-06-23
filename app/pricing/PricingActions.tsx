@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Button, ButtonLink } from '@/app/components/ui'
 import { useToast } from '@/app/components/Toast'
+import { useOrgRole } from '@/lib/client/useOrgRole'
 import { useT } from '@/lib/client/i18n'
 import type { PlanTier } from '@/lib/billing/plans'
 
@@ -14,6 +15,7 @@ interface PricingActionsProps {
 export default function PricingActions({ tier, isSignedIn }: PricingActionsProps) {
   const toast = useToast()
   const t = useT()
+  const { role, loading: roleLoading } = useOrgRole()
   const [loading, setLoading] = useState(false)
 
   if (tier === 'institution') {
@@ -34,6 +36,10 @@ export default function PricingActions({ tier, isSignedIn }: PricingActionsProps
         {t('pricing.signInToSubscribe')}
       </ButtonLink>
     )
+  }
+
+  if (!roleLoading && role && role !== 'owner') {
+    return <p className="text-sm text-fg-muted text-center">{t('pricing.ownerOnly')}</p>
   }
 
   const startCheckout = async () => {
@@ -60,7 +66,13 @@ export default function PricingActions({ tier, isSignedIn }: PricingActionsProps
   }
 
   return (
-    <Button type="button" onClick={() => void startCheckout()} loading={loading} block size="lg">
+    <Button
+      type="button"
+      onClick={() => void startCheckout()}
+      loading={loading || roleLoading}
+      block
+      size="lg"
+    >
       {loading ? t('pricing.redirecting') : t('pricing.subscribe')}
     </Button>
   )

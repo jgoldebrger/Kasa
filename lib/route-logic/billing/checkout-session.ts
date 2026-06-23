@@ -1,13 +1,31 @@
 import { z } from 'zod'
+import Stripe from 'stripe'
 import { handler } from '@/lib/api/handler'
 import { Organization, User } from '@/lib/models'
 import { getStripePriceIdForTier } from '@/lib/billing/plans'
 import { getAppBaseUrl, getBillingStripe } from '@/lib/billing/stripe-client'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { sanitizeStripeErrorMessage } from '@/lib/payments/sanitize'
 
 const checkoutBody = z.object({
   planTier: z.enum(['starter', 'community', 'institution']),
 })
+
+function checkoutError(err: unknown): { status: number; error: string } {
+  if (err instanceof Stripe.errors.StripeError) {
+    console.error('[billing/checkout] Stripe API error:', {
+      type: err.type,
+      code: err.code,
+      message: err.message,
+    })
+    return { status: 502, error: sanitizeStripeErrorMessage(err.message) }
+  }
+  if (err instanceof Error && err.message) {
+    console.error('[billing/checkout] Error:', err.message)
+    return { status: 500, error: sanitizeStripeErrorMessage(err.message) }
+  }
+  return { status: 500, error: 'Could not start checkout.' }
+}
 
 export const POST = handler({
   auth: 'org',
@@ -37,7 +55,9 @@ export const POST = handler({
     if (!priceId) {
       return {
         status: 503,
-        data: { error: `Stripe price is not configured for the ${body.planTier} plan.` },
+        data: {
+          error: `The ${body.planTier} plan is not configured yet. Set STRIPE_PRICE_${body.planTier.toUpperCase()} in your server environment (Stripe Dashboard → Products → copy the price ID).`,
+        },
       }
     }
 
@@ -49,32 +69,47 @@ export const POST = handler({
     }
 
     const owner = await User.findById(org.ownerId).select('email').lean<{ email?: string }>()
+    const customerEmail = org.stripeCustomerId
+      ? undefined
+      : (owner?.email || ctx!.session!.user.email)?.trim()
+    if (!org.stripeCustomerId && !customerEmail) {
+      return {
+        status: 400,
+        data: { error: 'No email on file for checkout. Update your account email and try again.' },
+      }
+    }
+
     const baseUrl = getAppBaseUrl()
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      customer: org.stripeCustomerId || undefined,
-      customer_email: org.stripeCustomerId ? undefined : owner?.email || ctx!.session.user.email,
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${baseUrl}/settings?tab=billing&checkout=success`,
-      cancel_url: `${baseUrl}/pricing?checkout=cancelled`,
-      metadata: {
-        organizationId: ctx!.organizationId,
-        planTier: body.planTier,
-      },
-      subscription_data: {
+    try {
+      const session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        customer: org.stripeCustomerId || undefined,
+        customer_email: customerEmail,
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${baseUrl}/settings?tab=billing&checkout=success`,
+        cancel_url: `${baseUrl}/pricing?checkout=cancelled`,
         metadata: {
           organizationId: ctx!.organizationId,
           planTier: body.planTier,
         },
-      },
-      allow_promotion_codes: true,
-    })
+        subscription_data: {
+          metadata: {
+            organizationId: ctx!.organizationId,
+            planTier: body.planTier,
+          },
+        },
+        allow_promotion_codes: true,
+      })
 
-    if (!session.url) {
-      return { status: 500, data: { error: 'Stripe did not return a checkout URL.' } }
+      if (!session.url) {
+        return { status: 500, data: { error: 'Stripe did not return a checkout URL.' } }
+      }
+
+      return { data: { url: session.url, sessionId: session.id } }
+    } catch (err: unknown) {
+      const { status, error } = checkoutError(err)
+      return { status, data: { error } }
     }
-
-    return { data: { url: session.url, sessionId: session.id } }
   },
 })
