@@ -5,7 +5,22 @@ const stripeMocks = vi.hoisted(() => {
     const text = typeof rawBody === 'string' ? rawBody : rawBody.toString('utf8')
     return JSON.parse(text)
   })
-  return { constructEvent }
+  const retrieve = vi.fn(async (id: string) => ({
+    id,
+    customer: 'cus_chk_1',
+    status: 'trialing',
+    metadata: { organizationId: '', planTier: 'starter' },
+    items: {
+      data: [
+        {
+          price: { id: 'price_starter_test' },
+          current_period_end: Math.floor(new Date('2026-08-01').getTime() / 1000),
+        },
+      ],
+    },
+    trial_end: Math.floor(new Date('2026-07-15').getTime() / 1000),
+  }))
+  return { constructEvent, retrieve }
 })
 
 vi.mock('stripe', () => ({
@@ -14,6 +29,7 @@ vi.mock('stripe', () => ({
       webhooks: { constructEvent: stripeMocks.constructEvent },
       charges: { retrieve: vi.fn() },
       paymentIntents: { create: vi.fn(), retrieve: vi.fn() },
+      subscriptions: { retrieve: stripeMocks.retrieve },
     }
   }),
 }))
@@ -39,10 +55,7 @@ describe('subscription webhook handlers (integration)', () => {
 
   afterEach(async () => {
     const { Organization, StripeWebhookEvent } = await import('@/lib/models')
-    await Promise.all([
-      StripeWebhookEvent.deleteMany({}),
-      Organization.deleteMany({ _id: orgId }),
-    ])
+    await Promise.all([StripeWebhookEvent.deleteMany({}), Organization.deleteMany({ _id: orgId })])
   })
 
   async function seedOrg(extra: Record<string, unknown> = {}) {
@@ -131,6 +144,7 @@ describe('subscription webhook handlers (integration)', () => {
     expect(org.stripeCustomerId).toBe('cus_chk_1')
     expect(org.subscriptionId).toBe('sub_chk_1')
     expect(org.planTier).toBe('starter')
+    expect(org.subscriptionStatus).toBe('trialing')
   })
 
   it('marks subscription canceled on customer.subscription.deleted', async () => {

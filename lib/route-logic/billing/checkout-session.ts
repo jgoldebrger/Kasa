@@ -95,7 +95,7 @@ export const POST = handler({
         customer: org.stripeCustomerId || undefined,
         customer_email: customerEmail,
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${baseUrl}/settings?tab=billing&checkout=success`,
+        success_url: `${baseUrl}/settings?tab=billing&checkout=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${baseUrl}/pricing?checkout=cancelled`,
         metadata: {
           organizationId: ctx!.organizationId,

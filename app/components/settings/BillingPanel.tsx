@@ -51,6 +51,7 @@ export default function BillingPanel({
   const [billing, setBilling] = useState<BillingSnapshot | null>(initialBilling)
   const [loading, setLoading] = useState(!initialBilling)
   const [portalLoading, setPortalLoading] = useState(false)
+  const [syncLoading, setSyncLoading] = useState(false)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -86,14 +87,62 @@ export default function BillingPanel({
     if (checkoutSuccessHandledRef.current) return
     checkoutSuccessHandledRef.current = true
 
-    toastRef.current.success('Subscription updated. It may take a moment to sync.')
-    void refresh()
+    const sessionId = searchParams.get('session_id')
+
+    const syncAndRefresh = async () => {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          const res = await fetch('/api/billing/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sessionId ? { sessionId } : {}),
+          })
+          if (res.ok) {
+            toastRef.current.success('Subscription active. Welcome to Kasa!')
+            await refresh()
+            return
+          }
+        } catch {
+          // retry below
+        }
+        if (attempt < 4) {
+          await new Promise((resolve) => setTimeout(resolve, 1500))
+        }
+      }
+      toastRef.current.success('Payment received. Refreshing billing status…')
+      await refresh()
+    }
+
+    void syncAndRefresh()
 
     const params = new URLSearchParams(searchParams.toString())
     params.delete('checkout')
+    params.delete('session_id')
     const qs = params.toString()
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
   }, [searchParams, pathname, router, refresh])
+
+  const syncFromStripe = useCallback(async () => {
+    setSyncLoading(true)
+    try {
+      const res = await fetch('/api/billing/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toastRef.current.error(body.error || 'Could not sync subscription from Stripe.')
+        return
+      }
+      toastRef.current.success('Billing status updated.')
+      await refresh()
+    } catch {
+      toastRef.current.error('Could not sync subscription from Stripe.')
+    } finally {
+      setSyncLoading(false)
+    }
+  }, [refresh])
 
   const openPortal = useCallback(async () => {
     setPortalLoading(true)
@@ -168,6 +217,19 @@ export default function BillingPanel({
               {portalLoading ? 'Opening…' : 'Manage in Stripe'}
             </Button>
           )}
+          {isOwner &&
+            billing?.stripeCustomerId &&
+            billing?.subscriptionStatus !== 'active' &&
+            billing?.subscriptionStatus !== 'trialing' && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void syncFromStripe()}
+                disabled={syncLoading}
+              >
+                {syncLoading ? 'Syncing…' : 'Refresh status'}
+              </Button>
+            )}
           {isOwner && !billing?.stripeCustomerId && (
             <Link
               href="/pricing"

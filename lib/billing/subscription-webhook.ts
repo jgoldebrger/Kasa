@@ -14,7 +14,11 @@ function customerId(customer: Stripe.Subscription['customer']): string | null {
 
 function resolvePlanTier(subscription: SubscriptionLike): PlanTier | null {
   const fromMetadata = subscription.metadata?.planTier
-  if (fromMetadata === 'starter' || fromMetadata === 'community' || fromMetadata === 'institution') {
+  if (
+    fromMetadata === 'starter' ||
+    fromMetadata === 'community' ||
+    fromMetadata === 'institution'
+  ) {
     return fromMetadata
   }
   const priceId = subscription.items?.data?.[0]?.price?.id
@@ -25,17 +29,12 @@ function subscriptionDates(subscription: SubscriptionLike) {
   const itemPeriodEnd = subscription.items?.data?.[0]?.current_period_end
   return {
     trialEndsAt:
-      typeof subscription.trial_end === 'number'
-        ? new Date(subscription.trial_end * 1000)
-        : null,
-    currentPeriodEnd:
-      typeof itemPeriodEnd === 'number' ? new Date(itemPeriodEnd * 1000) : null,
+      typeof subscription.trial_end === 'number' ? new Date(subscription.trial_end * 1000) : null,
+    currentPeriodEnd: typeof itemPeriodEnd === 'number' ? new Date(itemPeriodEnd * 1000) : null,
   }
 }
 
-async function resolveOrganizationId(
-  subscription: SubscriptionLike,
-): Promise<string | null> {
+async function resolveOrganizationId(subscription: SubscriptionLike): Promise<string | null> {
   const fromMetadata = subscription.metadata?.organizationId?.trim()
   if (fromMetadata) return fromMetadata
 
@@ -69,6 +68,7 @@ export async function syncSubscriptionToOrganization(
 
 export async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session,
+  stripe?: Stripe,
 ): Promise<void> {
   const organizationId = session.metadata?.organizationId?.trim()
   if (!organizationId) return
@@ -89,4 +89,14 @@ export async function handleCheckoutSessionCompleted(
   }
 
   await Organization.findByIdAndUpdate(organizationId, update)
+
+  if (!stripe || !subscriptionId) return
+
+  if (subscription && typeof subscription === 'object') {
+    await syncSubscriptionToOrganization(subscription)
+    return
+  }
+
+  const full = await stripe.subscriptions.retrieve(subscriptionId)
+  await syncSubscriptionToOrganization(full)
 }

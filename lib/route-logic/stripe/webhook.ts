@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
       }
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
-        await handleCheckoutSessionCompleted(session)
+        await handleCheckoutSessionCompleted(session, stripe)
         break
       }
       case 'customer.subscription.created':
