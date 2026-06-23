@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { BanknotesIcon } from '@heroicons/react/24/outline'
 import { Button, SkeletonRows } from '@/app/components/ui'
 import { useToast } from '@/app/components/Toast'
@@ -30,7 +30,12 @@ function statusLabel(status: ConnectStatusPayload['stripeConnectOnboardingStatus
 
 export default function StripeConnectPanel({ canManage, isOwner }: StripeConnectPanelProps) {
   const toast = useToast()
+  const toastRef = useRef(toast)
+  toastRef.current = toast
+  const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
+  const connectReturnHandledRef = useRef(false)
   const [status, setStatus] = useState<ConnectStatusPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
@@ -41,16 +46,16 @@ export default function StripeConnectPanel({ canManage, isOwner }: StripeConnect
       const res = await fetch('/api/stripe/connect/status')
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
-        toast.error(body.error || 'Could not load payout account status.')
+        toastRef.current.error(body.error || 'Could not load payout account status.')
         return
       }
       setStatus(body as ConnectStatusPayload)
     } catch {
-      toast.error('Could not load payout account status.')
+      toastRef.current.error('Could not load payout account status.')
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [])
 
   useOrgChanged(refresh)
 
@@ -60,11 +65,18 @@ export default function StripeConnectPanel({ canManage, isOwner }: StripeConnect
 
   useEffect(() => {
     const connectParam = searchParams.get('connect')
-    if (connectParam === 'return' || connectParam === 'refresh') {
-      toast.success('Checking your Stripe Connect status…')
-      void refresh()
-    }
-  }, [searchParams, toast, refresh])
+    if (connectParam !== 'return' && connectParam !== 'refresh') return
+    if (connectReturnHandledRef.current) return
+    connectReturnHandledRef.current = true
+
+    toastRef.current.success('Checking your Stripe Connect status…')
+    void refresh()
+
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('connect')
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [searchParams, pathname, router, refresh])
 
   const startOnboarding = useCallback(async () => {
     setActionLoading(true)
@@ -72,18 +84,18 @@ export default function StripeConnectPanel({ canManage, isOwner }: StripeConnect
       const res = await fetch('/api/stripe/connect/onboard', { method: 'POST' })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
-        toast.error(body.error || 'Could not start Stripe Connect onboarding.')
+        toastRef.current.error(body.error || 'Could not start Stripe Connect onboarding.')
         return
       }
       if (body.url) {
         window.location.href = body.url
       }
     } catch {
-      toast.error('Could not start Stripe Connect onboarding.')
+      toastRef.current.error('Could not start Stripe Connect onboarding.')
     } finally {
       setActionLoading(false)
     }
-  }, [toast])
+  }, [])
 
   const openDashboard = useCallback(async () => {
     setActionLoading(true)
@@ -91,18 +103,18 @@ export default function StripeConnectPanel({ canManage, isOwner }: StripeConnect
       const res = await fetch('/api/stripe/connect/dashboard', { method: 'POST' })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
-        toast.error(body.error || 'Could not open Stripe dashboard.')
+        toastRef.current.error(body.error || 'Could not open Stripe dashboard.')
         return
       }
       if (body.url) {
         window.location.href = body.url
       }
     } catch {
-      toast.error('Could not open Stripe dashboard.')
+      toastRef.current.error('Could not open Stripe dashboard.')
     } finally {
       setActionLoading(false)
     }
-  }, [toast])
+  }, [])
 
   if (loading) {
     return <SkeletonRows count={3} />

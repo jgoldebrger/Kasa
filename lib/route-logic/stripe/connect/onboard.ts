@@ -1,7 +1,9 @@
+import Stripe from 'stripe'
 import { handler } from '@/lib/api/handler'
 import { Organization } from '@/lib/models'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
+import { sanitizeStripeErrorMessage } from '@/lib/payments/sanitize'
 import {
   getAppBaseUrl,
   getPlatformStripe,
@@ -10,6 +12,23 @@ import {
 } from '@/lib/stripe/client'
 
 export const dynamic = 'force-dynamic'
+
+function stripeOnboardError(err: unknown): { status: number; error: string } {
+  if (err instanceof Stripe.errors.StripeError) {
+    console.error('[stripe/connect/onboard] Stripe API error:', {
+      type: err.type,
+      code: err.code,
+      message: err.message,
+    })
+    return { status: 502, error: sanitizeStripeErrorMessage(err.message) }
+  }
+  if (err instanceof Error && err.message) {
+    console.error('[stripe/connect/onboard] Error:', err.message)
+    return { status: 500, error: sanitizeStripeErrorMessage(err.message) }
+  }
+  console.error('[stripe/connect/onboard] Unknown error:', err)
+  return { status: 500, error: 'Could not start Stripe Connect onboarding.' }
+}
 
 export const POST = handler({
   auth: 'org',
@@ -41,47 +60,52 @@ export const POST = handler({
     }
 
     let accountId = org.stripeConnectAccountId?.trim() || null
-    if (!accountId) {
-      const account = await stripe.accounts.create({
-        type: 'express',
-        capabilities: {
-          card_payments: { requested: true },
-          transfers: { requested: true },
-        },
-        metadata: {
-          organizationId: String(ctx!.organizationId),
-        },
-      })
-      accountId = account.id
-      org.stripeConnectAccountId = accountId
-      syncOrgConnectFieldsFromAccount(org, account)
-      if (
-        !org.stripeConnectOnboardingStatus ||
-        org.stripeConnectOnboardingStatus === 'not_started'
-      ) {
-        org.stripeConnectOnboardingStatus = 'pending'
+    try {
+      if (!accountId) {
+        const account = await stripe.accounts.create({
+          type: 'express',
+          capabilities: {
+            card_payments: { requested: true },
+            transfers: { requested: true },
+          },
+          metadata: {
+            organizationId: String(ctx!.organizationId),
+          },
+        })
+        accountId = account.id
+        org.stripeConnectAccountId = accountId
+        syncOrgConnectFieldsFromAccount(org, account)
+        if (
+          !org.stripeConnectOnboardingStatus ||
+          org.stripeConnectOnboardingStatus === 'not_started'
+        ) {
+          org.stripeConnectOnboardingStatus = 'pending'
+        }
+        await org.save()
       }
-      await org.save()
+
+      const baseUrl = getAppBaseUrl()
+      const link = await stripe.accountLinks.create({
+        account: accountId,
+        refresh_url: `${baseUrl}/settings?tab=billing&connect=refresh`,
+        return_url: `${baseUrl}/settings?tab=billing&connect=return`,
+        type: 'account_onboarding',
+      })
+
+      await audit({
+        organizationId: ctx!.organizationId,
+        userId: ctx!.userId,
+        action: 'stripe.connect.onboard',
+        resourceType: 'Organization',
+        resourceId: ctx!.organizationId,
+        metadata: { stripeConnectAccountId: accountId },
+        request,
+      })
+
+      return { data: { url: link.url, accountId } }
+    } catch (err: unknown) {
+      const { status, error } = stripeOnboardError(err)
+      return { status, data: { error } }
     }
-
-    const baseUrl = getAppBaseUrl()
-    const link = await stripe.accountLinks.create({
-      account: accountId,
-      refresh_url: `${baseUrl}/settings?tab=billing&connect=refresh`,
-      return_url: `${baseUrl}/settings?tab=billing&connect=return`,
-      type: 'account_onboarding',
-    })
-
-    await audit({
-      organizationId: ctx!.organizationId,
-      userId: ctx!.userId,
-      action: 'stripe.connect.onboard',
-      resourceType: 'Organization',
-      resourceId: ctx!.organizationId,
-      metadata: { stripeConnectAccountId: accountId },
-      request,
-    })
-
-    return { data: { url: link.url, accountId } }
   },
 })

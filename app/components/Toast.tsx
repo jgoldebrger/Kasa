@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
@@ -80,16 +80,19 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       setToasts((cur) => [...cur, { id, kind, message }])
       setTimeout(() => remove(id), DEFAULT_DURATION_MS)
     },
-    [remove]
+    [remove],
   )
 
-  const api: ToastApi = {
-    show,
-    success: (m) => show(m, 'success'),
-    error: (m) => show(m, 'error'),
-    info: (m) => show(m, 'info'),
-    warning: (m) => show(m, 'warning'),
-  }
+  const api = useMemo<ToastApi>(
+    () => ({
+      show,
+      success: (m) => show(m, 'success'),
+      error: (m) => show(m, 'error'),
+      info: (m) => show(m, 'info'),
+      warning: (m) => show(m, 'warning'),
+    }),
+    [show],
+  )
 
   // ----- Confirm modal -----
   const [confirmState, setConfirmState] = useState<ConfirmState>({
@@ -100,8 +103,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const confirmFn = useCallback<ConfirmFn>((opts) => {
     return new Promise<boolean>((resolve) => {
-      const normalized: ConfirmOptions =
-        typeof opts === 'string' ? { message: opts } : opts
+      const normalized: ConfirmOptions = typeof opts === 'string' ? { message: opts } : opts
       setConfirmState({
         open: true,
         resolve,
@@ -115,7 +117,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       confirmState.resolve?.(answer)
       setConfirmState((s) => ({ ...s, open: false, resolve: null }))
     },
-    [confirmState]
+    [confirmState],
   )
 
   return (

@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { CreditCardIcon } from '@heroicons/react/24/outline'
 import { Button, SkeletonRows } from '@/app/components/ui'
 import { useToast } from '@/app/components/Toast'
@@ -42,7 +42,12 @@ export default function BillingPanel({
   initialBilling = null,
 }: BillingPanelProps) {
   const toast = useToast()
+  const toastRef = useRef(toast)
+  toastRef.current = toast
+  const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
+  const checkoutSuccessHandledRef = useRef(false)
   const [billing, setBilling] = useState<BillingSnapshot | null>(initialBilling)
   const [loading, setLoading] = useState(!initialBilling)
   const [portalLoading, setPortalLoading] = useState(false)
@@ -53,7 +58,7 @@ export default function BillingPanel({
       const res = await fetch('/api/organizations/current')
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
-        toast.error(body.error || 'Could not load billing status.')
+        toastRef.current.error(body.error || 'Could not load billing status.')
         return
       }
       setBilling({
@@ -64,11 +69,11 @@ export default function BillingPanel({
         stripeCustomerId: body.stripeCustomerId ?? null,
       })
     } catch {
-      toast.error('Could not load billing status.')
+      toastRef.current.error('Could not load billing status.')
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [])
 
   useOrgChanged(refresh)
 
@@ -77,11 +82,18 @@ export default function BillingPanel({
   }, [initialBilling, refresh])
 
   useEffect(() => {
-    if (searchParams.get('checkout') === 'success') {
-      toast.success('Subscription updated. It may take a moment to sync.')
-      void refresh()
-    }
-  }, [searchParams, toast, refresh])
+    if (searchParams.get('checkout') !== 'success') return
+    if (checkoutSuccessHandledRef.current) return
+    checkoutSuccessHandledRef.current = true
+
+    toastRef.current.success('Subscription updated. It may take a moment to sync.')
+    void refresh()
+
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('checkout')
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [searchParams, pathname, router, refresh])
 
   const openPortal = useCallback(async () => {
     setPortalLoading(true)
@@ -89,18 +101,18 @@ export default function BillingPanel({
       const res = await fetch('/api/billing/portal', { method: 'POST' })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
-        toast.error(body.error || 'Could not open billing portal.')
+        toastRef.current.error(body.error || 'Could not open billing portal.')
         return
       }
       if (body.url) {
         window.location.href = body.url
       }
     } catch {
-      toast.error('Could not open billing portal.')
+      toastRef.current.error('Could not open billing portal.')
     } finally {
       setPortalLoading(false)
     }
-  }, [toast])
+  }, [])
 
   const planName = PLAN_DEFINITIONS.find((p) => p.tier === billing?.planTier)?.name ?? 'None'
 
