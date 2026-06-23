@@ -159,7 +159,7 @@ export default function OrganizationsAdminPage() {
       </Card>
 
       {loading && rows.length === 0 ? (
-        <SkeletonRows rows={6} />
+        <SkeletonRows count={6} />
       ) : rows.length === 0 ? (
         <EmptyState title="No organizations found" description="Try a different search term." />
       ) : (
