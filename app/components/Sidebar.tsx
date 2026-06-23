@@ -151,6 +151,19 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
         {user?.isPlatformAdmin && (
           <>
             <Link
+              href="/admin"
+              onClick={onClose}
+              className={`focus-ring relative flex items-center gap-2.5 px-3 py-2 min-h-[var(--touch-target)] md:min-h-0 md:h-9 rounded-md text-sm font-medium transition-colors ${
+                pathname === '/admin'
+                  ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                  : 'text-fg-muted hover:bg-fg/5 hover:text-fg'
+              }`}
+              title={t('nav.platformAdmin')}
+            >
+              <ShieldCheckIcon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+              <span className="truncate">{t('nav.admin')}</span>
+            </Link>
+            <Link
               href="/admin/organizations"
               onClick={onClose}
               className={`focus-ring relative flex items-center gap-2.5 px-3 py-2 min-h-[var(--touch-target)] md:min-h-0 md:h-9 rounded-md text-sm font-medium transition-colors ${
@@ -162,6 +175,32 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
             >
               <ShieldCheckIcon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
               <span className="truncate">{t('nav.organizations')}</span>
+            </Link>
+            <Link
+              href="/admin/onboarding"
+              onClick={onClose}
+              className={`focus-ring relative flex items-center gap-2.5 px-3 py-2 min-h-[var(--touch-target)] md:min-h-0 md:h-9 rounded-md text-sm font-medium transition-colors ${
+                pathname?.startsWith('/admin/onboarding')
+                  ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                  : 'text-fg-muted hover:bg-fg/5 hover:text-fg'
+              }`}
+              title={t('nav.platformAdmin')}
+            >
+              <ShieldCheckIcon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+              <span className="truncate">Onboarding</span>
+            </Link>
+            <Link
+              href="/admin/jobs"
+              onClick={onClose}
+              className={`focus-ring relative flex items-center gap-2.5 px-3 py-2 min-h-[var(--touch-target)] md:min-h-0 md:h-9 rounded-md text-sm font-medium transition-colors ${
+                pathname?.startsWith('/admin/jobs')
+                  ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                  : 'text-fg-muted hover:bg-fg/5 hover:text-fg'
+              }`}
+              title={t('nav.platformAdmin')}
+            >
+              <ShieldCheckIcon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+              <span className="truncate">Job health</span>
             </Link>
             <Link
               href="/admin/invite-requests"

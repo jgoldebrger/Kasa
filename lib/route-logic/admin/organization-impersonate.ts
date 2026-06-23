@@ -14,7 +14,6 @@ export const dynamic = 'force-dynamic'
 
 export const POST = handler({
   auth: 'admin',
-  platformAdminTwoFactor: false,
   idParams: ['id'],
   name: 'POST /api/admin/organizations/:id/impersonate',
   fn: async ({ session, params, request }) => {

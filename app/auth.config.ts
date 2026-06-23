@@ -9,6 +9,7 @@ const PUBLIC_PATHS = [
   '/reset-password',
   '/request-invite',
   '/pricing',
+  '/status',
   '/privacy',
   '/terms',
   '/subprocessors',

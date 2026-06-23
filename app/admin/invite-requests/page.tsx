@@ -8,6 +8,7 @@ import {
   Alert,
   Badge,
   Button,
+  ButtonLink,
   Card,
   EmptyState,
   Input,
@@ -178,14 +179,18 @@ export default function InviteRequestsAdminPage() {
         title="Invitation requests"
         subtitle="Review who has asked for access. Approving generates a one-time signup link."
         actions={
-          !emailEnabled ? (
-            <Alert variant="warning" className="max-w-xs text-xs">
-              Platform email is not configured. Approval emails won&apos;t be sent — copy the signup
-              link manually.
-            </Alert>
-          ) : undefined
+          <ButtonLink href="/admin" variant="secondary" size="sm">
+            Admin hub
+          </ButtonLink>
         }
       />
+
+      {!emailEnabled && (
+        <Alert variant="warning" className="text-xs">
+          Platform email is not configured. Approval emails won&apos;t be sent — copy the signup
+          link manually.
+        </Alert>
+      )}
 
       <div className="flex flex-wrap gap-2 mb-4">
         {(['pending', 'approved', 'rejected', 'all'] as const).map((f) => (

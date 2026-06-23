@@ -34,6 +34,15 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Production env validation
+        env:
+          MONGODB_URI: mongodb://placeholder.invalid/ci
+          NEXTAUTH_SECRET: ci-placeholder-secret-do-not-use-32chars
+          AUTH_SECRET: ci-placeholder-secret-do-not-use-32chars
+          ENCRYPTION_KEY: ci-placeholder-encryption-key-32bytes-base64==
+          CRON_SECRET: ci-cron-secret-placeholder-32chars-minimum
+        run: npm run check:env
+
       - name: Lint
         run: npm run lint --if-present
 

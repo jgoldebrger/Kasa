@@ -25,6 +25,7 @@ export const SUBSCRIPTION_EXEMPT_PAGE_PREFIXES = [
   '/trust',
   '/help',
   '/overview',
+  '/status',
   '/offline',
   '/admin',
 ] as const

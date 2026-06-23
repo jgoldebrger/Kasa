@@ -60,7 +60,7 @@ export default function PlatformImpersonationBanner() {
       }
       toast.success('Exited support mode.')
       setState({ active: false })
-      router.push('/admin/organizations')
+      router.push('/admin')
       router.refresh()
     } catch {
       toast.error('Network error — please try again.')

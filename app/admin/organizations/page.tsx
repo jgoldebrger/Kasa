@@ -1,8 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/app/components/Toast'
+import { PLATFORM_ADMIN_2FA_REQUIRED_CODE } from '@/lib/platform-admin-constants'
 import {
   Alert,
   Badge,
@@ -40,6 +42,13 @@ function statusBadge(status: string | null) {
   return <Badge variant="warning">{status}</Badge>
 }
 
+function setupBadge(setupCompletedAt: string | null) {
+  if (setupCompletedAt) {
+    return <Badge variant="success">complete</Badge>
+  }
+  return <Badge variant="warning">in progress</Badge>
+}
+
 export default function OrganizationsAdminPage() {
   const router = useRouter()
   const toast = useToast()
@@ -50,10 +59,12 @@ export default function OrganizationsAdminPage() {
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [enteringId, setEnteringId] = useState<string | null>(null)
   const [forbidden, setForbidden] = useState(false)
+  const [twoFactorRequired, setTwoFactorRequired] = useState(false)
 
   const load = useCallback(
     async (opts?: { cursor?: string | null; append?: boolean; q?: string }) => {
       setLoading(true)
+      setTwoFactorRequired(false)
       try {
         const qs = new URLSearchParams()
         const q = opts?.q ?? search
@@ -61,6 +72,11 @@ export default function OrganizationsAdminPage() {
         if (opts?.cursor) qs.set('cursor', opts.cursor)
         const res = await fetch(`/api/admin/organizations?${qs.toString()}`)
         if (res.status === 403) {
+          const data = await res.json().catch(() => ({}))
+          if (data?.code === PLATFORM_ADMIN_2FA_REQUIRED_CODE) {
+            setTwoFactorRequired(true)
+            return
+          }
           setForbidden(true)
           return
         }
@@ -124,111 +140,136 @@ export default function OrganizationsAdminPage() {
         title="Organizations"
         subtitle="All Kasa workspaces. Open a tenant in support mode to troubleshoot as an org admin."
         actions={
-          <ButtonLink href="/admin/invite-requests" variant="secondary" size="sm">
-            Invite requests
-          </ButtonLink>
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink href="/admin" variant="secondary" size="sm">
+              Admin hub
+            </ButtonLink>
+            <ButtonLink href="/admin/onboarding" variant="secondary" size="sm">
+              Stuck onboarding
+            </ButtonLink>
+          </div>
         }
       />
 
-      <Card className="p-4">
-        <form
-          className="flex flex-col gap-3 sm:flex-row sm:items-end"
-          onSubmit={(e) => {
-            e.preventDefault()
-            setSearch(query.trim())
-            void load({ q: query.trim() })
-          }}
-        >
-          <div className="flex-1">
-            <Input
-              label="Search"
-              type="search"
-              placeholder="Name or slug…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
-          <Button type="submit">Search</Button>
-        </form>
-      </Card>
-
-      {loading && rows.length === 0 ? (
-        <SkeletonRows count={6} />
-      ) : rows.length === 0 ? (
-        <EmptyState title="No organizations found" description="Try a different search term." />
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-app-subtle border-b border-border">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Organization</th>
-                <th className="px-4 py-3 font-semibold">Owner</th>
-                <th className="px-4 py-3 font-semibold">Families</th>
-                <th className="px-4 py-3 font-semibold">Plan</th>
-                <th className="px-4 py-3 font-semibold">Subscription</th>
-                <th className="px-4 py-3 font-semibold">Created</th>
-                <th className="px-4 py-3 font-semibold">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {rows.map((org) => (
-                <tr key={org.id} className="bg-surface">
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-fg">{org.name}</div>
-                    <div className="text-xs text-fg-muted font-mono">{org.slug}</div>
-                  </td>
-                  <td className="px-4 py-3 text-fg-muted">
-                    {org.owner ? (
-                      <>
-                        <div>{org.owner.name || '—'}</div>
-                        <div className="text-xs">{org.owner.email}</div>
-                      </>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-fg-muted">{org.familyCount}</td>
-                  <td className="px-4 py-3">{planBadge(org.planTier)}</td>
-                  <td className="px-4 py-3">{statusBadge(org.subscriptionStatus)}</td>
-                  <td className="px-4 py-3 text-fg-muted whitespace-nowrap">
-                    {org.createdAt ? new Date(org.createdAt).toLocaleDateString() : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Button
-                      type="button"
-                      size="sm"
-                      loading={enteringId === org.id}
-                      onClick={() => enterAsAdmin(org)}
-                    >
-                      Open as admin
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {nextCursor && (
-        <div className="flex justify-center">
-          <Button
-            type="button"
-            variant="secondary"
-            loading={loading}
-            onClick={() => load({ cursor: nextCursor, append: true })}
+      {twoFactorRequired ? (
+        <Alert variant="warning" title="Two-factor authentication required">
+          <p>
+            Platform admin access requires 2FA on your account. Enable it in account settings, then
+            return to this page.
+          </p>
+          <Link
+            href="/account"
+            className="mt-2 inline-flex text-sm font-medium text-accent hover:text-accent-hover"
           >
-            Load more
-          </Button>
-        </div>
-      )}
+            Go to account settings →
+          </Link>
+        </Alert>
+      ) : (
+        <>
+          <Card className="p-4">
+            <form
+              className="flex flex-col gap-3 sm:flex-row sm:items-end"
+              onSubmit={(e) => {
+                e.preventDefault()
+                setSearch(query.trim())
+                void load({ q: query.trim() })
+              }}
+            >
+              <div className="flex-1">
+                <Input
+                  label="Search"
+                  type="search"
+                  placeholder="Name or slug…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </div>
+              <Button type="submit">Search</Button>
+            </form>
+          </Card>
 
-      <p className="text-xs text-fg-muted">
-        Support mode grants org <strong>admin</strong> access without changing the customer&apos;s
-        data ownership. All entries are audit-logged. Exit from the banner at the top of the app.
-      </p>
+          {loading && rows.length === 0 ? (
+            <SkeletonRows count={6} />
+          ) : rows.length === 0 ? (
+            <EmptyState title="No organizations found" description="Try a different search term." />
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-app-subtle border-b border-border">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Organization</th>
+                    <th className="px-4 py-3 font-semibold">Owner</th>
+                    <th className="px-4 py-3 font-semibold">Families</th>
+                    <th className="px-4 py-3 font-semibold">Setup</th>
+                    <th className="px-4 py-3 font-semibold">Plan</th>
+                    <th className="px-4 py-3 font-semibold">Subscription</th>
+                    <th className="px-4 py-3 font-semibold">Created</th>
+                    <th className="px-4 py-3 font-semibold">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {rows.map((org) => (
+                    <tr key={org.id} className="bg-surface">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-fg">{org.name}</div>
+                        <div className="text-xs text-fg-muted font-mono">{org.slug}</div>
+                      </td>
+                      <td className="px-4 py-3 text-fg-muted">
+                        {org.owner ? (
+                          <>
+                            <div>{org.owner.name || '—'}</div>
+                            <div className="text-xs">{org.owner.email}</div>
+                          </>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-fg-muted">{org.familyCount}</td>
+                      <td className="px-4 py-3">{setupBadge(org.setupCompletedAt)}</td>
+                      <td className="px-4 py-3">{planBadge(org.planTier)}</td>
+                      <td className="px-4 py-3">{statusBadge(org.subscriptionStatus)}</td>
+                      <td className="px-4 py-3 text-fg-muted whitespace-nowrap">
+                        {org.createdAt ? new Date(org.createdAt).toLocaleDateString() : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Button
+                          type="button"
+                          size="sm"
+                          loading={enteringId === org.id}
+                          onClick={() => enterAsAdmin(org)}
+                        >
+                          Open as admin
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {nextCursor && (
+            <div className="flex justify-center">
+              <Button
+                type="button"
+                variant="secondary"
+                loading={loading}
+                onClick={() => load({ cursor: nextCursor, append: true })}
+              >
+                Load more
+              </Button>
+            </div>
+          )}
+
+          <p className="text-xs text-fg-muted">
+            Support mode grants org <strong>admin</strong> access without changing the
+            customer&apos;s data ownership. All entries are audit-logged. Exit from the banner at
+            the top of the app.
+          </p>
+        </>
+      )}
     </div>
   )
 }

@@ -3,9 +3,10 @@
  */
 
 import { Types } from 'mongoose'
-import { Organization, User, Family } from '@/lib/models'
+import { Organization, User, Family, AuditLog } from '@/lib/models'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { handler } from '@/lib/api/handler'
+import { loadSetupProgress } from '@/lib/organizations/setup-progress-data'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,7 +30,6 @@ function encodeCursor(id: string): string {
 
 export const GET = handler({
   auth: 'admin',
-  platformAdminTwoFactor: false,
   name: 'GET /api/admin/organizations',
   fn: async ({ request }) => {
     const rateVerdict = await checkRateLimit(request, 'admin-organizations-list', {
@@ -43,6 +43,8 @@ export const GET = handler({
     const url = request.nextUrl
     const q = (url.searchParams.get('q') || '').trim().slice(0, 120)
     const cursorRaw = (url.searchParams.get('cursor') || '').trim()
+    const stuckOnly = url.searchParams.get('stuck') === 'true'
+    const includeProgress = url.searchParams.get('includeProgress') === 'true'
     const limitRaw = Number(url.searchParams.get('limit') || DEFAULT_LIMIT)
     const limit = Math.min(
       MAX_LIMIT,
@@ -50,6 +52,9 @@ export const GET = handler({
     )
 
     const query: Record<string, unknown> = {}
+    if (stuckOnly) {
+      query.setupCompletedAt = null
+    }
     if (q) {
       const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       query.$or = [
@@ -77,7 +82,7 @@ export const GET = handler({
     const orgIds = page.map((r) => r._id)
 
     const ownerIds = [...new Set(page.map((r) => String(r.ownerId)))]
-    const [owners, familyCounts] = await Promise.all([
+    const [owners, familyCounts, lastActivityRows] = await Promise.all([
       User.find({ _id: { $in: ownerIds } })
         .select('name email')
         .lean<{ _id: Types.ObjectId; name?: string; email?: string }[]>(),
@@ -85,25 +90,67 @@ export const GET = handler({
         { $match: { organizationId: { $in: orgIds } } },
         { $group: { _id: '$organizationId', count: { $sum: 1 } } },
       ]),
+      AuditLog.aggregate<{ _id: Types.ObjectId; lastAt: Date }>([
+        { $match: { organizationId: { $in: orgIds } } },
+        { $group: { _id: '$organizationId', lastAt: { $max: '$createdAt' } } },
+      ]),
     ])
 
     const ownerById = new Map(owners.map((o) => [String(o._id), o]))
     const familiesByOrg = new Map(familyCounts.map((f) => [String(f._id), f.count]))
+    const lastActivityByOrg = new Map(lastActivityRows.map((r) => [String(r._id), r.lastAt]))
+
+    const progressByOrg = includeProgress
+      ? new Map(
+          await Promise.all(
+            orgIds.map(async (id) => {
+              const progress = await loadSetupProgress(String(id))
+              return [String(id), progress] as const
+            }),
+          ),
+        )
+      : null
 
     const organizations = page.map((org) => {
       const owner = ownerById.get(String(org.ownerId))
+      const orgId = String(org._id)
+      const createdAt = org.createdAt ? new Date(org.createdAt) : null
+      const daysSinceCreated =
+        createdAt && !Number.isNaN(createdAt.getTime())
+          ? Math.floor((Date.now() - createdAt.getTime()) / (24 * 60 * 60 * 1000))
+          : null
+      const lastActivity = lastActivityByOrg.get(orgId)
+      const progress = progressByOrg?.get(orgId)
+
       return {
-        id: String(org._id),
+        id: orgId,
         name: org.name,
         slug: org.slug,
         planTier: org.planTier || null,
         subscriptionStatus: org.subscriptionStatus || null,
         setupCompletedAt: org.setupCompletedAt || null,
         createdAt: org.createdAt,
-        familyCount: familiesByOrg.get(String(org._id)) || 0,
+        daysSinceCreated,
+        lastActivityAt: lastActivity || null,
+        familyCount: familiesByOrg.get(orgId) || 0,
         owner: owner
           ? { id: String(owner._id), name: owner.name || '', email: owner.email || '' }
           : null,
+        ...(progress
+          ? {
+              setupProgress: {
+                completed: progress.completed,
+                total: progress.total,
+                requiredComplete: progress.requiredComplete,
+                complete: progress.complete,
+                steps: progress.steps.map((s) => ({
+                  id: s.id,
+                  done: s.done,
+                  optional: s.optional ?? false,
+                })),
+              },
+            }
+          : {}),
       }
     })
 

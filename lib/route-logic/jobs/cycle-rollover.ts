@@ -4,6 +4,7 @@ import { cycleConfigMatchesSchedule } from '@/lib/jobs'
 import { runCycleRolloverForOrg, type RolloverResult } from '@/lib/cycle-rollover'
 import { acquireCronLock } from '@/lib/cron-lock'
 import { logError } from '@/lib/log'
+import { reportCronBatchFailures } from '@/lib/cron-alerts'
 import { sanitizeStripeErrorMessage } from '@/lib/payments/sanitize'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { loadAllByIdCursor } from '@/lib/org-pagination'
@@ -151,6 +152,17 @@ export const POST = handler({
         },
       })
 
+      if (failed > 0) {
+        reportCronBatchFailures({
+          jobName: JOB_NAME,
+          jobRunId: jobRun._id.toString(),
+          failed,
+          processed,
+          errors,
+          status: 'completed',
+        })
+      }
+
       return {
         data: {
           jobRunId: jobRun._id.toString(),
@@ -166,6 +178,12 @@ export const POST = handler({
         status: 'failed',
         completedAt: new Date(),
         lastError: err?.message || String(err),
+      })
+      reportCronBatchFailures({
+        jobName: JOB_NAME,
+        jobRunId: jobRun._id.toString(),
+        failed: 1,
+        status: 'failed',
       })
       logError(err, { module: 'jobs', job: JOB_NAME })
       throw err

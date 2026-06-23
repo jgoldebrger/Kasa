@@ -122,6 +122,12 @@ export default function TrustPage() {
             — processor terms for GDPR/UK GDPR customers
           </li>
           <li>
+            <Link href="/status" className="text-accent hover:underline">
+              System status
+            </Link>{' '}
+            — live availability check
+          </li>
+          <li>
             <Link href="/terms" className="text-accent hover:underline">
               Terms of Service
             </Link>{' '}

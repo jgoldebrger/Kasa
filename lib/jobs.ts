@@ -19,6 +19,7 @@ import { HDate } from '@hebcal/hdate'
 import connectDB from '@/lib/database'
 import { Organization, Family, JobRun } from '@/lib/models'
 import { logError } from '@/lib/log'
+import { reportCronBatchFailures } from '@/lib/cron-alerts'
 import { DEFAULT_CRON_JOB_TOKEN_TTL_MS, signCronJob } from '@/lib/auth-cron-job'
 import {
   getDayInTimeZone,
@@ -119,6 +120,18 @@ export async function runChunked(
     lastError: result.errors[result.errors.length - 1]?.error,
   })
 
+  if (result.failed > 0) {
+    reportCronBatchFailures({
+      jobName: opts.name,
+      jobRunId: jobRun._id.toString(),
+      failed: result.failed,
+      processed: result.processed,
+      errors: result.errors,
+      cursorIn: cursor,
+      status: 'completed',
+    })
+  }
+
   // Fire-and-forget next batch. Don't await — we want this request to
   // return promptly so the cron trigger sees success.
   if (hasMore && cursorOut) {
@@ -213,6 +226,18 @@ export async function runChunkedFamilies(
     errors: result.errors,
     lastError: result.errors[result.errors.length - 1]?.error,
   })
+
+  if (result.failed > 0) {
+    reportCronBatchFailures({
+      jobName: opts.name,
+      jobRunId: jobRun._id.toString(),
+      failed: result.failed,
+      processed: result.processed,
+      errors: result.errors,
+      cursorIn: familyCursor,
+      status: 'completed',
+    })
+  }
 
   if (triggerContinuation && hasMore && familyCursorOut) {
     triggerNextBatch(opts.selfUrl, familyCursorOut, opts.name, {

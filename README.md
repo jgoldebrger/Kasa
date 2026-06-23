@@ -6,7 +6,7 @@ yearly P&L. Each organization owns its own families, members,
 payments, and settings; users can belong to multiple organizations with
 role-based access.
 
-**Public routes:** `/overview` · `/pricing` · `/help` · `/trust` · `/terms` · `/privacy` · `/dpa`
+**Public routes:** `/overview` · `/pricing` · `/help` · `/trust` · `/terms` · `/privacy` · `/dpa` · `/status`
 
 ---
 
@@ -139,6 +139,11 @@ Public routes for prospects, compliance, and support:
 | `/privacy`       | Privacy Policy                                |
 | `/dpa`           | Data Processing Addendum (GDPR)               |
 | `/subprocessors` | Third-party subprocessors                     |
+| `/status`        | Public system status (uptime page)            |
+
+**Platform admin** (requires `PLATFORM_ADMIN_EMAILS` + 2FA): `/admin` hub · `/admin/organizations` · `/admin/onboarding` · `/admin/jobs` · `/admin/invite-requests`
+
+**Uptime monitoring:** Point external monitors at `GET /api/health`. See [docs/runbooks/uptime-monitoring.md](docs/runbooks/uptime-monitoring.md).
 
 **Data export:** organization owners and admins can download a full JSON export
 from **Settings → Data export** (`GET /api/organizations/export`) for backup,
