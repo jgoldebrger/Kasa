@@ -20,7 +20,11 @@ export const SUBSCRIPTION_EXEMPT_PAGE_PREFIXES = [
   '/settings',
   '/privacy',
   '/terms',
+  '/dpa',
   '/subprocessors',
+  '/trust',
+  '/help',
+  '/overview',
   '/offline',
   '/admin',
 ] as const

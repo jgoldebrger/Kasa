@@ -1,61 +1,32 @@
 import type { Metadata } from 'next'
 import LegalPageLayout from '@/app/components/legal/LegalPageLayout'
+import { LEGAL_LAST_UPDATED, PRIVACY_CONTACT_EMAIL } from '@/lib/legal/contacts'
+import { SUBPROCESSORS } from '@/lib/legal/subprocessors'
 
 export const metadata: Metadata = {
   title: 'Subprocessors — Kasa',
   description: 'Third-party subprocessors that support the Kasa platform.',
 }
 
-const LAST_UPDATED = 'June 9, 2026'
-
-/** [TEMPLATE] Verify vendor list and regions with operations / legal before publishing. */
-const SUBPROCESSORS = [
-  {
-    name: 'MongoDB Atlas',
-    purpose: 'Database hosting and data storage',
-    location: '[TEMPLATE — specify region, e.g., US]',
-    website: 'https://www.mongodb.com/cloud/atlas',
-  },
-  {
-    name: 'Stripe',
-    purpose: 'Payment processing and billing',
-    location: '[TEMPLATE — specify region]',
-    website: 'https://stripe.com',
-  },
-  {
-    name: 'Resend (or configured email provider)',
-    purpose: 'Transactional email delivery',
-    location: '[TEMPLATE — specify region]',
-    website: 'https://resend.com',
-  },
-  {
-    name: 'Sentry',
-    purpose: 'Error monitoring and performance diagnostics',
-    location: '[TEMPLATE — specify region]',
-    website: 'https://sentry.io',
-  },
-  {
-    name: 'Hosting provider (e.g., Vercel / AWS)',
-    purpose: 'Application hosting and CDN',
-    location: '[TEMPLATE — specify region]',
-    website: '[TEMPLATE]',
-  },
-] as const
-
 export default function SubprocessorsPage() {
   return (
-    <LegalPageLayout title="Subprocessors" lastUpdated={LAST_UPDATED}>
+    <LegalPageLayout title="Subprocessors" lastUpdated={LEGAL_LAST_UPDATED}>
       <section>
         <h2>Overview</h2>
         <p>
-          Kasa uses the third-party service providers listed below (&quot;Subprocessors&quot;)
-          to help deliver the Service. This page is a <strong>template</strong> — confirm
-          vendors, purposes, and data locations with your legal and operations teams before
-          publishing.
+          Kasa uses the third-party service providers listed below (&quot;Subprocessors&quot;) to
+          help deliver the Service. Each Subprocessor processes personal information only as
+          necessary to perform its function and is bound by data protection obligations consistent
+          with our{' '}
+          <a href="/dpa" className="text-accent hover:underline">
+            Data Processing Addendum
+          </a>
+          .
         </p>
         <p>
-          We will update this page when we add or replace Subprocessors. Organizations with
-          data-processing agreements may be entitled to advance notice of material changes.
+          We will update this page when we add or replace Subprocessors. Organization owners with an
+          executed DPA are entitled to 30 days&apos; advance notice of material Subprocessor changes
+          and may object on reasonable grounds relating to data protection.
         </p>
       </section>
 
@@ -90,7 +61,7 @@ export default function SubprocessorsPage() {
                     </a>
                   </td>
                   <td className="px-4 py-3 text-fg-muted">{row.purpose}</td>
-                  <td className="px-4 py-3 text-fg-muted font-mono text-xs">{row.location}</td>
+                  <td className="px-4 py-3 text-fg-muted text-xs">{row.location}</td>
                 </tr>
               ))}
             </tbody>
@@ -101,17 +72,32 @@ export default function SubprocessorsPage() {
       <section>
         <h2>Notifications</h2>
         <p>
-          <strong>[TEMPLATE]</strong> Describe how customers will be notified of
-          subprocessor changes (e.g., email to organization owners, updated DPA, 30-day
-          objection period).
+          When we add a new Subprocessor or materially change how an existing Subprocessor processes
+          personal information, we will:
+        </p>
+        <ul>
+          <li>Update this page with the effective date</li>
+          <li>Email organization owners at least 30 days before the change takes effect</li>
+          <li>
+            Allow organizations with a DPA to object within that notice period by contacting{' '}
+            <a href={`mailto:${PRIVACY_CONTACT_EMAIL}`} className="text-accent hover:underline">
+              {PRIVACY_CONTACT_EMAIL}
+            </a>
+          </li>
+        </ul>
+        <p>
+          If an objection cannot be resolved, the organization may terminate the affected Service as
+          described in the DPA.
         </p>
       </section>
 
       <section>
         <h2>Contact</h2>
         <p>
-          <strong>[TEMPLATE]</strong> Subprocessor inquiries:{' '}
-          <span className="font-mono text-fg">privacy@example.com</span>
+          Subprocessor inquiries:{' '}
+          <a href={`mailto:${PRIVACY_CONTACT_EMAIL}`} className="text-accent hover:underline">
+            {PRIVACY_CONTACT_EMAIL}
+          </a>
         </p>
       </section>
     </LegalPageLayout>

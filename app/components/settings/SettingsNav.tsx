@@ -13,6 +13,7 @@ import {
   IdentificationIcon,
   ClockIcon,
   TrashIcon,
+  ArrowDownTrayIcon,
   Cog6ToothIcon,
   MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline'
@@ -35,6 +36,7 @@ export type SettingsTabId =
   | 'members'
   | 'billing'
   | 'trash'
+  | 'dataExport'
 
 interface NavItem {
   id: SettingsTabId
@@ -161,6 +163,13 @@ const ALL_SECTIONS: NavSection[] = [
         icon: <ClockIcon className="h-4 w-4" aria-hidden="true" />,
         privileged: true,
         keywords: 'audit log history',
+      },
+      {
+        id: 'dataExport',
+        labelKey: 'settings.nav.dataExport',
+        icon: <ArrowDownTrayIcon className="h-4 w-4" aria-hidden="true" />,
+        privileged: true,
+        keywords: 'export backup gdpr download json',
       },
       {
         id: 'trash',

@@ -69,6 +69,7 @@ const VALID_TABS: readonly TabType[] = [
   'members',
   'billing',
   'trash',
+  'dataExport',
 ] as const
 
 function isValidTab(s: string | null | undefined): s is TabType {
@@ -109,6 +110,9 @@ const DynamicBrandingPanel = dynamic(() => import('@/app/components/settings/Bra
   loading: () => <PanelSkeleton />,
 })
 const DynamicTrashPanel = dynamic(() => import('@/app/components/settings/TrashPanel'), {
+  loading: () => <PanelSkeleton />,
+})
+const DynamicDataExportPanel = dynamic(() => import('./panels/DataExportPanel'), {
   loading: () => <PanelSkeleton />,
 })
 const DynamicBillingPanel = dynamic(() => import('@/app/components/settings/BillingPanel'), {
@@ -1687,11 +1691,14 @@ export default function SettingsView({
               <DynamicTrashPanel canPurge={canPurge} />
             )}
 
+            {activeTab === 'dataExport' && canSeePrivilegedTabs && <DynamicDataExportPanel />}
+
             {/* If a privileged tab was deep-linked by a non-privileged user,
             show a friendly fallback instead of a silent blank page. */}
             {(activeTab === 'members' ||
               activeTab === 'billing' ||
               activeTab === 'trash' ||
+              activeTab === 'dataExport' ||
               activeTab === 'letterhead' ||
               activeTab === 'activity') &&
               !canSeePrivilegedTabs &&

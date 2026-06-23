@@ -6,6 +6,8 @@ interface LegalPageLayoutProps {
   title: string
   lastUpdated: string
   children: ReactNode
+  /** When true, shows a counsel-review notice (legacy template mode). */
+  showTemplateNotice?: boolean
 }
 
 /**
@@ -15,6 +17,7 @@ export default function LegalPageLayout({
   title,
   lastUpdated,
   children,
+  showTemplateNotice = false,
 }: LegalPageLayoutProps) {
   return (
     <div className="min-h-screen bg-app">
@@ -36,14 +39,15 @@ export default function LegalPageLayout({
           <p className="text-sm text-fg-muted">Last updated: {lastUpdated}</p>
         </header>
 
-        <div
-          role="note"
-          className="mb-8 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-fg"
-        >
-          <strong className="font-semibold">Template — requires legal review.</strong>{' '}
-          The text below is placeholder content for product and engineering use. Do not
-          publish or rely on it without review by qualified counsel.
-        </div>
+        {showTemplateNotice && (
+          <div
+            role="note"
+            className="mb-8 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-fg"
+          >
+            <strong className="font-semibold">Draft — requires legal review.</strong> The text below
+            must be reviewed by qualified counsel before external publication.
+          </div>
+        )}
 
         <article className="space-y-8 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:text-fg [&_h2]:mb-3 [&_p]:text-sm [&_p]:text-fg-muted [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:text-sm [&_ul]:text-fg-muted [&_ul]:space-y-1 [&_li]:leading-relaxed">
           {children}

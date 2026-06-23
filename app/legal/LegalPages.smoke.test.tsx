@@ -12,7 +12,7 @@ describe('legal pages smoke', () => {
   it('renders Privacy Policy', () => {
     render(<PrivacyPolicyPage />)
     expect(screen.getByRole('heading', { level: 1, name: /privacy policy/i })).toBeDefined()
-    expect(screen.getByText(/template — requires legal review/i)).toBeDefined()
+    expect(screen.getAllByText(/lawful bases/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/authjs\.session-token/i).length).toBeGreaterThan(0)
   })
 

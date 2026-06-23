@@ -9,7 +9,10 @@ interface LegalFooterLinksProps {
 const LEGAL_LINKS = [
   { href: '/privacy', label: 'Privacy Policy' },
   { href: '/terms', label: 'Terms of Service' },
+  { href: '/dpa', label: 'DPA' },
   { href: '/subprocessors', label: 'Subprocessors' },
+  { href: '/trust', label: 'Trust & Security' },
+  { href: '/help', label: 'Help Center' },
 ] as const
 
 /**

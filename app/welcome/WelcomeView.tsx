@@ -73,6 +73,9 @@ export default function WelcomeView() {
             <ButtonLink href="/pricing" variant="secondary" size="lg" block className="sm:w-auto">
               {t('welcome.hero.viewPricing')}
             </ButtonLink>
+            <ButtonLink href="/overview" variant="ghost" size="lg" block className="sm:w-auto">
+              Product overview
+            </ButtonLink>
           </div>
           <p className="text-sm text-fg-muted mt-4 text-pretty">{t('welcome.earlyAccess')}</p>
         </section>
