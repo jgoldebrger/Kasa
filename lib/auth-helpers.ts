@@ -4,6 +4,7 @@ import { Types } from 'mongoose'
 import { auth } from '@/app/auth'
 import connectDB from '@/lib/database'
 import { OrgMembership, Organization, User } from '@/lib/models'
+import { isPlatformImpersonating } from '@/lib/platform-impersonation'
 import type { Role, SessionMembership } from '@/types/auth'
 
 export type { Role, SessionMembership } from '@/types/auth'
@@ -31,6 +32,8 @@ export interface OrgContext {
   role: Role
   /** True for CRON_SECRET-authenticated synthetic context — not a real org role. */
   isCron?: boolean
+  /** Platform admin viewing an org via support impersonation (admin role). */
+  isPlatformImpersonation?: boolean
 }
 
 /** Role check for handler/route logic. Cron context never satisfies admin/owner gates. */
@@ -163,6 +166,15 @@ export async function requireOrg(
       organizationId: orgId,
     }).lean<{ role: Role }>()
     if (!membership) {
+      if (await isPlatformImpersonating(session.user.id, session.user.email, orgId)) {
+        return {
+          session,
+          userId: session.user.id,
+          organizationId: orgId,
+          role: 'admin',
+          isPlatformImpersonation: true,
+        }
+      }
       return forbidden('You are not a member of this organization')
     }
     role = membership.role

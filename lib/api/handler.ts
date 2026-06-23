@@ -182,7 +182,7 @@ export function handler<TBody = unknown, TQuery = unknown>(opts: HandlerOptions<
       // active platform subscription (owners subscribe via /pricing or Settings).
       if (opts.auth === 'org' && ctx) {
         const apiPath = new URL(request.url).pathname
-        if (!isSubscriptionExemptApi(apiPath)) {
+        if (!isSubscriptionExemptApi(apiPath) && !ctx.isPlatformImpersonation) {
           const gate = await enforcePlatformAccountAccess(ctx.organizationId)
           if (!gate.ok) {
             return NextResponse.json({ error: gate.error }, { status: gate.status })

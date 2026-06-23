@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import MobileTopBar from './MobileTopBar'
+import PlatformImpersonationBanner from './PlatformImpersonationBanner'
 
 const FULLSCREEN_PATHS = [
   '/welcome',
@@ -89,6 +90,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Main content offset uses logical `ms-64` (margin-inline-start)
           so RTL flips the offset to the right side automatically. */}
       <main id="main-content" className="min-h-screen md:ms-64">
+        <PlatformImpersonationBanner />
         {children}
       </main>
     </>

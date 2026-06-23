@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-06-23T17:53:43.501Z",
+  "generatedAt": "2026-06-23T18:59:08.803Z",
   "summary": {
-    "total": 160,
+    "total": 164,
     "byAuth": {
-      "admin": 2,
+      "admin": 6,
       "org": 118,
       "nextauth": 2,
       "public": 11,
@@ -12,10 +12,28 @@
       "org-or-cron": 4,
       "webhook": 1
     },
-    "mutating": 84,
+    "mutating": 86,
     "tenantScoped": 122
   },
   "routes": [
+    {
+      "path": "/api/admin/impersonate",
+      "method": "DELETE",
+      "auth": "admin",
+      "csrf": true,
+      "tenantScoped": false,
+      "dynamicParams": [],
+      "source": "app/api/admin/impersonate/route.ts"
+    },
+    {
+      "path": "/api/admin/impersonate",
+      "method": "GET",
+      "auth": "admin",
+      "csrf": false,
+      "tenantScoped": false,
+      "dynamicParams": [],
+      "source": "app/api/admin/impersonate/route.ts"
+    },
     {
       "path": "/api/admin/invite-requests",
       "method": "GET",
@@ -33,6 +51,24 @@
       "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/admin/invite-requests/route.ts"
+    },
+    {
+      "path": "/api/admin/organizations",
+      "method": "GET",
+      "auth": "admin",
+      "csrf": false,
+      "tenantScoped": false,
+      "dynamicParams": [],
+      "source": "app/api/admin/organizations/route.ts"
+    },
+    {
+      "path": "/api/admin/organizations/:id/impersonate",
+      "method": "POST",
+      "auth": "admin",
+      "csrf": true,
+      "tenantScoped": false,
+      "dynamicParams": ["id"],
+      "source": "app/api/admin/organizations/[id]/impersonate/route.ts"
     },
     {
       "path": "/api/audit-log",

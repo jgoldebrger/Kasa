@@ -11,6 +11,7 @@ import {
   enforcePlatformAccountAccess,
   platformAccessRedirectPath,
 } from '@/lib/billing/account-access'
+import { isPlatformImpersonating } from '@/lib/platform-impersonation'
 
 /**
  * Per-request memoized `auth()`. Use this from layout.tsx + every server
@@ -28,6 +29,7 @@ export interface ServerOrgContext {
   name: string
   organizationId: string
   role: Role
+  isPlatformImpersonation?: boolean
 }
 
 /**
@@ -80,9 +82,23 @@ export const getServerOrgContext = cache(async (): Promise<ServerOrgContext | nu
     const m = await OrgMembership.findOne({ userId, organizationId: orgId })
       .select('role')
       .lean<{ role: Role }>()
-    if (!m) return null
+    if (!m) {
+      if (await isPlatformImpersonating(userId, session.user?.email, orgId)) {
+        return {
+          userId,
+          email: session.user?.email || '',
+          name: session.user?.name || '',
+          organizationId: orgId,
+          role: 'admin',
+          isPlatformImpersonation: true,
+        }
+      }
+      return null
+    }
     role = m.role
   }
+
+  const impersonating = await isPlatformImpersonating(userId, session.user?.email, orgId)
 
   return {
     userId,
@@ -90,6 +106,7 @@ export const getServerOrgContext = cache(async (): Promise<ServerOrgContext | nu
     name: session.user?.name || '',
     organizationId: orgId,
     role,
+    isPlatformImpersonation: impersonating || undefined,
   }
 })
 
@@ -110,7 +127,7 @@ export async function requireServerOrgContext(options?: {
   if (options?.minRole && !hasMinRole(ctx.role, options.minRole)) {
     redirect('/')
   }
-  if (!options?.skipSubscriptionGate) {
+  if (!options?.skipSubscriptionGate && !ctx.isPlatformImpersonation) {
     const gate = await enforcePlatformAccountAccess(ctx.organizationId)
     if (!gate.ok) {
       redirect(platformAccessRedirectPath(ctx.role))

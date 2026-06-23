@@ -20,6 +20,7 @@ export async function enforceLayoutSubscriptionGate(
 
   const pathname = (await headers()).get('x-pathname') || ''
   if (!pathname || isSubscriptionExemptPage(pathname)) return
+  if (orgCtx.isPlatformImpersonation) return
 
   const gate = await enforcePlatformAccountAccess(orgCtx.organizationId)
   if (!gate.ok) {
