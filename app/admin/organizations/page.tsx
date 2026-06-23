@@ -128,7 +128,7 @@ export default function OrganizationsAdminPage() {
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
       <PageHeader
         title="Organizations"
-        description="All Kasa workspaces. Open a tenant in support mode to troubleshoot as an org admin."
+        subtitle="All Kasa workspaces. Open a tenant in support mode to troubleshoot as an org admin."
         actions={
           <ButtonLink href="/admin/invite-requests" variant="secondary" size="sm">
             Invite requests
