@@ -11,9 +11,15 @@ interface PricingActionsProps {
   tier: PlanTier
   isSignedIn: boolean
   available: boolean
+  trialDays?: number
 }
 
-export default function PricingActions({ tier, isSignedIn, available }: PricingActionsProps) {
+export default function PricingActions({
+  tier,
+  isSignedIn,
+  available,
+  trialDays = 0,
+}: PricingActionsProps) {
   const toast = useToast()
   const t = useT()
   const { role, loading: roleLoading } = useOrgRole()
@@ -78,7 +84,11 @@ export default function PricingActions({ tier, isSignedIn, available }: PricingA
       block
       size="lg"
     >
-      {loading ? t('pricing.redirecting') : t('pricing.subscribe')}
+      {loading
+        ? t('pricing.redirecting')
+        : trialDays > 0
+          ? t('pricing.startFreeTrial')
+          : t('pricing.subscribe')}
     </Button>
   )
 }

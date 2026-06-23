@@ -87,6 +87,11 @@ export default function PricingPageClient({ initialPlans }: PricingPageClientPro
             <Card key={plan.tier} className="flex flex-col border border-border">
               <h2 className="text-xl font-semibold tracking-tight text-fg">{plan.name}</h2>
               <p className="text-3xl font-semibold text-fg mt-2">{plan.priceLabel}</p>
+              {plan.trialDays > 0 && plan.available && (
+                <p className="text-sm font-medium text-accent mt-1">
+                  {t('pricing.freeTrialDays').replace('{days}', String(plan.trialDays))}
+                </p>
+              )}
               <p className="text-sm text-fg-muted mt-3 mb-5 leading-relaxed">{plan.description}</p>
               <ul className="space-y-2 text-sm text-fg-muted flex-1 mb-6">
                 {plan.highlights.map((item) => (
@@ -105,6 +110,7 @@ export default function PricingPageClient({ initialPlans }: PricingPageClientPro
                   tier={plan.tier}
                   isSignedIn={isSignedIn}
                   available={plan.available}
+                  trialDays={plan.trialDays}
                 />
               )}
             </Card>

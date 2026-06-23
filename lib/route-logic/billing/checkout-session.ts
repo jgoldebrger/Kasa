@@ -4,6 +4,7 @@ import { handler } from '@/lib/api/handler'
 import { Organization, User } from '@/lib/models'
 import { getStripePriceIdForTier } from '@/lib/billing/plans'
 import { getAppBaseUrl, getBillingStripe } from '@/lib/billing/stripe-client'
+import { resolveCheckoutTrialDays } from '@/lib/billing/trial'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { sanitizeStripeErrorMessage } from '@/lib/payments/sanitize'
 
@@ -62,8 +63,14 @@ export const POST = handler({
     }
 
     const org = await Organization.findById(ctx!.organizationId)
-      .select('name stripeCustomerId ownerId')
-      .lean<{ name?: string; stripeCustomerId?: string | null; ownerId?: { toString(): string } }>()
+      .select('name stripeCustomerId ownerId subscriptionId subscriptionStatus')
+      .lean<{
+        name?: string
+        stripeCustomerId?: string | null
+        ownerId?: { toString(): string }
+        subscriptionId?: string | null
+        subscriptionStatus?: string | null
+      }>()
     if (!org) {
       return { status: 404, data: { error: 'Organization not found' } }
     }
@@ -80,6 +87,7 @@ export const POST = handler({
     }
 
     const baseUrl = getAppBaseUrl()
+    const trialDays = resolveCheckoutTrialDays(org)
 
     try {
       const session = await stripe.checkout.sessions.create({
@@ -98,6 +106,7 @@ export const POST = handler({
             organizationId: ctx!.organizationId,
             planTier: body.planTier,
           },
+          ...(trialDays ? { trial_period_days: trialDays } : {}),
         },
         allow_promotion_codes: true,
       })

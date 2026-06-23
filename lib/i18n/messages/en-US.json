@@ -166,6 +166,8 @@
   "pricing.signInToSubscribe": "Sign in to subscribe",
   "pricing.redirecting": "Redirecting…",
   "pricing.subscribe": "Subscribe",
+  "pricing.startFreeTrial": "Start free trial",
+  "pricing.freeTrialDays": "{days}-day free trial",
   "pricing.checkoutFailed": "Could not start checkout.",
   "pricing.ownerOnly": "Only the organization owner can start a subscription. Ask your owner or switch to your own workspace.",
   "pricing.planUnavailable": "This plan is not available for online checkout yet.",

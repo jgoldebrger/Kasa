@@ -7,6 +7,7 @@ import {
 } from '@/lib/billing/plans'
 import { getBillingStripe } from '@/lib/billing/stripe-client'
 import { formatMoney } from '@/lib/currency'
+import { getSubscriptionTrialDays } from '@/lib/billing/trial'
 
 export interface PublicPlan {
   tier: PlanTier
@@ -18,6 +19,8 @@ export interface PublicPlan {
   priceLabel: string
   interval: Stripe.Price.Recurring.Interval | null
   available: boolean
+  /** Days of free trial on first subscribe, when STRIPE_SUBSCRIPTION_TRIAL_DAYS is set. */
+  trialDays: number
 }
 
 function intervalSuffix(interval: Stripe.Price.Recurring.Interval | null | undefined): string {
@@ -59,11 +62,13 @@ function productName(price: Stripe.Price, fallback: string): string {
 }
 
 async function resolvePurchasablePlan(def: PlanDefinition): Promise<PublicPlan> {
+  const trialDays = getSubscriptionTrialDays()
   const base = {
     tier: def.tier,
     description: def.description,
     highlights: def.highlights,
     familyCap: def.familyCap,
+    trialDays,
   }
 
   const priceId = getStripePriceIdForTier(def.tier)
@@ -122,6 +127,7 @@ function institutionPlan(def: PlanDefinition): PublicPlan {
     priceLabel: def.monthlyPriceLabel,
     interval: null,
     available: true,
+    trialDays: 0,
   }
 }
 
