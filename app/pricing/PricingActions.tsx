@@ -10,9 +10,10 @@ import type { PlanTier } from '@/lib/billing/plans'
 interface PricingActionsProps {
   tier: PlanTier
   isSignedIn: boolean
+  available: boolean
 }
 
-export default function PricingActions({ tier, isSignedIn }: PricingActionsProps) {
+export default function PricingActions({ tier, isSignedIn, available }: PricingActionsProps) {
   const toast = useToast()
   const t = useT()
   const { role, loading: roleLoading } = useOrgRole()
@@ -36,6 +37,10 @@ export default function PricingActions({ tier, isSignedIn }: PricingActionsProps
         {t('pricing.signInToSubscribe')}
       </ButtonLink>
     )
+  }
+
+  if (!available) {
+    return <p className="text-sm text-fg-muted text-center">{t('pricing.planUnavailable')}</p>
   }
 
   if (!roleLoading && role && role !== 'owner') {

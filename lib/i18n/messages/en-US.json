@@ -168,6 +168,7 @@
   "pricing.subscribe": "Subscribe",
   "pricing.checkoutFailed": "Could not start checkout.",
   "pricing.ownerOnly": "Only the organization owner can start a subscription. Ask your owner or switch to your own workspace.",
+  "pricing.planUnavailable": "This plan is not available for online checkout yet.",
   "resetPassword.title": "Reset your password",
   "resetPassword.emailSentPrefix": "If an account exists for",
   "resetPassword.emailSentSuffix": ", a reset link has been sent.",

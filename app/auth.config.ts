@@ -8,6 +8,7 @@ const PUBLIC_PATHS = [
   '/invite',
   '/reset-password',
   '/request-invite',
+  '/pricing',
   '/privacy',
   '/terms',
   '/subprocessors',
@@ -24,6 +25,7 @@ const PUBLIC_API_PREFIXES = [
   // entry refunds, disputes, and payment_failed events 401 silently and
   // never reach the handler.
   '/api/stripe/webhook',
+  '/api/billing/plans',
 ]
 
 /** API routes that may bypass session auth when `CRON_SECRET` matches. Handlers re-verify. */
