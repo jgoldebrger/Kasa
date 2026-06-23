@@ -255,7 +255,7 @@ describe('handler', () => {
     await expect(res.json()).resolves.toEqual({ email: 'user@example.com' })
   })
 
-  it('allows platform admin routes for admin emails with 2FA enabled', async () => {
+  it('allows platform admin routes for admin emails without requiring 2FA', async () => {
     const { requireSession } = await import('@/lib/auth-helpers')
     const { isPlatformAdminEmail, assertPlatformAdminTwoFactor } =
       await import('@/lib/platform-admin')
@@ -263,7 +263,6 @@ describe('handler', () => {
       user: { id: 'u1', email: 'admin@example.com' },
     } as any)
     vi.mocked(isPlatformAdminEmail).mockReturnValue(true)
-    vi.mocked(assertPlatformAdminTwoFactor).mockResolvedValue(null)
 
     const { handler } = await import('./handler')
     const route = handler({
@@ -273,10 +272,11 @@ describe('handler', () => {
     })
 
     const res = await route(sameOriginRequest('http://localhost/api/platform'))
+    expect(assertPlatformAdminTwoFactor).not.toHaveBeenCalled()
     await expect(res.json()).resolves.toEqual({ ok: true })
   })
 
-  it('returns 403 for platform admin routes when 2FA is not enabled', async () => {
+  it('returns 403 for platform admin routes when platformAdminTwoFactor is true and 2FA is off', async () => {
     const { requireSession } = await import('@/lib/auth-helpers')
     const { isPlatformAdminEmail, assertPlatformAdminTwoFactor } =
       await import('@/lib/platform-admin')
@@ -297,6 +297,7 @@ describe('handler', () => {
     const { handler } = await import('./handler')
     const route = handler({
       auth: 'admin',
+      platformAdminTwoFactor: true,
       noDb: true,
       fn: async () => ({ data: { ok: true } }),
     })
@@ -308,7 +309,7 @@ describe('handler', () => {
     })
   })
 
-  it('skips platform admin 2FA when platformAdminTwoFactor is false', async () => {
+  it('does not require 2FA on admin routes by default', async () => {
     const { requireSession } = await import('@/lib/auth-helpers')
     const { isPlatformAdminEmail, assertPlatformAdminTwoFactor } =
       await import('@/lib/platform-admin')
@@ -323,7 +324,6 @@ describe('handler', () => {
     const { handler } = await import('./handler')
     const route = handler({
       auth: 'admin',
-      platformAdminTwoFactor: false,
       noDb: true,
       fn: async () => ({ data: { ok: true } }),
     })

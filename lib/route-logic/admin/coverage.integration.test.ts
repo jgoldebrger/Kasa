@@ -59,8 +59,8 @@ async function withRateLimitBlocked<T>(fn: () => Promise<T>): Promise<T> {
   const rateLimit = await import('@/lib/rate-limit')
   const spy = vi.spyOn(rateLimit, 'checkRateLimit').mockResolvedValue({
     allowed: false,
-        remaining: 0,
-        resetAt: 0,
+    remaining: 0,
+    resetAt: 0,
   })
   try {
     return await fn()
@@ -85,22 +85,14 @@ describe.sequential('route-logic admin domain coverage', () => {
   })
 
   describe('admin/invite-requests', () => {
-    it('returns 403 with PLATFORM_ADMIN_2FA_REQUIRED when admin has not enabled 2FA', async () => {
-      const actual = await vi.importActual('@/lib/platform-admin')
-      const platformAdmin = await import('@/lib/platform-admin')
-      vi.mocked(platformAdmin.assertPlatformAdminTwoFactor).mockImplementationOnce(
-        actual.assertPlatformAdminTwoFactor as typeof platformAdmin.assertPlatformAdminTwoFactor,
-      )
+    it('GET allows platform admin without 2FA', async () => {
       const { User } = await import('@/lib/models')
-      const { PLATFORM_ADMIN_2FA_REQUIRED_CODE } = await import('@/lib/platform-admin')
       await User.findByIdAndUpdate(ctx.userId, { $set: { twoFactorEnabled: false } })
 
       try {
         const { GET } = await import('@/lib/route-logic/admin/invite-requests')
         const res = await GET(orgJsonReq('/api/admin/invite-requests', 'GET'))
-        expect(res.status).toBe(403)
-        const body = await res.json()
-        expect(body.code).toBe(PLATFORM_ADMIN_2FA_REQUIRED_CODE)
+        expect(res.status).toBe(200)
       } finally {
         await User.findByIdAndUpdate(ctx.userId, { $set: { twoFactorEnabled: true } })
       }
@@ -121,17 +113,19 @@ describe.sequential('route-logic admin domain coverage', () => {
       })
 
       const pag = await import('@/lib/pagination')
-      const spy = vi.spyOn(pag, 'collectCompoundCursorPages').mockImplementation(
-        async (loadPage, baseFilter, _sf, _dir, getCursor, _bs) => {
+      const spy = vi
+        .spyOn(pag, 'collectCompoundCursorPages')
+        .mockImplementation(async (loadPage, baseFilter, _sf, _dir, getCursor, _bs) => {
           const page = await loadPage(baseFilter, 3)
           getCursor({ _id: new Types.ObjectId(), createdAt: null } as never)
           if (page[0]) getCursor(page[0] as never)
           return page
-        },
-      )
+        })
 
       const platformEmail = await import('@/lib/platform-email')
-      const configuredSpy = vi.spyOn(platformEmail, 'isPlatformEmailConfigured').mockReturnValue(false)
+      const configuredSpy = vi
+        .spyOn(platformEmail, 'isPlatformEmailConfigured')
+        .mockReturnValue(false)
 
       try {
         const { GET } = await import('@/lib/route-logic/admin/invite-requests')
@@ -169,12 +163,15 @@ describe.sequential('route-logic admin domain coverage', () => {
       const missingId = new Types.ObjectId().toString()
 
       const platformEmail = await import('@/lib/platform-email')
-      const configuredSpy = vi.spyOn(platformEmail, 'isPlatformEmailConfigured').mockReturnValue(false)
+      const configuredSpy = vi
+        .spyOn(platformEmail, 'isPlatformEmailConfigured')
+        .mockReturnValue(false)
 
       const { PATCH } = await import('@/lib/route-logic/admin/invite-requests')
       try {
         expect(
-          (await PATCH(orgJsonReq('/api/admin/invite-requests', 'PATCH', { action: 'approve' }))).status,
+          (await PATCH(orgJsonReq('/api/admin/invite-requests', 'PATCH', { action: 'approve' })))
+            .status,
         ).toBe(400)
         expect(
           (
@@ -220,8 +217,14 @@ describe.sequential('route-logic admin domain coverage', () => {
 
         await withRateLimitBlocked(async () => {
           expect(
-            (await PATCH(orgJsonReq('/api/admin/invite-requests', 'PATCH', { id: missingId, action: 'approve' })))
-              .status,
+            (
+              await PATCH(
+                orgJsonReq('/api/admin/invite-requests', 'PATCH', {
+                  id: missingId,
+                  action: 'approve',
+                }),
+              )
+            ).status,
           ).toBe(429)
         })
       } finally {

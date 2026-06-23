@@ -16,7 +16,6 @@ const SECURITY_CONTROLS = [
       'Role-based access (owner, admin, member) enforced on every API route',
       'Multi-tenant data isolation via organization-scoped queries',
       'Optional TOTP two-factor authentication for all users',
-      'Platform admin access requires 2FA',
     ],
   },
   {

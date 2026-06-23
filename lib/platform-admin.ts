@@ -69,8 +69,6 @@ export async function requirePlatformAdmin(): Promise<PlatformAdminCtx | NextRes
   if (!isPlatformAdminEmail(session.user.email)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
-  const tfaBlock = await assertPlatformAdminTwoFactor(session.user.id as string)
-  if (tfaBlock) return tfaBlock
   return {
     userId: session.user.id as string,
     email: session.user.email as string,

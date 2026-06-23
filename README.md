@@ -141,7 +141,7 @@ Public routes for prospects, compliance, and support:
 | `/subprocessors` | Third-party subprocessors                     |
 | `/status`        | Public system status (uptime page)            |
 
-**Platform admin** (requires `PLATFORM_ADMIN_EMAILS` + 2FA): `/admin` hub · `/admin/organizations` · `/admin/onboarding` · `/admin/jobs` · `/admin/invite-requests`
+**Platform admin** (requires `PLATFORM_ADMIN_EMAILS`): `/admin` hub · `/admin/organizations` · `/admin/onboarding` · `/admin/jobs` · `/admin/invite-requests`
 
 **Uptime monitoring:** Point external monitors at `GET /api/health`. See [docs/runbooks/uptime-monitoring.md](docs/runbooks/uptime-monitoring.md).
 
@@ -288,10 +288,9 @@ This was hardened in a dedicated security pass. Highlights:
   fail closed if Mongo is unavailable; other scopes fail open.
 - **Audit log** — `AuditLog` collection captures actor, IP, user-agent,
   resource and action for auth events and all CRUD-of-record mutations.
-- **Platform admin 2FA** — users listed in `PLATFORM_ADMIN_EMAILS` must
-  have two-factor authentication enabled (`User.twoFactorEnabled`) before
-  accessing `/api/admin/*` routes or the `/admin/invite-requests` console.
-  Requests without 2FA return `403` with code `PLATFORM_ADMIN_2FA_REQUIRED`.
+- **Platform admin access** — users listed in `PLATFORM_ADMIN_EMAILS` can
+  access `/api/admin/*` routes and the `/admin` console. Optional TOTP 2FA
+  is available per user but not required for platform admin.
 
 ---
 
