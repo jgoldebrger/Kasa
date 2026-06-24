@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { Alert, Button, Card, Input } from '@/app/components/ui'
 import { useFormState } from '@/lib/client/useFormState'
 import { useToast } from '@/app/components/Toast'
+import { useBillingCheckoutReturn } from '@/lib/client/useBillingCheckoutReturn'
 import { useT } from '@/lib/client/i18n'
 import { CheckCircleIcon } from '@heroicons/react/24/outline'
 
@@ -24,6 +25,7 @@ export default function SetupWizard({ initialOrgName }: { initialOrgName: string
   const router = useRouter()
   const toast = useToast()
   const t = useT()
+  useBillingCheckoutReturn()
   const [step, setStep] = useState(1)
   const [orgName, setOrgName] = useState(initialOrgName)
   const [busy, setBusy] = useState(false)

@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import connectDB from '@/lib/database'
 import { Organization } from '@/lib/models'
@@ -24,5 +25,9 @@ export default async function SetupPage() {
     redirect('/')
   }
 
-  return <SetupWizard initialOrgName={org?.name || ''} />
+  return (
+    <Suspense fallback={null}>
+      <SetupWizard initialOrgName={org?.name || ''} />
+    </Suspense>
+  )
 }

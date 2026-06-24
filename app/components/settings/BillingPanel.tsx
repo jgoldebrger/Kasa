@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { CreditCardIcon } from '@heroicons/react/24/outline'
 import { Button, SkeletonRows } from '@/app/components/ui'
 import { useToast } from '@/app/components/Toast'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
+import { useBillingCheckoutReturn } from '@/lib/client/useBillingCheckoutReturn'
 import { PLAN_DEFINITIONS } from '@/lib/billing/plans'
 import StripeConnectPanel from '@/app/components/settings/StripeConnectPanel'
 
@@ -44,10 +44,6 @@ export default function BillingPanel({
   const toast = useToast()
   const toastRef = useRef(toast)
   toastRef.current = toast
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const checkoutSuccessHandledRef = useRef(false)
   const [billing, setBilling] = useState<BillingSnapshot | null>(initialBilling)
   const [loading, setLoading] = useState(!initialBilling)
   const [portalLoading, setPortalLoading] = useState(false)
@@ -82,45 +78,7 @@ export default function BillingPanel({
     if (!initialBilling) void refresh()
   }, [initialBilling, refresh])
 
-  useEffect(() => {
-    if (searchParams.get('checkout') !== 'success') return
-    if (checkoutSuccessHandledRef.current) return
-    checkoutSuccessHandledRef.current = true
-
-    const sessionId = searchParams.get('session_id')
-
-    const syncAndRefresh = async () => {
-      for (let attempt = 0; attempt < 5; attempt++) {
-        try {
-          const res = await fetch('/api/billing/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(sessionId ? { sessionId } : {}),
-          })
-          if (res.ok) {
-            toastRef.current.success('Subscription active. Welcome to Kasa!')
-            await refresh()
-            return
-          }
-        } catch {
-          // retry below
-        }
-        if (attempt < 4) {
-          await new Promise((resolve) => setTimeout(resolve, 1500))
-        }
-      }
-      toastRef.current.success('Payment received. Refreshing billing status…')
-      await refresh()
-    }
-
-    void syncAndRefresh()
-
-    const params = new URLSearchParams(searchParams.toString())
-    params.delete('checkout')
-    params.delete('session_id')
-    const qs = params.toString()
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
-  }, [searchParams, pathname, router, refresh])
+  useBillingCheckoutReturn(refresh)
 
   const syncFromStripe = useCallback(async () => {
     setSyncLoading(true)

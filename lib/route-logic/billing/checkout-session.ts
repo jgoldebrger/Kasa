@@ -63,13 +63,14 @@ export const POST = handler({
     }
 
     const org = await Organization.findById(ctx!.organizationId)
-      .select('name stripeCustomerId ownerId subscriptionId subscriptionStatus')
+      .select('name stripeCustomerId ownerId subscriptionId subscriptionStatus setupCompletedAt')
       .lean<{
         name?: string
         stripeCustomerId?: string | null
         ownerId?: { toString(): string }
         subscriptionId?: string | null
         subscriptionStatus?: string | null
+        setupCompletedAt?: Date | null
       }>()
     if (!org) {
       return { status: 404, data: { error: 'Organization not found' } }
@@ -88,6 +89,9 @@ export const POST = handler({
 
     const baseUrl = getAppBaseUrl()
     const trialDays = resolveCheckoutTrialDays(org)
+    const checkoutReturn = org.setupCompletedAt
+      ? `/settings?tab=billing&checkout=success&session_id={CHECKOUT_SESSION_ID}`
+      : `/setup?checkout=success&session_id={CHECKOUT_SESSION_ID}`
 
     try {
       const session = await stripe.checkout.sessions.create({
@@ -95,7 +99,7 @@ export const POST = handler({
         customer: org.stripeCustomerId || undefined,
         customer_email: customerEmail,
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${baseUrl}/settings?tab=billing&checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+        success_url: `${baseUrl}${checkoutReturn}`,
         cancel_url: `${baseUrl}/pricing?checkout=cancelled`,
         metadata: {
           organizationId: ctx!.organizationId,
