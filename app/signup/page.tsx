@@ -158,7 +158,7 @@ function ValidSignupForm({
   const toast = useToast()
   const t = useT()
 
-  const signupSchema = authSchemas.signupBody.omit({ email: true })
+  const signupSchema = authSchemas.signupBody.omit({ email: true, inviteCode: true })
 
   const form = useFormState({
     schema: signupSchema,
