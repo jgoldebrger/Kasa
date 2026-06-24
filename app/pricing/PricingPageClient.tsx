@@ -20,7 +20,10 @@ export default function PricingPageClient({ initialPlans }: PricingPageClientPro
   const sessionLoading = status === 'loading'
   const subscribeRequired = searchParams.get('subscribe') === 'required'
   const contactOwner = searchParams.get('contact') === 'owner'
-  const homeHref = subscribeRequired ? '/settings?tab=billing' : isSignedIn ? '/' : '/welcome'
+  const subscribePath = contactOwner
+    ? '/pricing?subscribe=required&contact=owner'
+    : '/pricing?subscribe=required'
+  const homeHref = subscribeRequired ? subscribePath : isSignedIn ? '/' : '/welcome'
 
   return (
     <div className="min-h-screen bg-app">
@@ -39,9 +42,11 @@ export default function PricingPageClient({ initialPlans }: PricingPageClientPro
               <Skeleton h={32} w={96} className="rounded-md" />
             ) : isSignedIn ? (
               <>
-                <ButtonLink href="/settings?tab=billing" variant="ghost" size="sm">
-                  {t('pricing.billing')}
-                </ButtonLink>
+                {!subscribeRequired && (
+                  <ButtonLink href="/settings?tab=billing" variant="ghost" size="sm">
+                    {t('pricing.billing')}
+                  </ButtonLink>
+                )}
                 {!subscribeRequired && (
                   <ButtonLink href="/" size="sm">
                     {t('nav.dashboard')}
@@ -56,11 +61,15 @@ export default function PricingPageClient({ initialPlans }: PricingPageClientPro
           </nav>
         </header>
 
-        <p className="mb-8">
-          <Link href={homeHref} className="text-sm text-fg-muted hover:text-fg transition-colors">
-            ← {subscribeRequired ? t('pricing.backToBilling') : t('pricing.backToHome')}
-          </Link>
-        </p>
+        {!subscribeRequired && (
+          <p className="mb-8">
+            <Link href={homeHref} className="text-sm text-fg-muted hover:text-fg transition-colors">
+              ← {t('pricing.backToHome')}
+            </Link>
+          </p>
+        )}
+
+        {subscribeRequired && <div className="mb-8" />}
 
         {subscribeRequired && (
           <div

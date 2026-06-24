@@ -17,7 +17,6 @@ export const SUBSCRIPTION_EXEMPT_PAGE_PREFIXES = [
   '/request-invite',
   '/pricing',
   '/setup',
-  '/settings',
   '/privacy',
   '/terms',
   '/dpa',

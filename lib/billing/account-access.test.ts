@@ -18,11 +18,11 @@ describe('platform account access', () => {
     else process.env.STRIPE_PRICE_STARTER = prevStarterPrice
   })
 
-  it('exempts pricing, setup, and settings pages', () => {
+  it('exempts pricing and setup but not the main app settings area', () => {
     expect(isSubscriptionExemptPage('/pricing')).toBe(true)
     expect(isSubscriptionExemptPage('/setup')).toBe(true)
-    expect(isSubscriptionExemptPage('/settings')).toBe(true)
-    expect(isSubscriptionExemptPage('/settings/members')).toBe(true)
+    expect(isSubscriptionExemptPage('/settings')).toBe(false)
+    expect(isSubscriptionExemptPage('/settings/members')).toBe(false)
     expect(isSubscriptionExemptPage('/')).toBe(false)
     expect(isSubscriptionExemptPage('/families')).toBe(false)
   })

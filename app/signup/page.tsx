@@ -132,7 +132,7 @@ function SignupForm() {
               if (welcomeOrgName) {
                 toast.success(t('signup.welcomeOrg').replace('{orgName}', welcomeOrgName))
               }
-              router.push('/')
+              router.push('/pricing?subscribe=required')
               router.refresh()
             }}
           />
