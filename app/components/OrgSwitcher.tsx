@@ -3,9 +3,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { ChevronUpDownIcon, PlusIcon, BuildingOffice2Icon } from '@heroicons/react/24/outline'
+import { ChevronUpDownIcon, BuildingOffice2Icon } from '@heroicons/react/24/outline'
 import Link from 'next/link'
-import { cachedFetch, invalidate as invalidateUrl, clearCache } from '@/lib/client-cache'
+import { cachedFetch, clearCache } from '@/lib/client-cache'
 import { useToast } from './Toast'
 import OrgLogo from './OrgLogo'
 import { useOrgRole } from '@/lib/client/useOrgRole'
@@ -18,10 +18,6 @@ interface Org {
 }
 
 const ORGS_URL = '/api/organizations'
-
-function invalidateOrgCache() {
-  invalidateUrl(ORGS_URL)
-}
 
 async function loadOrgs(
   force = false,
@@ -46,9 +42,6 @@ export default function OrgSwitcher() {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [switching, setSwitching] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [showCreate, setShowCreate] = useState(false)
-  const [newName, setNewName] = useState('')
   const [loadingOrgs, setLoadingOrgs] = useState(false)
   const ref = useRef<HTMLDivElement | null>(null)
   const hasLoadedOrgs = useRef(false)
@@ -76,7 +69,6 @@ export default function OrgSwitcher() {
     const onDocClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false)
-        setShowCreate(false)
       }
     }
     if (open) document.addEventListener('mousedown', onDocClick)
@@ -140,137 +132,91 @@ export default function OrgSwitcher() {
     }
   }
 
-  const createOrg = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (newName.trim().length < 2 || creating || switching) return
-    setCreating(true)
-    try {
-      const res = await fetch('/api/organizations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim() }),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        toast.error(err.error || 'Could not create organization.')
-        return
-      }
-      const created = await res.json().catch(() => ({}))
-      setNewName('')
-      setShowCreate(false)
-      invalidateOrgCache()
-      await load(true)
-      if (created?.id) await switchTo(created.id)
-    } finally {
-      setCreating(false)
-    }
-  }
-
   if (hasLoadedOrgs.current && orgs.length === 0) return null
 
-  // When the user has only one org the dropdown is just visual noise —
-  // we collapse to a compact static label, but still let them open the
-  // menu (via "More" button) to create a new org or manage members.
   const isSolo = orgs.length === 1
+  const canOpenMenu = !isSolo || isAdmin
 
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className={`focus-ring w-full bg-app-subtle rounded-md border border-border flex items-center gap-2 hover:bg-fg/5 transition-colors text-left ${
-          isSolo ? 'px-2.5 py-1.5' : 'px-2.5 py-2'
-        }`}
-        title={active?.name}
-      >
-        <OrgLogo size={20} fallbackChar={active?.name?.[0]} />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-fg truncate">
-            {switching
-              ? 'Switching workspace…'
-              : loadingOrgs
-                ? 'Loading…'
-                : active?.name || 'Select organization'}
-          </p>
-          {!isSolo && active && !switching && (
-            <p className="text-[11px] text-fg-muted capitalize">{active.role}</p>
-          )}
-        </div>
-        {switching || loadingOrgs ? (
+  const orgLabel = (
+    <>
+      <OrgLogo size={20} fallbackChar={active?.name?.[0]} />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-fg truncate">
+          {switching
+            ? 'Switching workspace…'
+            : loadingOrgs
+              ? 'Loading…'
+              : active?.name || 'Select organization'}
+        </p>
+        {!isSolo && active && !switching && (
+          <p className="text-[11px] text-fg-muted capitalize">{active.role}</p>
+        )}
+      </div>
+      {canOpenMenu &&
+        (switching || loadingOrgs ? (
           <InlineSpinner />
         ) : (
           <ChevronUpDownIcon className="h-4 w-4 text-fg-subtle shrink-0" aria-hidden="true" />
-        )}
-      </button>
+        ))}
+    </>
+  )
 
-      {open && (
+  return (
+    <div className="relative" ref={ref}>
+      {canOpenMenu ? (
+        <button
+          onClick={() => setOpen((o) => !o)}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          className={`focus-ring w-full bg-app-subtle rounded-md border border-border flex items-center gap-2 hover:bg-fg/5 transition-colors text-left ${
+            isSolo ? 'px-2.5 py-1.5' : 'px-2.5 py-2'
+          }`}
+          title={active?.name}
+        >
+          {orgLabel}
+        </button>
+      ) : (
+        <div
+          className={`w-full bg-app-subtle rounded-md border border-border flex items-center gap-2 text-left ${
+            isSolo ? 'px-2.5 py-1.5' : 'px-2.5 py-2'
+          }`}
+          title={active?.name}
+        >
+          {orgLabel}
+        </div>
+      )}
+
+      {open && canOpenMenu && (
         <div className="absolute left-0 right-0 top-full mt-2 bg-surface border border-border rounded-md shadow-popover z-50 overflow-hidden">
-          <div className="max-h-72 overflow-y-auto py-1">
-            {orgs.map((o) => {
-              const isActive = o.id === activeId
-              return (
-                <button
-                  key={o.id}
-                  onClick={() => switchTo(o.id)}
-                  disabled={switching || creating}
-                  className={`w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-fg/5 disabled:opacity-50 disabled:pointer-events-none ${
-                    isActive ? 'bg-accent/10' : ''
-                  }`}
-                >
-                  <BuildingOffice2Icon className="h-4 w-4 text-fg-subtle shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-fg truncate">{o.name}</p>
-                    <p className="text-[11px] text-fg-muted capitalize">{o.role}</p>
-                  </div>
-                  {isActive && <span className="text-[11px] font-medium text-accent">Active</span>}
-                </button>
-              )
-            })}
-          </div>
+          {!isSolo && (
+            <div className="max-h-72 overflow-y-auto py-1">
+              {orgs.map((o) => {
+                const isActive = o.id === activeId
+                return (
+                  <button
+                    key={o.id}
+                    onClick={() => switchTo(o.id)}
+                    disabled={switching}
+                    className={`w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-fg/5 disabled:opacity-50 disabled:pointer-events-none ${
+                      isActive ? 'bg-accent/10' : ''
+                    }`}
+                  >
+                    <BuildingOffice2Icon className="h-4 w-4 text-fg-subtle shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-fg truncate">{o.name}</p>
+                      <p className="text-[11px] text-fg-muted capitalize">{o.role}</p>
+                    </div>
+                    {isActive && (
+                      <span className="text-[11px] font-medium text-accent">Active</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
 
-          <div className="border-t border-border p-2 space-y-1">
-            {!showCreate ? (
-              <button
-                onClick={() => setShowCreate(true)}
-                disabled={switching || creating}
-                className="w-full px-2 py-1.5 text-sm text-accent hover:bg-accent/10 rounded flex items-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
-              >
-                <PlusIcon className="h-4 w-4" />
-                New organization
-              </button>
-            ) : (
-              <form onSubmit={createOrg} className="px-1 space-y-2">
-                <input
-                  type="text"
-                  autoFocus
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Organization name"
-                  className="w-full text-sm bg-surface text-fg border border-border rounded px-2 py-1 focus:ring-2 focus:ring-accent outline-none"
-                />
-                <div className="flex gap-1">
-                  <button
-                    type="submit"
-                    disabled={creating || switching || newName.trim().length < 2}
-                    className="flex-1 text-xs bg-accent text-accent-fg px-2 py-1 rounded hover:bg-accent-hover disabled:opacity-50"
-                  >
-                    {creating ? 'Creating…' : 'Create'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowCreate(false)
-                      setNewName('')
-                    }}
-                    className="flex-1 text-xs bg-fg/5 text-fg px-2 py-1 rounded hover:bg-fg/10"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            )}
-            {isAdmin && (
+          {isAdmin && (
+            <div className={`${!isSolo ? 'border-t border-border' : ''} p-2`}>
               <Link
                 href="/settings?tab=members"
                 onClick={() => setOpen(false)}
@@ -278,8 +224,8 @@ export default function OrgSwitcher() {
               >
                 Manage members
               </Link>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>
