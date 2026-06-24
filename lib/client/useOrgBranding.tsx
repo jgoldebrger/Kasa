@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { cachedFetch, invalidate as invalidateCache } from '@/lib/client-cache'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { applyAccentCssVars, clearAccentCssVars } from '@/lib/branding-colors'
@@ -40,6 +41,7 @@ export interface OrgBrandingProviderProps {
 }
 
 export function OrgBrandingProvider({ children, initialBranding }: OrgBrandingProviderProps) {
+  const { status: sessionStatus } = useSession()
   const serverSeeded = initialBranding !== undefined
   const [branding, setBranding] = useState<OrgBranding>(initialBranding ?? EMPTY)
   const [loading, setLoading] = useState(!serverSeeded)
@@ -76,6 +78,12 @@ export function OrgBrandingProvider({ children, initialBranding }: OrgBrandingPr
   }, [begin, isStale])
 
   useEffect(() => {
+    if (sessionStatus === 'loading') return
+    if (sessionStatus !== 'authenticated') {
+      if (!serverSeeded) setBranding(EMPTY)
+      setLoading(false)
+      return
+    }
     if (!serverSeeded) {
       void refresh()
     }
@@ -98,7 +106,7 @@ export function OrgBrandingProvider({ children, initialBranding }: OrgBrandingPr
       window.removeEventListener(EVENT, onBrandingUpdated)
       window.removeEventListener(ORG_CHANGED, onOrgChanged)
     }
-  }, [refresh, invalidate, serverSeeded])
+  }, [refresh, invalidate, serverSeeded, sessionStatus])
 
   useEffect(() => {
     const root = document.documentElement

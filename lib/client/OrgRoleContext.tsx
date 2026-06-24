@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { useSession } from 'next-auth/react'
 import { cachedFetch, invalidate as invalidateCache } from '@/lib/client-cache'
 import type { Role } from '@/lib/auth-helpers'
 
@@ -34,6 +35,7 @@ export function OrgRoleProvider({
   children: ReactNode
   initialRole?: Role | null
 }) {
+  const { status: sessionStatus } = useSession()
   const [role, setRole] = useState<Role | null>(initialRole)
   const [loading, setLoading] = useState(initialRole === null)
   const refreshIdRef = useRef(0)
@@ -59,6 +61,12 @@ export function OrgRoleProvider({
   }, [])
 
   useEffect(() => {
+    if (sessionStatus === 'loading') return
+    if (sessionStatus !== 'authenticated') {
+      setRole(null)
+      setLoading(false)
+      return
+    }
     if (skipInitialFetchRef.current) {
       skipInitialFetchRef.current = false
       return
@@ -70,7 +78,7 @@ export function OrgRoleProvider({
     }
     window.addEventListener(ORG_CHANGED, onOrgChanged)
     return () => window.removeEventListener(ORG_CHANGED, onOrgChanged)
-  }, [refresh])
+  }, [refresh, sessionStatus])
 
   return (
     <OrgRoleContext.Provider
