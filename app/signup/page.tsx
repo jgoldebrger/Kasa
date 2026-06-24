@@ -4,11 +4,11 @@ import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import Link from 'next/link'
-import { z } from 'zod'
 import { Button, ButtonLink, Card, Input, Skeleton } from '@/app/components/ui'
 import { useFormState } from '@/lib/client/useFormState'
 import { useToast } from '@/app/components/Toast'
 import { useT } from '@/lib/client/i18n'
+import { auth as authSchemas } from '@/lib/schemas'
 import { LockClosedIcon } from '@heroicons/react/24/outline'
 import type { MessageKey } from '@/lib/i18n/load-locale'
 
@@ -158,13 +158,7 @@ function ValidSignupForm({
   const toast = useToast()
   const t = useT()
 
-  const signupSchema = z.object({
-    name: z.string().trim().min(2, t('signup.validation.nameMin')).max(100),
-    password: z
-      .string()
-      .min(8, t('signup.validation.passwordMin'))
-      .max(200, t('signup.validation.passwordMax')),
-  })
+  const signupSchema = authSchemas.signupBody.omit({ email: true })
 
   const form = useFormState({
     schema: signupSchema,
@@ -178,6 +172,15 @@ function ValidSignupForm({
         })
         const data = await res.json().catch(() => ({}))
         if (!res.ok) {
+          if (Array.isArray(data?.issues)) {
+            for (const issue of data.issues) {
+              const field = typeof issue.path === 'string' ? issue.path : ''
+              if (field === 'password' || field === 'name') {
+                setFieldError(field, issue.message || t('signup.failed'))
+              }
+            }
+            if (data.issues.length > 0) return
+          }
           const msg = data?.error || t('signup.failed')
           if (msg.toLowerCase().includes('password')) setFieldError('password', msg)
           else toast.error(msg)
@@ -218,6 +221,7 @@ function ValidSignupForm({
           required
           autoComplete="new-password"
           placeholder={t('signup.passwordPlaceholder')}
+          hint={t('signup.passwordHint')}
           {...form.register('password')}
         />
 

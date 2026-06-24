@@ -58,40 +58,44 @@ export default function InviteRequestsAdminPage() {
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending')
   const [busyId, setBusyId] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    setTwoFactorRequired(false)
-    try {
-      const url =
-        filter === 'all'
-          ? '/api/admin/invite-requests'
-          : `/api/admin/invite-requests?status=${filter}`
-      const res = await fetch(url)
-      if (res.status === 403) {
-        const data = await res.json().catch(() => ({}))
-        if (data?.code === PLATFORM_ADMIN_2FA_REQUIRED_CODE) {
-          setTwoFactorRequired(true)
+  const load = useCallback(
+    async (statusOverride?: typeof filter) => {
+      const activeFilter = statusOverride ?? filter
+      setLoading(true)
+      setError(null)
+      setTwoFactorRequired(false)
+      try {
+        const url =
+          activeFilter === 'all'
+            ? '/api/admin/invite-requests'
+            : `/api/admin/invite-requests?status=${activeFilter}`
+        const res = await fetch(url)
+        if (res.status === 403) {
+          const data = await res.json().catch(() => ({}))
+          if (data?.code === PLATFORM_ADMIN_2FA_REQUIRED_CODE) {
+            setTwoFactorRequired(true)
+            setRows([])
+            return
+          }
+          setError('You don\u2019t have permission to view this page.')
           setRows([])
           return
         }
-        setError('You don\u2019t have permission to view this page.')
-        setRows([])
-        return
-      }
-      if (!res.ok) {
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data?.error || 'Failed to load')
+        }
         const data = await res.json().catch(() => ({}))
-        throw new Error(data?.error || 'Failed to load')
+        setRows(data.requests || [])
+        setEmailEnabled(Boolean(data.emailEnabled))
+      } catch (err: any) {
+        setError(err.message || 'Failed to load')
+      } finally {
+        setLoading(false)
       }
-      const data = await res.json().catch(() => ({}))
-      setRows(data.requests || [])
-      setEmailEnabled(Boolean(data.emailEnabled))
-    } catch (err: any) {
-      setError(err.message || 'Failed to load')
-    } finally {
-      setLoading(false)
-    }
-  }, [filter])
+    },
+    [filter],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -121,6 +125,7 @@ export default function InviteRequestsAdminPage() {
         return
       }
       if (action === 'approve' || action === 'reissue') {
+        if (filter !== 'approved') setFilter('approved')
         if (data?.email?.sent) {
           toast.success('Approved and emailed the requester.')
         } else if (data?.email?.reason === 'platform SMTP not configured') {
@@ -128,6 +133,7 @@ export default function InviteRequestsAdminPage() {
         } else {
           toast.success('Approved. Email delivery failed — copy the signup link below.')
         }
+        await load('approved')
       } else {
         if (data?.email?.sent) {
           toast.success('Rejected and notified the requester.')
@@ -135,7 +141,9 @@ export default function InviteRequestsAdminPage() {
           toast.success('Request rejected.')
         }
       }
-      await load()
+      if (action !== 'approve' && action !== 'reissue') {
+        await load()
+      }
     } catch (err: any) {
       toast.error(err.message || 'Action failed')
     } finally {

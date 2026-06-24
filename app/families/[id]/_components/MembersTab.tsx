@@ -4,10 +4,12 @@
 import type { FamilyDetailContextValue } from '../FamilyDetailContext'
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
 import type { ReactNode } from 'react'
-import { DataView, EmptyState, SkeletonRows, Button, Card } from '@/app/components/ui'
+import { useState } from 'react'
+import { DataView, EmptyState, SkeletonRows, Button, Card, type SortDir } from '@/app/components/ui'
 import { calculateHebrewAge, convertToHebrewDate } from '@/lib/hebrew-date'
 import { buildMemberColumns, computeMemberDisplay } from '../_lib/helpers'
 import { paymentColumnsFor, paymentMobileCard } from '../_lib/helpers'
+import { sortPaymentRows } from '@/lib/payments/sort-payments'
 import { useFamilyDetail } from '../FamilyDetailContext'
 
 function InfoSection({ title, children }: { title: string; children: ReactNode }) {
@@ -64,6 +66,8 @@ function MembersTabContent(props: FamilyDetailContextValue) {
     handleEditMember,
     handleDeleteMember,
   } = props
+
+  const [paymentSort, setPaymentSort] = useState<{ id: string; dir: SortDir } | null>(null)
 
   return (
     <div>
@@ -573,9 +577,11 @@ function MembersTabContent(props: FamilyDetailContextValue) {
                   ) : (
                     <DataView
                       tableId="family-member-payments"
-                      rows={memberPayments}
+                      rows={sortPaymentRows(memberPayments, paymentSort)}
                       columns={paymentColumnsFor('member-payment', formatMoney)}
                       rowKey={(p: any) => p._id}
+                      sort={paymentSort}
+                      onSortChange={(id, dir) => setPaymentSort({ id, dir })}
                       globalSearch={{ placeholder: 'Search payments…' }}
                       pageSize={10}
                       import={{

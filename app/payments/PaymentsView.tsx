@@ -18,8 +18,10 @@ import {
   PageHeader,
   SkeletonRows,
   type DataColumn,
+  type SortDir,
 } from '@/app/components/ui'
 import { netPaymentAmount } from '@/lib/money'
+import { sortPaymentRows } from '@/lib/payments/sort-payments'
 import { formatLocaleDate } from '@/lib/date-utils'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
@@ -96,6 +98,7 @@ export default function PaymentsView({
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(false)
   const [visiblePayments, setVisiblePayments] = useState<Payment[]>([])
+  const [sort, setSort] = useState<{ id: string; dir: SortDir } | null>(null)
   const hasFetchedRef = useRef(serverHydrated)
   const { begin, invalidate, isStale } = useRequestGeneration()
 
@@ -178,12 +181,15 @@ export default function PaymentsView({
     [visiblePayments],
   )
 
+  const sortedPayments = useMemo(() => sortPaymentRows(allPayments, sort), [allPayments, sort])
+
   const columns: DataColumn<Payment>[] = useMemo(
     () => [
       {
         id: 'date',
         header: t('payments.column.date'),
         headerText: t('payments.column.date'),
+        sortable: true,
         cell: (p) => formatLocaleDate(p.paymentDate),
         exportValue: (p) => (p.paymentDate ? new Date(p.paymentDate) : ''),
         filter: { type: 'dateRange', getValue: (p) => p.paymentDate || null },
@@ -192,6 +198,7 @@ export default function PaymentsView({
         id: 'family',
         header: t('payments.column.family'),
         headerText: t('payments.column.family'),
+        sortable: true,
         cell: (p) =>
           p.familyId ? (
             <div className="min-w-0">
@@ -215,6 +222,7 @@ export default function PaymentsView({
         id: 'familyEmail',
         header: t('payments.column.familyEmail'),
         headerText: t('payments.column.familyEmail'),
+        sortable: true,
         defaultHidden: true,
         cell: (p) => <span className="text-fg-muted text-sm">{p.familyId?.email || '—'}</span>,
         exportValue: (p) => p.familyId?.email || '',
@@ -223,6 +231,7 @@ export default function PaymentsView({
         id: 'familyPhone',
         header: t('payments.column.familyPhone'),
         headerText: t('payments.column.familyPhone'),
+        sortable: true,
         defaultHidden: true,
         cell: (p) => (
           <span className="text-fg-muted text-sm tabular">{p.familyId?.phone || '—'}</span>
@@ -233,6 +242,7 @@ export default function PaymentsView({
         id: 'amount',
         header: t('payments.column.amount'),
         headerText: t('payments.column.amount'),
+        sortable: true,
         align: 'right',
         cell: (p) => (
           <span className="font-semibold text-success tabular">
@@ -246,6 +256,7 @@ export default function PaymentsView({
         id: 'type',
         header: t('payments.column.type'),
         headerText: t('payments.column.type'),
+        sortable: true,
         hideBelow: 'md',
         cell: (p) => <span>{t(PAYMENT_TYPE_KEYS[p.type])}</span>,
         exportValue: (p) => p.type || '',
@@ -262,6 +273,7 @@ export default function PaymentsView({
         id: 'method',
         header: t('payments.column.method'),
         headerText: t('payments.column.method'),
+        sortable: true,
         hideBelow: 'md',
         cell: (p) => {
           const MethodIcon =
@@ -298,6 +310,7 @@ export default function PaymentsView({
         id: 'year',
         header: t('payments.column.year'),
         headerText: t('payments.column.year'),
+        sortable: true,
         hideBelow: 'lg',
         cell: (p) => p.year,
         exportValue: (p) => p.year || '',
@@ -307,6 +320,7 @@ export default function PaymentsView({
         id: 'notes',
         header: t('payments.column.notes'),
         headerText: t('payments.column.notes'),
+        sortable: true,
         hideBelow: 'lg',
         defaultHidden: true,
         cell: (p) => <span className="text-fg text-sm">{p.notes || '—'}</span>,
@@ -346,9 +360,11 @@ export default function PaymentsView({
         ) : (
           <DataView
             tableId="payments"
-            rows={allPayments}
+            rows={sortedPayments}
             columns={columns}
             rowKey={(p) => p._id}
+            sort={sort}
+            onSortChange={(id, dir) => setSort({ id, dir })}
             globalSearch={{
               placeholder: t('payments.searchPlaceholder'),
               getValue: (p) =>

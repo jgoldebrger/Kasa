@@ -39,6 +39,7 @@ export function paymentColumnsFor(
       id: 'date',
       header: 'Date',
       headerText: 'Date',
+      sortable: true,
       cell: (p) => <span className="tabular">{formatLocaleDate(p.paymentDate)}</span>,
       exportValue: (p) => (p.paymentDate ? new Date(p.paymentDate) : ''),
       filter: { type: 'dateRange', getValue: (p) => p.paymentDate || null },
@@ -47,6 +48,7 @@ export function paymentColumnsFor(
       id: 'amount',
       header: 'Amount',
       headerText: 'Amount',
+      sortable: true,
       align: 'right',
       cell: (p) => (
         <span className="font-semibold tabular text-green-700 dark:text-green-400">
@@ -60,6 +62,7 @@ export function paymentColumnsFor(
       id: 'type',
       header: 'Type',
       headerText: 'Type',
+      sortable: true,
       hideBelow: 'md',
       cell: (p) => <span className="capitalize text-fg">{p.type}</span>,
       exportValue: (p) => p.type || '',
@@ -76,6 +79,7 @@ export function paymentColumnsFor(
       id: 'method',
       header: 'Payment Method',
       headerText: 'Payment Method',
+      sortable: true,
       hideBelow: 'md',
       cell: (p) => (
         <div>
@@ -104,6 +108,7 @@ export function paymentColumnsFor(
       id: 'year',
       header: 'Year',
       headerText: 'Year',
+      sortable: true,
       hideBelow: 'lg',
       cell: (p) => <span className="text-fg-muted tabular">{p.year}</span>,
       exportValue: (p) => p.year || '',
@@ -113,6 +118,7 @@ export function paymentColumnsFor(
       id: `${tableHint}-notes`,
       header: 'Notes',
       headerText: 'Notes',
+      sortable: true,
       hideBelow: 'lg',
       defaultHidden: true,
       cell: (p) => (
