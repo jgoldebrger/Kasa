@@ -341,6 +341,23 @@ export default function CommunicationsView() {
             rowKey={(r) => r._id}
             pageSize={15}
             exportFileName="email-log"
+            mobileCard={(row) => (
+              <Card compact>
+                <p className="font-medium text-fg truncate">{row.subject}</p>
+                <p className="text-sm text-fg-muted mt-1">
+                  {row.familyName || row.to} ·{' '}
+                  {row.createdAt ? formatLocaleDate(row.createdAt) : '—'}
+                </p>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge size="sm" variant={statusBadge(row.status)}>
+                    {row.status}
+                  </Badge>
+                  <span className="text-xs text-fg-muted tabular">
+                    {row.openCount}/{row.clickCount}
+                  </span>
+                </div>
+              </Card>
+            )}
             empty={
               <EmptyState
                 icon={<EnvelopeIcon className="h-10 w-10" />}
