@@ -17,10 +17,12 @@ import {
   PageHeader,
   SkeletonRows,
   type DataColumn,
+  type SortDir,
 } from '@/app/components/ui'
 import { eventTypeBadgeClass } from '@/lib/event-type-badge'
 import { cn } from '@/lib/cn'
 import { eventsListUrl, parseEventsListResponse } from '@/lib/client/events-list'
+import { sortEventRows } from '@/lib/events/sort-events'
 import { useT } from '@/lib/client/i18n'
 
 interface LifecycleEvent {
@@ -54,6 +56,7 @@ export default function EventsView({
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const [visibleEvents, setVisibleEvents] = useState<LifecycleEvent[]>(initialEvents ?? [])
+  const [sort, setSort] = useState<{ id: string; dir: SortDir } | null>(null)
   const { begin, invalidate, isStale } = useRequestGeneration()
 
   const fetchEvents = useCallback(
@@ -123,6 +126,8 @@ export default function EventsView({
     [visibleEvents],
   )
 
+  const sortedEvents = useMemo(() => sortEventRows(events, sort), [events, sort])
+
   const eventTypeOptions = useMemo(() => {
     const labels = new Map<string, string>()
     events.forEach((e) => {
@@ -136,6 +141,7 @@ export default function EventsView({
       id: 'family',
       header: t('events.column.familyName'),
       headerText: t('events.column.familyName'),
+      sortable: true,
       cell: (e) =>
         e.familyId ? (
           <Link
@@ -154,6 +160,7 @@ export default function EventsView({
       id: 'eventType',
       header: t('events.column.eventType'),
       headerText: t('events.column.eventType'),
+      sortable: true,
       cell: (e) => (
         <Badge
           size="md"
@@ -172,6 +179,7 @@ export default function EventsView({
       id: 'eventDate',
       header: t('events.column.eventDate'),
       headerText: t('events.column.eventDate'),
+      sortable: true,
       cell: (e) => <span className="tabular">{formatLocaleDate(e.eventDate)}</span>,
       exportValue: (e) => (e.eventDate ? new Date(e.eventDate) : ''),
       filter: { type: 'dateRange', getValue: (e) => e.eventDate || null },
@@ -181,6 +189,7 @@ export default function EventsView({
       header: t('events.column.year'),
       headerText: t('events.column.year'),
       hideBelow: 'md',
+      sortable: true,
       cell: (e) => <span className="text-fg-muted tabular">{e.year}</span>,
       exportValue: (e) => e.year || '',
       filter: { type: 'select', getValue: (e) => (e.year ? String(e.year) : '') },
@@ -190,6 +199,7 @@ export default function EventsView({
       header: t('events.column.amount'),
       headerText: t('events.column.amount'),
       align: 'right',
+      sortable: true,
       cell: (e) => (
         <span className="font-medium tabular">
           {Number.isFinite(e.amount) ? formatMoney(e.amount) : '—'}
@@ -204,6 +214,7 @@ export default function EventsView({
       headerText: t('events.column.notes'),
       hideBelow: 'lg',
       defaultHidden: true,
+      sortable: true,
       cell: (e) => <span className="text-fg-muted text-sm">{e.notes || '—'}</span>,
       exportValue: (e) => e.notes || '',
     },
@@ -243,9 +254,11 @@ export default function EventsView({
         ) : (
           <DataView
             tableId="events"
-            rows={events}
+            rows={sortedEvents}
             columns={columns}
             rowKey={(e) => e._id}
+            sort={sort}
+            onSortChange={(id, dir) => setSort({ id, dir })}
             globalSearch={{ placeholder: t('events.searchPlaceholder') }}
             pageSize={10}
             import={{ type: 'lifecycle-events', onImported: () => fetchEvents({}) }}
