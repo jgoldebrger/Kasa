@@ -2,7 +2,21 @@ import { Types } from 'mongoose'
 import { Family, EmailMessage } from '@/lib/models'
 import { encodeCompoundCursor, decodeCompoundCursor } from '@/lib/pagination'
 
+function errorFromRow(row: {
+  error?: string | null
+  events?: Array<{ type?: string; meta?: { message?: string } }>
+}): string | null {
+  if (row.error) return row.error
+  const events = row.events ?? []
+  for (let i = events.length - 1; i >= 0; i--) {
+    const ev = events[i]
+    if (ev?.type === 'failed' && ev.meta?.message) return String(ev.meta.message)
+  }
+  return null
+}
+
 function formatEmailRow(row: any, familyName?: string) {
+  const error = errorFromRow(row)
   return {
     _id: String(row._id),
     familyId: row.familyId ? String(row.familyId) : null,
@@ -13,7 +27,7 @@ function formatEmailRow(row: any, familyName?: string) {
     status: row.status,
     openCount: row.openCount ?? 0,
     clickCount: row.clickCount ?? 0,
-    error: row.error ?? null,
+    error,
     createdAt: row.createdAt,
     firstOpenedAt: row.firstOpenedAt ?? null,
     firstClickedAt: row.firstClickedAt ?? null,

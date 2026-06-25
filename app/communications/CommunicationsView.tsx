@@ -241,7 +241,9 @@ export default function CommunicationsView() {
           className="text-sm text-danger max-w-md block truncate"
           title={row.error || undefined}
         >
-          {row.status === 'failed' && row.error ? row.error : '—'}
+          {row.status === 'failed'
+            ? row.error || 'Send failed — verify Settings → Email (Gmail app password).'
+            : '—'}
         </span>
       ),
       exportValue: (row) => row.error || '',
@@ -378,8 +380,11 @@ export default function CommunicationsView() {
                     {row.openCount}/{row.clickCount}
                   </span>
                 </div>
-                {row.status === 'failed' && row.error && (
-                  <p className="text-xs text-danger mt-2 line-clamp-3">{row.error}</p>
+                {row.status === 'failed' && (
+                  <p className="text-xs text-danger mt-2 line-clamp-4">
+                    {row.error ||
+                      'Send failed. Check Settings → Email, then send a new test message.'}
+                  </p>
                 )}
               </Card>
             )}
