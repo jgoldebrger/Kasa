@@ -12,10 +12,21 @@ interface PerEventRow {
   eventTypeId: string
   name: string
   type: string
-  historicalAvgCount: number
-  historicalSampleSize: number
   currentCost: number
-  expectedExpense: number
+  rosterMapped: boolean
+  projectedCountStartYear: number
+  projectedExpenseStartYear: number
+}
+
+interface PlanRecommendation {
+  planId: string
+  planName: string
+  currentPrice: number
+  familyCount: number
+}
+
+interface YearlyPlanRecommendation extends PlanRecommendation {
+  recommendedPrice: number
 }
 
 interface YearlyDuesRow {
@@ -23,13 +34,16 @@ interface YearlyDuesRow {
   projectedFamilies: number
   projectedBarMitzvahPayers: number
   projectedPayers: number
-  expectedEventExpense: number
-  recommendedDuesPerPayer: number
+  projectedExpenses: number
+  projectedPlanIncome: number
+  scaleFactor: number
+  planRecommendations: YearlyPlanRecommendation[]
 }
 
 interface DuesRecommendation {
-  recommendedDuesPerPayer: number
-  expectedAnnualEventExpense: number
+  plans: PlanRecommendation[]
+  currentPlanIncome: number
+  expenseSource: 'roster'
   currentPayers: number
   currentFamilies: number
   currentBarMitzvahPayers: number
@@ -38,8 +52,7 @@ interface DuesRecommendation {
   projectedNewPayersPerYear: number
   projectedPayers: number
   chargesBarMitzvahPayers: boolean
-  historyWindowYears: number
-  historyYearsSeen: number
+  growthLookbackYears: number
   perEvent: PerEventRow[]
   multiYear: YearlyDuesRow[]
 }
@@ -145,7 +158,10 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
   const r = recommendation
   const showBM = r?.chargesBarMitzvahPayers ?? false
   const yearLabel =
-    r && r.historyYearsSeen === 1 ? t('projections.yearSingular') : t('projections.yearPlural')
+    r && r.growthLookbackYears === 1 ? t('projections.yearSingular') : t('projections.yearPlural')
+  const headlineRow =
+    r?.multiYear.find((row) => row.year === currentYear) ?? r?.multiYear[0] ?? null
+  const startYearExpenses = r?.perEvent.reduce((s, e) => s + e.projectedExpenseStartYear, 0) ?? 0
 
   return (
     <div className="min-h-screen p-4 sm:p-6 md:p-8">
@@ -178,11 +194,68 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
 
         {r && (
           <>
+            <Card compact className="space-y-4">
+              <h2 className="text-sm font-semibold text-fg">{t('projections.headline.title')}</h2>
+              {r.plans.length === 0 ? (
+                <p className="text-xs text-fg-muted">
+                  {t('projections.headline.noPlans')}{' '}
+                  <a href="/settings?tab=paymentPlans" className="text-accent hover:underline">
+                    {t('projections.headline.plansLink')}
+                  </a>
+                  .
+                </p>
+              ) : headlineRow ? (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wide text-fg-muted">
+                      {t('projections.headline.projectedCosts')}
+                    </div>
+                    <div className="tabular font-semibold text-fg">
+                      {formatMoney(headlineRow.projectedExpenses)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wide text-fg-muted">
+                      {t('projections.headline.planIncome')}
+                    </div>
+                    <div className="tabular font-semibold text-fg">
+                      {formatMoney(headlineRow.projectedPlanIncome)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wide text-fg-muted">
+                      {t('projections.headline.adjustment')}
+                    </div>
+                    <div className="tabular font-semibold text-fg">
+                      {headlineRow.projectedPlanIncome > 0
+                        ? formatAdjustment(headlineRow.scaleFactor)
+                        : '—'}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              {r.plans.length > 0 && headlineRow && headlineRow.projectedPlanIncome > 0 && (
+                <ul className="space-y-1 text-xs text-fg-muted border-t border-border pt-3">
+                  {headlineRow.planRecommendations.map((p) => (
+                    <li key={p.planId} className="tabular">
+                      {t('projections.headline.planRow')
+                        .replace('{name}', p.planName)
+                        .replace('{current}', formatMoney(p.currentPrice))
+                        .replace('{recommended}', formatMoney(p.recommendedPrice))}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {r.plans.length > 0 && r.currentPlanIncome === 0 && (
+                <p className="text-xs text-fg-muted">{t('projections.headline.noIncome')}</p>
+              )}
+            </Card>
+
             <Card
               compact
               className="space-y-3 sm:space-y-0 sm:flex sm:flex-wrap sm:items-end sm:gap-6"
             >
-              <ControlGroup label={t('projections.control.historyWindow')}>
+              <ControlGroup label={t('projections.control.growthLookback')}>
                 <div className="flex flex-wrap gap-1">
                   {WINDOW_OPTIONS.map((opt) => (
                     <Chip
@@ -259,8 +332,8 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                   </span>
                 )}
                 <span className="text-xs text-fg-muted text-right">
-                  {t('projections.control.historySummary')
-                    .replace('{years}', String(r.historyYearsSeen))
+                  {t('projections.control.growthSummary')
+                    .replace('{years}', String(r.growthLookbackYears))
                     .replace('{yearLabel}', yearLabel)}
                   <br />
                   {t('projections.control.newFamilies').replace(
@@ -298,22 +371,28 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                       )}
                       <th className="text-right px-3 py-2">{t('projections.table.totalPayers')}</th>
                       <th className="text-right px-3 py-2">
-                        {t('projections.table.expectedExpenses')}
+                        {t('projections.table.projectedExpenses')}
                       </th>
+                      <th className="text-right px-3 py-2">{t('projections.table.planIncome')}</th>
                       <th className="text-right px-3 py-2 bg-accent/5">
                         <span className="inline-flex items-center justify-end gap-1">
-                          {t('projections.table.recommendedDues')}
-                          <Tooltip content={t('projections.table.duesTooltip')}>
+                          {t('projections.table.adjustment')}
+                          <Tooltip content={t('projections.table.adjustmentTooltip')}>
                             <button
                               type="button"
                               className="text-fg-subtle hover:text-fg-muted focus-ring rounded normal-case"
-                              aria-label={t('projections.table.duesAria')}
+                              aria-label={t('projections.table.adjustmentAria')}
                             >
                               <InformationCircleIcon className="h-3.5 w-3.5" aria-hidden="true" />
                             </button>
                           </Tooltip>
                         </span>
                       </th>
+                      {r.plans.length > 0 && (
+                        <th className="text-right px-3 py-2 bg-accent/5">
+                          {t('projections.table.recommendedPlans')}
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -351,17 +430,27 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                             {fmt(row.projectedPayers)}
                           </td>
                           <td className="text-right px-3 py-1.5 tabular text-fg-muted">
-                            {formatMoney(row.expectedEventExpense)}
+                            {formatMoney(row.projectedExpenses)}
+                          </td>
+                          <td className="text-right px-3 py-1.5 tabular text-fg-muted">
+                            {formatMoney(row.projectedPlanIncome)}
                           </td>
                           <td
                             className={`text-right px-3 py-1.5 tabular bg-accent/5 ${
                               isCurrent ? 'font-bold text-fg' : 'font-semibold text-fg'
                             }`}
                           >
-                            {row.projectedPayers > 0
-                              ? formatMoney(row.recommendedDuesPerPayer)
-                              : '—'}
+                            {row.projectedPlanIncome > 0 ? formatAdjustment(row.scaleFactor) : '—'}
                           </td>
+                          {r.plans.length > 0 && (
+                            <td className="text-right px-3 py-1.5 tabular text-xs bg-accent/5 text-fg">
+                              {row.planRecommendations.map((p) => (
+                                <div key={p.planId}>
+                                  {p.planName}: {formatMoney(p.recommendedPrice)}
+                                </div>
+                              ))}
+                            </td>
+                          )}
                         </tr>
                       )
                     })}
@@ -400,8 +489,7 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                         <span className="font-medium text-fg">
                           {t('projections.how.expectedExpenses')}
                         </span>{' '}
-                        {formatMoney(r.expectedAnnualEventExpense)}{' '}
-                        {t('projections.how.expectedExpensesDesc')}
+                        {formatMoney(startYearExpenses)} {t('projections.how.expectedExpensesDesc')}
                       </p>
                       <p>
                         <span className="font-medium text-fg">
@@ -464,7 +552,12 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                           <thead className="text-fg-muted">
                             <tr>
                               <th className="text-left py-1">{t('projections.how.eventColumn')}</th>
-                              <th className="text-right py-1">{t('projections.how.avgPerYear')}</th>
+                              <th className="text-right py-1">
+                                {t('projections.how.rosterMapped')}
+                              </th>
+                              <th className="text-right py-1">
+                                {t('projections.how.countInYear')}
+                              </th>
                               <th className="text-right py-1">{t('projections.how.cost')}</th>
                               <th className="text-right py-1">{t('projections.how.total')}</th>
                             </tr>
@@ -473,23 +566,28 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                             {r.perEvent.map((e) => (
                               <tr key={e.eventTypeId} className="border-t border-border">
                                 <td className="py-1 text-fg">{e.name}</td>
+                                <td className="py-1 text-right text-fg-muted">
+                                  {e.rosterMapped
+                                    ? t('projections.how.rosterYes')
+                                    : t('projections.how.rosterNo')}
+                                </td>
                                 <td className="py-1 text-right tabular text-fg">
-                                  {e.historicalAvgCount.toFixed(1)}
+                                  {e.projectedCountStartYear}
                                 </td>
                                 <td className="py-1 text-right tabular text-fg-muted">
                                   {formatMoney(e.currentCost)}
                                 </td>
                                 <td className="py-1 text-right tabular font-medium text-fg">
-                                  {formatMoney(e.expectedExpense)}
+                                  {formatMoney(e.projectedExpenseStartYear)}
                                 </td>
                               </tr>
                             ))}
                             <tr className="border-t-2 border-border">
-                              <td className="py-1 font-semibold text-fg" colSpan={3}>
+                              <td className="py-1 font-semibold text-fg" colSpan={4}>
                                 {t('projections.how.total')}
                               </td>
                               <td className="py-1 text-right tabular font-bold text-fg">
-                                {formatMoney(r.expectedAnnualEventExpense)}
+                                {formatMoney(startYearExpenses)}
                               </td>
                             </tr>
                           </tbody>
@@ -544,4 +642,11 @@ function fmt(n: number): string {
   if (!Number.isFinite(n)) return '0'
   if (Math.abs(n - Math.round(n)) < 1e-6) return String(Math.round(n))
   return n.toFixed(1)
+}
+
+function formatAdjustment(scaleFactor: number): string {
+  if (!Number.isFinite(scaleFactor) || scaleFactor === 0) return '0%'
+  const pct = (scaleFactor - 1) * 100
+  const sign = pct > 0 ? '+' : ''
+  return `${sign}${pct.toFixed(1)}%`
 }

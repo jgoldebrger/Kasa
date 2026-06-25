@@ -1,62 +1,52 @@
 // Dues recommendation engine.
 //
-// One async loader + a small handful of pure functions. The page at
-// /projections asks one question and this file answers it: "based on the
-// historical average of lifecycle events (expense side) and the historical
-// average of new payers (income side), what must each family — and each
-// bar-mitzvah-aged male, when the org charges them separately — pay this
-// year to break even?"
+// The page at /projections answers: "based on roster dates (when lifecycle
+// events are expected) and your current payment-plan income, how much should
+// each plan cost to cover projected event expenses?"
 //
-//     recommendedDues = expectedEventExpenses / projectedPayers
+//     scaleFactor[y]       = projectedExpenses[y] / projectedPlanIncome[y]
+//     recommendedPrice[p]  = plan.yearlyPrice × scaleFactor[y]
 //
-//     expectedEventExpenses = Σ(event types) historicalAvgCount × currentCost
-//     projectedPayers       = currentFamilies + avgNewFamiliesPerYear
-//                             [+ currentBarMitzvahMembers + avgNewBarMitzvahsPerYear
-//                              if org has barMitzvahAutoAssignPlanId set]
+//     projectedExpenses[y] = Σ (roster events of type T in year y) × cost(T)
+//     projectedPlanIncome[y] = currentPlanIncome × (families[y] / currentFamilies)
 //
-// The Excel-style breakdown rolls that forward year by year, growing the
-// payer base linearly and recomputing dues against the new base each year.
-// No churn, no inflation, no compounding — keeps the math honest with the
-// "average from history" framing.
+// No YearlyCalculation snapshots required — expenses come from member/family
+// dates bucketed into each forecast year.
 
 import { unstable_cache } from 'next/cache'
 import { Types } from 'mongoose'
 import connectDB from './database'
-import {
-  Family,
-  FamilyMember,
-  LifecycleEvent,
-  Organization,
-  YearlyCalculation,
-} from './models'
+import { countMembersByPaymentPlan } from './calculations'
+import { Family, FamilyMember, LifecycleEvent, Organization } from './models'
 import { calendarYearBoundsInTimeZone, getYearInTimeZone } from './date-utils'
 import { loadAllByIdCursor } from './org-pagination'
-import { collectCompoundCursorPages } from './pagination'
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/**
- * Subset of a YearlyCalculation document used for historical-event averaging.
- * Defined as a separate interface so the loader can `.lean<YearlyCalculationLean[]>()`
- * without dragging in mongoose Document plumbing.
- */
-export interface YearlyCalculationLean {
-  _id: unknown
-  year: number
-  byPlan?: Array<{ planNumber: number; name?: string; count?: number; income?: number }>
-  byEvent?: Array<{ type: string; name?: string; count?: number; amount?: number }>
+export type RosterEventSource = 'bar_mitzvah' | 'bat_mitzvah' | 'member_wedding'
+
+export interface PlanRecommendation {
+  planId: string
+  planName: string
+  currentPrice: number
+  familyCount: number
+}
+
+export interface YearlyPlanRecommendation extends PlanRecommendation {
+  recommendedPrice: number
 }
 
 export interface DuesRecommendationEventRow {
   eventTypeId: string
   name: string
   type: string
-  historicalAvgCount: number
-  historicalSampleSize: number
   currentCost: number
-  expectedExpense: number
+  rosterMapped: boolean
+  /** Projected event count in the first forecast year. */
+  projectedCountStartYear: number
+  projectedExpenseStartYear: number
 }
 
 /**
@@ -67,13 +57,16 @@ export interface YearlyDuesRow {
   projectedFamilies: number
   projectedBarMitzvahPayers: number
   projectedPayers: number
-  expectedEventExpense: number
-  recommendedDuesPerPayer: number
+  projectedExpenses: number
+  projectedPlanIncome: number
+  scaleFactor: number
+  planRecommendations: YearlyPlanRecommendation[]
 }
 
 export interface DuesRecommendation {
-  recommendedDuesPerPayer: number
-  expectedAnnualEventExpense: number
+  plans: PlanRecommendation[]
+  currentPlanIncome: number
+  expenseSource: 'roster'
   currentPayers: number
   currentFamilies: number
   currentBarMitzvahPayers: number
@@ -82,8 +75,7 @@ export interface DuesRecommendation {
   projectedNewPayersPerYear: number
   projectedPayers: number
   chargesBarMitzvahPayers: boolean
-  historyWindowYears: number
-  historyYearsSeen: number
+  growthLookbackYears: number
   perEvent: DuesRecommendationEventRow[]
   multiYear: YearlyDuesRow[]
 }
@@ -91,22 +83,139 @@ export interface DuesRecommendation {
 /** Default forward-projection horizon for the Excel-style table. */
 export const DEFAULT_DUES_FORECAST_YEARS = 20
 
+export interface EventTypeConfig {
+  eventTypeId: string
+  type: string
+  name: string
+  currentCost: number
+  rosterSource: RosterEventSource | null
+}
+
 export interface DuesRecommendationInput {
   currentFamilies: number
   currentBarMitzvahPayers: number
   avgNewFamiliesPerYear: number
   avgNewBarMitzvahsPerYear: number
   chargesBarMitzvahPayers: boolean
-  historyWindowYears: number
-  historyYearsSeen: number
-  eventTypes: Array<{
-    eventTypeId: string
-    type: string
-    name: string
-    currentCost: number
-    historicalAvgCount: number
-    historicalSampleSize: number
-  }>
+  growthLookbackYears: number
+  plans: PlanRecommendation[]
+  currentPlanIncome: number
+  expensesByYear: number[]
+  eventTypes: Array<EventTypeConfig & { projectedCountByYear: number[] }>
+}
+
+export interface RosterCountsByYear {
+  barMitzvah: Map<number, number>
+  batMitzvah: Map<number, number>
+  memberWedding: Map<number, number>
+}
+
+// ---------------------------------------------------------------------------
+// Roster mapping (pure)
+// ---------------------------------------------------------------------------
+
+const BAR_MITZVAH_SLUG = /bar[_\s-]?mitzvah|barmitzvah/
+const BAT_MITZVAH_SLUG = /bat[_\s-]?mitzvah|batmitzvah/
+const WEDDING_SLUG = /wedding|chasuna|kiddushin|chasan/
+
+function slugMatches(type: string, pattern: RegExp): boolean {
+  return pattern.test(type.toLowerCase().replace(/\s+/g, ''))
+}
+
+/**
+ * Assign each lifecycle event type to at most one roster date source.
+ * Explicit org automation IDs take precedence over slug heuristics.
+ */
+export function mapEventTypesToRoster(
+  eventTypes: Array<{ eventTypeId: string; type: string }>,
+  barMitzvahAutoCreateEventTypeId: string | null,
+): Map<string, RosterEventSource | null> {
+  const assigned = new Map<string, RosterEventSource | null>()
+  const usedSources = new Set<RosterEventSource>()
+
+  if (barMitzvahAutoCreateEventTypeId) {
+    const explicit = eventTypes.find((e) => e.eventTypeId === barMitzvahAutoCreateEventTypeId)
+    if (explicit) {
+      assigned.set(explicit.eventTypeId, 'bar_mitzvah')
+      usedSources.add('bar_mitzvah')
+    }
+  }
+
+  for (const e of eventTypes) {
+    if (assigned.has(e.eventTypeId)) continue
+    let source: RosterEventSource | null = null
+    if (!usedSources.has('bar_mitzvah') && slugMatches(e.type, BAR_MITZVAH_SLUG)) {
+      source = 'bar_mitzvah'
+    } else if (!usedSources.has('bat_mitzvah') && slugMatches(e.type, BAT_MITZVAH_SLUG)) {
+      source = 'bat_mitzvah'
+    } else if (!usedSources.has('member_wedding') && slugMatches(e.type, WEDDING_SLUG)) {
+      source = 'member_wedding'
+    }
+    if (source) {
+      assigned.set(e.eventTypeId, source)
+      usedSources.add(source)
+    } else {
+      assigned.set(e.eventTypeId, null)
+    }
+  }
+
+  return assigned
+}
+
+function countForSource(
+  roster: RosterCountsByYear,
+  source: RosterEventSource | null,
+  year: number,
+): number {
+  if (!source) return 0
+  switch (source) {
+    case 'bar_mitzvah':
+      return roster.barMitzvah.get(year) ?? 0
+    case 'bat_mitzvah':
+      return roster.batMitzvah.get(year) ?? 0
+    case 'member_wedding':
+      return roster.memberWedding.get(year) ?? 0
+    default:
+      return 0
+  }
+}
+
+function aggRowsToMap(rows: Array<{ _id: string; count?: number }>): Map<number, number> {
+  const map = new Map<number, number>()
+  for (const row of rows) {
+    const year = Number(row._id)
+    if (Number.isFinite(year)) {
+      map.set(year, row.count ?? 0)
+    }
+  }
+  return map
+}
+
+/**
+ * Bucket roster dates into per-year event counts and expenses.
+ */
+export function projectRosterEventsByYear(
+  eventTypes: EventTypeConfig[],
+  roster: RosterCountsByYear,
+  startYear: number,
+  years: number,
+): {
+  expensesByYear: number[]
+  eventTypesWithCounts: Array<EventTypeConfig & { projectedCountByYear: number[] }>
+} {
+  const horizon = Math.max(1, Math.min(50, Math.floor(years)))
+  const expensesByYear = new Array<number>(horizon).fill(0)
+  const eventTypesWithCounts = eventTypes.map((e) => {
+    const projectedCountByYear: number[] = []
+    for (let i = 0; i < horizon; i++) {
+      const year = startYear + i
+      const count = countForSource(roster, e.rosterSource, year)
+      projectedCountByYear.push(count)
+      expensesByYear[i] += count * e.currentCost
+    }
+    return { ...e, projectedCountByYear }
+  })
+  return { expensesByYear, eventTypesWithCounts }
 }
 
 // ---------------------------------------------------------------------------
@@ -114,21 +223,10 @@ export interface DuesRecommendationInput {
 // ---------------------------------------------------------------------------
 
 /**
- * Year-by-year breakdown. For year `i` (starting at 0 = startYear):
- *
- *     families[i]      = currentFamilies + avgNewFamiliesPerYear * i
- *     bm_payers[i]     = currentBarMitzvahPayers + avgNewBarMitzvahsPerYear * i
- *                          (or 0 if the org doesn't charge them)
- *     total[i]         = families[i] + bm_payers[i]
- *     dues_per_payer[i] = expectedAnnualEventExpense / total[i]
- *
- * Linear growth + constant expenses is intentional: matches the "average from
- * history × number of payers" framing without sneaking in inflation or churn.
- * Horizon is clamped to [1, 50].
+ * Year-by-year breakdown with proportional plan scaling.
  */
 export function projectDuesMultiYear(
   input: DuesRecommendationInput,
-  expectedAnnualEventExpense: number,
   startYear: number,
   years: number,
 ): YearlyDuesRow[] {
@@ -140,64 +238,63 @@ export function projectDuesMultiYear(
       ? input.currentBarMitzvahPayers + input.avgNewBarMitzvahsPerYear * i
       : 0
     const payers = families + bm
-    const dues = payers > 0 ? expectedAnnualEventExpense / payers : 0
+    const projectedExpenses = input.expensesByYear[i] ?? 0
+    const projectedPlanIncome =
+      input.currentPlanIncome > 0 && input.currentFamilies > 0
+        ? input.currentPlanIncome * (families / input.currentFamilies)
+        : 0
+    const scaleFactor = projectedPlanIncome > 0 ? projectedExpenses / projectedPlanIncome : 0
+    const planRecommendations: YearlyPlanRecommendation[] = input.plans.map((p) => ({
+      ...p,
+      recommendedPrice: p.currentPrice * scaleFactor,
+    }))
     rows.push({
       year: startYear + i,
       projectedFamilies: families,
       projectedBarMitzvahPayers: bm,
       projectedPayers: payers,
-      expectedEventExpense: expectedAnnualEventExpense,
-      recommendedDuesPerPayer: dues,
+      projectedExpenses,
+      projectedPlanIncome,
+      scaleFactor,
+      planRecommendations,
     })
   }
   return rows
 }
 
 /**
- * Compute the headline recommendation + the multi-year table. The loader
- * below feeds this; tests construct inputs directly.
+ * Compute the headline recommendation + the multi-year table.
  */
 export function computeDuesRecommendation(
   input: DuesRecommendationInput,
   opts: { startYear?: number; forecastYears?: number } = {},
 ): DuesRecommendation {
+  const startYear = opts.startYear ?? new Date().getFullYear()
+  const forecastYears = opts.forecastYears ?? DEFAULT_DUES_FORECAST_YEARS
+
   const perEvent: DuesRecommendationEventRow[] = input.eventTypes.map((e) => ({
     eventTypeId: e.eventTypeId,
     name: e.name,
     type: e.type,
-    historicalAvgCount: e.historicalAvgCount,
-    historicalSampleSize: e.historicalSampleSize,
     currentCost: e.currentCost,
-    expectedExpense: e.historicalAvgCount * e.currentCost,
+    rosterMapped: e.rosterSource !== null,
+    projectedCountStartYear: e.projectedCountByYear[0] ?? 0,
+    projectedExpenseStartYear: (e.projectedCountByYear[0] ?? 0) * e.currentCost,
   }))
-  const expectedAnnualEventExpense = perEvent.reduce((s, r) => s + r.expectedExpense, 0)
 
   const projectedNewPayersPerYear =
     input.avgNewFamiliesPerYear +
     (input.chargesBarMitzvahPayers ? input.avgNewBarMitzvahsPerYear : 0)
   const currentPayers =
-    input.currentFamilies +
-    (input.chargesBarMitzvahPayers ? input.currentBarMitzvahPayers : 0)
+    input.currentFamilies + (input.chargesBarMitzvahPayers ? input.currentBarMitzvahPayers : 0)
   const projectedPayers = currentPayers + projectedNewPayersPerYear
 
-  // Guard against divide-by-zero. With nobody to charge, "infinity" is
-  // useless; surface 0 so the UI can render a "no payers" empty state
-  // instead of NaN.
-  const recommendedDuesPerPayer =
-    projectedPayers > 0 ? expectedAnnualEventExpense / projectedPayers : 0
-
-  const startYear = opts.startYear ?? new Date().getFullYear()
-  const forecastYears = opts.forecastYears ?? DEFAULT_DUES_FORECAST_YEARS
-  const multiYear = projectDuesMultiYear(
-    input,
-    expectedAnnualEventExpense,
-    startYear,
-    forecastYears,
-  )
+  const multiYear = projectDuesMultiYear(input, startYear, forecastYears)
 
   return {
-    recommendedDuesPerPayer,
-    expectedAnnualEventExpense,
+    plans: input.plans,
+    currentPlanIncome: input.currentPlanIncome,
+    expenseSource: 'roster',
     currentPayers,
     currentFamilies: input.currentFamilies,
     currentBarMitzvahPayers: input.currentBarMitzvahPayers,
@@ -206,8 +303,7 @@ export function computeDuesRecommendation(
     projectedNewPayersPerYear,
     projectedPayers,
     chargesBarMitzvahPayers: input.chargesBarMitzvahPayers,
-    historyWindowYears: input.historyWindowYears,
-    historyYearsSeen: input.historyYearsSeen,
+    growthLookbackYears: input.growthLookbackYears,
     perEvent,
     multiYear,
   }
@@ -217,23 +313,62 @@ export function computeDuesRecommendation(
 // Loader
 // ---------------------------------------------------------------------------
 
-/**
- * Pulls org config, event types, current member counts, and gross year-by-year
- * history of new families + bar-mitzvah arrivals from the DB.
- *
- *   - "Gross new families per year" = count of Family.createdAt by year.
- *     Soft-deleted families are excluded by the soft-delete plugin's filter,
- *     which is the correct behaviour: a family that joined and was hard-removed
- *     shouldn't pad future-year expectations.
- *   - "Gross new bar mitzvahs per year" = count of FamilyMember.barMitzvahDate
- *     falling in the year. Only meaningful when `org.barMitzvahAutoAssignPlanId`
- *     is set — otherwise those members don't become independent payers.
- *   - Event averages exclude snapshot years that are "stale" (no byPlan and no
- *     byEvent rows), so a year where the admin never ran "Calculate Year"
- *     doesn't drag averages down.
- */
 /** Revalidate cached projections after 1 hour (see docs/PERFORMANCE.md). */
 export const DUES_RECOMMENDATION_CACHE_SECONDS = 3600
+
+async function loadRosterCountsByYear(
+  orgFilter: Record<string, unknown>,
+  tz: string,
+  startYear: number,
+  endYear: number,
+): Promise<RosterCountsByYear> {
+  const rangeStart = calendarYearBoundsInTimeZone(startYear, tz).start
+  const rangeEnd = calendarYearBoundsInTimeZone(endYear + 1, tz).start
+  const yearBucket = (field: string) => ({
+    $dateToString: { format: '%Y', date: `$${field}`, timezone: tz },
+  })
+  const dateInRange = { $gte: rangeStart, $lt: rangeEnd }
+
+  const [barRows, batRows, weddingRows] = await Promise.all([
+    FamilyMember.aggregate([
+      {
+        $match: {
+          ...orgFilter,
+          gender: 'male',
+          convertedToFamily: { $ne: true },
+          barMitzvahDate: { $ne: null, ...dateInRange },
+        },
+      },
+      { $group: { _id: yearBucket('barMitzvahDate'), count: { $sum: 1 } } },
+    ]),
+    FamilyMember.aggregate([
+      {
+        $match: {
+          ...orgFilter,
+          convertedToFamily: { $ne: true },
+          batMitzvahDate: { $ne: null, ...dateInRange },
+        },
+      },
+      { $group: { _id: yearBucket('batMitzvahDate'), count: { $sum: 1 } } },
+    ]),
+    FamilyMember.aggregate([
+      {
+        $match: {
+          ...orgFilter,
+          convertedToFamily: { $ne: true },
+          weddingDate: { $ne: null, ...dateInRange },
+        },
+      },
+      { $group: { _id: yearBucket('weddingDate'), count: { $sum: 1 } } },
+    ]),
+  ])
+
+  return {
+    barMitzvah: aggRowsToMap(barRows),
+    batMitzvah: aggRowsToMap(batRows),
+    memberWedding: aggRowsToMap(weddingRows),
+  }
+}
 
 async function loadDuesRecommendationUncached(
   organizationId: string,
@@ -247,18 +382,24 @@ async function loadDuesRecommendationUncached(
     deletedAt: null,
   }
   const safeWindow = Math.max(1, Math.min(10, Math.floor(windowYears)))
+  const safeHorizon = Math.max(1, Math.min(50, Math.floor(forecastYears)))
 
   const org = await Organization.findById(new Types.ObjectId(organizationId)).lean<any>()
   const tz = org?.timezone ?? 'UTC'
   const currentYear = getYearInTimeZone(tz)
-  // History window covers [oldestYear .. currentYear - 1]; the current
-  // partial year is excluded so half-finished years don't drag averages down.
+  const startYear = Number.isFinite(startYearOverride) ? (startYearOverride as number) : currentYear
+  const endYear = startYear + safeHorizon - 1
+
   const oldestYear = currentYear - safeWindow
   const windowStart = calendarYearBoundsInTimeZone(oldestYear, tz).start
-  const windowEnd = calendarYearBoundsInTimeZone(currentYear, tz).start // exclusive
+  const windowEnd = calendarYearBoundsInTimeZone(currentYear, tz).start
   const yearBucket = (field: string) => ({
     $dateToString: { format: '%Y', date: `$${field}`, timezone: tz },
   })
+
+  const barMitzvahAutoCreateEventTypeId = org?.barMitzvahAutoCreateEventTypeId
+    ? String(org.barMitzvahAutoCreateEventTypeId)
+    : null
 
   const [
     eventsRaw,
@@ -266,7 +407,8 @@ async function loadDuesRecommendationUncached(
     currentBarMitzvahPayers,
     newFamilyByYear,
     newBarMitzvahByYear,
-    historyRaw,
+    planBreakdown,
+    rosterCounts,
   ] = await Promise.all([
     loadAllByIdCursor<any>(
       (filter, limit) =>
@@ -278,15 +420,6 @@ async function loadDuesRecommendationUncached(
       ...orgFilter,
       gender: 'male',
       convertedToFamily: { $ne: true },
-      // "Currently a paying bar-mitzvah-aged member" = the
-      // bar-mitzvah has already happened (any non-null date in the
-      // past) AND they have an explicit payment plan assigned. The
-      // earlier filter clamped to `< windowEnd` (Jan 1 of currentYear),
-      // which silently excluded every kid whose bar mitzvah fell
-      // inside the partially-completed current year — they're current
-      // payers but were being treated as "future" payers for
-      // projections, undercounting `currentBarMitzvahPayers` and
-      // over-projecting per-payer dues.
       barMitzvahDate: { $ne: null, $lte: new Date() },
       paymentPlanId: { $ne: null },
     }),
@@ -305,28 +438,12 @@ async function loadDuesRecommendationUncached(
       },
       { $group: { _id: yearBucket('barMitzvahDate'), count: { $sum: 1 } } },
     ]),
-    collectCompoundCursorPages<YearlyCalculationLean>(
-      (filter, limit) =>
-        YearlyCalculation.find(filter)
-          .sort({ year: -1, _id: -1 })
-          .limit(limit)
-          .lean()
-          .exec() as Promise<YearlyCalculationLean[]>,
-      { ...orgFilter, year: { $gte: oldestYear, $lt: currentYear } },
-      'year',
-      -1,
-      (last) => ({
-        v: Number(last.year),
-        id: String(last._id),
-      }),
-    ),
+    countMembersByPaymentPlan(currentYear, organizationId),
+    loadRosterCountsByYear(orgFilter, tz, startYear, endYear),
   ])
 
   const chargesBarMitzvahPayers = !!(org && org.barMitzvahAutoAssignPlanId)
 
-  // Average over the window, treating missing years as 0 (the absence of
-  // any new families in 2022 is real signal, not missing data — Family is
-  // a master table, not an event log).
   const sumNewFamilies = (newFamilyByYear as Array<{ count: number }>).reduce(
     (s, r) => s + (r.count ?? 0),
     0,
@@ -338,35 +455,33 @@ async function loadDuesRecommendationUncached(
   const avgNewFamiliesPerYear = sumNewFamilies / safeWindow
   const avgNewBarMitzvahsPerYear = sumNewBarMitzvahs / safeWindow
 
-  const historyForAvg = historyRaw.filter(isNonStaleSnapshot)
+  const rosterMapping = mapEventTypesToRoster(
+    eventsRaw.map((e: any) => ({ eventTypeId: String(e._id), type: e.type })),
+    barMitzvahAutoCreateEventTypeId,
+  )
 
-  const eventTypes = eventsRaw.map((e: any) => {
-    let cumulative = 0
-    let contributing = 0
-    for (const snap of historyForAvg) {
-      const hit = (snap.byEvent ?? []).find((b) => b.type === e.type)
-      if (hit) {
-        cumulative += hit.count ?? 0
-        contributing += 1
-      }
-    }
-    // Average across the full observation window, not just the years
-    // that happened to have at least one occurrence. Dividing by
-    // `contributing` over-states how often rare events happen — a
-    // bar mitzvah that occurred once in five years would yield an
-    // average of 1/year instead of 0.2/year, and the projections panel
-    // would over-collect dues by ~5×.
-    const windowYears = Math.max(historyForAvg.length, 1)
-    const historicalAvgCount = cumulative / windowYears
-    return {
-      eventTypeId: String(e._id),
-      type: e.type,
-      name: e.name,
-      currentCost: e.amount,
-      historicalAvgCount,
-      historicalSampleSize: contributing,
-    }
-  })
+  const eventTypeConfigs: EventTypeConfig[] = eventsRaw.map((e: any) => ({
+    eventTypeId: String(e._id),
+    type: e.type,
+    name: e.name,
+    currentCost: e.amount,
+    rosterSource: rosterMapping.get(String(e._id)) ?? null,
+  }))
+
+  const { expensesByYear, eventTypesWithCounts } = projectRosterEventsByYear(
+    eventTypeConfigs,
+    rosterCounts,
+    startYear,
+    safeHorizon,
+  )
+
+  const plans: PlanRecommendation[] = planBreakdown.map((p) => ({
+    planId: p.planId,
+    planName: p.name,
+    currentPrice: p.yearlyPrice,
+    familyCount: p.familyCount,
+  }))
+  const currentPlanIncome = planBreakdown.reduce((s, p) => s + p.income, 0)
 
   return computeDuesRecommendation(
     {
@@ -375,34 +490,26 @@ async function loadDuesRecommendationUncached(
       avgNewFamiliesPerYear,
       avgNewBarMitzvahsPerYear,
       chargesBarMitzvahPayers,
-      historyWindowYears: safeWindow,
-      historyYearsSeen: historyForAvg.length,
-      eventTypes,
+      growthLookbackYears: safeWindow,
+      plans,
+      currentPlanIncome,
+      expensesByYear,
+      eventTypes: eventTypesWithCounts,
     },
-    {
-      startYear:
-        Number.isFinite(startYearOverride) ? (startYearOverride as number) : currentYear,
-      forecastYears,
-    },
+    { startYear, forecastYears: safeHorizon },
   )
-}
-
-function isNonStaleSnapshot(snap: YearlyCalculationLean): boolean {
-  const hasPlan = (snap.byPlan?.length ?? 0) > 0
-  const hasEvent = (snap.byEvent?.length ?? 0) > 0
-  return hasPlan || hasEvent
 }
 
 const getCachedDuesRecommendation = unstable_cache(
   async (organizationId: string, windowYears: number) =>
     loadDuesRecommendationUncached(organizationId, windowYears),
-  ['dues-recommendation'],
+  ['dues-recommendation-v2'],
   { revalidate: DUES_RECOMMENDATION_CACHE_SECONDS },
 )
 
 /**
- * Load break-even dues recommendation. Results for the default forecast horizon
- * are cached per org + history window for {@link DUES_RECOMMENDATION_CACHE_SECONDS}s.
+ * Load roster-based dues recommendation. Results for the default forecast horizon
+ * are cached per org + growth lookback for {@link DUES_RECOMMENDATION_CACHE_SECONDS}s.
  * Custom `forecastYears` / `startYearOverride` bypass the cache.
  */
 export async function loadDuesRecommendation(
@@ -411,10 +518,7 @@ export async function loadDuesRecommendation(
   forecastYears = DEFAULT_DUES_FORECAST_YEARS,
   startYearOverride?: number,
 ): Promise<DuesRecommendation> {
-  if (
-    forecastYears === DEFAULT_DUES_FORECAST_YEARS &&
-    startYearOverride === undefined
-  ) {
+  if (forecastYears === DEFAULT_DUES_FORECAST_YEARS && startYearOverride === undefined) {
     return getCachedDuesRecommendation(organizationId, windowYears)
   }
   return loadDuesRecommendationUncached(

@@ -5,6 +5,7 @@ import { setupMongo, teardownMongo } from './test/mongo-memory'
 describe('loadDuesRecommendation (integration)', () => {
   const ownerId = new Types.ObjectId()
   let orgId: Types.ObjectId
+  let planId: Types.ObjectId
 
   beforeAll(async () => {
     await setupMongo()
@@ -15,10 +16,9 @@ describe('loadDuesRecommendation (integration)', () => {
   })
 
   afterEach(async () => {
-    const { Organization, Family, FamilyMember, LifecycleEvent, YearlyCalculation, PaymentPlan } =
+    const { Organization, Family, FamilyMember, LifecycleEvent, PaymentPlan } =
       await import('./models')
     await Promise.all([
-      YearlyCalculation.deleteMany({}),
       LifecycleEvent.deleteMany({}),
       FamilyMember.deleteMany({}),
       Family.deleteMany({}),
@@ -27,12 +27,15 @@ describe('loadDuesRecommendation (integration)', () => {
     ])
   })
 
-  it('loads lifecycle events, aggregates, and history from Mongo', async () => {
-    const { Organization, Family, FamilyMember, LifecycleEvent, YearlyCalculation } =
+  it('projects expenses from roster dates and scales payment plans', async () => {
+    const { Organization, Family, FamilyMember, LifecycleEvent, PaymentPlan } =
       await import('./models')
     const { loadDuesRecommendation } = await import('./projections')
 
     orgId = new Types.ObjectId()
+    planId = new Types.ObjectId()
+    const barEventId = new Types.ObjectId()
+
     await Organization.create({
       _id: orgId,
       name: 'Projection Org',
@@ -40,81 +43,49 @@ describe('loadDuesRecommendation (integration)', () => {
       ownerId,
       timezone: 'UTC',
       barMitzvahAutoAssignPlanId: null,
+      barMitzvahAutoCreateEventTypeId: barEventId,
+    })
+    await PaymentPlan.create({
+      _id: planId,
+      organizationId: orgId,
+      name: 'Standard',
+      planNumber: 1,
+      yearlyPrice: 1000,
     })
     await LifecycleEvent.create({
+      _id: barEventId,
       organizationId: orgId,
-      type: 'wedding',
-      name: 'Wedding',
-      amount: 250,
+      type: 'barmitzvah',
+      name: 'Bar Mitzvah',
+      amount: 500,
     })
-    await Family.create({
+    const family = await Family.create({
       organizationId: orgId,
       name: 'Alpha',
       weddingDate: new Date('2018-01-01'),
-    })
-    await Family.create({
-      organizationId: orgId,
-      name: 'Beta',
-      weddingDate: new Date('2024-03-01'),
-      createdAt: new Date('2024-03-01'),
+      paymentPlanId: planId,
     })
     await FamilyMember.create({
       organizationId: orgId,
-      familyId: (await Family.findOne({ organizationId: orgId, name: 'Alpha' }))!._id,
+      familyId: family._id,
       firstName: 'Ben',
       lastName: 'Alpha',
       gender: 'male',
-      barMitzvahDate: new Date('2023-06-01'),
-      paymentPlanId: new Types.ObjectId(),
+      barMitzvahDate: new Date('2030-06-01'),
     })
-    await YearlyCalculation.insertMany([
-      {
-        organizationId: orgId,
-        year: 2022,
-        byEvent: [{ type: 'wedding', count: 1, amount: 100 }],
-        byPlan: [],
-        calculatedIncome: 0,
-        calculatedExpenses: 0,
-        balance: 0,
-        totalPayments: 0,
-        planIncome: 0,
-        totalIncome: 0,
-        totalExpenses: 0,
-      },
-      {
-        organizationId: orgId,
-        year: 2023,
-        byEvent: [{ type: 'wedding', count: 2, amount: 200 }],
-        byPlan: [],
-        calculatedIncome: 0,
-        calculatedExpenses: 0,
-        balance: 0,
-        totalPayments: 0,
-        planIncome: 0,
-        totalIncome: 0,
-        totalExpenses: 0,
-      },
-      {
-        organizationId: orgId,
-        year: 2024,
-        byEvent: [{ type: 'wedding', count: 2, amount: 500 }],
-        byPlan: [],
-        calculatedIncome: 0,
-        calculatedExpenses: 0,
-        balance: 0,
-        totalPayments: 0,
-        planIncome: 0,
-        totalIncome: 0,
-        totalExpenses: 0,
-      },
-    ])
 
     const out = await loadDuesRecommendation(orgId.toString(), 5, 3, 2030)
 
-    expect(out.currentFamilies).toBe(2)
+    expect(out.currentFamilies).toBe(1)
+    expect(out.currentPlanIncome).toBe(1000)
+    expect(out.plans).toHaveLength(1)
     expect(out.perEvent).toHaveLength(1)
-    expect(out.perEvent[0].type).toBe('wedding')
-    expect(out.historyYearsSeen).toBeGreaterThanOrEqual(0)
-    expect(out.multiYear.length).toBeGreaterThan(0)
+    expect(out.perEvent[0].type).toBe('barmitzvah')
+    expect(out.perEvent[0].rosterMapped).toBe(true)
+    expect(out.expenseSource).toBe('roster')
+    expect(out.multiYear[0].projectedExpenses).toBe(500)
+    expect(out.multiYear[0].scaleFactor).toBeCloseTo(0.5, 6)
+    expect(out.multiYear[0].planRecommendations[0].recommendedPrice).toBeCloseTo(500, 6)
+    expect(out.multiYear.length).toBe(3)
   })
 })
