@@ -12,6 +12,7 @@ const EmailConfigSchema = new Schema(
     email: { type: String, required: true },
     password: { type: String, required: true }, // Encrypted at rest in Phase 4 via lib/encryption.ts
     fromName: { type: String, default: 'Kasa Family Management' },
+    replyTo: { type: String },
     isActive: { type: Boolean, default: true },
     lastTestAt: Date,
     lastTestStatus: { type: String, enum: ['success', 'failed'] },

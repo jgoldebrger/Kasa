@@ -37,7 +37,13 @@ export const POST = handler({
       return { status: 400, data: { error: 'Only failed emails can be retried' } }
     }
     if (!row.html?.trim() && !row.text?.trim()) {
-      return { status: 400, data: { error: 'Email content is not available for retry' } }
+      return {
+        status: 400,
+        data: {
+          error: 'Email content is not available for retry',
+          code: 'EMAIL_CONTENT_UNAVAILABLE',
+        },
+      }
     }
 
     const result = await sendEmail({

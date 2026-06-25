@@ -12,6 +12,7 @@ import {
 import { useToast } from '@/app/components/Toast'
 import { Alert, Button, Card, Input, Select } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
+import type { MessageKey } from '@/lib/i18n/load-locale'
 import EmailComposeEditor from './EmailComposeEditor'
 import EmailPreviewModal from './EmailPreviewModal'
 import RecipientList from './RecipientList'
@@ -34,6 +35,7 @@ export default function ComposeTab({ families, loadingFamilies, onSent }: Compos
   const toast = useToast()
 
   const [subject, setSubject] = useState('')
+  const [subjectB, setSubjectB] = useState('')
   const [body, setBody] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [attachments, setAttachments] = useState<EmailAttachment[]>([])
@@ -58,7 +60,13 @@ export default function ComposeTab({ families, loadingFamilies, onSent }: Compos
       const res = await fetch('/api/email-templates')
       if (!res.ok) return
       const data = await res.json()
-      setTemplates((data.items ?? []) as EmailTemplate[])
+      const rows = (data.templates ?? data.items ?? []) as Array<EmailTemplate & { html?: string }>
+      setTemplates(
+        rows.map((r) => ({
+          ...r,
+          body: r.body ?? r.html ?? '',
+        })),
+      )
     } catch {
       /* ignore */
     }
@@ -225,13 +233,15 @@ export default function ComposeTab({ families, loadingFamilies, onSent }: Compos
   const buildPayload = () => {
     const html = markdownToHtml(body)
     const text = markdownToPlainText(body)
-    return {
+    const payload: Record<string, unknown> = {
       familyIds: Array.from(selectedIds),
       subject: subject.trim(),
       html,
       text,
       attachments: attachments.length > 0 ? attachments : undefined,
     }
+    if (subjectB.trim()) payload.subjectB = subjectB.trim()
+    return payload
   }
 
   const send = async () => {
@@ -258,6 +268,7 @@ export default function ComposeTab({ families, loadingFamilies, onSent }: Compos
         if (!res.ok) throw new Error(data.error || 'Schedule failed')
         toast.success(t('communications.schedule.success'))
         setSubject('')
+        setSubjectB('')
         setBody('')
         setSelectedIds(new Set())
         setAttachments([])
@@ -291,6 +302,7 @@ export default function ComposeTab({ families, loadingFamilies, onSent }: Compos
       }
 
       setSubject('')
+      setSubjectB('')
       setBody('')
       setSelectedIds(new Set())
       setAttachments([])
@@ -344,6 +356,20 @@ export default function ComposeTab({ families, loadingFamilies, onSent }: Compos
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
           placeholder={t('communications.field.subjectPlaceholder')}
+        />
+
+        <Input
+          label={t('communications.field.subjectB' as MessageKey, 'Subject B (A/B test)')}
+          hint={t(
+            'communications.field.subjectBHint' as MessageKey,
+            'Optional. Half of recipients get this subject line instead.',
+          )}
+          value={subjectB}
+          onChange={(e) => setSubjectB(e.target.value)}
+          placeholder={t(
+            'communications.field.subjectBPlaceholder' as MessageKey,
+            'Alternate subject line',
+          )}
         />
 
         <EmailComposeEditor

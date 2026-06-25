@@ -139,6 +139,38 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
   },
   {
+    slug: 'email-setup',
+    title: 'Set up Gmail for sending email',
+    summary: 'Connect Gmail with an app password, test delivery, and understand sending limits.',
+    category: 'statements',
+    sections: [
+      {
+        heading: 'Gmail app password',
+        body: 'Open Settings → Email and enter your Gmail address plus a Google App Password — not your regular Gmail password. Generate one at Google Account → Security → 2-Step Verification → App passwords. Paste the 16-character password with or without spaces.',
+      },
+      {
+        heading: 'Send a test email',
+        body: 'After saving, click Send Test Email. A successful test confirms Kasa can authenticate with Gmail. Check spam if nothing arrives within a few minutes.',
+      },
+      {
+        heading: 'Daily sending limits',
+        body: 'Personal Gmail accounts are limited to roughly 500 outgoing messages per day. Large statement batches or communications campaigns may be throttled or fail if you exceed this limit. Spread bulk sends across days or use Google Workspace for higher quotas.',
+      },
+      {
+        heading: 'Opt-out and unsubscribe',
+        body: 'Families can opt out of bulk statement emails and bulk communications separately on the family edit form. Opted-out families are skipped in batch sends but can still receive ad-hoc emails from their family page.',
+      },
+      {
+        heading: 'Communications vs statement opt-out',
+        body: 'Statement opt-out affects Send via Email on the Statements page and monthly auto-email. Communications opt-out affects the Communications compose tab and scheduled campaigns. A family may opt out of one but not the other.',
+      },
+      {
+        heading: 'Troubleshooting "Gmail rejected"',
+        body: 'If sends fail with a Gmail rejection, verify the app password is current (revoke and create a new one if needed), confirm 2-Step Verification is enabled on the account, and check that "Less secure app access" is not blocking the connection. Review failed sends in Communications → Sent log or the dashboard email summary.',
+      },
+    ],
+  },
+  {
     slug: 'statements',
     title: 'Generate and email statements',
     summary: 'Monthly statements for families with balances.',

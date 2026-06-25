@@ -15,7 +15,7 @@ function errorFromRow(row: {
   return null
 }
 
-function formatEmailRow(row: any, familyName?: string) {
+function formatEmailRow(row: any, familyName?: string, deliverabilityWarning?: boolean) {
   const error = errorFromRow(row)
   return {
     _id: String(row._id),
@@ -28,6 +28,7 @@ function formatEmailRow(row: any, familyName?: string) {
     openCount: row.openCount ?? 0,
     clickCount: row.clickCount ?? 0,
     error,
+    deliverabilityWarning: deliverabilityWarning ?? false,
     createdAt: row.createdAt,
     firstOpenedAt: row.firstOpenedAt ?? null,
     firstClickedAt: row.firstClickedAt ?? null,
@@ -40,6 +41,8 @@ export async function listOrgEmails(
     familyId?: string
     kind?: string
     status?: string
+    dateFrom?: Date
+    dateTo?: Date
     limit?: number
     cursor?: string
   },
@@ -49,6 +52,12 @@ export async function listOrgEmails(
   if (query.familyId) filter.familyId = new Types.ObjectId(query.familyId)
   if (query.kind) filter.kind = query.kind
   if (query.status) filter.status = query.status
+  if (query.dateFrom || query.dateTo) {
+    const createdAt: Record<string, Date> = {}
+    if (query.dateFrom) createdAt.$gte = query.dateFrom
+    if (query.dateTo) createdAt.$lte = query.dateTo
+    filter.createdAt = createdAt
+  }
 
   if (query.cursor) {
     const cur = decodeCompoundCursor(query.cursor)
@@ -91,14 +100,21 @@ export async function listOrgEmails(
         organizationId,
         _id: { $in: familyIds },
       })
-        .select('name')
-        .lean<{ _id: Types.ObjectId; name?: string }[]>()
+        .select('name emailDeliverabilityWarning')
+        .lean<{ _id: Types.ObjectId; name?: string; emailDeliverabilityWarning?: boolean }[]>()
     : []
   const familyNames = new Map(families.map((f) => [String(f._id), f.name ?? '']))
+  const deliverabilityByFamily = new Map(
+    families.map((f) => [String(f._id), f.emailDeliverabilityWarning === true]),
+  )
 
   return {
     items: page.map((r) =>
-      formatEmailRow(r, r.familyId ? familyNames.get(String(r.familyId)) : undefined),
+      formatEmailRow(
+        r,
+        r.familyId ? familyNames.get(String(r.familyId)) : undefined,
+        r.familyId ? deliverabilityByFamily.get(String(r.familyId)) : undefined,
+      ),
     ),
     nextCursor,
   }

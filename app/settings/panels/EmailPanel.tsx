@@ -9,6 +9,7 @@ import { useT } from '@/lib/client/i18n'
 export interface EmailConfig {
   email: string
   fromName?: string
+  replyTo?: string | null
   lastTestAt?: string | null
   lastTestStatus?: 'success' | 'failed' | null
   lastTestError?: string | null
@@ -20,12 +21,14 @@ export interface EmailPanelProps {
     email: string
     password: string
     fromName: string
+    replyTo: string
   }
   setEmailFormData: React.Dispatch<
     React.SetStateAction<{
       email: string
       password: string
       fromName: string
+      replyTo: string
     }>
   >
   saving: boolean
@@ -178,6 +181,15 @@ export default function EmailPanel({
           hint={t('settings.email.fromNameHint')}
         />
 
+        <Input
+          label={t('settings.email.replyTo')}
+          type="email"
+          value={emailFormData.replyTo}
+          onChange={(e) => setEmailFormData({ ...emailFormData, replyTo: e.target.value })}
+          placeholder="office@yourkehilla.org"
+          hint={t('settings.email.replyToHint')}
+        />
+
         <div className="flex gap-3 pt-4">
           <Button type="submit" loading={saving} leftIcon={<EnvelopeIcon className="h-4 w-4" />}>
             {emailConfig ? t('settings.email.update') : t('settings.email.save')}
@@ -207,6 +219,10 @@ export default function EmailPanel({
           </ul>
         </Alert>
       )}
+
+      <Alert variant="info" className="mt-4" title={t('sms.comingSoon.title')}>
+        {t('sms.comingSoon.message')}
+      </Alert>
     </SettingsPanel>
   )
 }

@@ -19,6 +19,8 @@ import { useT } from '@/lib/client/i18n'
 import ComposeTab from './_components/ComposeTab'
 import EmailDetailDrawer from './_components/EmailDetailDrawer'
 import CampaignStatsModal from './_components/CampaignStatsModal'
+import CommunicationsNav from './_components/CommunicationsNav'
+import EmailLogFilters, { type EmailLogFilterValues } from './_components/EmailLogFilters'
 import type { EmailLogRow, FamilyOption } from './_components/types'
 
 type Tab = 'compose' | 'log'
@@ -45,6 +47,18 @@ export default function CommunicationsView() {
   const [detailEmailId, setDetailEmailId] = useState<string | null>(null)
   const [campaignId, setCampaignId] = useState<string | null>(null)
   const [showCampaignStats, setShowCampaignStats] = useState(false)
+  const [logFilters, setLogFilters] = useState<EmailLogFilterValues>({
+    status: '',
+    kind: '',
+    dateFrom: '',
+    dateTo: '',
+  })
+  const [appliedFilters, setAppliedFilters] = useState<EmailLogFilterValues>({
+    status: '',
+    kind: '',
+    dateFrom: '',
+    dateTo: '',
+  })
 
   const loadFamilies = useCallback(async () => {
     setLoadingFamilies(true)
@@ -64,7 +78,12 @@ export default function CommunicationsView() {
   const loadLogs = useCallback(async () => {
     setLoadingLogs(true)
     try {
-      const res = await fetch('/api/emails?limit=50')
+      const params = new URLSearchParams({ limit: '50' })
+      if (appliedFilters.status) params.set('status', appliedFilters.status)
+      if (appliedFilters.kind) params.set('kind', appliedFilters.kind)
+      if (appliedFilters.dateFrom) params.set('dateFrom', appliedFilters.dateFrom)
+      if (appliedFilters.dateTo) params.set('dateTo', appliedFilters.dateTo)
+      const res = await fetch(`/api/emails?${params.toString()}`)
       if (!res.ok) throw new Error('Failed to load emails')
       const data = await res.json()
       setLogs((data.items ?? []) as EmailLogRow[])
@@ -73,7 +92,7 @@ export default function CommunicationsView() {
     } finally {
       setLoadingLogs(false)
     }
-  }, [toast, t])
+  }, [toast, t, appliedFilters])
 
   useEffect(() => {
     void loadFamilies()
@@ -188,6 +207,8 @@ export default function CommunicationsView() {
       <div className="max-w-7xl mx-auto space-y-6">
         <PageHeader title={t('communications.title')} subtitle={t('communications.subtitle')} />
 
+        <CommunicationsNav />
+
         <div className="flex gap-2 border-b border-border">
           <button
             type="button"
@@ -215,54 +236,69 @@ export default function CommunicationsView() {
 
         {tab === 'compose' ? (
           <ComposeTab families={families} loadingFamilies={loadingFamilies} onSent={handleSent} />
-        ) : loadingLogs ? (
-          <Card>
-            <SkeletonRows count={6} />
-          </Card>
         ) : (
-          <DataView
-            tableId="email-log"
-            rows={logs}
-            columns={columns}
-            rowKey={(r) => r._id}
-            pageSize={15}
-            exportFileName="email-log"
-            onRowClick={(row) => setDetailEmailId(row._id)}
-            mobileCard={(row) => (
-              <Card
-                compact
-                className="cursor-pointer hover:bg-app-subtle"
-                onClick={() => setDetailEmailId(row._id)}
-              >
-                <p className="font-medium text-fg truncate">{row.subject}</p>
-                <p className="text-sm text-fg-muted mt-1">
-                  {row.familyName || row.to} ·{' '}
-                  {row.createdAt ? formatLocaleDate(row.createdAt) : '—'}
-                </p>
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge size="sm" variant={statusBadge(row.status)}>
-                    {row.status}
-                  </Badge>
-                  <span className="text-xs text-fg-muted tabular">
-                    {row.openCount}/{row.clickCount}
-                  </span>
-                </div>
-                {row.status === 'failed' && (
-                  <p className="text-xs text-danger mt-2 line-clamp-4">
-                    {row.error ||
-                      'Send failed. Check Settings → Email, then send a new test message.'}
-                  </p>
+          <Card className="overflow-hidden">
+            <EmailLogFilters
+              values={logFilters}
+              onChange={setLogFilters}
+              loading={loadingLogs}
+              onApply={() => setAppliedFilters({ ...logFilters })}
+              onClear={() => {
+                const empty = { status: '', kind: '', dateFrom: '', dateTo: '' }
+                setLogFilters(empty)
+                setAppliedFilters(empty)
+              }}
+            />
+            {loadingLogs ? (
+              <div className="p-4">
+                <SkeletonRows count={6} />
+              </div>
+            ) : (
+              <DataView
+                tableId="email-log"
+                rows={logs}
+                columns={columns}
+                rowKey={(r) => r._id}
+                pageSize={15}
+                exportFileName="email-log"
+                onRowClick={(row) => setDetailEmailId(row._id)}
+                mobileCard={(row) => (
+                  <Card
+                    compact
+                    className="cursor-pointer hover:bg-app-subtle"
+                    onClick={() => setDetailEmailId(row._id)}
+                  >
+                    <p className="font-medium text-fg truncate">{row.subject}</p>
+                    <p className="text-sm text-fg-muted mt-1">
+                      {row.familyName || row.to} ·{' '}
+                      {row.createdAt ? formatLocaleDate(row.createdAt) : '—'}
+                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge size="sm" variant={statusBadge(row.status)}>
+                        {row.status}
+                      </Badge>
+                      <span className="text-xs text-fg-muted tabular">
+                        {row.openCount}/{row.clickCount}
+                      </span>
+                    </div>
+                    {row.status === 'failed' && (
+                      <p className="text-xs text-danger mt-2 line-clamp-4">
+                        {row.error ||
+                          'Send failed. Check Settings → Email, then send a new test message.'}
+                      </p>
+                    )}
+                  </Card>
                 )}
-              </Card>
-            )}
-            empty={
-              <EmptyState
-                icon={<EnvelopeIcon className="h-10 w-10" />}
-                title={t('communications.empty.title')}
-                description={t('communications.empty.description')}
+                empty={
+                  <EmptyState
+                    icon={<EnvelopeIcon className="h-10 w-10" />}
+                    title={t('communications.empty.title')}
+                    description={t('communications.empty.description')}
+                  />
+                }
               />
-            }
-          />
+            )}
+          </Card>
         )}
       </div>
 

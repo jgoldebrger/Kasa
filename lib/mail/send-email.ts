@@ -1,14 +1,15 @@
 import { Types } from 'mongoose'
 import type nodemailer from 'nodemailer'
-import { EmailMessage, Organization } from '@/lib/models'
+import { EmailMessage, Organization, Family } from '@/lib/models'
 import { audit } from '@/lib/audit'
 import { logError } from '@/lib/log'
 import { isAllowedOutboundRecipient } from '@/lib/email-recipients'
-import { createGmailTransport } from './create-transport'
+import { createTransportWithFallback } from './create-transport'
 import { applyEmailTracking } from './tracking-html'
 import { loadOrgEmailConfig, type OrgEmailConfigCreds } from './load-org-email-config'
 import { wrapEmailHtml } from './email-wrapper'
 import { buildUnsubscribeUrl, createUnsubscribeToken } from './unsubscribe-token'
+import { checkDailySendQuota } from './daily-send-quota'
 
 export type EmailKind = 'custom' | 'statement' | 'tax-receipt' | 'task-reminder' | 'file'
 
@@ -58,6 +59,29 @@ function bodyPreviewFrom(html?: string, text?: string): string | undefined {
     ''
   ).slice(0, 200)
   return raw || undefined
+}
+
+async function trackDeliverabilityFailure(organizationId: string, to: string): Promise<void> {
+  const normalized = to.trim().toLowerCase()
+  if (!normalized) return
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const failureCount = await EmailMessage.countDocuments({
+    organizationId: new Types.ObjectId(organizationId),
+    to: { $regex: new RegExp(`^${normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+    status: 'failed',
+    createdAt: { $gte: sevenDaysAgo },
+  })
+  if (failureCount >= 3) {
+    await Family.updateMany(
+      {
+        organizationId: new Types.ObjectId(organizationId),
+        email: {
+          $regex: new RegExp(`^${normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+        },
+      },
+      { $set: { emailDeliverabilityWarning: true } },
+    )
+  }
 }
 
 async function loadOrgBranding(organizationId: string): Promise<{
@@ -139,6 +163,7 @@ async function recordFailedEmail(
       request: input.auditRequest,
     })
   }
+  void trackDeliverabilityFailure(input.organizationId, to)
   return { ok: false, emailMessageId: String(doc._id), error }
 }
 
@@ -155,6 +180,11 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       subject,
       'Recipient must be an organization member or a family contact email on file in this organization.',
     )
+  }
+
+  const quota = await checkDailySendQuota(input.organizationId)
+  if (!quota.ok) {
+    return recordFailedEmail(input, to, subject, quota.error)
   }
 
   const credsResult = input.config
@@ -207,13 +237,14 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       })
     }
 
-    const transporter = input.transporter ?? createGmailTransport(creds)
+    const transporter = input.transporter ?? createTransportWithFallback(creds)
     await transporter.sendMail({
       from: `"${creds.fromName}" <${creds.email}>`,
       to,
       subject: doc.subject,
       text: input.text,
       html,
+      ...(creds.replyTo ? { replyTo: creds.replyTo } : {}),
       attachments: input.attachments?.map((a) => ({
         filename: a.filename,
         content: a.content,
@@ -270,6 +301,8 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         request: input.auditRequest,
       })
     }
+
+    void trackDeliverabilityFailure(input.organizationId, to)
 
     return { ok: false, emailMessageId, error: message }
   }

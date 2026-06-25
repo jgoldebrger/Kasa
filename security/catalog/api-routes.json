@@ -1,19 +1,19 @@
 {
-  "generatedAt": "2026-06-25T13:32:41.376Z",
+  "generatedAt": "2026-06-25T18:56:21.615Z",
   "summary": {
-    "total": 170,
+    "total": 197,
     "byAuth": {
       "admin": 8,
-      "org": 120,
+      "org": 142,
       "nextauth": 2,
-      "public": 11,
-      "cron": 14,
+      "public": 14,
+      "cron": 16,
       "session": 10,
       "org-or-cron": 4,
       "webhook": 1
     },
-    "mutating": 89,
-    "tenantScoped": 124
+    "mutating": 102,
+    "tenantScoped": 146
   },
   "routes": [
     {
@@ -367,6 +367,183 @@
       "source": "app/api/email-config/test/route.ts"
     },
     {
+      "path": "/api/email-drafts",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "member",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/email-drafts/route.ts"
+    },
+    {
+      "path": "/api/email-drafts",
+      "method": "POST",
+      "auth": "org",
+      "minRole": "member",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/email-drafts/route.ts"
+    },
+    {
+      "path": "/api/email-drafts/:id",
+      "method": "DELETE",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": ["id"],
+      "source": "app/api/email-drafts/[id]/route.ts"
+    },
+    {
+      "path": "/api/email-drafts/:id",
+      "method": "PATCH",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": ["id"],
+      "source": "app/api/email-drafts/[id]/route.ts"
+    },
+    {
+      "path": "/api/email-templates",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "member",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/email-templates/route.ts"
+    },
+    {
+      "path": "/api/email-templates",
+      "method": "POST",
+      "auth": "org",
+      "minRole": "member",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/email-templates/route.ts"
+    },
+    {
+      "path": "/api/email-templates/:id",
+      "method": "DELETE",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": ["id"],
+      "source": "app/api/email-templates/[id]/route.ts"
+    },
+    {
+      "path": "/api/email-templates/:id",
+      "method": "PATCH",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": ["id"],
+      "source": "app/api/email-templates/[id]/route.ts"
+    },
+    {
+      "path": "/api/email/track/click/:id",
+      "method": "GET",
+      "auth": "public",
+      "csrf": false,
+      "tenantScoped": false,
+      "dynamicParams": ["id"],
+      "source": "app/api/email/track/click/[id]/route.ts"
+    },
+    {
+      "path": "/api/email/track/open/:id",
+      "method": "GET",
+      "auth": "public",
+      "csrf": false,
+      "tenantScoped": false,
+      "dynamicParams": ["id"],
+      "source": "app/api/email/track/open/[id]/route.ts"
+    },
+    {
+      "path": "/api/email/unsubscribe",
+      "method": "GET",
+      "auth": "public",
+      "csrf": false,
+      "tenantScoped": false,
+      "dynamicParams": [],
+      "source": "app/api/email/unsubscribe/route.ts"
+    },
+    {
+      "path": "/api/emails",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "member",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/emails/route.ts"
+    },
+    {
+      "path": "/api/emails/:id",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": ["id"],
+      "source": "app/api/emails/[id]/route.ts"
+    },
+    {
+      "path": "/api/emails/:id/retry",
+      "method": "POST",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": ["id"],
+      "source": "app/api/emails/[id]/retry/route.ts"
+    },
+    {
+      "path": "/api/emails/campaign/:campaignId",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": ["campaignId"],
+      "source": "app/api/emails/campaign/[campaignId]/route.ts"
+    },
+    {
+      "path": "/api/emails/send",
+      "method": "POST",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/emails/send/route.ts"
+    },
+    {
+      "path": "/api/emails/send-bulk",
+      "method": "POST",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/emails/send-bulk/route.ts"
+    },
+    {
+      "path": "/api/emails/send-bulk/worker",
+      "method": "POST",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/emails/send-bulk/worker/route.ts"
+    },
+    {
       "path": "/api/events",
       "method": "GET",
       "auth": "org",
@@ -430,7 +607,7 @@
       "path": "/api/families/:id/charge-saved-card",
       "method": "POST",
       "auth": "org",
-      "minRole": "admin",
+      "minRole": "member",
       "csrf": true,
       "tenantScoped": true,
       "dynamicParams": ["id"],
@@ -445,6 +622,16 @@
       "tenantScoped": true,
       "dynamicParams": ["id"],
       "source": "app/api/families/[id]/cycle-charges/route.ts"
+    },
+    {
+      "path": "/api/families/:id/emails",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "member",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": ["id"],
+      "source": "app/api/families/[id]/emails/route.ts"
     },
     {
       "path": "/api/families/:id/lifecycle-events",
@@ -465,6 +652,26 @@
       "tenantScoped": true,
       "dynamicParams": ["id"],
       "source": "app/api/families/[id]/lifecycle-events/route.ts"
+    },
+    {
+      "path": "/api/families/:id/member-financials",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "member",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": ["id"],
+      "source": "app/api/families/[id]/member-financials/route.ts"
+    },
+    {
+      "path": "/api/families/:id/member-statements",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "member",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": ["id"],
+      "source": "app/api/families/[id]/member-statements/route.ts"
     },
     {
       "path": "/api/families/:id/members",
@@ -530,7 +737,7 @@
       "path": "/api/families/:id/payments",
       "method": "POST",
       "auth": "org",
-      "minRole": "admin",
+      "minRole": "member",
       "csrf": true,
       "tenantScoped": true,
       "dynamicParams": ["id"],
@@ -550,7 +757,7 @@
       "path": "/api/families/:id/saved-payment-methods",
       "method": "GET",
       "auth": "org",
-      "minRole": "admin",
+      "minRole": "member",
       "csrf": false,
       "tenantScoped": true,
       "dynamicParams": ["id"],
@@ -560,7 +767,7 @@
       "path": "/api/families/:id/saved-payment-methods",
       "method": "POST",
       "auth": "org",
-      "minRole": "admin",
+      "minRole": "member",
       "csrf": true,
       "tenantScoped": true,
       "dynamicParams": ["id"],
@@ -774,6 +981,24 @@
       "source": "app/api/jobs/send-monthly-statements/route.ts"
     },
     {
+      "path": "/api/jobs/send-scheduled-emails",
+      "method": "GET",
+      "auth": "cron",
+      "csrf": false,
+      "tenantScoped": false,
+      "dynamicParams": [],
+      "source": "app/api/jobs/send-scheduled-emails/route.ts"
+    },
+    {
+      "path": "/api/jobs/send-scheduled-emails",
+      "method": "POST",
+      "auth": "cron",
+      "csrf": true,
+      "tenantScoped": false,
+      "dynamicParams": [],
+      "source": "app/api/jobs/send-scheduled-emails/route.ts"
+    },
+    {
       "path": "/api/jobs/wedding-converter",
       "method": "GET",
       "auth": "cron",
@@ -850,6 +1075,16 @@
       "tenantScoped": true,
       "dynamicParams": ["memberId"],
       "source": "app/api/members/[memberId]/balance/route.ts"
+    },
+    {
+      "path": "/api/members/:memberId/emails",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "member",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": ["memberId"],
+      "source": "app/api/members/[memberId]/emails/route.ts"
     },
     {
       "path": "/api/members/:memberId/payments",
@@ -1239,6 +1474,36 @@
       "source": "app/api/reports/saved/[id]/route.ts"
     },
     {
+      "path": "/api/scheduled-emails",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "member",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/scheduled-emails/route.ts"
+    },
+    {
+      "path": "/api/scheduled-emails",
+      "method": "POST",
+      "auth": "org",
+      "minRole": "member",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/scheduled-emails/route.ts"
+    },
+    {
+      "path": "/api/scheduled-emails/:id",
+      "method": "DELETE",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": ["id"],
+      "source": "app/api/scheduled-emails/[id]/route.ts"
+    },
+    {
       "path": "/api/search",
       "method": "GET",
       "auth": "org",
@@ -1282,7 +1547,7 @@
       "path": "/api/statements/:id",
       "method": "GET",
       "auth": "org",
-      "minRole": "admin",
+      "minRole": "member",
       "csrf": false,
       "tenantScoped": true,
       "dynamicParams": ["id"],
@@ -1322,7 +1587,7 @@
       "path": "/api/statements/generate-pdf",
       "method": "POST",
       "auth": "org",
-      "minRole": "admin",
+      "minRole": "member",
       "csrf": true,
       "tenantScoped": true,
       "dynamicParams": [],
@@ -1382,7 +1647,7 @@
       "path": "/api/stripe/confirm-payment",
       "method": "POST",
       "auth": "org",
-      "minRole": "admin",
+      "minRole": "member",
       "csrf": true,
       "tenantScoped": true,
       "dynamicParams": [],
@@ -1422,7 +1687,7 @@
       "path": "/api/stripe/create-payment-intent",
       "method": "POST",
       "auth": "org",
-      "minRole": "admin",
+      "minRole": "member",
       "csrf": true,
       "tenantScoped": true,
       "dynamicParams": [],

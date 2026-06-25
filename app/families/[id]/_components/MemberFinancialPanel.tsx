@@ -9,6 +9,7 @@ import { formatLocaleDate } from '@/lib/date-utils'
 import { useT } from '@/lib/client/i18n'
 import { familyTabHref } from '../_lib/constants'
 import MemberMakePaymentModal from './MemberMakePaymentModal'
+import MemberEmailsSection from './MemberEmailsSection'
 
 interface MemberPayment {
   _id: string
@@ -143,6 +144,8 @@ export default function MemberFinancialPanel({
           </ul>
         </Card>
       )}
+
+      <MemberEmailsSection familyId={familyId} />
     </div>
   )
 }

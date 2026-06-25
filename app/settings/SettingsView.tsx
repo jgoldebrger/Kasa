@@ -241,6 +241,7 @@ export default function SettingsView({
     email: seededEmailConfig?.email || '',
     password: '',
     fromName: seededEmailConfig?.fromName || 'Kasa Family Management',
+    replyTo: seededEmailConfig?.replyTo || '',
   })
   const [emailMessage, setEmailMessage] = useState<{
     type: 'success' | 'error'
@@ -475,7 +476,7 @@ export default function SettingsView({
       // Clear org-scoped form/config so the user can't briefly interact
       // with the previous org's email or letterhead/automation state.
       setEmailConfig(null)
-      setEmailFormData({ email: '', password: '', fromName: 'Kasa Family Management' })
+      setEmailFormData({ email: '', password: '', fromName: 'Kasa Family Management', replyTo: '' })
       setLoading(true)
       setEventTypesLoading(true)
       setPlansLoading(true)
@@ -553,6 +554,7 @@ export default function SettingsView({
             email: config.email || '',
             password: '',
             fromName: config.fromName || 'Kasa Family Management',
+            replyTo: config.replyTo || '',
           })
         }
       } else {

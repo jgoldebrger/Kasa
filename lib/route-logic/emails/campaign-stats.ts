@@ -31,7 +31,7 @@ export const GET = handler({
       campaignId: new Types.ObjectId(campaignId),
     }
 
-    const [total, sent, failed, opened, clicked] = await Promise.all([
+    const [total, sent, failed, opened, clicked, messageRows] = await Promise.all([
       EmailMessage.countDocuments(filter),
       EmailMessage.countDocuments({ ...filter, status: { $in: ['sent', 'opened', 'clicked'] } }),
       EmailMessage.countDocuments({ ...filter, status: 'failed' }),
@@ -43,8 +43,25 @@ export const GET = handler({
         ...filter,
         $or: [{ status: 'clicked' }, { clickCount: { $gt: 0 } }],
       }),
+      EmailMessage.find(filter)
+        .select('events')
+        .lean<{ events?: Array<{ type?: string; meta?: { url?: string } }> }[]>(),
     ])
 
-    return { data: { sent, failed, opened, clicked, total } }
+    const urlCounts = new Map<string, number>()
+    for (const row of messageRows) {
+      for (const ev of row.events ?? []) {
+        if (ev.type === 'clicked' && ev.meta?.url) {
+          const url = String(ev.meta.url)
+          urlCounts.set(url, (urlCounts.get(url) ?? 0) + 1)
+        }
+      }
+    }
+    const topLinks = [...urlCounts.entries()]
+      .map(([url, count]) => ({ url, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20)
+
+    return { data: { sent, failed, opened, clicked, total, topLinks } }
   },
 })

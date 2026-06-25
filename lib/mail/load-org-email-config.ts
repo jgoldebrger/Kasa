@@ -6,6 +6,7 @@ export interface OrgEmailConfigCreds {
   email: string
   password: string
   fromName: string
+  replyTo?: string
 }
 
 export type LoadOrgEmailConfigResult =
@@ -40,6 +41,7 @@ export async function loadOrgEmailConfig(
       email: doc.email,
       password: decrypted.value,
       fromName: sanitizeFromName(doc.fromName),
+      replyTo: doc.replyTo?.trim() || undefined,
     },
   }
 }

@@ -8,6 +8,7 @@
  *   { action: 'delete',          ids: ObjectId[] }
  *   { action: 'setPaymentPlan',  ids: ObjectId[], paymentPlanId: ObjectId | null }
  *   { action: 'setEmailOptOut',  ids: ObjectId[], emailOptOut: boolean }
+ *   { action: 'setCommunicationsOptOut', ids: ObjectId[], communicationsOptOut: boolean }
  *
  * Auth: any org member with `admin+` role (delete is destructive and
  * setting plan/email-opt-out can quietly change billing behavior).
@@ -35,6 +36,11 @@ const body = z.union([
     action: z.literal('setEmailOptOut'),
     ids: idsField,
     emailOptOut: z.boolean(),
+  }),
+  z.object({
+    action: z.literal('setCommunicationsOptOut'),
+    ids: idsField,
+    communicationsOptOut: z.boolean(),
   }),
 ])
 
@@ -135,17 +141,36 @@ export const POST = handler({
     }
 
     // action === 'setEmailOptOut'
+    if (body.action === 'setEmailOptOut') {
+      const result = await Family.updateMany(baseFilter, {
+        $set: { emailOptOut: body.emailOptOut },
+      })
+      await audit({
+        organizationId: ctx!.organizationId,
+        userId: session!.user.id,
+        action: 'family.bulk_set_email_opt_out',
+        resourceType: 'Family',
+        metadata: {
+          ids: body.ids,
+          emailOptOut: body.emailOptOut,
+          count: result.modifiedCount || 0,
+        },
+        request,
+      })
+      return { data: { ok: true, modified: result.modifiedCount || 0 } }
+    }
+
     const result = await Family.updateMany(baseFilter, {
-      $set: { emailOptOut: body.emailOptOut },
+      $set: { communicationsOptOut: body.communicationsOptOut },
     })
     await audit({
       organizationId: ctx!.organizationId,
       userId: session!.user.id,
-      action: 'family.bulk_set_email_opt_out',
+      action: 'family.bulk_set_communications_opt_out',
       resourceType: 'Family',
       metadata: {
         ids: body.ids,
-        emailOptOut: body.emailOptOut,
+        communicationsOptOut: body.communicationsOptOut,
         count: result.modifiedCount || 0,
       },
       request,

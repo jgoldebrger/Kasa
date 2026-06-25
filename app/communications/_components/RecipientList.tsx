@@ -22,7 +22,7 @@ export default function RecipientList({
   const t = useT()
 
   const emailableFamilies = families.filter((f) => f.email)
-  const selectableFamilies = emailableFamilies.filter((f) => !f.emailOptOut)
+  const selectableFamilies = emailableFamilies.filter((f) => !f.communicationsOptOut)
 
   return (
     <div>
@@ -47,7 +47,7 @@ export default function RecipientList({
       ) : (
         <div className="max-h-64 overflow-y-auto border border-border rounded-lg divide-y divide-border">
           {emailableFamilies.map((f) => {
-            const optedOut = Boolean(f.emailOptOut)
+            const optedOut = Boolean(f.communicationsOptOut)
             return (
               <label
                 key={f._id}

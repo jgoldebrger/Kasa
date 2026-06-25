@@ -1,5 +1,6 @@
 import { Types } from 'mongoose'
 import { ScheduledEmail } from '@/lib/models'
+import { audit } from '@/lib/audit'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { handler } from '@/lib/api/handler'
 
@@ -37,6 +38,16 @@ export const DELETE = handler({
       if (!exists) return { status: 404, data: { error: 'Scheduled email not found' } }
       return { status: 400, data: { error: 'Only pending scheduled emails can be cancelled' } }
     }
+
+    await audit({
+      organizationId: ctx!.organizationId,
+      userId: ctx!.userId,
+      action: 'scheduled_email.cancel',
+      resourceType: 'ScheduledEmail',
+      resourceId: updated._id,
+      metadata: { subject: updated.subject },
+      request,
+    })
 
     return { data: { ok: true, status: updated.status } }
   },

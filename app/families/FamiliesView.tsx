@@ -86,6 +86,7 @@ interface Family {
   openBalance: number
   memberCount?: number
   emailOptOut?: boolean
+  communicationsOptOut?: boolean
 }
 
 interface PaymentPlan {
@@ -117,6 +118,7 @@ const initialForm = {
   paymentPlanId: '',
   currentPayment: 0,
   emailOptOut: false,
+  communicationsOptOut: false,
 }
 
 export interface FamiliesViewProps {
@@ -358,6 +360,7 @@ export default function FamiliesView({
       phone: formatPhone(formData.phone),
       email: (formData.email || '').trim(),
       emailOptOut: !!formData.emailOptOut,
+      communicationsOptOut: !!formData.communicationsOptOut,
     }
 
     const validationError = validateFamilyFormFields(formattedData)
@@ -450,6 +453,7 @@ export default function FamiliesView({
       paymentPlanId: family.paymentPlanId,
       currentPayment: family.currentPayment,
       emailOptOut: !!family.emailOptOut,
+      communicationsOptOut: !!family.communicationsOptOut,
     })
     setShowModal(true)
   }
@@ -649,6 +653,34 @@ export default function FamiliesView({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'setEmailOptOut', ids, emailOptOut }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data.error || t('families.error.bulkUpdate'))
+        return
+      }
+      toast.success(
+        t('families.success.bulkUpdated').replace('{count}', String(data.modified || ids.length)),
+      )
+      clearSelection()
+      invalidateCache(/^\/api\/families/)
+      fetchFamilies()
+    } catch {
+      toast.error(t('common.networkErrorShort'))
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  const handleBulkSetCommunicationsOptOut = async (communicationsOptOut: boolean) => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    setBulkBusy(true)
+    try {
+      const res = await fetch('/api/families/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'setCommunicationsOptOut', ids, communicationsOptOut }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -920,6 +952,22 @@ export default function FamiliesView({
               onClick={() => handleBulkSetEmailOptOut(false)}
             >
               {t('families.optInEmail')}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={bulkBusy}
+              onClick={() => handleBulkSetCommunicationsOptOut(true)}
+            >
+              Opt out of communications
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={bulkBusy}
+              onClick={() => handleBulkSetCommunicationsOptOut(false)}
+            >
+              Opt in to communications
             </Button>
             <Button size="sm" variant="destructive" disabled={bulkBusy} onClick={handleBulkDelete}>
               {t('common.delete')}
@@ -1461,6 +1509,20 @@ function FamilyModalBody({
               <span className="font-medium">{t('families.form.emailOptOut')}</span>
               <span className="block text-xs text-fg-muted">
                 {t('families.form.emailOptOutDesc')}
+              </span>
+            </span>
+          </label>
+          <label className="mt-2 flex items-start gap-2 text-sm text-fg cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!formData.communicationsOptOut}
+              onChange={(e) => setFormData({ ...formData, communicationsOptOut: e.target.checked })}
+              className="mt-0.5 h-4 w-4 accent-accent"
+            />
+            <span>
+              <span className="font-medium">{t('families.form.communicationsOptOut')}</span>
+              <span className="block text-xs text-fg-muted">
+                {t('families.form.communicationsOptOutDesc')}
               </span>
             </span>
           </label>

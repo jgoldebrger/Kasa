@@ -21,9 +21,9 @@ export const GET = handler({
 
     const updated = await Family.findOneAndUpdate(
       { _id: parsed.familyId, organizationId: parsed.organizationId },
-      { $set: { emailOptOut: true } },
+      { $set: { communicationsOptOut: true } },
       { new: true },
-    ).select('name emailOptOut')
+    ).select('name communicationsOptOut')
 
     if (!updated) {
       return { status: 404, data: { error: 'Family not found' } }

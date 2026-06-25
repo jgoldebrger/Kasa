@@ -60,6 +60,7 @@ export const GET = handler({
         configured: true,
         email: config.email,
         fromName: config.fromName,
+        replyTo: config.replyTo ?? null,
         isActive: config.isActive,
         lastTestAt: config.lastTestAt ?? null,
         lastTestStatus: config.lastTestStatus ?? null,
@@ -86,8 +87,9 @@ const saveEmailConfig = handler({
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    const { email, fromName } = body
+    const { email, fromName, replyTo } = body
     const normalizedPassword = body.password ? normalizeGmailAppPassword(body.password) : undefined
+    const cleanedReplyTo = replyTo === '' ? null : replyTo?.trim() || undefined
 
     const existingConfig = await EmailConfig.findOne({
       isActive: true,
@@ -101,6 +103,10 @@ const saveEmailConfig = handler({
       const updateData: Record<string, unknown> = {
         email,
         fromName: cleanedFromName,
+        replyTo: cleanedReplyTo,
+      }
+      if (replyTo !== undefined) {
+        updateData.replyTo = cleanedReplyTo
       }
 
       let verifyPassword = normalizedPassword
@@ -168,6 +174,7 @@ const saveEmailConfig = handler({
           email: updatedConfig!.email,
           fromName: updatedConfig!.fromName,
           isActive: updatedConfig!.isActive,
+          replyTo: updatedConfig!.replyTo ?? null,
         },
       }
     }
@@ -187,6 +194,7 @@ const saveEmailConfig = handler({
       email,
       password: encrypt(normalizedPassword),
       fromName: sanitizeFromName(fromName || 'Kasa Family Management'),
+      replyTo: cleanedReplyTo,
       isActive: true,
       organizationId: ctx!.organizationId,
     })
@@ -207,6 +215,7 @@ const saveEmailConfig = handler({
         email: config.email,
         fromName: config.fromName,
         isActive: config.isActive,
+        replyTo: config.replyTo ?? null,
       },
     }
   },

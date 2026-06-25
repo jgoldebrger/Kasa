@@ -1,4 +1,5 @@
 import { ScheduledEmail } from '@/lib/models'
+import { audit } from '@/lib/audit'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { scheduledEmail as scheduledEmailSchemas } from '@/lib/schemas'
 import { handler } from '@/lib/api/handler'
@@ -73,6 +74,20 @@ export const POST = handler({
       scheduledFor: body.scheduledFor,
       status: 'pending',
       createdBy: ctx!.userId,
+    })
+
+    await audit({
+      organizationId: ctx!.organizationId,
+      userId: ctx!.userId,
+      action: 'scheduled_email.create',
+      resourceType: 'ScheduledEmail',
+      resourceId: doc._id,
+      metadata: {
+        subject: body.subject,
+        familyCount: body.familyIds.length,
+        scheduledFor: body.scheduledFor.toISOString(),
+      },
+      request,
     })
 
     return {

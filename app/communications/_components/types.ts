@@ -3,6 +3,7 @@ export interface FamilyOption {
   name: string
   email?: string
   emailOptOut?: boolean
+  communicationsOptOut?: boolean
 }
 
 export interface EmailLogRow {
@@ -62,11 +63,31 @@ export interface EmailDetail {
   events: EmailEvent[]
 }
 
+export interface CampaignLinkClick {
+  url: string
+  count?: number
+  clicks?: number
+}
+
 export interface CampaignStats {
-  campaignId: string
+  campaignId?: string
   sent: number
   opened: number
   clicked: number
-  openRate: number
-  clickRate: number
+  failed?: number
+  total?: number
+  openRate?: number
+  clickRate?: number
+  topLinks?: CampaignLinkClick[]
+}
+
+export interface ScheduledEmailRow {
+  _id: string
+  subject: string
+  familyIds: string[]
+  scheduledFor: string
+  status: string
+  sentAt?: string | null
+  error?: string | null
+  createdAt?: string
 }

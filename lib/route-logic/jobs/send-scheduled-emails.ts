@@ -1,6 +1,11 @@
 import { Family, ScheduledEmail } from '@/lib/models'
-import { sendEmail, applyMergeFields, delayBetweenSendsMs, sleep } from '@/lib/mail'
-import { calculateFamilyBalance } from '@/lib/calculations'
+import {
+  sendEmail,
+  applyMergeFields,
+  loadMergeFieldContext,
+  delayBetweenSendsMs,
+  sleep,
+} from '@/lib/mail'
 import { escapeHtml } from '@/lib/html-escape'
 import { handler } from '@/lib/api/handler'
 import { checkRateLimit } from '@/lib/rate-limit'
@@ -58,7 +63,7 @@ export const POST = handler({
           errors.push(`Family ${familyId}: not found`)
           continue
         }
-        if (family.emailOptOut) {
+        if (family.communicationsOptOut) {
           errors.push(`${family.name}: opted out`)
           continue
         }
@@ -67,17 +72,7 @@ export const POST = handler({
           continue
         }
 
-        let balance = 0
-        let dues = 0
-        try {
-          const bal = await calculateFamilyBalance(familyId, orgId)
-          balance = bal.balance
-          dues = bal.planCost
-        } catch {
-          /* use defaults */
-        }
-
-        const mergeCtx = { familyName: family.name || '', balance, dues }
+        const mergeCtx = await loadMergeFieldContext(familyId, orgId)
         const html = applyMergeFields(job.html, mergeCtx).replace(
           /\{\{familyName\}\}/g,
           escapeHtml(family.name || ''),

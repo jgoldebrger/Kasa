@@ -28,6 +28,7 @@ export const familyBody = z.object({
   openBalance: z.number().finite().optional(),
   parentFamilyId: objectId.optional().nullable(),
   emailOptOut: z.boolean().optional(),
+  communicationsOptOut: z.boolean().optional(),
 })
 
 export const familyUpdateBody = familyBody.partial()

@@ -26,6 +26,8 @@ import { selfUrl } from './jobs'
 import { UNBOUNDED_LIST_CAP } from './schemas/common'
 import type { NextRequest } from 'next/server'
 
+export type EmailJobKind = 'statements' | 'tax-receipts' | 'communications'
+
 export const EMAIL_JOB_STALE_AFTER_MS = 30 * 60 * 1000
 
 export interface SweepResult {
@@ -46,7 +48,7 @@ export interface SweepResult {
 /** Return an in-flight EmailJob for the org/kind, if any. */
 export async function findActiveEmailJob(opts: {
   organizationId: string
-  kind: 'statements' | 'tax-receipts'
+  kind: EmailJobKind
 }): Promise<{ _id: unknown; status: string } | null> {
   return EmailJob.findOne({
     organizationId: new Types.ObjectId(opts.organizationId),
@@ -57,11 +59,13 @@ export async function findActiveEmailJob(opts: {
     .lean<{ _id: unknown; status: string }>()
 }
 
-export async function sweepStaleEmailJobs(opts: {
-  organizationId?: string
-  kind?: 'statements' | 'tax-receipts'
-  staleAfterMs?: number
-} = {}): Promise<SweepResult> {
+export async function sweepStaleEmailJobs(
+  opts: {
+    organizationId?: string
+    kind?: EmailJobKind
+    staleAfterMs?: number
+  } = {},
+): Promise<SweepResult> {
   const staleAfterMs = opts.staleAfterMs ?? EMAIL_JOB_STALE_AFTER_MS
   const cutoff = new Date(Date.now() - staleAfterMs)
 
