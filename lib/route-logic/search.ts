@@ -2,7 +2,8 @@
  * GET /api/search?q=…
  *
  * Cross-resource search for the global header search box. Returns up
- * to a few hits each from Families, FamilyMembers, and Payments,
+ * to a few hits each from Families, FamilyMembers, Payments, Tasks,
+ * and LifecycleEventPayments (admin-only),
  * scoped to the current org.
  *
  * Implementation notes:
@@ -25,7 +26,8 @@ import { checkRateLimit } from '@/lib/rate-limit'
 import { formatLocaleDate } from '@/lib/date-utils'
 import { sanitizePaymentNotes } from '@/lib/payments/sanitize'
 import { loadByIdsInChunks } from '@/lib/org-pagination'
-import { Family, FamilyMember, Payment } from '@/lib/models'
+import { Family, FamilyMember, Payment, Task, LifecycleEventPayment } from '@/lib/models'
+import { formatLifecycleEventPayments } from '@/lib/route-logic/events'
 
 // Cap each category independently so a broad substring match cannot scan
 // unbounded rows; PER_GROUP is the per-category ceiling (families, members, payments).
@@ -48,12 +50,16 @@ export const GET = handler({
   query: querySchema,
   name: 'GET /api/search',
   fn: async ({ ctx, query, request }) => {
-    const searchLimit =
-      process.env.SECURITY_STRICT_RATE_LIMITS === '1' ? 20 : 60
-    const rateVerdict = await checkRateLimit(request, 'search', {
-      limit: searchLimit,
-      windowMs: 60_000,
-    }, ctx!.organizationId)
+    const searchLimit = process.env.SECURITY_STRICT_RATE_LIMITS === '1' ? 20 : 60
+    const rateVerdict = await checkRateLimit(
+      request,
+      'search',
+      {
+        limit: searchLimit,
+        windowMs: 60_000,
+      },
+      ctx!.organizationId,
+    )
     if (!rateVerdict.allowed) {
       return { status: 429, data: { error: 'Too many requests' } }
     }
@@ -63,7 +69,7 @@ export const GET = handler({
     const rx = new RegExp(escapeRegex(query!.q), 'i')
     const includePayments = hasMinRole(ctx!.role, 'admin')
 
-    const [families, members, payments] = await Promise.all([
+    const [families, members, payments, tasks, events] = await Promise.all([
       Family.find({
         organizationId: orgId,
         $or: [{ name: rx }, { hebrewName: rx }, { email: rx }],
@@ -107,6 +113,26 @@ export const GET = handler({
             .limit(PER_GROUP)
             .lean<any[]>()
         : Promise.resolve([] as any[]),
+      includePayments
+        ? Task.find({
+            organizationId: orgId,
+            title: rx,
+          })
+            .select('_id title dueDate status')
+            .sort({ dueDate: 1 })
+            .limit(PER_GROUP)
+            .lean<any[]>()
+        : Promise.resolve([] as any[]),
+      includePayments && query!.q.length >= 3
+        ? LifecycleEventPayment.find({
+            organizationId: orgId,
+            $or: [{ notes: rx }, { eventType: rx }],
+          })
+            .select('_id familyId eventType eventDate notes amount')
+            .sort({ eventDate: -1 })
+            .limit(PER_GROUP)
+            .lean<any[]>()
+        : Promise.resolve([] as any[]),
     ])
 
     // Hydrate member -> family name in one batched lookup.
@@ -118,8 +144,12 @@ export const GET = handler({
       .map((p) => p.familyId)
       .filter(Boolean)
       .map((id) => id.toString())
+    const familyIdsFromEvents = events
+      .map((e) => e.familyId)
+      .filter(Boolean)
+      .map((id) => id.toString())
     const allRelatedFamilyIds = Array.from(
-      new Set([...familyIdsFromMembers, ...familyIdsFromPayments]),
+      new Set([...familyIdsFromMembers, ...familyIdsFromPayments, ...familyIdsFromEvents]),
     )
     const relatedFams: Record<string, string> = {}
     if (allRelatedFamilyIds.length) {
@@ -143,7 +173,8 @@ export const GET = handler({
 
     const memberResults = members.map((m) => {
       const fam = m.familyId ? relatedFams[m.familyId.toString()] : ''
-      const fullName = [m.firstName, m.lastName].filter(Boolean).join(' ') ||
+      const fullName =
+        [m.firstName, m.lastName].filter(Boolean).join(' ') ||
         [m.hebrewFirstName, m.hebrewLastName].filter(Boolean).join(' ') ||
         '(unnamed)'
       return {
@@ -158,24 +189,51 @@ export const GET = handler({
     const paymentResults = payments
       .filter((p) => !p.familyId || relatedFams[p.familyId.toString()])
       .map((p) => {
-      const fam = p.familyId ? relatedFams[p.familyId.toString()] : ''
-      const checkRef = p.checkInfo?.checkNumber ? `Check #${p.checkInfo.checkNumber}` : ''
-      const cardRef = p.ccInfo?.last4 ? `••${p.ccInfo.last4}` : ''
-      const dateStr = p.paymentDate ? formatLocaleDate(p.paymentDate) : ''
-      const safeNotes = sanitizePaymentNotes(p.notes)
-      return {
-        type: 'payment' as const,
-        id: p._id.toString(),
-        label: `${formatMoney(netPaymentAmount(p), moneyCtx)} — ${fam || 'payment'}`,
-        sublabel: [checkRef || cardRef, safeNotes, dateStr].filter(Boolean).join(' · '),
-        href: p.familyId ? `/families/${p.familyId.toString()}` : '/payments',
-      }
-    })
+        const fam = p.familyId ? relatedFams[p.familyId.toString()] : ''
+        const checkRef = p.checkInfo?.checkNumber ? `Check #${p.checkInfo.checkNumber}` : ''
+        const cardRef = p.ccInfo?.last4 ? `••${p.ccInfo.last4}` : ''
+        const dateStr = p.paymentDate ? formatLocaleDate(p.paymentDate) : ''
+        const safeNotes = sanitizePaymentNotes(p.notes)
+        return {
+          type: 'payment' as const,
+          id: p._id.toString(),
+          label: `${formatMoney(netPaymentAmount(p), moneyCtx)} — ${fam || 'payment'}`,
+          sublabel: [checkRef || cardRef, safeNotes, dateStr].filter(Boolean).join(' · '),
+          href: p.familyId ? `/families/${p.familyId.toString()}` : '/payments',
+        }
+      })
 
-    const items = [...familyResults, ...memberResults, ...paymentResults].slice(
-      0,
-      MAX_TOTAL,
-    )
+    const taskResults = tasks.map((task) => ({
+      type: 'task' as const,
+      id: task._id.toString(),
+      label: task.title,
+      sublabel: [task.status, task.dueDate ? formatLocaleDate(task.dueDate) : '']
+        .filter(Boolean)
+        .join(' · '),
+      href: '/tasks',
+    }))
+
+    const formattedEvents =
+      events.length > 0
+        ? await formatLifecycleEventPayments(String(ctx!.organizationId), events)
+        : []
+    const eventResults = formattedEvents.map((ev) => ({
+      type: 'event' as const,
+      id: ev._id,
+      label: ev.eventTypeLabel || ev.eventType,
+      sublabel: [ev.familyName, ev.notes, ev.eventDate ? formatLocaleDate(ev.eventDate) : '']
+        .filter(Boolean)
+        .join(' · '),
+      href: ev.familyId ? `/families/${ev.familyId}` : '/events',
+    }))
+
+    const items = [
+      ...familyResults,
+      ...memberResults,
+      ...paymentResults,
+      ...taskResults,
+      ...eventResults,
+    ].slice(0, MAX_TOTAL)
     return { data: { items } }
   },
 })

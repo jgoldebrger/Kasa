@@ -26,6 +26,7 @@ import {
   ArrowRightOnRectangleIcon,
   UserCircleIcon,
   ShieldCheckIcon,
+  QuestionMarkCircleIcon,
 } from '@heroicons/react/24/outline'
 
 const GlobalSearch = dynamic(() => import('./GlobalSearch'), { ssr: false })
@@ -60,6 +61,7 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
     },
     { href: '/reports', label: t('nav.reports'), icon: PresentationChartBarIcon, adminOnly: true },
     { href: '/statements', label: t('nav.statements'), icon: DocumentTextIcon, adminOnly: true },
+    { href: '/help', label: t('nav.help'), icon: QuestionMarkCircleIcon },
     { href: '/settings', label: t('nav.settings'), icon: CogIcon, adminOnly: true },
   ].filter((item) => !('adminOnly' in item && item.adminOnly) || isAdmin)
 

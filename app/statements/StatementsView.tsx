@@ -36,6 +36,7 @@ import {
   type DataColumn,
 } from '@/app/components/ui'
 import TaxReceiptsPanel from './TaxReceiptsPanel'
+import ContextualHelpLink from '@/app/components/ContextualHelpLink'
 
 interface Statement {
   _id: string
@@ -668,6 +669,7 @@ export default function StatementsView({ initialStatements }: StatementsViewProp
           subtitle="View and generate financial statements."
           actions={
             <>
+              <ContextualHelpLink slug="statements-email" />
               <Button
                 variant="secondary"
                 leftIcon={<EnvelopeIcon className="h-5 w-5" />}

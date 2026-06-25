@@ -8,7 +8,9 @@ import {
   DocumentTextIcon,
   BoltIcon,
   ExclamationTriangleIcon,
+  PlusIcon,
 } from '@heroicons/react/24/outline'
+import RecordPaymentModal from '@/app/components/payments/RecordPaymentModal'
 import { useToast } from '@/app/components/Toast'
 import {
   Button,
@@ -99,6 +101,7 @@ export default function PaymentsView({
   const [error, setError] = useState(false)
   const [visiblePayments, setVisiblePayments] = useState<Payment[]>([])
   const [sort, setSort] = useState<{ id: string; dir: SortDir } | null>(null)
+  const [showRecordModal, setShowRecordModal] = useState(false)
   const hasFetchedRef = useRef(serverHydrated)
   const { begin, invalidate, isStale } = useRequestGeneration()
 
@@ -337,10 +340,18 @@ export default function PaymentsView({
           title={t('payments.title')}
           subtitle={t('payments.subtitle')}
           actions={
-            <div className="text-right">
-              <div className="text-xs text-fg-muted">{t('payments.totalAmount')}</div>
-              <div className="text-2xl sm:text-3xl font-bold text-fg tabular">
-                {formatMoney(totalAmount)}
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+              <Button
+                leftIcon={<PlusIcon className="h-5 w-5" />}
+                onClick={() => setShowRecordModal(true)}
+              >
+                {t('payments.recordPayment')}
+              </Button>
+              <div className="text-right">
+                <div className="text-xs text-fg-muted">{t('payments.totalAmount')}</div>
+                <div className="text-2xl sm:text-3xl font-bold text-fg tabular">
+                  {formatMoney(totalAmount)}
+                </div>
               </div>
             </div>
           }
@@ -464,6 +475,12 @@ export default function PaymentsView({
           </div>
         )}
       </div>
+
+      <RecordPaymentModal
+        open={showRecordModal}
+        onClose={() => setShowRecordModal(false)}
+        onCreated={() => fetchPayments()}
+      />
     </div>
   )
 }

@@ -20,6 +20,7 @@ const GET_ENDPOINTS: Array<{ path: string; assert?: (body: unknown) => void }> =
   { path: '/api/statements' },
   { path: `/api/tax-receipts?year=${YEAR}` },
   { path: '/api/dashboard-stats' },
+  { path: '/api/dashboard-actions' },
   { path: '/api/notifications?limit=20' },
   { path: '/api/search?q=Alpha' },
   { path: '/api/org-members' },

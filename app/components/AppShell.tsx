@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import MobileTopBar from './MobileTopBar'
 import PlatformImpersonationBanner from './PlatformImpersonationBanner'
+import KeyboardShortcuts from './KeyboardShortcuts'
+import GlobalQuickActionModals from './GlobalQuickActionModals'
 
 const FULLSCREEN_PATHS = [
   '/welcome',
@@ -93,6 +95,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <PlatformImpersonationBanner />
         {children}
       </main>
+      <KeyboardShortcuts />
+      <GlobalQuickActionModals />
     </>
   )
 }

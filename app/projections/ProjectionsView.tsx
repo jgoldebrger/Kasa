@@ -7,6 +7,7 @@ import { useCurrency } from '@/lib/client/useCurrency'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useToast } from '@/app/components/Toast'
 import { useT } from '@/lib/client/i18n'
+import ContextualHelpLink from '@/app/components/ContextualHelpLink'
 
 interface PerEventRow {
   eventTypeId: string
@@ -179,6 +180,7 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
         <PageHeader
           title={t('projections.title')}
           subtitle={t('projections.subtitle').replace('{horizon}', String(horizon))}
+          actions={<ContextualHelpLink slug="dues-calculator" />}
         />
 
         {!r && !hasError && (

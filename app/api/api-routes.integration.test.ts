@@ -1807,6 +1807,61 @@ describe.sequential('route-logic row coverage (gap order)', () => {
     })
   })
 
+  describe('tasks/bulk', () => {
+    it('completes and soft-deletes tasks in bulk', async () => {
+      const today = new Date().toISOString().slice(0, 10)
+      const { Task } = await import('@/lib/models')
+      const { POST: createTask } = await import('@/lib/route-logic/tasks')
+      const { POST } = await import('@/lib/route-logic/tasks/bulk')
+
+      const createRes = await invokeRouteLogic(
+        createTask,
+        orgJsonReq('/api/tasks', 'POST', {
+          title: `Bulk Task ${Date.now()}`,
+          dueDate: today,
+          email: ctx.email,
+          priority: 'medium',
+          status: 'pending',
+        }),
+      )
+      expect(createRes.status).toBe(201)
+      const created = await createRes.json()
+      const taskId = created._id.toString()
+
+      const completeRes = await invokeRouteLogic(
+        POST,
+        orgJsonReq('/api/tasks/bulk', 'POST', {
+          action: 'complete',
+          ids: [taskId],
+        }),
+      )
+      expect(completeRes.status).toBe(200)
+      expect((await completeRes.json()).modified).toBe(1)
+
+      const completed = await Task.findById(taskId).lean<{ status?: string }>()
+      expect(completed?.status).toBe('completed')
+
+      const disposable = await Task.create({
+        organizationId: ctx.orgId,
+        title: 'Bulk Delete Task',
+        dueDate: new Date(today),
+        email: ctx.email,
+        status: 'pending',
+        priority: 'low',
+      })
+
+      const deleteRes = await invokeRouteLogic(
+        POST,
+        orgJsonReq('/api/tasks/bulk', 'POST', {
+          action: 'delete',
+          ids: [disposable._id.toString()],
+        }),
+      )
+      expect(deleteRes.status).toBe(200)
+      expect((await deleteRes.json()).modified).toBe(1)
+    })
+  })
+
   describe('statements/send-emails/status', () => {
     it('returns job status and marks stale running jobs failed', async () => {
       const { EmailJob } = await import('@/lib/models')

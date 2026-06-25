@@ -36,5 +36,8 @@
   "onboarding.step.eventTypes": "Define event types",
   "onboarding.step.email": "Configure email (SMTP)",
   "onboarding.step.firstFamily": "Add your first family",
-  "onboarding.step.firstPayment": "Record your first payment"
+  "onboarding.step.firstPayment": "Record your first payment",
+  "nav.help": "Help",
+  "dashboard.member.searchFamilies": "Search families",
+  "help.contextual.label": "Help for this page"
 }

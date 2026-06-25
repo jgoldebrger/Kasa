@@ -19,6 +19,8 @@
  *   - `families-list` — GET /api/families
 
  *   - `dashboard-stats` — GET /api/dashboard-stats
+ *
+ *   - `dashboard-actions` — GET /api/dashboard-actions
 
  * These require org auth and tenant isolation via ctx.organizationId. They were
 
@@ -40,8 +42,6 @@
 
  */
 
-
-
 import { Ratelimit } from '@upstash/ratelimit'
 
 import { Redis } from '@upstash/redis'
@@ -50,16 +50,15 @@ import mongoose, { Schema } from 'mongoose'
 
 import connectDB from '@/lib/database'
 
-
-
 /** Documented exempt scopes — see module header. */
 
-export const ORG_SCOPED_READ_EXEMPT_SCOPES = ['families-list', 'dashboard-stats'] as const
-
-
+export const ORG_SCOPED_READ_EXEMPT_SCOPES = [
+  'families-list',
+  'dashboard-stats',
+  'dashboard-actions',
+] as const
 
 interface RateLimitDoc {
-
   _id: string
 
   count: number
@@ -67,83 +66,50 @@ interface RateLimitDoc {
   windowStart: Date
 
   expiresAt: Date
-
 }
 
+const RateLimitSchema = new Schema<RateLimitDoc>(
+  {
+    _id: { type: String, required: true },
 
+    count: { type: Number, default: 0 },
 
-const RateLimitSchema = new Schema<RateLimitDoc>({
+    windowStart: { type: Date, required: true },
 
-  _id: { type: String, required: true },
-
-  count: { type: Number, default: 0 },
-
-  windowStart: { type: Date, required: true },
-
-  expiresAt: { type: Date, required: true, index: { expires: 0 } },
-
-}, { _id: false, versionKey: false })
-
-
+    expiresAt: { type: Date, required: true, index: { expires: 0 } },
+  },
+  { _id: false, versionKey: false },
+)
 
 const RateLimit =
-
   (mongoose.models.RateLimit as mongoose.Model<RateLimitDoc>) ||
-
   mongoose.model<RateLimitDoc>('RateLimit', RateLimitSchema)
 
-
-
-const TRUST_PROXY =
-
-  process.env.TRUST_PROXY_HEADERS === 'true' ||
-
-  process.env.VERCEL === '1'
-
-
+const TRUST_PROXY = process.env.TRUST_PROXY_HEADERS === 'true' || process.env.VERCEL === '1'
 
 let redisClient: Redis | null = null
 
 const redisLimiterCache = new Map<string, Ratelimit>()
 
-
-
 function isRedisBackendEnabled(): boolean {
-
-  return Boolean(
-
-    process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN,
-
-  )
-
+  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
 }
 
-
-
 function getRedis(): Redis {
-
   if (!redisClient) {
-
     redisClient = Redis.fromEnv()
-
   }
 
   return redisClient
-
 }
 
-
-
 function getRedisLimiter(scope: string, opts: RateLimitOptions): Ratelimit {
-
   const cacheKey = `${scope}:${opts.limit}:${opts.windowMs}`
 
   let limiter = redisLimiterCache.get(cacheKey)
 
   if (!limiter) {
-
     limiter = new Ratelimit({
-
       redis: getRedis(),
 
       limiter: Ratelimit.fixedWindow(opts.limit, `${opts.windowMs} ms`),
@@ -151,21 +117,15 @@ function getRedisLimiter(scope: string, opts: RateLimitOptions): Ratelimit {
       prefix: `kasa:rl:${scope}`,
 
       analytics: false,
-
     })
 
     redisLimiterCache.set(cacheKey, limiter)
-
   }
 
   return limiter
-
 }
 
-
-
 function getClientIp(req: Request): string | null {
-
   if (!TRUST_PROXY) return null
 
   const headers = req.headers
@@ -173,29 +133,15 @@ function getClientIp(req: Request): string | null {
   const xff = headers.get('x-forwarded-for')
 
   if (xff) {
-
     const first = xff.split(',')[0].trim()
 
     if (first) return first
-
   }
 
-  return (
-
-    headers.get('x-real-ip') ||
-
-    headers.get('cf-connecting-ip') ||
-
-    null
-
-  )
-
+  return headers.get('x-real-ip') || headers.get('cf-connecting-ip') || null
 }
 
-
-
 export interface RateLimitOptions {
-
   limit: number
 
   windowMs: number
@@ -213,27 +159,19 @@ export interface RateLimitOptions {
    */
 
   failClosed?: boolean
-
 }
 
-
-
 export interface RateLimitVerdict {
-
   allowed: boolean
 
   remaining: number
 
   resetAt: number
-
 }
-
-
 
 /** Scopes that trigger outbound email — fail-closed on backend errors. */
 
 const EMAIL_SEND_SCOPES = new Set([
-
   'send-file-email',
 
   'send-monthly-emails',
@@ -251,45 +189,26 @@ const EMAIL_SEND_SCOPES = new Set([
   'email-config-test',
 
   'task-due-emails',
-
 ])
 
-
-
 export function isEmailSendScope(scope: string): boolean {
-
   return EMAIL_SEND_SCOPES.has(scope)
-
 }
 
-
-
 export function isFailClosedScope(scope: string, opts?: RateLimitOptions): boolean {
-
   if (opts?.failClosed) return true
 
   if (
-
     scope === 'login' ||
-
     scope === 'login-email' ||
-
     scope === 'signup' ||
-
     scope === 'precheck-2fa' ||
-
     scope === 'precheck-2fa-email' ||
-
     scope === '2fa-change' ||
-
     scope === '2fa-setup' ||
-
     scope === 'import'
-
   ) {
-
     return true
-
   }
 
   if (scope.startsWith('pwd-reset')) return true
@@ -297,21 +216,15 @@ export function isFailClosedScope(scope: string, opts?: RateLimitOptions): boole
   if (isEmailSendScope(scope)) return true
 
   return false
-
 }
 
-
-
 function buildRateLimitKey(
-
   req: Request,
 
   scope: string,
 
   extraKey?: string,
-
 ): { key: string; identifier: string } {
-
   const ip = getClientIp(req)
 
   const principal = ip || (extraKey ? `id:${String(extraKey).toLowerCase()}` : 'shared')
@@ -327,35 +240,23 @@ function buildRateLimitKey(
   if (extraKey && ip) identifierParts.push(String(extraKey).toLowerCase())
 
   return { key, identifier: identifierParts.join(':') }
-
 }
 
-
-
 function failVerdict(
-
   opts: RateLimitOptions,
 
   scope: string,
 
   now: number,
-
 ): RateLimitVerdict {
-
   if (isFailClosedScope(scope, opts)) {
-
     return { allowed: false, remaining: 0, resetAt: now + opts.windowMs }
-
   }
 
   return { allowed: true, remaining: opts.limit - 1, resetAt: now + opts.windowMs }
-
 }
 
-
-
 async function checkRateLimitRedis(
-
   scope: string,
 
   identifier: string,
@@ -363,99 +264,65 @@ async function checkRateLimitRedis(
   opts: RateLimitOptions,
 
   now: number,
-
 ): Promise<RateLimitVerdict> {
-
   const limiter = getRedisLimiter(scope, opts)
 
   const result = await limiter.limit(identifier)
 
   return {
-
     allowed: result.success,
 
     remaining: result.remaining,
 
     resetAt: result.reset,
-
   }
-
 }
 
-
-
 async function checkRateLimitMongo(
-
   key: string,
 
   opts: RateLimitOptions,
 
   now: number,
-
 ): Promise<RateLimitVerdict> {
-
   await connectDB()
 
-
-
   const doc = await RateLimit.findOneAndUpdate(
-
     { _id: key },
 
     {
-
       $inc: { count: 1 },
 
       $setOnInsert: {
-
         windowStart: new Date(now),
 
         expiresAt: new Date(now + opts.windowMs),
-
       },
-
     },
 
     { upsert: true, new: true, setDefaultsOnInsert: true },
-
   ).lean<RateLimitDoc>()
 
-
-
   if (!doc) {
-
     return { allowed: true, remaining: opts.limit - 1, resetAt: now + opts.windowMs }
-
   }
-
-
 
   const resetAt = new Date(doc.expiresAt).getTime()
 
-
-
   if (doc.count > opts.limit) {
-
     return { allowed: false, remaining: 0, resetAt }
-
   }
 
   return {
-
     allowed: true,
 
     remaining: Math.max(0, opts.limit - doc.count),
 
     resetAt,
-
   }
-
 }
 
-
-
 export async function checkRateLimit(
-
   req: Request,
 
   scope: string,
@@ -463,41 +330,26 @@ export async function checkRateLimit(
   opts: RateLimitOptions,
 
   extraKey?: string,
-
 ): Promise<RateLimitVerdict> {
-
   const { key, identifier } = buildRateLimitKey(req, scope, extraKey)
 
   const now = Date.now()
 
-
-
   try {
-
     if (isRedisBackendEnabled()) {
-
       return await checkRateLimitRedis(scope, identifier, opts, now)
-
     }
 
     return await checkRateLimitMongo(key, opts, now)
-
   } catch (err) {
-
     const forceClosed = isFailClosedScope(scope, opts)
 
     console.error(
-
       `[rate-limit] fallback (fail-${forceClosed ? 'closed' : 'open'}) scope=${scope} backend=${isRedisBackendEnabled() ? 'redis' : 'mongo'}:`,
 
       (err as Error)?.message,
-
     )
 
     return failVerdict(opts, scope, now)
-
   }
-
 }
-
-

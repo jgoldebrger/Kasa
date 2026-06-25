@@ -59,6 +59,26 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
   },
   {
+    slug: 'dues-calculator',
+    title: 'Understanding the dues calculator',
+    summary: 'Project future dues income and recommend plan pricing.',
+    category: 'getting-started',
+    sections: [
+      {
+        heading: 'What it shows',
+        body: 'The Dues calc page (Projections) forecasts membership growth, lifecycle expenses, and whether your current payment plans cover projected costs over the next several years.',
+      },
+      {
+        heading: 'Adjusting assumptions',
+        body: 'Change the history window and projection horizon to see how recommendations shift. The tool blends roster data, historical averages, and planned events when estimating future expenses.',
+      },
+      {
+        heading: 'Using recommendations',
+        body: 'Review suggested plan prices per year before changing Settings → Payment Plans. Recommendations aim to keep the fund solvent while accounting for Bar Mitzvah payers and new families.',
+      },
+    ],
+  },
+  {
     slug: 'import-families',
     title: 'Import families from CSV',
     summary: 'Migrate from spreadsheets using the import tool.',
@@ -95,6 +115,26 @@ export const HELP_ARTICLES: HelpArticle[] = [
       {
         heading: 'Recurring billing',
         body: 'Set up recurring monthly charges per family. The nightly cron job processes due charges in your organization timezone.',
+      },
+    ],
+  },
+  {
+    slug: 'statements-email',
+    title: 'Email statements to families',
+    summary: 'Send statement PDFs from the Statements page.',
+    category: 'statements',
+    sections: [
+      {
+        heading: 'Prerequisites',
+        body: 'Configure SMTP in Settings → Email and test the connection. Families need a valid email address and must not be opted out of statement email.',
+      },
+      {
+        heading: 'Send individually or in bulk',
+        body: 'On the Statements page, use Send via Email for one family or select multiple statements for a batch. Each email includes the PDF attachment and uses your letterhead footer.',
+      },
+      {
+        heading: 'Auto-send',
+        body: 'Enable scheduled statement generation in Settings → Rules to create monthly statements automatically. Pair with SMTP so families receive balances without manual sends.',
       },
     ],
   },

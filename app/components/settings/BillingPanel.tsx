@@ -9,6 +9,7 @@ import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useBillingCheckoutReturn } from '@/lib/client/useBillingCheckoutReturn'
 import { PLAN_DEFINITIONS } from '@/lib/billing/plans'
 import StripeConnectPanel from '@/app/components/settings/StripeConnectPanel'
+import ContextualHelpLink from '@/app/components/ContextualHelpLink'
 
 export interface BillingSnapshot {
   planTier?: string | null
@@ -132,8 +133,11 @@ export default function BillingPanel({
       <div className="surface-card p-6">
         <div className="flex items-start gap-3 mb-4">
           <CreditCardIcon className="h-6 w-6 text-fg-muted shrink-0" aria-hidden="true" />
-          <div>
-            <h2 className="text-lg font-semibold text-fg">Platform subscription</h2>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-fg">Platform subscription</h2>
+              <ContextualHelpLink slug="billing-subscription" />
+            </div>
             <p className="text-sm text-fg-muted mt-1">
               Your Kasa workspace subscription is billed separately from member dues.
             </p>

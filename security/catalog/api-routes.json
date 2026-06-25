@@ -1,19 +1,19 @@
 {
-  "generatedAt": "2026-06-23T18:59:08.803Z",
+  "generatedAt": "2026-06-25T13:32:41.376Z",
   "summary": {
-    "total": 164,
+    "total": 170,
     "byAuth": {
-      "admin": 6,
-      "org": 118,
+      "admin": 8,
+      "org": 120,
       "nextauth": 2,
       "public": 11,
-      "cron": 12,
+      "cron": 14,
       "session": 10,
       "org-or-cron": 4,
       "webhook": 1
     },
-    "mutating": 86,
-    "tenantScoped": 122
+    "mutating": 89,
+    "tenantScoped": 124
   },
   "routes": [
     {
@@ -53,6 +53,15 @@
       "source": "app/api/admin/invite-requests/route.ts"
     },
     {
+      "path": "/api/admin/jobs",
+      "method": "GET",
+      "auth": "admin",
+      "csrf": false,
+      "tenantScoped": false,
+      "dynamicParams": [],
+      "source": "app/api/admin/jobs/route.ts"
+    },
+    {
       "path": "/api/admin/organizations",
       "method": "GET",
       "auth": "admin",
@@ -69,6 +78,15 @@
       "tenantScoped": false,
       "dynamicParams": ["id"],
       "source": "app/api/admin/organizations/[id]/impersonate/route.ts"
+    },
+    {
+      "path": "/api/admin/organizations/:id/mark-setup-complete",
+      "method": "POST",
+      "auth": "admin",
+      "csrf": true,
+      "tenantScoped": false,
+      "dynamicParams": ["id"],
+      "source": "app/api/admin/organizations/[id]/mark-setup-complete/route.ts"
     },
     {
       "path": "/api/audit-log",
@@ -277,6 +295,16 @@
       "tenantScoped": true,
       "dynamicParams": [],
       "source": "app/api/cycle-config/route.ts"
+    },
+    {
+      "path": "/api/dashboard-actions",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/dashboard-actions/route.ts"
     },
     {
       "path": "/api/dashboard-stats",
@@ -690,6 +718,24 @@
       "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/jobs/generate-monthly-statements/worker/route.ts"
+    },
+    {
+      "path": "/api/jobs/ops-digest",
+      "method": "GET",
+      "auth": "cron",
+      "csrf": false,
+      "tenantScoped": false,
+      "dynamicParams": [],
+      "source": "app/api/jobs/ops-digest/route.ts"
+    },
+    {
+      "path": "/api/jobs/ops-digest",
+      "method": "POST",
+      "auth": "cron",
+      "csrf": true,
+      "tenantScoped": false,
+      "dynamicParams": [],
+      "source": "app/api/jobs/ops-digest/route.ts"
     },
     {
       "path": "/api/jobs/process-recurring-payments",
@@ -1440,6 +1486,16 @@
       "tenantScoped": true,
       "dynamicParams": ["id"],
       "source": "app/api/tasks/[id]/route.ts"
+    },
+    {
+      "path": "/api/tasks/bulk",
+      "method": "POST",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/tasks/bulk/route.ts"
     },
     {
       "path": "/api/tasks/send-due-date-emails",

@@ -6,6 +6,8 @@ import connectDB from '@/lib/database'
 import { Organization, Family, FamilyMember, YearlyCalculation } from '@/lib/models'
 import { calculateYearlyExpenses } from '@/lib/calculations'
 import { loadSetupProgress } from '@/lib/organizations/setup-progress-data'
+import { loadDashboardAttention } from '@/lib/route-logic/dashboard-actions'
+import { serializeForRsc } from '@/lib/serialize-rsc'
 import DashboardView from './DashboardView'
 import Loading from './loading'
 
@@ -54,15 +56,23 @@ async function fetchInitialDashboardData(organizationId: string, includeFinancia
   const financialsComplete = !includeFinancials || calcDoc != null
 
   let initialSetupProgress = null
+  let initialAttention = null
   if (includeFinancials) {
-    try {
-      initialSetupProgress = await loadSetupProgress(organizationId)
-    } catch (err) {
-      console.error('[dashboard] setup-progress prefetch failed:', err)
-    }
+    const [setupProgress, attention] = await Promise.all([
+      loadSetupProgress(organizationId).catch((err) => {
+        console.error('[dashboard] setup-progress prefetch failed:', err)
+        return null
+      }),
+      loadDashboardAttention(organizationId).catch((err) => {
+        console.error('[dashboard] attention prefetch failed:', err)
+        return null
+      }),
+    ])
+    initialSetupProgress = setupProgress
+    initialAttention = attention ? serializeForRsc(attention) : null
   }
 
-  return { initialStats, financialsComplete, initialSetupProgress }
+  return { initialStats, financialsComplete, initialSetupProgress, initialAttention }
 }
 
 async function DashboardServer() {
@@ -86,6 +96,7 @@ async function DashboardServer() {
         initialStats={data.initialStats}
         initialFinancialsComplete={data.financialsComplete}
         initialSetupProgress={data.initialSetupProgress}
+        initialAttention={data.initialAttention}
         showFinancials={showFinancials}
       />
     )

@@ -2,7 +2,13 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import Link from 'next/link'
-import { CalendarIcon, ExclamationTriangleIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
+import {
+  CalendarIcon,
+  ExclamationTriangleIcon,
+  ArrowPathIcon,
+  PlusIcon,
+} from '@heroicons/react/24/outline'
+import RecordEventModal from '@/app/components/events/RecordEventModal'
 import { formatLocaleDate } from '@/lib/date-utils'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
@@ -57,6 +63,7 @@ export default function EventsView({
   const [loadError, setLoadError] = useState(false)
   const [visibleEvents, setVisibleEvents] = useState<LifecycleEvent[]>(initialEvents ?? [])
   const [sort, setSort] = useState<{ id: string; dir: SortDir } | null>(null)
+  const [showRecordModal, setShowRecordModal] = useState(false)
   const { begin, invalidate, isStale } = useRequestGeneration()
 
   const fetchEvents = useCallback(
@@ -227,10 +234,18 @@ export default function EventsView({
           title={t('events.title')}
           subtitle={t('events.subtitle')}
           actions={
-            <div className="text-right">
-              <div className="text-xs text-fg-muted">{t('events.totalAmount')}</div>
-              <div className="text-2xl sm:text-3xl font-bold text-fg tabular">
-                {formatMoney(totalAmount)}
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+              <Button
+                leftIcon={<PlusIcon className="h-5 w-5" />}
+                onClick={() => setShowRecordModal(true)}
+              >
+                {t('events.addEvent')}
+              </Button>
+              <div className="text-right">
+                <div className="text-xs text-fg-muted">{t('events.totalAmount')}</div>
+                <div className="text-2xl sm:text-3xl font-bold text-fg tabular">
+                  {formatMoney(totalAmount)}
+                </div>
               </div>
             </div>
           }
@@ -269,6 +284,11 @@ export default function EventsView({
                 icon={<CalendarIcon className="h-10 w-10" />}
                 title={t('events.empty.title')}
                 description={t('events.empty.description')}
+                cta={{
+                  label: t('events.empty.cta'),
+                  onClick: () => setShowRecordModal(true),
+                  icon: <PlusIcon className="h-4 w-4" />,
+                }}
               />
             }
           />
@@ -286,6 +306,12 @@ export default function EventsView({
           </div>
         )}
       </div>
+
+      <RecordEventModal
+        open={showRecordModal}
+        onClose={() => setShowRecordModal(false)}
+        onCreated={() => fetchEvents({})}
+      />
     </div>
   )
 }

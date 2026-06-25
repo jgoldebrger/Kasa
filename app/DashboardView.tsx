@@ -14,8 +14,9 @@ import {
   CalculatorIcon,
   ArrowPathIcon,
   InformationCircleIcon,
-  CheckCircleIcon,
   ChevronRightIcon,
+  CalendarIcon,
+  ClipboardDocumentListIcon,
 } from '@heroicons/react/24/outline'
 import Link from 'next/link'
 import { useToast } from './components/Toast'
@@ -27,6 +28,10 @@ import { useT } from '@/lib/client/i18n'
 import { EmptyState, PageHeader, Tooltip } from './components/ui'
 import { Skeleton } from './components/ui/Skeleton'
 import OnboardingChecklist from './components/OnboardingChecklist'
+import DashboardAttentionPanel from './components/DashboardAttentionPanel'
+import type { DashboardAttentionPayload } from '@/lib/route-logic/dashboard-actions'
+import MemberWelcomeChecklist from './components/MemberWelcomeChecklist'
+import { openCreateTask, openRecordEvent, openRecordPayment } from '@/lib/client/command-events'
 
 interface DashboardStats {
   totalFamilies: number
@@ -46,6 +51,8 @@ export interface DashboardViewProps {
     | null
   /** When false, hide org-wide balance/income and admin quick actions. */
   showFinancials?: boolean
+  /** Server-prefetched needs-attention panel (admin dashboard). */
+  initialAttention?: DashboardAttentionPayload | null
 }
 
 export default function DashboardView({
@@ -53,6 +60,7 @@ export default function DashboardView({
   initialFinancialsComplete = true,
   initialSetupProgress = null,
   showFinancials = true,
+  initialAttention = null,
 }: DashboardViewProps = {}) {
   const toast = useToast()
   const t = useT()
@@ -229,6 +237,8 @@ export default function DashboardView({
           </div>
         )}
 
+        {showFinancials && <DashboardAttentionPanel initialAttention={initialAttention} />}
+
         {showFinancials && (
           <div className="surface-card p-4 sm:p-6 max-w-md">
             <div className="flex items-center gap-3 mb-5">
@@ -238,6 +248,21 @@ export default function DashboardView({
               <h2 className="text-base font-semibold text-fg">{t('dashboard.quickActions')}</h2>
             </div>
             <div className="space-y-1.5">
+              <ActionEventButton
+                onClick={openRecordPayment}
+                label={t('search.action.recordPayment')}
+                icon={CurrencyDollarIcon}
+              />
+              <ActionEventButton
+                onClick={openRecordEvent}
+                label={t('search.action.addEvent')}
+                icon={CalendarIcon}
+              />
+              <ActionEventButton
+                onClick={openCreateTask}
+                label={t('search.action.createTask')}
+                icon={ClipboardDocumentListIcon}
+              />
               <ActionButton
                 href="/families"
                 label={t('dashboard.manageFamilies')}
@@ -263,65 +288,6 @@ export default function DashboardView({
         )}
       </div>
     </div>
-  )
-}
-
-function MemberWelcomeChecklist() {
-  const t = useT()
-  const steps = [
-    { title: t('dashboard.member.browseFamilies'), href: '/families', done: false },
-    { title: t('dashboard.member.viewMembers'), href: '/families', done: false },
-  ]
-  return (
-    <section
-      className="mb-8 surface-card p-5 sm:p-6 animate-ui-fade"
-      aria-labelledby="member-welcome-title"
-    >
-      <div className="flex items-start gap-3">
-        <div
-          className="inline-flex items-center justify-center h-10 w-10 rounded-md bg-accent/10 text-accent shrink-0"
-          aria-hidden="true"
-        >
-          <UserGroupIcon className="h-5 w-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h2 id="member-welcome-title" className="text-base font-semibold text-fg">
-            {t('dashboard.welcomeKasa')}
-          </h2>
-          <p className="mt-1 text-sm text-fg-muted">{t('dashboard.memberSubtitle')}</p>
-          <ol className="mt-4 divide-y divide-border rounded-md border border-border bg-app-subtle overflow-hidden">
-            {steps.map((s, i) => (
-              <li key={s.title}>
-                <Link
-                  href={s.href}
-                  className="focus-ring flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-fg hover:bg-fg/5 transition-colors"
-                >
-                  <span
-                    className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 text-xs font-semibold text-accent"
-                    aria-hidden="true"
-                  >
-                    {s.done ? <CheckCircleIcon className="h-4 w-4" /> : i + 1}
-                  </span>
-                  <span className="flex-1 truncate">{s.title}</span>
-                  <ChevronRightIcon
-                    aria-hidden="true"
-                    className="h-4 w-4 text-fg-subtle shrink-0 rtl:rotate-180"
-                  />
-                </Link>
-              </li>
-            ))}
-          </ol>
-          <div className="mt-4">
-            <Link
-              href="/families"
-              className="focus-ring inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-accent-fg rounded-md hover:bg-accent-hover transition-colors text-sm font-medium min-h-[var(--touch-target)] sm:min-h-0"
-            >
-              {t('dashboard.member.browseFamilies')}
-            </Link>
-          </div>
-        </div>
-      </div>
-    </section>
   )
 }
 
@@ -440,5 +406,30 @@ function ActionButton({
         aria-hidden="true"
       />
     </Link>
+  )
+}
+
+function ActionEventButton({
+  onClick,
+  label,
+  icon: Icon,
+}: {
+  onClick: () => void
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="focus-ring flex w-full items-center gap-3 px-3 py-2.5 rounded-md hover:bg-fg/5 transition-colors group min-h-[var(--touch-target)] sm:min-h-0 text-start"
+    >
+      <Icon className="h-4 w-4 text-fg-subtle group-hover:text-fg-muted" aria-hidden="true" />
+      <span className="text-sm font-medium text-fg-muted group-hover:text-fg flex-1">{label}</span>
+      <ChevronRightIcon
+        className="h-4 w-4 text-fg-subtle group-hover:text-fg-muted shrink-0 rtl:rotate-180"
+        aria-hidden="true"
+      />
+    </button>
   )
 }
