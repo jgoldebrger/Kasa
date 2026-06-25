@@ -13,7 +13,7 @@ import { openGlobalSearch } from '@/lib/client/open-global-search'
 
 export default function MemberWelcomeChecklist() {
   const t = useT()
-  const { visitedFamilies, viewedFamily } = useMemberOnboarding()
+  const { visitedFamilies, viewedFamily, viewedStatements } = useMemberOnboarding()
 
   const steps = [
     {
@@ -25,6 +25,11 @@ export default function MemberWelcomeChecklist() {
       title: t('dashboard.member.viewMembers'),
       href: '/families',
       done: viewedFamily,
+    },
+    {
+      title: t('dashboard.member.viewStatements'),
+      href: '/families',
+      done: viewedStatements,
     },
   ]
 

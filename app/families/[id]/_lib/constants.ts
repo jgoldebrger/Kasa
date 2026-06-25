@@ -5,7 +5,6 @@ export const ADMIN_ONLY_FAMILY_TABS = new Set([
   'withdrawals',
   'events',
   'cycle-charges',
-  'statements',
   'tasks',
 ])
 
@@ -53,6 +52,8 @@ export type FamilyTabDef = {
   label: string
   i18nKey?: string
   adminOnly?: boolean
+  /** Visible to email-linked members (read-only financial tab). */
+  memberReadable?: boolean
 }
 
 export const FAMILY_TABS: FamilyTabDef[] = [
@@ -62,7 +63,7 @@ export const FAMILY_TABS: FamilyTabDef[] = [
   { id: 'withdrawals', label: 'Withdrawals', i18nKey: 'family.withdrawals', adminOnly: true },
   { id: 'events', label: 'Lifecycle Events', i18nKey: 'family.lifecycleEvents', adminOnly: true },
   { id: 'cycle-charges', label: 'Cycle Charges', i18nKey: 'family.cycleCharges', adminOnly: true },
-  { id: 'statements', label: 'Statements', i18nKey: 'family.statements', adminOnly: true },
+  { id: 'statements', label: 'Statements', i18nKey: 'family.statements', memberReadable: true },
   { id: 'tasks', label: 'Tasks', i18nKey: 'nav.tasks', adminOnly: true },
   { id: 'sub-families', label: 'Sub-Families', i18nKey: 'family.subFamilies' },
 ]

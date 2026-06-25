@@ -14,10 +14,10 @@ import {
   ORG_CONNECT_SELECT,
   type OrgStripeConnectFields,
 } from '@/lib/stripe/client'
+import { requireFamilyPaymentAccess } from '@/lib/member-family-access.server'
 
 export const POST = handler({
   auth: 'org',
-  minRole: 'admin',
   body: paymentSchemas.createPaymentIntentBody,
   name: 'POST /api/stripe/create-payment-intent',
   fn: async ({ ctx, body, request }) => {
@@ -51,6 +51,16 @@ export const POST = handler({
     }
 
     const { amount, familyId, description, idempotencyHint } = body
+
+    const paymentAccess = await requireFamilyPaymentAccess(
+      ctx!.organizationId,
+      familyId,
+      ctx!.userId,
+      ctx!.role,
+    )
+    if (!paymentAccess.ok) {
+      return NextResponse.json({ error: paymentAccess.error }, { status: paymentAccess.status })
+    }
 
     const fam = await Family.findOne({ _id: familyId, organizationId: ctx!.organizationId }).select(
       '_id',

@@ -216,8 +216,12 @@ export function FamilyDetailProvider({
   })
   const { memberActiveTab, setMemberActiveTab } = members
 
+  const memberFinancialAccess = Boolean(data?.memberFinancialAccess)
+
   const statements = useFamilyStatements({
     familyId,
+    isAdmin,
+    memberFinancialAccess,
     data,
     formatMoney,
     emailConfig: deferred.emailConfig,
@@ -286,17 +290,21 @@ export function FamilyDetailProvider({
   }, [params.id, roleLoading, beginFamilyFetch, invalidateFamilyFetch])
 
   useEffect(() => {
-    if (roleLoading || !isAdmin || !params.id || !data?.family) return
-    if (activeTab === 'statements') void statements.fetchStatements()
-    else if (activeTab === 'sub-families') void deferred.fetchSubFamilies()
-    else if (activeTab === 'tasks') void deferred.fetchFamilyTasks()
-    else if (['info', 'members'].includes(activeTab)) void deferred.ensurePaymentPlans()
-    else if (LEDGER_TABS.has(activeTab) && !ledger.loadedLedgerTabsRef.current.has(activeTab)) {
-      ledger.loadedLedgerTabsRef.current.add(activeTab)
-      void ledger.fetchLedgerForTab(activeTab)
+    if (roleLoading || !params.id || !data?.family) return
+    if (isAdmin) {
+      if (activeTab === 'statements') void statements.fetchStatements()
+      else if (activeTab === 'sub-families') void deferred.fetchSubFamilies()
+      else if (activeTab === 'tasks') void deferred.fetchFamilyTasks()
+      else if (['info', 'members'].includes(activeTab)) void deferred.ensurePaymentPlans()
+      else if (LEDGER_TABS.has(activeTab) && !ledger.loadedLedgerTabsRef.current.has(activeTab)) {
+        ledger.loadedLedgerTabsRef.current.add(activeTab)
+        void ledger.fetchLedgerForTab(activeTab)
+      }
+    } else if (memberFinancialAccess && activeTab === 'statements') {
+      void statements.fetchStatements()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, roleLoading, isAdmin, params.id, data?.family])
+  }, [activeTab, roleLoading, isAdmin, memberFinancialAccess, params.id, data?.family])
 
   useEffect(() => {
     if (!isAdmin || !payments.showEventModal || deferred.lifecycleEventTypes.length > 0) return
@@ -326,10 +334,22 @@ export function FamilyDetailProvider({
     if (!isAdmin && ADMIN_ONLY_FAMILY_TABS.has(activeTab)) {
       router.replace(familyTabHref(familyId, 'info'))
     }
+    if (!isAdmin && activeTab === 'statements' && !memberFinancialAccess) {
+      router.replace(familyTabHref(familyId, 'info'))
+    }
     if (!isAdmin && memberActiveTab !== 'info') {
       setMemberActiveTab('info')
     }
-  }, [isAdmin, roleLoading, activeTab, memberActiveTab, familyId, router, setMemberActiveTab])
+  }, [
+    isAdmin,
+    roleLoading,
+    activeTab,
+    memberFinancialAccess,
+    memberActiveTab,
+    familyId,
+    router,
+    setMemberActiveTab,
+  ])
 
   const handleFieldEdit = (fieldName: string, currentValue: unknown) => {
     if (fieldName === 'weddingDate' && currentValue) {
@@ -650,6 +670,7 @@ export function FamilyDetailProvider({
       confirm,
       isAdmin,
       roleLoading,
+      memberFinancialAccess,
       formatMoney,
       data,
       setData,

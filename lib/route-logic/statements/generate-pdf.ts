@@ -10,10 +10,11 @@ import {
 } from '@/lib/statements/period'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { handler } from '@/lib/api/handler'
+import { checkMemberFamilyFinancialAccess } from '@/lib/member-family-access.server'
+import { hasMinRole } from '@/lib/auth-helpers'
 
 export const POST = handler({
   auth: 'org',
-  minRole: 'admin',
   name: 'POST /api/statements/generate-pdf',
   fn: async ({ ctx, request }) => {
     const rateVerdict = await checkRateLimit(
@@ -46,6 +47,18 @@ export const POST = handler({
     }).lean<any>()
     if (!dbStatement) {
       return { status: 404, data: { error: 'Statement not found' } }
+    }
+
+    if (!hasMinRole(ctx!.role, 'admin')) {
+      const access = await checkMemberFamilyFinancialAccess(
+        ctx!.organizationId,
+        dbStatement.familyId.toString(),
+        ctx!.userId,
+        ctx!.role,
+      )
+      if (!access.allowed) {
+        return { status: 403, data: { error: 'Financial access denied for this family' } }
+      }
     }
 
     const openingBalanceData = await calculateFamilyBalance(

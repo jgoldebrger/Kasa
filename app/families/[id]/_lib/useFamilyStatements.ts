@@ -6,6 +6,8 @@ import type { FamilyDetails } from './helpers'
 
 export interface UseFamilyStatementsOptions {
   familyId: string
+  isAdmin: boolean
+  memberFinancialAccess: boolean
   data: FamilyDetails | null
   formatMoney: (n: number) => string
   emailConfig: any
@@ -21,6 +23,8 @@ export interface UseFamilyStatementsOptions {
 
 export function useFamilyStatements({
   familyId,
+  isAdmin,
+  memberFinancialAccess,
   data,
   formatMoney,
   emailConfig,
@@ -38,25 +42,32 @@ export function useFamilyStatements({
   const fetchStatements = useCallback(
     async (sharedGen?: number) => {
       if (!familyId) return
+      if (!isAdmin && !memberFinancialAccess) return
       const gen = sharedGen ?? beginFamilyFetch()
       try {
-        const res = await fetch(`/api/statements?familyId=${familyId}`)
+        const url = isAdmin
+          ? `/api/statements?familyId=${familyId}`
+          : `/api/families/${familyId}/member-statements`
+        const res = await fetch(url)
         if (isFamilyFetchStale(gen)) return
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const data = await res.json().catch(() => ({}))
         if (isFamilyFetchStale(gen)) return
-        if (Array.isArray(data)) {
-          const sorted = data.sort(
-            (a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-          )
-          setStatements(sorted)
-        }
+        const rows = Array.isArray(data)
+          ? data
+          : Array.isArray(data.statements)
+            ? data.statements
+            : []
+        const sorted = rows.sort(
+          (a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+        )
+        setStatements(sorted)
       } catch (error) {
         if (isFamilyFetchStale(gen)) return
         console.error('Error fetching statements:', error)
       }
     },
-    [familyId, beginFamilyFetch, isFamilyFetchStale],
+    [familyId, isAdmin, memberFinancialAccess, beginFamilyFetch, isFamilyFetchStale],
   )
 
   const handlePrintStatement = useCallback(

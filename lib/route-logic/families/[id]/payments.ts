@@ -1,5 +1,6 @@
 import { Types } from 'mongoose'
 import { Payment, Organization, Family, FamilyMember } from '@/lib/models'
+import { hasMinRole } from '@/lib/auth-helpers'
 import { audit } from '@/lib/audit'
 import { handler } from '@/lib/api/handler'
 import { z } from 'zod'
@@ -13,6 +14,7 @@ import {
 import { checkRateLimit } from '@/lib/rate-limit'
 import { scheduleYearlyCalculationRefresh } from '@/lib/calculations'
 import { familyLedgerListQuery, listFamilyLedger } from '@/lib/family-ledger-list'
+import { requireFamilyPaymentAccess } from '@/lib/member-family-access.server'
 
 const LEDGER_CACHE_HEADERS = {
   'Cache-Control': 'private, max-age=15, stale-while-revalidate=60',
@@ -124,11 +126,9 @@ const createBody = z.object({
 })
 
 // POST /api/families/[id]/payments — record a payment for one family.
-// Admin-only: this writes money into the ledger. Members can view
-// payments via GET but cannot create them.
+// Admins or email-linked members (cash/check/quick_pay; card via Stripe).
 export const POST = handler({
   auth: 'org',
-  minRole: 'admin',
   idParams: ['id'],
   body: createBody,
   name: 'POST /api/families/[id]/payments',
@@ -158,6 +158,26 @@ export const POST = handler({
     }).select('_id')
     if (!fam) return { status: 404, data: { error: 'Family not found' } }
 
+    const paymentAccess = await requireFamilyPaymentAccess(
+      ctx!.organizationId,
+      id,
+      ctx!.userId,
+      ctx!.role,
+    )
+    if (!paymentAccess.ok) {
+      return { status: paymentAccess.status, data: { error: paymentAccess.error } }
+    }
+
+    const method = body.paymentMethod || 'cash'
+    if (!hasMinRole(ctx!.role, 'admin')) {
+      if (method === 'credit_card') {
+        return {
+          status: 400,
+          data: { error: 'Card payments must be submitted through the secure card form' },
+        }
+      }
+    }
+
     // memberId is optional, but when supplied it MUST point at a member
     // of this family and this org — otherwise a caller could attribute
     // payments to a member from a completely different family / tenant.
@@ -169,8 +189,6 @@ export const POST = handler({
       }).select('_id')
       if (!mem) return { status: 404, data: { error: 'Member not found in family' } }
     }
-
-    const method = body.paymentMethod || 'cash'
 
     const org = await Organization.findById(ctx!.organizationId)
       .select('timezone')

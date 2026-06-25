@@ -28,13 +28,13 @@ import {
   ORG_CONNECT_WITH_TIMEZONE_SELECT,
   type OrgStripeConnectFields,
 } from '@/lib/stripe/client'
+import { requireFamilyPaymentAccess } from '@/lib/member-family-access.server'
 
 const MAX_CHARGE = 100_000
 
 // POST - Charge a saved payment method
 export const POST = handler({
   auth: 'org',
-  minRole: 'admin',
   idParams: ['id'],
   body: paymentSchemas.chargeSavedCardBody,
   name: 'POST /api/families/[id]/charge-saved-card',
@@ -86,6 +86,16 @@ export const POST = handler({
       }).select('_id')
       if (!parentFamily) {
         return { status: 404, data: { error: 'Family not found' } }
+      }
+
+      const paymentAccess = await requireFamilyPaymentAccess(
+        ctx!.organizationId,
+        id,
+        ctx!.userId,
+        ctx!.role,
+      )
+      if (!paymentAccess.ok) {
+        return { status: paymentAccess.status, data: { error: paymentAccess.error } }
       }
 
       const savedPaymentMethod = await SavedPaymentMethod.findOne({

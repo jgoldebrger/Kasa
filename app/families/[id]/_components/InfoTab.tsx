@@ -7,6 +7,7 @@ import { Alert, Button, Card } from '@/app/components/ui'
 import type { FamilyDetailContextValue } from '../FamilyDetailContext'
 import { useFamilyDetail } from '../FamilyDetailContext'
 import { normalizePlanId } from '@/lib/payment-plan-display'
+import MemberFinancialPanel from './MemberFinancialPanel'
 
 function InfoSection({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -42,6 +43,8 @@ function InfoTabContent(props: FamilyDetailContextValue) {
   const {
     data,
     isAdmin,
+    familyId,
+    memberFinancialAccess,
     paymentPlans,
     getPlanNameById,
     setInfoForm,
@@ -81,6 +84,14 @@ function InfoTabContent(props: FamilyDetailContextValue) {
 
   return (
     <div className="space-y-4">
+      {!isAdmin && (
+        <MemberFinancialPanel
+          familyId={familyId}
+          memberFinancialAccess={memberFinancialAccess}
+          initialBalance={memberFinancialAccess ? data?.balance : null}
+          initialPayments={memberFinancialAccess ? data?.payments : []}
+        />
+      )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-base font-semibold text-fg">Family profile</h3>

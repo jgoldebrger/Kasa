@@ -7,6 +7,7 @@ import { useOrgChanged } from '@/lib/client/useOrgChanged'
 
 const VISITED_FAMILIES_KEY = 'kasa-member-visited-families'
 const VIEWED_FAMILY_KEY = 'kasa-member-viewed-family'
+const VIEWED_STATEMENTS_KEY = 'kasa-member-viewed-statements'
 
 function storageKey(base: string, orgId: string | null): string {
   return orgId ? `${base}:${orgId}` : base
@@ -25,6 +26,7 @@ function writeFlag(base: string, orgId: string | null): void {
 export interface MemberOnboardingProgress {
   visitedFamilies: boolean
   viewedFamily: boolean
+  viewedStatements: boolean
   loading: boolean
 }
 
@@ -33,11 +35,13 @@ export function useMemberOnboarding(): MemberOnboardingProgress {
   const [orgId, setOrgId] = useState<string | null>(null)
   const [visitedFamilies, setVisitedFamilies] = useState(false)
   const [viewedFamily, setViewedFamily] = useState(false)
+  const [viewedStatements, setViewedStatements] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const syncFromStorage = useCallback((id: string | null) => {
     setVisitedFamilies(readFlag(VISITED_FAMILIES_KEY, id))
     setViewedFamily(readFlag(VIEWED_FAMILY_KEY, id))
+    setViewedStatements(readFlag(VIEWED_STATEMENTS_KEY, id))
   }, [])
 
   const loadOrg = useCallback(async () => {
@@ -85,7 +89,14 @@ export function useMemberOnboarding(): MemberOnboardingProgress {
       }
       setViewedFamily(true)
     }
+
+    if (pathname.match(/^\/families\/[^/]+\/statements/)) {
+      if (!readFlag(VIEWED_STATEMENTS_KEY, orgId)) {
+        writeFlag(VIEWED_STATEMENTS_KEY, orgId)
+      }
+      setViewedStatements(true)
+    }
   }, [pathname, orgId])
 
-  return { visitedFamilies, viewedFamily, loading }
+  return { visitedFamilies, viewedFamily, viewedStatements, loading }
 }

@@ -13,6 +13,7 @@ import { audit } from '@/lib/audit'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { loadAllByIdCursor } from '@/lib/org-pagination'
 import { payment as paymentSchemas } from '@/lib/schemas'
+import { requireFamilyPaymentAccess } from '@/lib/member-family-access.server'
 
 function publicSavedPaymentMethod(
   doc: { toObject?: () => Record<string, unknown> } & Record<string, unknown>,
@@ -26,7 +27,6 @@ function publicSavedPaymentMethod(
 // GET - Get all saved payment methods for a family
 export const GET = handler({
   auth: 'org',
-  minRole: 'admin',
   idParams: ['id'],
   name: 'GET /api/families/[id]/saved-payment-methods',
   fn: async ({ params, ctx, request }) => {
@@ -45,6 +45,16 @@ export const GET = handler({
     const fam = await Family.findOne({ _id: id, organizationId: ctx!.organizationId }).select('_id')
     if (!fam) {
       return { status: 404, data: { error: 'Family not found' } }
+    }
+
+    const paymentAccess = await requireFamilyPaymentAccess(
+      ctx!.organizationId,
+      id,
+      ctx!.userId,
+      ctx!.role,
+    )
+    if (!paymentAccess.ok) {
+      return { status: paymentAccess.status, data: { error: paymentAccess.error } }
     }
 
     const paymentMethods = await loadAllByIdCursor(
@@ -67,7 +77,6 @@ export const GET = handler({
 // POST - Save a new payment method
 export const POST = handler({
   auth: 'org',
-  minRole: 'admin',
   idParams: ['id'],
   body: paymentSchemas.savePaymentMethodBody,
   name: 'POST /api/families/[id]/saved-payment-methods',
@@ -88,6 +97,16 @@ export const POST = handler({
     const fam = await Family.findOne({ _id: id, organizationId: ctx!.organizationId }).select('_id')
     if (!fam) {
       return { status: 404, data: { error: 'Family not found' } }
+    }
+
+    const paymentAccess = await requireFamilyPaymentAccess(
+      ctx!.organizationId,
+      id,
+      ctx!.userId,
+      ctx!.role,
+    )
+    if (!paymentAccess.ok) {
+      return { status: paymentAccess.status, data: { error: paymentAccess.error } }
     }
 
     const org = await Organization.findById(ctx!.organizationId)

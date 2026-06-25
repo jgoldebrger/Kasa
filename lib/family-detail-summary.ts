@@ -1,9 +1,10 @@
 import { Types } from 'mongoose'
-import { Family, FamilyMember } from '@/lib/models'
+import { Family, FamilyMember, User } from '@/lib/models'
 import { calculateFamilyBalance } from '@/lib/calculations'
 import { hasMinRole, type Role } from '@/lib/auth-helpers'
 import { loadAllByIdCursor } from '@/lib/org-pagination'
 import { normalizePlanId } from '@/lib/payment-plan-display'
+import { userEmailMatchesFamily } from '@/lib/member-family-access'
 
 const EMPTY_BALANCE = {
   openingBalance: 0,
@@ -23,6 +24,8 @@ export interface FamilySummaryPayload {
   lifecycleEvents: []
   cycleCharges: []
   balance: typeof EMPTY_BALANCE
+  /** True when a member role user is linked to this family by email. */
+  memberFinancialAccess?: boolean
 }
 
 /**
@@ -33,6 +36,7 @@ export async function fetchFamilySummary(
   organizationId: string,
   familyId: string,
   role: Role,
+  userId?: string,
 ): Promise<FamilySummaryPayload | null> {
   if (!Types.ObjectId.isValid(familyId)) return null
 
@@ -64,6 +68,17 @@ export async function fetchFamilySummary(
     delete (family as any).currentPayment
     delete (family as any).currentPlan
     delete (family as any).paymentPlanId
+
+    let memberFinancialAccess = false
+    let balance = { ...EMPTY_BALANCE }
+    if (userId) {
+      const user = await User.findById(userId).select('email').lean<{ email?: string }>()
+      if (user?.email && userEmailMatchesFamily(user.email, fam, members)) {
+        memberFinancialAccess = true
+        balance = await calculateFamilyBalance(fam._id.toString(), organizationId)
+      }
+    }
+
     return {
       family,
       members: sanitizedMembers,
@@ -71,7 +86,8 @@ export async function fetchFamilySummary(
       withdrawals: [],
       lifecycleEvents: [],
       cycleCharges: [],
-      balance: { ...EMPTY_BALANCE },
+      balance,
+      memberFinancialAccess,
     }
   }
 

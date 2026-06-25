@@ -6,10 +6,14 @@ import { FAMILY_TABS, familyTabHref, resolveFamilyTabLabel } from './_lib/consta
 import { useT } from '@/lib/client/i18n'
 
 export default function FamilyTabNav() {
-  const { familyId, activeTab, isAdmin } = useFamilyDetail()
+  const { familyId, activeTab, isAdmin, memberFinancialAccess } = useFamilyDetail()
   const t = useT()
 
-  const visibleTabs = FAMILY_TABS.filter((tab) => !tab.adminOnly || isAdmin)
+  const visibleTabs = FAMILY_TABS.filter((tab) => {
+    if (tab.adminOnly) return isAdmin
+    if (tab.memberReadable) return isAdmin || memberFinancialAccess
+    return true
+  })
 
   return (
     <div className="border-b border-border">

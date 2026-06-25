@@ -398,6 +398,7 @@ export interface FamilyDetails {
   lifecycleEvents: any[]
   cycleCharges: any[]
   balance: any
+  memberFinancialAccess?: boolean
 }
 
 export interface PaymentPlan {

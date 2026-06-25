@@ -9,6 +9,7 @@ import { useFamilyDetail } from '../FamilyDetailContext'
 function StatementsTabContent(props: FamilyDetailContextValue) {
   const {
     data,
+    isAdmin,
     statements,
     sendingEmail,
     formatMoney,
@@ -18,11 +19,13 @@ function StatementsTabContent(props: FamilyDetailContextValue) {
     handlePrintAllStatements,
   } = props
 
+  const readOnly = !isAdmin
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-lg font-semibold text-fg">Statements</h3>
-        {statements.length > 0 && (
+        {!readOnly && statements.length > 0 && (
           <Button
             size="sm"
             leftIcon={<PrinterIcon className="h-4 w-4" aria-hidden="true" />}
@@ -111,7 +114,7 @@ function StatementsTabContent(props: FamilyDetailContextValue) {
                 >
                   Save as PDF
                 </Button>
-                {data?.family?.email && (
+                {!readOnly && data?.family?.email && (
                   <Button
                     variant="ghost"
                     size="sm"

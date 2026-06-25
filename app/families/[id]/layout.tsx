@@ -18,7 +18,7 @@ export default async function FamilyDetailLayout({
   try {
     const ctx = await requireServerOrgContext()
     await connectDB()
-    const summary = await fetchFamilySummary(ctx.organizationId, id, ctx.role)
+    const summary = await fetchFamilySummary(ctx.organizationId, id, ctx.role, ctx.userId)
     if (summary) {
       initialSummary = serializeForRsc(summary)
     }

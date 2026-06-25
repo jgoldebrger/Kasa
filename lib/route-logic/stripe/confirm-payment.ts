@@ -26,6 +26,7 @@ import {
   ORG_CONNECT_WITH_TIMEZONE_SELECT,
   type OrgStripeConnectFields,
 } from '@/lib/stripe/client'
+import { requireFamilyPaymentAccess } from '@/lib/member-family-access.server'
 
 if (!process.env.STRIPE_SECRET_KEY) {
   console.error('STRIPE_SECRET_KEY is not set in environment variables')
@@ -33,7 +34,6 @@ if (!process.env.STRIPE_SECRET_KEY) {
 
 export const POST = handler({
   auth: 'org',
-  minRole: 'admin',
   body: paymentSchemas.confirmPaymentBody,
   name: 'POST /api/stripe/confirm-payment',
   fn: async ({ ctx, body, request }) => {
@@ -80,6 +80,16 @@ export const POST = handler({
     )
     if (!fam) {
       return NextResponse.json({ error: 'Family not found' }, { status: 404 })
+    }
+
+    const paymentAccess = await requireFamilyPaymentAccess(
+      ctx!.organizationId,
+      familyId,
+      ctx!.userId,
+      ctx!.role,
+    )
+    if (!paymentAccess.ok) {
+      return NextResponse.json({ error: paymentAccess.error }, { status: paymentAccess.status })
     }
 
     // Tenant guard for memberId: when supplied, the member must belong

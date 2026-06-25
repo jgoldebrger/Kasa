@@ -1,3 +1,4 @@
+import { Types } from 'mongoose'
 import { handler } from '@/lib/api/handler'
 import { Statement } from '@/lib/models'
 import { calculateFamilyBalance } from '@/lib/calculations'
@@ -6,12 +7,63 @@ import {
   buildTransactionList,
   statementSnapshotFromPeriod,
 } from '@/lib/statements/period'
+import { checkMemberFamilyFinancialAccess } from '@/lib/member-family-access.server'
+import { hasMinRole } from '@/lib/auth-helpers'
 import { checkRateLimit } from '@/lib/rate-limit'
 
-// GET - Get statement details with all transactions
+/** Shared statement detail for admins and email-linked members. */
+export async function loadStatementDetailForContext(
+  organizationId: string,
+  statementId: string,
+  userId: string,
+  role: import('@/lib/auth-helpers').Role,
+) {
+  const statement = await Statement.findOne({ _id: statementId, organizationId })
+  if (!statement) return { status: 404 as const, error: 'Statement not found' }
+
+  if (!hasMinRole(role, 'admin')) {
+    const access = await checkMemberFamilyFinancialAccess(
+      organizationId,
+      statement.familyId.toString(),
+      userId,
+      role,
+    )
+    if (!access.allowed) {
+      return { status: 403 as const, error: 'Financial access denied for this family' }
+    }
+  }
+
+  const openingBalanceData = await calculateFamilyBalance(
+    statement.familyId.toString(),
+    organizationId,
+    new Date(statement.fromDate.getTime() - 1),
+  )
+  const period = await loadStatementPeriod({
+    organizationId,
+    familyId: statement.familyId.toString(),
+    fromDate: statement.fromDate,
+    toDate: statement.toDate,
+    openingBalance: openingBalanceData.balance,
+  })
+
+  const refreshed = await Statement.findOneAndUpdate(
+    { _id: statement._id, organizationId, familyId: statement.familyId },
+    { $set: statementSnapshotFromPeriod(openingBalanceData.balance, period) },
+    { new: true },
+  )
+
+  return {
+    status: 200 as const,
+    data: {
+      statement: refreshed ?? statement,
+      transactions: buildTransactionList(period),
+    },
+  }
+}
+
+// GET - Statement details (admin or email-linked member for that family).
 export const GET = handler({
   auth: 'org',
-  minRole: 'admin',
   idParams: ['id'],
   name: 'GET /api/statements/[id]',
   fn: async ({ params, ctx, request }) => {
@@ -25,37 +77,20 @@ export const GET = handler({
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    const statement = await Statement.findOne({ _id: params.id, organizationId: ctx!.organizationId })
-    if (!statement) {
-      return { status: 404, data: { error: 'Statement not found' } }
+    const id = params.id as string
+    if (!Types.ObjectId.isValid(id)) {
+      return { status: 400, data: { error: 'Invalid statement id' } }
     }
 
-    const openingBalanceData = await calculateFamilyBalance(
-      statement.familyId.toString(),
+    const result = await loadStatementDetailForContext(
       ctx!.organizationId,
-      new Date(statement.fromDate.getTime() - 1),
+      id,
+      ctx!.userId,
+      ctx!.role,
     )
-    const period = await loadStatementPeriod({
-      organizationId: ctx!.organizationId,
-      familyId: statement.familyId.toString(),
-      fromDate: statement.fromDate,
-      toDate: statement.toDate,
-      openingBalance: openingBalanceData.balance,
-    })
-
-    const refreshed = await Statement.findOneAndUpdate(
-      { _id: statement._id, organizationId: ctx!.organizationId, familyId: statement.familyId },
-      { $set: statementSnapshotFromPeriod(openingBalanceData.balance, period) },
-      { new: true },
-    )
-
-    const transactions = buildTransactionList(period)
-
-    return {
-      data: {
-        statement: refreshed ?? statement,
-        transactions,
-      },
+    if (result.status !== 200) {
+      return { status: result.status, data: { error: result.error } }
     }
+    return { data: result.data }
   },
 })

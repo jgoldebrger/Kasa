@@ -818,5 +818,22 @@
   "payments.recordModal.error": "Failed to record payment.",
   "payments.recordModal.invalidAmount": "Please enter an amount greater than 0.",
   "payments.recordModal.familyRequired": "Please select a family.",
-  "projections.how.avgPerYear": "Avg/yr"
+  "projections.how.avgPerYear": "Avg/yr",
+  "dashboard.member.viewStatements": "View your family statements",
+  "memberPortal.currentBalance": "Current balance",
+  "memberPortal.recentPayments": "Recent payments",
+  "memberPortal.viewStatements": "View statements",
+  "memberPortal.noFinancialAccess": "Financial details are not available for this family.",
+  "memberPortal.noFinancialAccessHint": "Your login email must match this family's email or a member's email to view balance and statements.",
+  "memberPortal.noticeAria": "Member financial access",
+  "memberPortal.noticeLinked": "You can view your balance, make payments, and download statements for families linked to your email.",
+  "memberPortal.makePayment": "Make payment",
+  "memberPortal.makePaymentModal.title": "Make a payment",
+  "memberPortal.makePaymentModal.submit": "Submit payment",
+  "memberPortal.makePaymentModal.success": "Payment recorded successfully",
+  "memberPortal.makePaymentModal.error": "Could not record payment",
+  "memberPortal.makePaymentModal.savedCards": "Saved cards",
+  "memberPortal.makePaymentModal.useNewCard": "Use a new card instead",
+  "memberPortal.makePaymentModal.saveCard": "Save this card for future payments",
+  "memberPortal.noticeUnlinked": "Payments and statements are managed by your organization admin. Link your account by using the same email as your family record."
 }

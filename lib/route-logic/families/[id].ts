@@ -22,6 +22,7 @@ import { checkRateLimit } from '@/lib/rate-limit'
 import { loadAllByIdCursor } from '@/lib/org-pagination'
 import { collectCompoundCursorPages } from '@/lib/pagination'
 import { fetchFamilySummary } from '@/lib/family-detail-summary'
+import { checkMemberFamilyFinancialAccess } from '@/lib/member-family-access.server'
 
 const SUMMARY_CACHE_HEADERS = {
   'Cache-Control': 'private, max-age=15, stale-while-revalidate=60',
@@ -57,7 +58,7 @@ export const GET = handler({
     }
 
     if (query.view === 'summary') {
-      const summary = await fetchFamilySummary(ctx!.organizationId, id, ctx!.role)
+      const summary = await fetchFamilySummary(ctx!.organizationId, id, ctx!.role, ctx!.userId)
       if (!summary) return { status: 404, data: { error: 'Family not found' } }
       return { data: summary, headers: SUMMARY_CACHE_HEADERS }
     }
@@ -74,6 +75,12 @@ export const GET = handler({
     }
 
     if (!isAdmin) {
+      const access = await checkMemberFamilyFinancialAccess(
+        ctx!.organizationId,
+        id,
+        ctx!.userId,
+        ctx!.role,
+      )
       const members = await loadAllByIdCursor<any>(
         (filter, limit) => FamilyMember.find(filter).sort({ _id: 1 }).limit(limit).lean<any[]>(),
         memberFilter,
@@ -90,23 +97,38 @@ export const GET = handler({
       delete (family as any).currentPayment
       delete (family as any).currentPlan
       delete (family as any).paymentPlanId
+
+      let balance = {
+        openingBalance: 0,
+        planCost: 0,
+        totalPayments: 0,
+        totalWithdrawals: 0,
+        totalLifecyclePayments: 0,
+        totalCycleCharges: 0,
+        balance: 0,
+      }
+      let payments: any[] = []
+      if (access.allowed) {
+        balance = await calculateFamilyBalance(fam._id.toString(), ctx!.organizationId)
+        payments = serializePaymentsPublic(
+          await Payment.find({ familyId: fam._id, organizationId: ctx!.organizationId })
+            .select(PAYMENT_PUBLIC_SELECT)
+            .sort({ paymentDate: -1, _id: -1 })
+            .limit(10)
+            .lean<any[]>(),
+        )
+      }
+
       return {
         data: {
           family,
           members: sanitizedMembers,
-          payments: [],
+          payments,
           withdrawals: [],
           lifecycleEvents: [],
           cycleCharges: [],
-          balance: {
-            openingBalance: 0,
-            planCost: 0,
-            totalPayments: 0,
-            totalWithdrawals: 0,
-            totalLifecyclePayments: 0,
-            totalCycleCharges: 0,
-            balance: 0,
-          },
+          balance,
+          memberFinancialAccess: access.allowed,
         },
       }
     }
