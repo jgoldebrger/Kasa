@@ -29,7 +29,12 @@ import { loadAllByIdCursor } from './org-pagination'
 // ---------------------------------------------------------------------------
 
 export type RosterEventSource = 'bar_mitzvah' | 'bat_mitzvah' | 'member_wedding'
-export type ExpenseCountSource = 'roster' | 'historical' | 'blended'
+export type ExpenseCountSource = 'roster' | 'historical' | 'planned' | 'blended'
+
+export interface PlannedEventYearBucket {
+  count: number
+  totalAmount: number
+}
 
 export interface PlanRecommendation {
   planId: string
@@ -118,6 +123,8 @@ export interface DuesRecommendationInput {
       historicalAvgPerYear: number
       blendedCountByYear: number[]
       rosterCountStartYear: number
+      plannedCountStartYear: number
+      plannedAmountStartYear: number
     }
   >
 }
@@ -226,15 +233,17 @@ export function projectRosterEventsByYear(
 }
 
 /**
- * Per event type per year: max(roster count, historical average).
- * Child-add events also use avgNewChildrenPerYear when mapped.
+ * Per event type per year: max(roster count, historical average, planned payments).
+ * Expense uses the higher of (blended count × configured cost) or summed planned amounts.
  */
 export function blendEventProjections(
   eventTypes: EventTypeConfig[],
   rosterCountByYear: Map<string, number[]>,
   historicalAvgByEventId: Map<string, number>,
+  plannedByTypeAndYear: Map<string, Map<number, PlannedEventYearBucket>>,
   addChildEventTypeId: string | null,
   avgNewChildrenPerYear: number,
+  startYear: number,
   years: number,
 ): {
   expensesByYear: number[]
@@ -243,6 +252,8 @@ export function blendEventProjections(
       historicalAvgPerYear: number
       blendedCountByYear: number[]
       rosterCountStartYear: number
+      plannedCountStartYear: number
+      plannedAmountStartYear: number
     }
   >
 } {
@@ -250,21 +261,34 @@ export function blendEventProjections(
   const expensesByYear = new Array<number>(horizon).fill(0)
   const eventTypesBlended = eventTypes.map((e) => {
     const rosterCounts = rosterCountByYear.get(e.eventTypeId) ?? new Array(horizon).fill(0)
+    const plannedByYear = plannedByTypeAndYear.get(e.type.toLowerCase()) ?? new Map()
     let historicalAvg = historicalAvgByEventId.get(e.eventTypeId) ?? 0
     if (addChildEventTypeId && e.eventTypeId === addChildEventTypeId) {
       historicalAvg = Math.max(historicalAvg, avgNewChildrenPerYear)
     }
-    const blendedCountByYear = rosterCounts.map((rosterCount) =>
-      Math.max(rosterCount, historicalAvg),
-    )
+    const blendedCountByYear: number[] = []
+    const plannedCountsByYear: number[] = []
+    const plannedAmountsByYear: number[] = []
     for (let i = 0; i < horizon; i++) {
-      expensesByYear[i] += blendedCountByYear[i] * e.currentCost
+      const year = startYear + i
+      const planned = plannedByYear.get(year)
+      const plannedCount = planned?.count ?? 0
+      const plannedAmount = planned?.totalAmount ?? 0
+      plannedCountsByYear.push(plannedCount)
+      plannedAmountsByYear.push(plannedAmount)
+      const rosterCount = rosterCounts[i] ?? 0
+      const blendedCount = Math.max(rosterCount, historicalAvg, plannedCount)
+      blendedCountByYear.push(blendedCount)
+      const expenseFromCount = blendedCount * e.currentCost
+      expensesByYear[i] += Math.max(expenseFromCount, plannedAmount)
     }
     return {
       ...e,
       historicalAvgPerYear: historicalAvg,
       blendedCountByYear,
       rosterCountStartYear: rosterCounts[0] ?? 0,
+      plannedCountStartYear: plannedCountsByYear[0] ?? 0,
+      plannedAmountStartYear: plannedAmountsByYear[0] ?? 0,
     }
   })
   return { expensesByYear, eventTypesBlended }
@@ -273,9 +297,13 @@ export function blendEventProjections(
 export function countSourceForEvent(
   rosterCount: number,
   historicalAvg: number,
+  plannedCount: number,
   blendedCount: number,
 ): ExpenseCountSource {
   if (blendedCount <= 0) return 'historical'
+  if (plannedCount > 0 && plannedCount >= rosterCount && plannedCount >= historicalAvg) {
+    return 'planned'
+  }
   if (rosterCount >= blendedCount && rosterCount > 0) return 'roster'
   if (historicalAvg >= blendedCount && historicalAvg > 0) return 'historical'
   return 'blended'
@@ -375,6 +403,7 @@ export function computeDuesRecommendation(
 
   const perEvent: DuesRecommendationEventRow[] = input.eventTypes.map((e) => {
     const blendedStart = e.blendedCountByYear[0] ?? 0
+    const expenseFromCount = blendedStart * e.currentCost
     return {
       eventTypeId: e.eventTypeId,
       name: e.name,
@@ -383,10 +412,11 @@ export function computeDuesRecommendation(
       rosterMapped: e.rosterSource !== null,
       historicalAvgPerYear: e.historicalAvgPerYear,
       projectedCountStartYear: blendedStart,
-      projectedExpenseStartYear: blendedStart * e.currentCost,
+      projectedExpenseStartYear: Math.max(expenseFromCount, e.plannedAmountStartYear),
       countSource: countSourceForEvent(
         e.rosterCountStartYear,
         e.historicalAvgPerYear,
+        e.plannedCountStartYear,
         blendedStart,
       ),
     }
@@ -560,6 +590,56 @@ async function loadRosterCountsByYear(
   }
 }
 
+/** Planned lifecycle event payments in the forecast window, by event type and year. */
+async function loadPlannedEventsByYear(
+  orgFilter: Record<string, unknown>,
+  tz: string,
+  startYear: number,
+  endYear: number,
+): Promise<Map<string, Map<number, PlannedEventYearBucket>>> {
+  const rangeStart = calendarYearBoundsInTimeZone(startYear, tz).start
+  const rangeEnd = calendarYearBoundsInTimeZone(endYear + 1, tz).start
+  const yearBucket = (field: string) => ({
+    $dateToString: { format: '%Y', date: `$${field}`, timezone: tz },
+  })
+
+  const rows = await LifecycleEventPayment.aggregate([
+    {
+      $match: {
+        ...orgFilter,
+        eventDate: { $gte: rangeStart, $lt: rangeEnd },
+      },
+    },
+    {
+      $group: {
+        _id: {
+          type: { $toLower: { $ifNull: ['$eventType', ''] } },
+          year: yearBucket('eventDate'),
+        },
+        count: { $sum: 1 },
+        totalAmount: { $sum: { $ifNull: ['$amount', 0] } },
+      },
+    },
+  ])
+
+  const result = new Map<string, Map<number, PlannedEventYearBucket>>()
+  for (const row of rows) {
+    const type = String(row._id?.type ?? '').toLowerCase()
+    const year = Number(row._id?.year)
+    if (!type || !Number.isFinite(year)) continue
+    let byYear = result.get(type)
+    if (!byYear) {
+      byYear = new Map()
+      result.set(type, byYear)
+    }
+    byYear.set(year, {
+      count: row.count ?? 0,
+      totalAmount: row.totalAmount ?? 0,
+    })
+  }
+  return result
+}
+
 async function loadDuesRecommendationUncached(
   organizationId: string,
   windowYears = 5,
@@ -604,6 +684,7 @@ async function loadDuesRecommendationUncached(
     planBreakdown,
     rosterCounts,
     openingFundBalance,
+    plannedByTypeAndYear,
   ] = await Promise.all([
     loadAllByIdCursor<any>(
       (filter, limit) =>
@@ -646,7 +727,7 @@ async function loadDuesRecommendationUncached(
     countMembersByPaymentPlan(currentYear, organizationId),
     loadRosterCountsByYear(orgFilter, tz, startYear, endYear),
     loadOpeningFundBalance(organizationId, startYear),
-    loadHistoricalEventAverages(organizationId, safeWindow, currentYear, []),
+    loadPlannedEventsByYear(orgFilter, tz, startYear, endYear),
   ])
 
   const chargesBarMitzvahPayers = !!(org && org.barMitzvahAutoAssignPlanId)
@@ -698,8 +779,10 @@ async function loadDuesRecommendationUncached(
     eventTypeConfigs,
     rosterCountByYear,
     historicalAvgByEventId,
+    plannedByTypeAndYear,
     addChildEventTypeId,
     avgNewChildrenPerYear,
+    startYear,
     safeHorizon,
   )
 
@@ -745,7 +828,7 @@ async function loadDuesRecommendationUncached(
 const getCachedDuesRecommendation = unstable_cache(
   async (organizationId: string, windowYears: number) =>
     loadDuesRecommendationUncached(organizationId, windowYears),
-  ['dues-recommendation-v3'],
+  ['dues-recommendation-v4'],
   { revalidate: DUES_RECOMMENDATION_CACHE_SECONDS },
 )
 

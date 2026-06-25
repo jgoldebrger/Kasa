@@ -31,6 +31,11 @@ const loaderMocks = vi.hoisted(() => ({
   }>,
   yearlySnapshots: [] as Array<{ calculatedIncome?: number; calculatedExpenses?: number }>,
   lifecycleCountsByYear: {} as Record<number, Array<{ type: string; count: number }>>,
+  plannedEventsAgg: [] as Array<{
+    _id: { type: string; year: string }
+    count: number
+    totalAmount: number
+  }>,
 }))
 
 vi.mock('./database', () => ({ default: loaderMocks.connectDB }))
@@ -88,7 +93,13 @@ vi.mock('./models', () => ({
     })),
   },
   Payment: { aggregate: vi.fn(async () => [{ total: 0 }]) },
-  LifecycleEventPayment: { aggregate: vi.fn(async () => [{ total: 0 }]) },
+  LifecycleEventPayment: {
+    aggregate: vi.fn(async (pipeline: unknown[]) => {
+      const str = JSON.stringify(pipeline)
+      if (str.includes('eventDate')) return loaderMocks.plannedEventsAgg
+      return [{ total: 0 }]
+    }),
+  },
 }))
 
 import {
@@ -131,6 +142,8 @@ function recInput(over: Partial<DuesRecommendationInput> = {}): DuesRecommendati
         historicalAvgPerYear: 2,
         blendedCountByYear: [2, 2, 2],
         rosterCountStartYear: 0,
+        plannedCountStartYear: 0,
+        plannedAmountStartYear: 0,
       },
       {
         eventTypeId: 'wed',
@@ -141,6 +154,8 @@ function recInput(over: Partial<DuesRecommendationInput> = {}): DuesRecommendati
         historicalAvgPerYear: 4,
         blendedCountByYear: [4, 4, 4],
         rosterCountStartYear: 1,
+        plannedCountStartYear: 0,
+        plannedAmountStartYear: 0,
       },
     ],
     ...over,
@@ -162,8 +177,10 @@ describe('blendEventProjections', () => {
       types,
       new Map([['wed', [0, 0, 0]]]),
       new Map([['wed', 4]]),
+      new Map(),
       null,
       0,
+      2026,
       3,
     )
     expect(expensesByYear[0]).toBe(1200)
@@ -184,13 +201,43 @@ describe('blendEventProjections', () => {
       types,
       new Map([['bar', [1, 0, 3]]]),
       new Map([['bar', 2]]),
+      new Map(),
       null,
       0,
+      2026,
       3,
     )
     expect(expensesByYear[0]).toBe(1000)
     expect(expensesByYear[1]).toBe(1000)
     expect(expensesByYear[2]).toBe(1500)
+  })
+
+  it('uses planned event payment amounts when higher than configured cost × count', () => {
+    const types = [
+      {
+        eventTypeId: 'wed',
+        type: 'wedding',
+        name: 'Wedding',
+        currentCost: 300,
+        rosterSource: 'member_wedding' as const,
+      },
+    ]
+    const planned = new Map<string, Map<number, { count: number; totalAmount: number }>>([
+      ['wedding', new Map([[2026, { count: 2, totalAmount: 2000 }]])],
+    ])
+    const { expensesByYear, eventTypesBlended } = blendEventProjections(
+      types,
+      new Map([['wed', [0, 0, 0]]]),
+      new Map([['wed', 0]]),
+      planned,
+      null,
+      0,
+      2026,
+      1,
+    )
+    expect(expensesByYear[0]).toBe(2000)
+    expect(eventTypesBlended[0].plannedCountStartYear).toBe(2)
+    expect(eventTypesBlended[0].plannedAmountStartYear).toBe(2000)
   })
 })
 
@@ -255,6 +302,7 @@ describe('loadDuesRecommendation', () => {
       2024: [{ type: 'wedding', count: 4 }],
       2025: [{ type: 'wedding', count: 2 }],
     }
+    loaderMocks.plannedEventsAgg = []
     loaderMocks.orgLean.mockResolvedValue({
       timezone: 'UTC',
       barMitzvahAutoAssignPlanId: null,

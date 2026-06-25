@@ -17,7 +17,7 @@ interface PerEventRow {
   historicalAvgPerYear: number
   projectedCountStartYear: number
   projectedExpenseStartYear: number
-  countSource: 'roster' | 'historical' | 'blended'
+  countSource: 'roster' | 'historical' | 'planned' | 'blended'
 }
 
 interface PlanRecommendation {

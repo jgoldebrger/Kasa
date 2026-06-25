@@ -112,6 +112,14 @@ describe('loadDuesRecommendation (integration)', () => {
       gender: 'male',
       barMitzvahDate: new Date('2030-06-01'),
     })
+    await LifecycleEventPayment.create({
+      organizationId: orgId,
+      familyId: family._id,
+      eventType: 'wedding',
+      amount: 5000,
+      year: 2031,
+      eventDate: new Date('2031-03-15'),
+    })
 
     const out = await loadDuesRecommendation(orgId.toString(), 5, 3, 2030)
 
@@ -120,6 +128,7 @@ describe('loadDuesRecommendation (integration)', () => {
     expect(out.expenseSource).toBe('blended')
     expect(out.perEvent.find((e) => e.type === 'wedding')?.historicalAvgPerYear).toBeGreaterThan(0)
     expect(out.multiYear[0].projectedExpenses).toBeGreaterThan(0)
+    expect(out.multiYear[1].projectedExpenses).toBeGreaterThanOrEqual(5000)
     expect(out.multiYear[0].closingFundBalance).toBeDefined()
     expect(out.multiYear[0].closingFundBalance).toBe(
       out.openingFundBalance +
