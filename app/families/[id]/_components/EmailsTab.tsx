@@ -15,6 +15,7 @@ interface EmailLogRow {
   status: string
   openCount: number
   clickCount: number
+  error: string | null
   createdAt: string
 }
 
@@ -86,6 +87,9 @@ export default function EmailsTab() {
               </span>
               <Badge size="sm">{row.status}</Badge>
             </div>
+            {row.status === 'failed' && row.error && (
+              <p className="text-xs text-danger mt-2 line-clamp-2">{row.error}</p>
+            )}
           </li>
         ))}
       </ul>

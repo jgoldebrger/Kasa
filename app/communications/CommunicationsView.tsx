@@ -36,6 +36,7 @@ interface EmailLogRow {
   status: string
   openCount: number
   clickCount: number
+  error: string | null
   createdAt: string
 }
 
@@ -150,11 +151,18 @@ export default function CommunicationsView() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Send failed')
-      toast.success(
-        (t('communications.sendResult') || 'Sent: {sent}, failed: {failed}')
-          .replace('{sent}', String(data.sent ?? 0))
-          .replace('{failed}', String(data.failed ?? 0)),
-      )
+      const sent = data.sent ?? 0
+      const failed = data.failed ?? 0
+      if (failed > 0 && Array.isArray(data.errors) && data.errors.length > 0) {
+        toast.error(data.errors.slice(0, 2).join(' · '))
+      }
+      if (sent > 0) {
+        toast.success(
+          (t('communications.sendResult') || 'Sent: {sent}, failed: {failed}')
+            .replace('{sent}', String(sent))
+            .replace('{failed}', String(failed)),
+        )
+      }
       setSubject('')
       setBody('')
       setSelectedIds(new Set())
@@ -223,6 +231,20 @@ export default function CommunicationsView() {
         </Badge>
       ),
       exportValue: (row) => row.status,
+    },
+    {
+      id: 'error',
+      header: t('communications.column.error'),
+      headerText: t('communications.column.error'),
+      cell: (row) => (
+        <span
+          className="text-sm text-danger max-w-md block truncate"
+          title={row.error || undefined}
+        >
+          {row.status === 'failed' && row.error ? row.error : '—'}
+        </span>
+      ),
+      exportValue: (row) => row.error || '',
     },
     {
       id: 'tracking',
@@ -356,6 +378,9 @@ export default function CommunicationsView() {
                     {row.openCount}/{row.clickCount}
                   </span>
                 </div>
+                {row.status === 'failed' && row.error && (
+                  <p className="text-xs text-danger mt-2 line-clamp-3">{row.error}</p>
+                )}
               </Card>
             )}
             empty={

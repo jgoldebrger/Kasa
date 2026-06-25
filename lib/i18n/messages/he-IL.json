@@ -492,6 +492,7 @@
   "communications.column.subject": "נושא",
   "communications.column.kind": "סוג",
   "communications.column.status": "סטטוס",
+  "communications.column.error": "שגיאה",
   "communications.column.tracking": "פתיחות / לחיצות",
   "communications.empty.title": "עדיין לא נשלחו אימיילים",
   "communications.empty.description": "כתוב הודעה או שלח דף חשבון כדי לראות היסטוריה כאן.",

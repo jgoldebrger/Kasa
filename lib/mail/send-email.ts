@@ -2,6 +2,7 @@ import { Types } from 'mongoose'
 import type nodemailer from 'nodemailer'
 import { EmailMessage } from '@/lib/models'
 import { audit } from '@/lib/audit'
+import { logError } from '@/lib/log'
 import { isAllowedOutboundRecipient } from '@/lib/email-recipients'
 import { createGmailTransport } from './create-transport'
 import { applyEmailTracking } from './tracking-html'
@@ -44,17 +45,60 @@ function appBaseUrl(): string {
   return url.replace(/\/$/, '')
 }
 
+async function recordFailedEmail(
+  input: SendEmailInput,
+  to: string,
+  subject: string,
+  error: string,
+): Promise<SendEmailResult> {
+  const doc = await EmailMessage.create({
+    organizationId: new Types.ObjectId(input.organizationId),
+    familyId: input.familyId ? new Types.ObjectId(input.familyId) : undefined,
+    userId: input.userId ? new Types.ObjectId(input.userId) : undefined,
+    to,
+    subject: subject.replace(/[\r\n]+/g, ' ').slice(0, 998),
+    kind: input.kind,
+    provider: 'gmail',
+    status: 'failed',
+    error,
+    events: [
+      { type: 'queued', at: new Date() },
+      { type: 'failed', at: new Date(), meta: { message: error } },
+    ],
+  })
+  logError(new Error(error), {
+    module: 'mail.sendEmail',
+    organizationId: input.organizationId,
+    kind: input.kind,
+    familyId: input.familyId ?? undefined,
+  })
+  if (input.auditRequest) {
+    void audit({
+      organizationId: input.organizationId,
+      userId: input.userId ?? undefined,
+      action: 'email.failed',
+      resourceType: 'EmailMessage',
+      resourceId: doc._id,
+      metadata: { kind: input.kind, familyId: input.familyId ?? null, reason: error },
+      request: input.auditRequest,
+    })
+  }
+  return { ok: false, emailMessageId: String(doc._id), error }
+}
+
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   const to = input.to.trim()
+  const subject = input.subject.replace(/[\r\n]+/g, ' ').slice(0, 998)
   if (!to) return { ok: false, error: 'Recipient email is required' }
 
   const allowed = await isAllowedOutboundRecipient(input.organizationId, to)
   if (!allowed) {
-    return {
-      ok: false,
-      error:
-        'Recipient must be an organization member or a family contact email on file in this organization.',
-    }
+    return recordFailedEmail(
+      input,
+      to,
+      subject,
+      'Recipient must be an organization member or a family contact email on file in this organization.',
+    )
   }
 
   const credsResult = input.config
@@ -64,7 +108,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       })
     : await loadOrgEmailConfig(input.organizationId)
   if (!credsResult.ok) {
-    return { ok: false, error: credsResult.error }
+    return recordFailedEmail(input, to, subject, credsResult.error)
   }
   const creds = credsResult.config
 
@@ -80,7 +124,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     userId: input.userId ? new Types.ObjectId(input.userId) : undefined,
     emailJobId: input.emailJobId ? new Types.ObjectId(input.emailJobId) : undefined,
     to,
-    subject: input.subject.replace(/[\r\n]+/g, ' ').slice(0, 998),
+    subject,
     kind: input.kind,
     provider: 'gmail',
     status: 'queued',
@@ -140,6 +184,13 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     return { ok: true, emailMessageId }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
+    logError(err, {
+      module: 'mail.sendEmail',
+      organizationId: input.organizationId,
+      kind: input.kind,
+      familyId: input.familyId ?? undefined,
+      emailMessageId,
+    })
     await EmailMessage.updateOne(
       { _id: doc._id },
       {

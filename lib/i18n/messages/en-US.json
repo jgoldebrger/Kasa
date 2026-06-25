@@ -577,6 +577,7 @@
   "communications.column.subject": "Subject",
   "communications.column.kind": "Type",
   "communications.column.status": "Status",
+  "communications.column.error": "Error",
   "communications.column.tracking": "Opens / Clicks",
   "communications.empty.title": "No emails sent yet",
   "communications.empty.description": "Compose a message or send a statement to see history here.",
