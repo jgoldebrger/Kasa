@@ -14,8 +14,10 @@ interface PerEventRow {
   type: string
   currentCost: number
   rosterMapped: boolean
+  historicalAvgPerYear: number
   projectedCountStartYear: number
   projectedExpenseStartYear: number
+  countSource: 'roster' | 'historical' | 'blended'
 }
 
 interface PlanRecommendation {
@@ -36,6 +38,9 @@ interface YearlyDuesRow {
   projectedPayers: number
   projectedExpenses: number
   projectedPlanIncome: number
+  openingFundBalance: number
+  closingFundBalance: number
+  fundSolvent: boolean
   scaleFactor: number
   planRecommendations: YearlyPlanRecommendation[]
 }
@@ -43,7 +48,11 @@ interface YearlyDuesRow {
 interface DuesRecommendation {
   plans: PlanRecommendation[]
   currentPlanIncome: number
-  expenseSource: 'roster'
+  openingFundBalance: number
+  solvencyScaleFactor: number
+  avgNewChildrenPerYear: number
+  historyYearsWithData: number
+  expenseSource: 'blended'
   currentPayers: number
   currentFamilies: number
   currentBarMitzvahPayers: number
@@ -162,6 +171,7 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
   const headlineRow =
     r?.multiYear.find((row) => row.year === currentYear) ?? r?.multiYear[0] ?? null
   const startYearExpenses = r?.perEvent.reduce((s, e) => s + e.projectedExpenseStartYear, 0) ?? 0
+  const hasShortfall = r?.multiYear.some((row) => !row.fundSolvent) ?? false
 
   return (
     <div className="min-h-screen p-4 sm:p-6 md:p-8">
@@ -196,6 +206,56 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
           <>
             <Card compact className="space-y-4">
               <h2 className="text-sm font-semibold text-fg">{t('projections.headline.title')}</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <div className="text-[10px] uppercase tracking-wide text-fg-muted">
+                    {t('projections.headline.openingFund')}
+                  </div>
+                  <div className="tabular font-semibold text-fg">
+                    {formatMoney(r.openingFundBalance)}
+                  </div>
+                </div>
+                {headlineRow && (
+                  <>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-fg-muted">
+                        {t('projections.headline.projectedCosts')}
+                      </div>
+                      <div className="tabular font-semibold text-fg">
+                        {formatMoney(headlineRow.projectedExpenses)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-fg-muted">
+                        {t('projections.headline.planIncome')}
+                      </div>
+                      <div className="tabular font-semibold text-fg">
+                        {formatMoney(headlineRow.projectedPlanIncome)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-fg-muted">
+                        {t('projections.headline.closingFund')}
+                      </div>
+                      <div
+                        className={`tabular font-semibold ${
+                          headlineRow.fundSolvent ? 'text-fg' : 'text-danger'
+                        }`}
+                      >
+                        {formatMoney(headlineRow.closingFundBalance)}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+              {hasShortfall && (
+                <p className="text-xs text-danger border-t border-border pt-3">
+                  {t('projections.headline.shortfallWarning').replace(
+                    '{adjustment}',
+                    formatAdjustment(r.solvencyScaleFactor),
+                  )}
+                </p>
+              )}
               {r.plans.length === 0 ? (
                 <p className="text-xs text-fg-muted">
                   {t('projections.headline.noPlans')}{' '}
@@ -204,24 +264,8 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                   </a>
                   .
                 </p>
-              ) : headlineRow ? (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <div className="text-[10px] uppercase tracking-wide text-fg-muted">
-                      {t('projections.headline.projectedCosts')}
-                    </div>
-                    <div className="tabular font-semibold text-fg">
-                      {formatMoney(headlineRow.projectedExpenses)}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] uppercase tracking-wide text-fg-muted">
-                      {t('projections.headline.planIncome')}
-                    </div>
-                    <div className="tabular font-semibold text-fg">
-                      {formatMoney(headlineRow.projectedPlanIncome)}
-                    </div>
-                  </div>
+              ) : headlineRow && r.plans.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm border-t border-border pt-3">
                   <div>
                     <div className="text-[10px] uppercase tracking-wide text-fg-muted">
                       {t('projections.headline.adjustment')}
@@ -340,6 +384,11 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                     '{count}',
                     r.avgNewFamiliesPerYear.toFixed(1),
                   )}
+                  ,{' '}
+                  {t('projections.control.newChildren').replace(
+                    '{count}',
+                    r.avgNewChildrenPerYear.toFixed(1),
+                  )}
                   {showBM && (
                     <>
                       ,{' '}
@@ -374,6 +423,7 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                         {t('projections.table.projectedExpenses')}
                       </th>
                       <th className="text-right px-3 py-2">{t('projections.table.planIncome')}</th>
+                      <th className="text-right px-3 py-2">{t('projections.table.closingFund')}</th>
                       <th className="text-right px-3 py-2 bg-accent/5">
                         <span className="inline-flex items-center justify-end gap-1">
                           {t('projections.table.adjustment')}
@@ -436,6 +486,13 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                             {formatMoney(row.projectedPlanIncome)}
                           </td>
                           <td
+                            className={`text-right px-3 py-1.5 tabular font-medium ${
+                              row.fundSolvent ? 'text-fg' : 'text-danger'
+                            }`}
+                          >
+                            {formatMoney(row.closingFundBalance)}
+                          </td>
+                          <td
                             className={`text-right px-3 py-1.5 tabular bg-accent/5 ${
                               isCurrent ? 'font-bold text-fg' : 'font-semibold text-fg'
                             }`}
@@ -487,6 +544,12 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                       </p>
                       <p>
                         <span className="font-medium text-fg">
+                          {t('projections.how.fundBalance')}
+                        </span>{' '}
+                        {formatMoney(r.openingFundBalance)} {t('projections.how.fundBalanceDesc')}
+                      </p>
+                      <p>
+                        <span className="font-medium text-fg">
                           {t('projections.how.expectedExpenses')}
                         </span>{' '}
                         {formatMoney(startYearExpenses)} {t('projections.how.expectedExpensesDesc')}
@@ -514,6 +577,11 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                         {t('projections.how.newFamiliesGrowth').replace(
                           '{count}',
                           r.avgNewFamiliesPerYear.toFixed(1),
+                        )}
+                        ,{' '}
+                        {t('projections.how.newChildrenGrowth').replace(
+                          '{count}',
+                          r.avgNewChildrenPerYear.toFixed(1),
                         )}
                         {showBM && (
                           <>
@@ -552,9 +620,7 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                           <thead className="text-fg-muted">
                             <tr>
                               <th className="text-left py-1">{t('projections.how.eventColumn')}</th>
-                              <th className="text-right py-1">
-                                {t('projections.how.rosterMapped')}
-                              </th>
+                              <th className="text-right py-1">{t('projections.how.avgPerYear')}</th>
                               <th className="text-right py-1">
                                 {t('projections.how.countInYear')}
                               </th>
@@ -566,10 +632,8 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                             {r.perEvent.map((e) => (
                               <tr key={e.eventTypeId} className="border-t border-border">
                                 <td className="py-1 text-fg">{e.name}</td>
-                                <td className="py-1 text-right text-fg-muted">
-                                  {e.rosterMapped
-                                    ? t('projections.how.rosterYes')
-                                    : t('projections.how.rosterNo')}
+                                <td className="py-1 text-right tabular text-fg-muted">
+                                  {e.historicalAvgPerYear.toFixed(1)}
                                 </td>
                                 <td className="py-1 text-right tabular text-fg">
                                   {e.projectedCountStartYear}

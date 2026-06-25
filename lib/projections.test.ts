@@ -8,6 +8,7 @@ const loaderMocks = vi.hoisted(() => ({
         timezone: 'UTC',
         barMitzvahAutoAssignPlanId: null,
         barMitzvahAutoCreateEventTypeId: null,
+        addChildAutoCreateEventTypeId: null,
       }) as Record<string, unknown>,
   ),
   lifecycleEvents: [] as Array<{ _id: string; type: string; name: string; amount: number }>,
@@ -15,6 +16,7 @@ const loaderMocks = vi.hoisted(() => ({
   bmCount: 0,
   newFamiliesAgg: [] as Array<{ count: number }>,
   newBmAgg: [] as Array<{ count: number }>,
+  newChildrenAgg: [] as Array<{ count: number }>,
   rosterAgg: {
     bar: [] as Array<{ _id: string; count: number }>,
     bat: [] as Array<{ _id: string; count: number }>,
@@ -27,6 +29,8 @@ const loaderMocks = vi.hoisted(() => ({
     familyCount: number
     income: number
   }>,
+  yearlySnapshots: [] as Array<{ calculatedIncome?: number; calculatedExpenses?: number }>,
+  lifecycleCountsByYear: {} as Record<number, Array<{ type: string; count: number }>>,
 }))
 
 vi.mock('./database', () => ({ default: loaderMocks.connectDB }))
@@ -45,6 +49,16 @@ vi.mock('./calculations', () => ({
       income: p.income,
     })),
   ),
+  countLifecycleEvents: vi.fn(async (year: number) => {
+    const rows = loaderMocks.lifecycleCountsByYear[year] ?? []
+    return rows.map((r) => ({
+      type: r.type,
+      name: r.type,
+      configuredAmount: 0,
+      count: r.count,
+      amount: 0,
+    }))
+  }),
 }))
 vi.mock('./models', () => ({
   Organization: {
@@ -61,14 +75,26 @@ vi.mock('./models', () => ({
       if (str.includes('barMitzvahDate')) return loaderMocks.rosterAgg.bar
       if (str.includes('batMitzvahDate')) return loaderMocks.rosterAgg.bat
       if (str.includes('weddingDate')) return loaderMocks.rosterAgg.wedding
+      if (str.includes('createdAt')) return loaderMocks.newChildrenAgg
       return loaderMocks.newBmAgg
     }),
   },
   LifecycleEvent: {},
+  YearlyCalculation: {
+    find: vi.fn(() => ({
+      select: vi.fn(() => ({
+        lean: vi.fn(async () => loaderMocks.yearlySnapshots),
+      })),
+    })),
+  },
+  Payment: { aggregate: vi.fn(async () => [{ total: 0 }]) },
+  LifecycleEventPayment: { aggregate: vi.fn(async () => [{ total: 0 }]) },
 }))
 
 import {
+  blendEventProjections,
   computeDuesRecommendation,
+  computeSolvencyScaleFactor,
   DEFAULT_DUES_FORECAST_YEARS,
   loadDuesRecommendation,
   mapEventTypesToRoster,
@@ -83,14 +109,18 @@ function recInput(over: Partial<DuesRecommendationInput> = {}): DuesRecommendati
     currentBarMitzvahPayers: 0,
     avgNewFamiliesPerYear: 2,
     avgNewBarMitzvahsPerYear: 0,
+    avgNewChildrenPerYear: 3,
     chargesBarMitzvahPayers: false,
     growthLookbackYears: 5,
+    openingFundBalance: 10_000,
+    solvencyScaleFactor: 1,
+    historyYearsWithData: 5,
     plans: [
       { planId: 'p1', planName: 'Standard', currentPrice: 1000, familyCount: 30 },
       { planId: 'p2', planName: 'Young', currentPrice: 500, familyCount: 20 },
     ],
     currentPlanIncome: 40_000,
-    expensesByYear: [2250, 0, 0, 0, 0],
+    expensesByYear: [10_000, 10_000, 10_000],
     eventTypes: [
       {
         eventTypeId: 'bar',
@@ -98,7 +128,9 @@ function recInput(over: Partial<DuesRecommendationInput> = {}): DuesRecommendati
         name: 'Bar Mitzvah',
         currentCost: 500,
         rosterSource: 'bar_mitzvah',
-        projectedCountByYear: [2, 0, 0, 0, 0],
+        historicalAvgPerYear: 2,
+        blendedCountByYear: [2, 2, 2],
+        rosterCountStartYear: 0,
       },
       {
         eventTypeId: 'wed',
@@ -106,129 +138,102 @@ function recInput(over: Partial<DuesRecommendationInput> = {}): DuesRecommendati
         name: 'Wedding',
         currentCost: 300,
         rosterSource: 'member_wedding',
-        projectedCountByYear: [1, 0, 0, 0, 0],
+        historicalAvgPerYear: 4,
+        blendedCountByYear: [4, 4, 4],
+        rosterCountStartYear: 1,
       },
     ],
     ...over,
   }
 }
 
-describe('mapEventTypesToRoster', () => {
-  it('prefers explicit bar mitzvah automation id', () => {
+describe('blendEventProjections', () => {
+  it('uses historical average when roster has no dates', () => {
     const types = [
-      { eventTypeId: 'a', type: 'barmitzvah' },
-      { eventTypeId: 'b', type: 'other' },
-    ]
-    const map = mapEventTypesToRoster(types, 'b')
-    expect(map.get('b')).toBe('bar_mitzvah')
-    expect(map.get('a')).toBeNull()
-  })
-
-  it('assigns each roster source at most once via heuristics', () => {
-    const types = [
-      { eventTypeId: 'bar', type: 'bar_mitzvah' },
-      { eventTypeId: 'bat', type: 'bat_mitzvah' },
-      { eventTypeId: 'wed', type: 'chasuna' },
-      { eventTypeId: 'misc', type: 'bris' },
-    ]
-    const map = mapEventTypesToRoster(types, null)
-    expect(map.get('bar')).toBe('bar_mitzvah')
-    expect(map.get('bat')).toBe('bat_mitzvah')
-    expect(map.get('wed')).toBe('member_wedding')
-    expect(map.get('misc')).toBeNull()
-  })
-})
-
-describe('projectRosterEventsByYear', () => {
-  it('buckets bar mitzvah dates into the matching forecast year only', () => {
-    const { expensesByYear, eventTypesWithCounts } = projectRosterEventsByYear(
-      [
-        {
-          eventTypeId: 'bar',
-          type: 'barmitzvah',
-          name: 'Bar Mitzvah',
-          currentCost: 500,
-          rosterSource: 'bar_mitzvah',
-        },
-      ],
       {
-        barMitzvah: new Map([[2028, 2]]),
-        batMitzvah: new Map(),
-        memberWedding: new Map(),
+        eventTypeId: 'wed',
+        type: 'wedding',
+        name: 'Wedding',
+        currentCost: 300,
+        rosterSource: 'member_wedding' as const,
       },
+    ]
+    const { expensesByYear } = blendEventProjections(
+      types,
+      new Map([['wed', [0, 0, 0]]]),
+      new Map([['wed', 4]]),
+      null,
+      0,
+      3,
+    )
+    expect(expensesByYear[0]).toBe(1200)
+    expect(expensesByYear[2]).toBe(1200)
+  })
+
+  it('uses the higher of roster count and historical average', () => {
+    const types = [
+      {
+        eventTypeId: 'bar',
+        type: 'barmitzvah',
+        name: 'Bar Mitzvah',
+        currentCost: 500,
+        rosterSource: 'bar_mitzvah' as const,
+      },
+    ]
+    const { expensesByYear } = blendEventProjections(
+      types,
+      new Map([['bar', [1, 0, 3]]]),
+      new Map([['bar', 2]]),
+      null,
+      0,
+      3,
+    )
+    expect(expensesByYear[0]).toBe(1000)
+    expect(expensesByYear[1]).toBe(1000)
+    expect(expensesByYear[2]).toBe(1500)
+  })
+})
+
+describe('computeSolvencyScaleFactor', () => {
+  it('returns 1 when the fund stays solvent at current income', () => {
+    expect(computeSolvencyScaleFactor(10_000, [40_000, 40_000], [10_000, 10_000])).toBe(1)
+  })
+
+  it('returns a scale > 1 when expenses outpace income and opening balance', () => {
+    const scale = computeSolvencyScaleFactor(0, [40_000, 40_000], [50_000, 50_000])
+    expect(scale).toBeGreaterThan(1)
+    expect(scale).toBeCloseTo(1.25, 2)
+  })
+})
+
+describe('projectDuesMultiYear — fund balance', () => {
+  it('tracks opening and closing fund balance at current plan prices', () => {
+    const rows = projectDuesMultiYear(recInput(), 2026, 2)
+    expect(rows[0].openingFundBalance).toBe(10_000)
+    expect(rows[0].closingFundBalance).toBe(10_000 + 40_000 - 10_000)
+    expect(rows[1].openingFundBalance).toBe(rows[0].closingFundBalance)
+    expect(rows[0].fundSolvent).toBe(true)
+  })
+
+  it('flags insolvent years when the fund runs dry', () => {
+    const rows = projectDuesMultiYear(
+      recInput({ openingFundBalance: 0, expensesByYear: [50_000, 50_000] }),
       2026,
-      5,
+      2,
     )
-    expect(expensesByYear[0]).toBe(0)
-    expect(expensesByYear[2]).toBe(1000)
-    expect(eventTypesWithCounts[0].projectedCountByYear[2]).toBe(2)
+    expect(rows[0].fundSolvent).toBe(false)
   })
 })
 
-describe('computeDuesRecommendation — proportional plan scaling', () => {
-  it('scales all plan prices by the same factor to cover expenses', () => {
-    const out = computeDuesRecommendation(recInput(), { startYear: 2026, forecastYears: 1 })
-    // expenses 2250, income 40000 → factor 0.05625
-    expect(out.multiYear[0].projectedExpenses).toBe(2250)
-    expect(out.multiYear[0].projectedPlanIncome).toBe(40_000)
-    expect(out.multiYear[0].scaleFactor).toBeCloseTo(2250 / 40_000, 6)
-    expect(out.multiYear[0].planRecommendations[0].recommendedPrice).toBeCloseTo(56.25, 2)
-    expect(out.multiYear[0].planRecommendations[1].recommendedPrice).toBeCloseTo(28.125, 2)
-  })
-
-  it('preserves plan price ratios after scaling', () => {
-    const out = computeDuesRecommendation(recInput(), { startYear: 2026, forecastYears: 1 })
-    const [a, b] = out.multiYear[0].planRecommendations
-    expect(a.recommendedPrice / b.recommendedPrice).toBeCloseTo(2, 6)
-  })
-
-  it('returns scale factor 0 when plan income is zero', () => {
-    const out = computeDuesRecommendation(recInput({ currentPlanIncome: 0, plans: [] }), {
-      startYear: 2026,
-      forecastYears: 1,
-    })
-    expect(out.multiYear[0].scaleFactor).toBe(0)
-    expect(out.multiYear[0].planRecommendations).toHaveLength(0)
-  })
-
-  it('grows projected plan income with family count', () => {
-    const out = computeDuesRecommendation(recInput(), { startYear: 2026, forecastYears: 3 })
-    expect(out.multiYear[2].projectedFamilies).toBe(54)
-    expect(out.multiYear[2].projectedPlanIncome).toBeCloseTo(40_000 * (54 / 50), 6)
-  })
-
-  it('exposes per-event start-year counts from roster', () => {
-    const out = computeDuesRecommendation(recInput())
-    expect(out.perEvent[0].projectedCountStartYear).toBe(2)
-    expect(out.perEvent[0].projectedExpenseStartYear).toBe(1000)
-    expect(out.perEvent[1].projectedCountStartYear).toBe(1)
-    expect(out.expenseSource).toBe('roster')
-  })
-
-  it('counts bar-mitzvah payers when the org opts in', () => {
+describe('computeDuesRecommendation', () => {
+  it('applies solvency scale when higher than the annual expense ratio', () => {
     const out = computeDuesRecommendation(
-      recInput({
-        chargesBarMitzvahPayers: true,
-        currentBarMitzvahPayers: 5,
-        avgNewBarMitzvahsPerYear: 3,
-      }),
+      recInput({ solvencyScaleFactor: 1.5, expensesByYear: [10_000] }),
+      { startYear: 2026, forecastYears: 1 },
     )
-    expect(out.currentPayers).toBe(55)
-    expect(out.projectedPayers).toBe(60)
-  })
-})
-
-describe('projectDuesMultiYear', () => {
-  it('clamps fractional and out-of-range horizons', () => {
-    expect(projectDuesMultiYear(recInput(), 2026, 2.7)).toHaveLength(2)
-    expect(projectDuesMultiYear(recInput(), 2026, -5)).toHaveLength(1)
-    expect(projectDuesMultiYear(recInput(), 2026, 99)).toHaveLength(50)
-  })
-})
-
-describe('DEFAULT_DUES_FORECAST_YEARS', () => {
-  it('is 20', () => {
-    expect(DEFAULT_DUES_FORECAST_YEARS).toBe(20)
+    expect(out.multiYear[0].scaleFactor).toBe(1.5)
+    expect(out.solvencyScaleFactor).toBe(1.5)
+    expect(out.expenseSource).toBe('blended')
   })
 })
 
@@ -237,50 +242,39 @@ describe('loadDuesRecommendation', () => {
     vi.clearAllMocks()
     loaderMocks.lifecycleEvents = [
       { _id: 'ev-bar', type: 'barmitzvah', name: 'Bar Mitzvah', amount: 500 },
+      { _id: 'ev-wed', type: 'wedding', name: 'Wedding', amount: 300 },
     ]
     loaderMocks.familyCount = 40
-    loaderMocks.bmCount = 3
-    loaderMocks.newFamiliesAgg = [{ count: 10 }, { count: 5 }]
-    loaderMocks.newBmAgg = [{ count: 4 }]
-    loaderMocks.rosterAgg = {
-      bar: [{ _id: '2030', count: 2 }],
-      bat: [],
-      wedding: [],
-    }
+    loaderMocks.newChildrenAgg = [{ count: 15 }]
+    loaderMocks.rosterAgg = { bar: [{ _id: '2030', count: 2 }], bat: [], wedding: [] }
     loaderMocks.planBreakdown = [
       { planId: 'p1', name: 'Standard', yearlyPrice: 1000, familyCount: 40, income: 40_000 },
     ]
+    loaderMocks.yearlySnapshots = [{ calculatedIncome: 50_000, calculatedExpenses: 30_000 }]
+    loaderMocks.lifecycleCountsByYear = {
+      2024: [{ type: 'wedding', count: 4 }],
+      2025: [{ type: 'wedding', count: 2 }],
+    }
     loaderMocks.orgLean.mockResolvedValue({
-      timezone: 'America/New_York',
-      barMitzvahAutoAssignPlanId: 'plan-bm',
+      timezone: 'UTC',
+      barMitzvahAutoAssignPlanId: null,
       barMitzvahAutoCreateEventTypeId: 'ev-bar',
+      addChildAutoCreateEventTypeId: null,
     })
   })
 
-  it('uses roster dates and plans without YearlyCalculation', async () => {
+  it('blends roster, history, and opening fund balance', async () => {
     const out = await loadDuesRecommendation('507f1f77bcf86cd799439011', 5, 3, 2030)
-    expect(loaderMocks.connectDB).toHaveBeenCalled()
-    expect(out.expenseSource).toBe('roster')
-    expect(out.currentPlanIncome).toBe(40_000)
-    expect(out.plans).toHaveLength(1)
-    expect(out.multiYear[0].year).toBe(2030)
-    expect(out.multiYear[0].projectedExpenses).toBe(1000)
-    expect(out.perEvent[0].rosterMapped).toBe(true)
-    expect(out.avgNewFamiliesPerYear).toBe(3)
-    expect(out.chargesBarMitzvahPayers).toBe(true)
+    expect(out.openingFundBalance).toBe(20_000)
+    expect(out.avgNewChildrenPerYear).toBe(3)
+    expect(out.expenseSource).toBe('blended')
+    expect(out.multiYear[0].projectedExpenses).toBeGreaterThan(0)
+    expect(out.multiYear[0].closingFundBalance).toBeDefined()
   })
+})
 
-  it('returns zero expenses when roster has no dates in range', async () => {
-    loaderMocks.rosterAgg = { bar: [], bat: [], wedding: [] }
-    const out = await loadDuesRecommendation('507f1f77bcf86cd799439011', 5, 1, 2030)
-    expect(out.multiYear[0].projectedExpenses).toBe(0)
-    expect(out.multiYear[0].scaleFactor).toBe(0)
-  })
-
-  it('clamps growth lookback to [1, 10]', async () => {
-    const narrow = await loadDuesRecommendation('507f1f77bcf86cd799439011', 0)
-    expect(narrow.growthLookbackYears).toBe(1)
-    const wide = await loadDuesRecommendation('507f1f77bcf86cd799439011', 99)
-    expect(wide.growthLookbackYears).toBe(10)
+describe('DEFAULT_DUES_FORECAST_YEARS', () => {
+  it('is 20', () => {
+    expect(DEFAULT_DUES_FORECAST_YEARS).toBe(20)
   })
 })

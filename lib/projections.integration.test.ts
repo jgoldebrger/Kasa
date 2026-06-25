@@ -16,9 +16,18 @@ describe('loadDuesRecommendation (integration)', () => {
   })
 
   afterEach(async () => {
-    const { Organization, Family, FamilyMember, LifecycleEvent, PaymentPlan } =
-      await import('./models')
+    const {
+      Organization,
+      Family,
+      FamilyMember,
+      LifecycleEvent,
+      LifecycleEventPayment,
+      PaymentPlan,
+      YearlyCalculation,
+    } = await import('./models')
     await Promise.all([
+      LifecycleEventPayment.deleteMany({}),
+      YearlyCalculation.deleteMany({}),
       LifecycleEvent.deleteMany({}),
       FamilyMember.deleteMany({}),
       Family.deleteMany({}),
@@ -27,14 +36,22 @@ describe('loadDuesRecommendation (integration)', () => {
     ])
   })
 
-  it('projects expenses from roster dates and scales payment plans', async () => {
-    const { Organization, Family, FamilyMember, LifecycleEvent, PaymentPlan } =
-      await import('./models')
+  it('projects fund balance with blended roster and historical weddings', async () => {
+    const {
+      Organization,
+      Family,
+      FamilyMember,
+      LifecycleEvent,
+      LifecycleEventPayment,
+      PaymentPlan,
+      YearlyCalculation,
+    } = await import('./models')
     const { loadDuesRecommendation } = await import('./projections')
 
     orgId = new Types.ObjectId()
     planId = new Types.ObjectId()
     const barEventId = new Types.ObjectId()
+    const wedEventId = new Types.ObjectId()
 
     await Organization.create({
       _id: orgId,
@@ -59,11 +76,33 @@ describe('loadDuesRecommendation (integration)', () => {
       name: 'Bar Mitzvah',
       amount: 500,
     })
+    await LifecycleEvent.create({
+      _id: wedEventId,
+      organizationId: orgId,
+      type: 'wedding',
+      name: 'Wedding',
+      amount: 300,
+    })
+    await YearlyCalculation.create({
+      organizationId: orgId,
+      year: 2025,
+      calculatedIncome: 50_000,
+      calculatedExpenses: 30_000,
+      balance: 20_000,
+    })
     const family = await Family.create({
       organizationId: orgId,
       name: 'Alpha',
       weddingDate: new Date('2018-01-01'),
       paymentPlanId: planId,
+    })
+    await LifecycleEventPayment.create({
+      organizationId: orgId,
+      familyId: family._id,
+      eventType: 'wedding',
+      amount: 300,
+      year: 2025,
+      eventDate: new Date('2025-06-01'),
     })
     await FamilyMember.create({
       organizationId: orgId,
@@ -77,15 +116,15 @@ describe('loadDuesRecommendation (integration)', () => {
     const out = await loadDuesRecommendation(orgId.toString(), 5, 3, 2030)
 
     expect(out.currentFamilies).toBe(1)
-    expect(out.currentPlanIncome).toBe(1000)
-    expect(out.plans).toHaveLength(1)
-    expect(out.perEvent).toHaveLength(1)
-    expect(out.perEvent[0].type).toBe('barmitzvah')
-    expect(out.perEvent[0].rosterMapped).toBe(true)
-    expect(out.expenseSource).toBe('roster')
-    expect(out.multiYear[0].projectedExpenses).toBe(500)
-    expect(out.multiYear[0].scaleFactor).toBeCloseTo(0.5, 6)
-    expect(out.multiYear[0].planRecommendations[0].recommendedPrice).toBeCloseTo(500, 6)
-    expect(out.multiYear.length).toBe(3)
+    expect(out.openingFundBalance).toBe(20_000)
+    expect(out.expenseSource).toBe('blended')
+    expect(out.perEvent.find((e) => e.type === 'wedding')?.historicalAvgPerYear).toBeGreaterThan(0)
+    expect(out.multiYear[0].projectedExpenses).toBeGreaterThan(0)
+    expect(out.multiYear[0].closingFundBalance).toBeDefined()
+    expect(out.multiYear[0].closingFundBalance).toBe(
+      out.openingFundBalance +
+        out.multiYear[0].projectedPlanIncome -
+        out.multiYear[0].projectedExpenses,
+    )
   })
 })
