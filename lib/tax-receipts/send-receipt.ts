@@ -16,12 +16,9 @@ import nodemailer from 'nodemailer'
 import { Family, Organization, Payment } from '@/lib/models'
 import { generateTaxReceiptPDF } from '@/lib/email-utils'
 import { escapeHtml } from '@/lib/html-escape'
-import { sanitizeFromName } from '@/lib/email-from-name'
+import { sendEmail } from '@/lib/mail'
 import { Types } from 'mongoose'
-import {
-  membershipDuesYearFilter,
-  netMembershipPaymentAmount,
-} from '@/lib/tax-receipts/queries'
+import { membershipDuesYearFilter, netMembershipPaymentAmount } from '@/lib/tax-receipts/queries'
 
 export interface ReceiptEmailCreds {
   email: string
@@ -44,9 +41,7 @@ export interface SendReceiptResult {
   error?: string
 }
 
-export async function sendOneFamilyTaxReceipt(
-  input: SendReceiptInput,
-): Promise<SendReceiptResult> {
+export async function sendOneFamilyTaxReceipt(input: SendReceiptInput): Promise<SendReceiptResult> {
   const orgId = new Types.ObjectId(String(input.organizationId))
   const familyOid = new Types.ObjectId(String(input.familyId))
 
@@ -110,15 +105,7 @@ export async function sendOneFamilyTaxReceipt(
       input.year,
     )
 
-    const transporter =
-      input.transporter ||
-      nodemailer.createTransport({
-        service: 'gmail',
-        auth: { user: input.config.email, pass: input.config.password },
-      })
-
     const safeName = String(family.name || 'family').replace(/[^a-z0-9_\-]+/gi, '_')
-    const fromHeader = `"${sanitizeFromName(input.config.fromName)}" <${input.config.email}>`
     // Format the total using the org's configured locale / currency so the
     // body of the email matches the PDF (previously hard-coded en-US/USD
     // even for orgs using ₪ / € / etc).
@@ -137,19 +124,29 @@ export async function sendOneFamilyTaxReceipt(
       }).format(totalPaid)
     }
 
-    await transporter.sendMail({
-      from: fromHeader,
-      to: family.email,
-      subject: `${org.name} – Tax Receipt for ${input.year}`,
-      text:
-        `Hello ${family.name || 'friend'},\n\n` +
-        `Attached is your annual donation receipt from ${org.name} for tax year ${input.year}.\n` +
-        `Total contributions on record: ${formatted}.\n\n` +
-        `Please keep this receipt for your tax records.\n`,
-      html: `<p>Hello ${escapeHtml(family.name || 'friend')},</p>
+    const subject = `${org.name} – Tax Receipt for ${input.year}`
+    const textBody =
+      `Hello ${family.name || 'friend'},\n\n` +
+      `Attached is your annual donation receipt from ${org.name} for tax year ${input.year}.\n` +
+      `Total contributions on record: ${formatted}.\n\n` +
+      `Please keep this receipt for your tax records.\n`
+    const htmlBody = `<p>Hello ${escapeHtml(family.name || 'friend')},</p>
 <p>Attached is your annual donation receipt from <strong>${escapeHtml(org.name)}</strong> for tax year <strong>${input.year}</strong>.</p>
 <p>Total contributions on record: <strong>${formatted}</strong>.</p>
-<p>Please keep this receipt for your tax records.</p>`,
+<p>Please keep this receipt for your tax records.</p>`
+
+    const sendResult = await sendEmail({
+      organizationId: input.organizationId,
+      familyId: family._id.toString(),
+      to: family.email,
+      subject,
+      text: textBody,
+      html: htmlBody,
+      kind: 'tax-receipt',
+      relatedResource: { type: 'tax-receipt', id: String(input.year) },
+      tracking: { opens: true, clicks: false },
+      config: input.config,
+      transporter: input.transporter,
       attachments: [
         {
           filename: `Tax_Receipt_${safeName}_${input.year}.pdf`,
@@ -158,6 +155,15 @@ export async function sendOneFamilyTaxReceipt(
         },
       ],
     })
+
+    if (!sendResult.ok) {
+      return {
+        ok: false,
+        email: family.email,
+        totalPaid,
+        error: sendResult.error || 'Send failed',
+      }
+    }
 
     return { ok: true, email: family.email, totalPaid }
   } catch (error: any) {

@@ -12,6 +12,7 @@ import { calculateFamilyBalance } from '@/lib/calculations'
 import { generateStatementPDF, StatementTransaction } from '@/lib/email-utils'
 import { escapeHtml } from '@/lib/html-escape'
 import { sanitizeFromName } from '@/lib/email-from-name'
+import { sendEmail } from '@/lib/mail'
 import {
   loadStatementPeriod,
   buildTransactionList,
@@ -218,35 +219,9 @@ export async function sendOneFamilyStatement(
     const safeSubject = `Monthly Statement - ${String(statement.statementNumber || '').replace(/[\r\n]+/g, ' ')}`
 
     const cycleChargesForEmail = Number(statement.cycleCharges || 0)
-
-    const transporter =
-      input.transporter ??
-      nodemailer.createTransport({
-        service: 'gmail',
-        auth: { user: input.config.email, pass: input.config.password },
-      })
-
     const senderName = sanitizeFromName(input.config.fromName || org?.name)
 
-    await transporter.sendMail({
-      from: `"${senderName}" <${input.config.email}>`,
-      to: family.email,
-      subject: safeSubject,
-      text:
-        `Dear ${family.name},\n\n` +
-        `Please find attached your monthly statement for the period ${formatDate(statement.fromDate)} to ${formatDate(statement.toDate)}.\n\n` +
-        `Statement Summary:\n` +
-        `- Statement Number: ${statement.statementNumber}\n` +
-        `- Opening Balance: ${formatCurrency(statement.openingBalance)}\n` +
-        `- Income: ${formatCurrency(statement.income)}\n` +
-        `- Withdrawals: ${formatCurrency(statement.withdrawals)}\n` +
-        (cycleChargesForEmail > 0
-          ? `- Annual Dues Charged: ${formatCurrency(cycleChargesForEmail)}\n`
-          : '') +
-        `- Expenses: ${formatCurrency(statement.expenses)}\n` +
-        `- Closing Balance: ${formatCurrency(statement.closingBalance)}\n\n` +
-        `The detailed statement is attached as a PDF file.\n\nIf you have any questions, please contact us.\n\nBest regards,\n${senderName}`,
-      html: `
+    const htmlBody = `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
           <p>Dear ${escapeHtml(family.name)},</p>
           <p>Please find attached your monthly statement for the period <strong>${escapeHtml(formatDate(statement.fromDate))}</strong> to <strong>${escapeHtml(formatDate(statement.toDate))}</strong>.</p>
@@ -256,9 +231,11 @@ export async function sendOneFamilyStatement(
             <li><strong>Opening Balance:</strong> ${formatCurrency(statement.openingBalance)}</li>
             <li><strong>Income:</strong> <span style="color: #10b981;">${formatCurrency(statement.income)}</span></li>
             <li><strong>Withdrawals:</strong> <span style="color: #ef4444;">${formatCurrency(statement.withdrawals)}</span></li>
-            ${cycleChargesForEmail > 0
-              ? `<li><strong>Annual Dues Charged:</strong> <span style="color: #ef4444;">${formatCurrency(cycleChargesForEmail)}</span></li>`
-              : ''}
+            ${
+              cycleChargesForEmail > 0
+                ? `<li><strong>Annual Dues Charged:</strong> <span style="color: #ef4444;">${formatCurrency(cycleChargesForEmail)}</span></li>`
+                : ''
+            }
             <li><strong>Expenses:</strong> <span style="color: #ef4444;">${formatCurrency(statement.expenses)}</span></li>
             <li><strong>Closing Balance:</strong> <strong>${formatCurrency(statement.closingBalance)}</strong></li>
           </ul>
@@ -266,15 +243,49 @@ export async function sendOneFamilyStatement(
           <p>If you have any questions, please contact us.</p>
           <p>Best regards,<br>${escapeHtml(senderName)}</p>
         </div>
-      `,
+      `
+
+    const textBody =
+      `Dear ${family.name},\n\n` +
+      `Please find attached your monthly statement for the period ${formatDate(statement.fromDate)} to ${formatDate(statement.toDate)}.\n\n` +
+      `Statement Summary:\n` +
+      `- Statement Number: ${statement.statementNumber}\n` +
+      `- Opening Balance: ${formatCurrency(statement.openingBalance)}\n` +
+      `- Income: ${formatCurrency(statement.income)}\n` +
+      `- Withdrawals: ${formatCurrency(statement.withdrawals)}\n` +
+      (cycleChargesForEmail > 0
+        ? `- Annual Dues Charged: ${formatCurrency(cycleChargesForEmail)}\n`
+        : '') +
+      `- Expenses: ${formatCurrency(statement.expenses)}\n` +
+      `- Closing Balance: ${formatCurrency(statement.closingBalance)}\n\n` +
+      `The detailed statement is attached as a PDF file.\n\nIf you have any questions, please contact us.\n\nBest regards,\n${senderName}`
+
+    const sendResult = await sendEmail({
+      organizationId: input.organizationId,
+      familyId: family._id.toString(),
+      to: family.email,
+      subject: safeSubject,
+      text: textBody,
+      html: htmlBody,
+      kind: 'statement',
+      relatedResource: { type: 'statement', id: String(statement._id) },
+      tracking: { opens: true, clicks: false },
+      config: input.config,
+      transporter: input.transporter,
       attachments: [
         {
-          filename: `Statement_${String(statement.statementNumber || '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 100)}.pdf`,
+          filename: `Statement_${String(statement.statementNumber || '')
+            .replace(/[^A-Za-z0-9._-]+/g, '_')
+            .slice(0, 100)}.pdf`,
           content: pdfBuffer,
           contentType: 'application/pdf',
         },
       ],
     })
+
+    if (!sendResult.ok) {
+      return { ok: false, email: family.email, error: sendResult.error || 'Send failed' }
+    }
 
     return { ok: true, email: family.email }
   } catch (err: any) {

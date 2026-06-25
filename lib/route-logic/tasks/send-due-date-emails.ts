@@ -2,12 +2,12 @@ import { Task, EmailConfig, Organization } from '@/lib/models'
 import { safeDecrypt, decryptFailureMessage } from '@/lib/encryption'
 import { escapeHtml } from '@/lib/html-escape'
 import { sanitizeFromName } from '@/lib/email-from-name'
+import { createGmailTransport, sendEmail } from '@/lib/mail'
 import { sanitizeBatchErrors, sanitizeStripeErrorMessage } from '@/lib/payments/sanitize'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { calendarDayBoundsInTimeZone } from '@/lib/date-utils'
 import { loadAllByIdCursor } from '@/lib/org-pagination'
 import { handler } from '@/lib/api/handler'
-import nodemailer from 'nodemailer'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +27,10 @@ export const POST = handler({
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    const emailConfig = await EmailConfig.findOne({ isActive: true, organizationId: ctx!.organizationId })
+    const emailConfig = await EmailConfig.findOne({
+      isActive: true,
+      organizationId: ctx!.organizationId,
+    })
     if (!emailConfig) {
       return {
         status: 400,
@@ -35,7 +38,9 @@ export const POST = handler({
       }
     }
 
-    const org = await Organization.findById(ctx!.organizationId).select('timezone').lean<{ timezone?: string }>()
+    const org = await Organization.findById(ctx!.organizationId)
+      .select('timezone')
+      .lean<{ timezone?: string }>()
     const { from, toExclusive } = calendarDayBoundsInTimeZone(org?.timezone)
 
     const tasksDueToday = await loadAllByIdCursor<any>(
@@ -52,7 +57,8 @@ export const POST = handler({
             match: { organizationId: ctx!.organizationId },
           })
           .sort({ _id: 1 })
-          .limit(limit).lean(),
+          .limit(limit)
+          .lean(),
       {
         dueDate: { $gte: from, $lt: toExclusive },
         emailSent: false,
@@ -78,13 +84,15 @@ export const POST = handler({
       return { status: 500, data: { error: decryptFailureMessage(decrypted.reason) } }
     }
 
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: emailConfig.email,
-        pass: decrypted.value,
-      },
+    const transporter = createGmailTransport({
+      email: emailConfig.email,
+      password: decrypted.value,
     })
+    const mailConfig = {
+      email: emailConfig.email,
+      password: decrypted.value,
+      fromName: sanitizeFromName(emailConfig.fromName),
+    }
 
     const results = {
       sent: 0,
@@ -118,7 +126,11 @@ export const POST = handler({
         }
 
         const relatedInfo: string[] = []
-        if (task.relatedFamilyId && typeof task.relatedFamilyId === 'object' && 'name' in task.relatedFamilyId) {
+        if (
+          task.relatedFamilyId &&
+          typeof task.relatedFamilyId === 'object' &&
+          'name' in task.relatedFamilyId
+        ) {
           relatedInfo.push(`Family: ${escapeHtml((task.relatedFamilyId as any).name)}`)
         }
         if (task.relatedMemberId && typeof task.relatedMemberId === 'object') {
@@ -127,12 +139,7 @@ export const POST = handler({
         }
 
         const safeSubject = `Task Due Today: ${String(task.title || '').replace(/[\r\n]+/g, ' ')}`
-
-        const mailOptions = {
-          from: `"${sanitizeFromName(emailConfig.fromName)}" <${emailConfig.email}>`,
-          to,
-          subject: safeSubject,
-          html: `
+        const html = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
               <h2 style="color: #333;">Task Due Today</h2>
               <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0;">
@@ -145,10 +152,31 @@ export const POST = handler({
               </div>
               <p style="color: #666; font-size: 14px;">This is an automated notification from Kasa Family Management System.</p>
             </div>
-          `,
-        }
+          `
 
-        await transporter.sendMail(mailOptions)
+        const familyId =
+          task.relatedFamilyId &&
+          typeof task.relatedFamilyId === 'object' &&
+          '_id' in task.relatedFamilyId
+            ? String((task.relatedFamilyId as { _id: unknown })._id)
+            : null
+
+        const sendResult = await sendEmail({
+          organizationId: ctx!.organizationId,
+          familyId,
+          to,
+          subject: safeSubject,
+          html,
+          kind: 'task-reminder',
+          relatedResource: { type: 'task', id: String(task._id) },
+          tracking: { opens: true, clicks: true },
+          config: mailConfig,
+          transporter,
+        })
+
+        if (!sendResult.ok) {
+          throw new Error(sendResult.error || 'Send failed')
+        }
         results.sent++
       } catch (error: any) {
         await Task.findOneAndUpdate(

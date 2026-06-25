@@ -23,6 +23,7 @@ import {
   PresentationChartBarIcon,
   CurrencyDollarIcon,
   ClipboardDocumentListIcon,
+  EnvelopeOpenIcon,
   ArrowRightOnRectangleIcon,
   UserCircleIcon,
   ShieldCheckIcon,
@@ -53,6 +54,12 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
     { href: '/tasks', label: t('nav.tasks'), icon: ClipboardDocumentListIcon, adminOnly: true },
     { href: '/calculations', label: t('nav.calculations'), icon: CalculatorIcon, adminOnly: true },
     { href: '/events', label: t('nav.events'), icon: CalendarIcon, adminOnly: true },
+    {
+      href: '/communications',
+      label: t('nav.communications'),
+      icon: EnvelopeOpenIcon,
+      adminOnly: true,
+    },
     {
       href: '/projections',
       label: t('nav.projections'),

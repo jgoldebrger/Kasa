@@ -44,7 +44,8 @@ export default function EmailPanel({
           className="mb-4"
           title={<>✓ Email configuration is active: {emailConfig.email}</>}
         >
-          Your email settings are saved and will be used automatically for sending statements.
+          Your email settings are saved and will be used for statements, receipts, and
+          communications. Sent emails are logged; opens and link clicks are tracked when enabled.
         </Alert>
       )}
 

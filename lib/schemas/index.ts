@@ -1,3 +1,4 @@
+export * as email from './email'
 export * as emailConfig from './email-config'
 export * as report from './report'
 export * from './common'

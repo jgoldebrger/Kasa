@@ -3,9 +3,9 @@ import { safeDecrypt, decryptFailureMessage } from '@/lib/encryption'
 import { escapeHtml } from '@/lib/html-escape'
 import { sanitizeFromName } from '@/lib/email-from-name'
 import { isAllowedOutboundRecipient } from '@/lib/email-recipients'
+import { sendEmail } from '@/lib/mail'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { handler } from '@/lib/api/handler'
-import nodemailer from 'nodemailer'
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024 // 10 MB
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -119,21 +119,14 @@ export const POST = handler({
       fromName: sanitizeFromName(emailConfigDoc.fromName),
     }
 
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: emailConfig.email,
-        pass: emailConfig.password,
-      },
-    })
-
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    await transporter.sendMail({
-      from: `"${emailConfig.fromName}" <${emailConfig.email}>`,
-      to: to,
-      subject: subject,
+    const result = await sendEmail({
+      organizationId: ctx!.organizationId,
+      userId: ctx!.userId,
+      to,
+      subject,
       text: message,
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
@@ -144,6 +137,10 @@ export const POST = handler({
           </p>
         </div>
       `,
+      kind: 'file',
+      tracking: { opens: true, clicks: false },
+      config: emailConfig,
+      auditRequest: request,
       attachments: [
         {
           filename: (file.name || 'attachment').replace(/[\r\n\\/]+/g, '_').slice(0, 200),
@@ -152,6 +149,10 @@ export const POST = handler({
         },
       ],
     })
+
+    if (!result.ok) {
+      return { status: 500, data: { error: result.error || 'Failed to send email' } }
+    }
 
     return {
       data: {

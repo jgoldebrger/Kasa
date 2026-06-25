@@ -16,6 +16,7 @@ export type FamilyTabId =
   | 'events'
   | 'cycle-charges'
   | 'statements'
+  | 'emails'
   | 'sub-families'
   | 'tasks'
 
@@ -27,6 +28,7 @@ export const FAMILY_TAB_SEGMENTS: Record<FamilyTabId, string> = {
   events: 'events',
   'cycle-charges': 'cycle-charges',
   statements: 'statements',
+  emails: 'emails',
   'sub-families': 'sub-families',
   tasks: 'tasks',
 }
@@ -64,6 +66,7 @@ export const FAMILY_TABS: FamilyTabDef[] = [
   { id: 'events', label: 'Lifecycle Events', i18nKey: 'family.lifecycleEvents', adminOnly: true },
   { id: 'cycle-charges', label: 'Cycle Charges', i18nKey: 'family.cycleCharges', adminOnly: true },
   { id: 'statements', label: 'Statements', i18nKey: 'family.statements', memberReadable: true },
+  { id: 'emails', label: 'Emails', i18nKey: 'family.emails', adminOnly: true },
   { id: 'tasks', label: 'Tasks', i18nKey: 'nav.tasks', adminOnly: true },
   { id: 'sub-families', label: 'Sub-Families', i18nKey: 'family.subFamilies' },
 ]
