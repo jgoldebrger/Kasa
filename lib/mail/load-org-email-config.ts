@@ -27,6 +27,13 @@ export async function loadOrgEmailConfig(
   if (!decrypted.ok) {
     return { ok: false, status: 500, error: decryptFailureMessage(decrypted.reason) }
   }
+  if (!decrypted.value.trim()) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'Email password is missing. Re-save your Gmail app password in settings.',
+    }
+  }
   return {
     ok: true,
     config: {

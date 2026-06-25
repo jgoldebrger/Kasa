@@ -6,8 +6,11 @@ export interface GmailTransportCreds {
 }
 
 export function createGmailTransport(creds: GmailTransportCreds): nodemailer.Transporter {
+  // Explicit host/port is more reliable on serverless (Vercel) than `service: 'gmail'`.
   return nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
     auth: { user: creds.email, pass: creds.password },
   })
 }

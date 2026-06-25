@@ -1,9 +1,9 @@
-import { EmailConfig } from '@/lib/models'
-import { safeDecrypt, decryptFailureMessage } from '@/lib/encryption'
-import { sanitizeFromName } from '@/lib/email-from-name'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { handler } from '@/lib/api/handler'
-import nodemailer from 'nodemailer'
+import { logError } from '@/lib/log'
+import { createGmailTransport } from '@/lib/mail/create-transport'
+import { formatMailError } from '@/lib/mail/format-mail-error'
+import { loadOrgEmailConfig } from '@/lib/mail/load-org-email-config'
 
 // POST - Send a test email
 export const POST = handler({
@@ -21,33 +21,23 @@ export const POST = handler({
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    const emailConfigDoc = await EmailConfig.findOne({ isActive: true, organizationId: ctx!.organizationId })
-
-    if (!emailConfigDoc) {
-      return {
-        status: 400,
-        data: { error: 'Email configuration not found. Please configure email settings first.' },
-      }
+    const credsResult = await loadOrgEmailConfig(ctx!.organizationId)
+    if (!credsResult.ok) {
+      return { status: credsResult.status, data: { error: credsResult.error } }
     }
+    const creds = credsResult.config
 
-    const decrypted = safeDecrypt(emailConfigDoc.password)
-    if (!decrypted.ok) {
-      return { status: 500, data: { error: decryptFailureMessage(decrypted.reason) } }
-    }
-
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: emailConfigDoc.email,
-        pass: decrypted.value,
-      },
+    const transporter = createGmailTransport({
+      email: creds.email,
+      password: creds.password,
     })
 
-    await transporter.sendMail({
-      from: `"${sanitizeFromName(emailConfigDoc.fromName)}" <${emailConfigDoc.email}>`,
-      to: emailConfigDoc.email,
-      subject: 'Test Email - Kasa Family Management',
-      text: `This is a test email from Kasa Family Management.
+    try {
+      await transporter.sendMail({
+        from: `"${creds.fromName}" <${creds.email}>`,
+        to: creds.email,
+        subject: 'Test Email - Kasa Family Management',
+        text: `This is a test email from Kasa Family Management.
 
 If you received this email, your email configuration is working correctly!
 
@@ -55,7 +45,7 @@ You can now send statements to families via email.
 
 Best regards,
 Kasa Family Management System`,
-      html: `
+        html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
           <h2 style="color: #4F46E5;">Test Email - Kasa Family Management</h2>
           <p>This is a test email from Kasa Family Management.</p>
@@ -64,7 +54,16 @@ Kasa Family Management System`,
           <p>Best regards,<br>Kasa Family Management System</p>
         </div>
       `,
-    })
+      })
+    } catch (err: unknown) {
+      const error = formatMailError(err)
+      logError(err, {
+        module: 'email-config.test',
+        organizationId: ctx!.organizationId,
+        email: creds.email,
+      })
+      return { status: 502, data: { error } }
+    }
 
     return {
       data: {
