@@ -1,44 +1,25 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { EnvelopeIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline'
+import { EnvelopeIcon } from '@heroicons/react/24/outline'
 import { formatLocaleDate } from '@/lib/date-utils'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useToast } from '@/app/components/Toast'
 import {
   Badge,
-  Button,
   Card,
   DataView,
   EmptyState,
-  Input,
   PageHeader,
   SkeletonRows,
-  Textarea,
   type DataColumn,
 } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
-
-interface FamilyOption {
-  _id: string
-  name: string
-  email?: string
-}
-
-interface EmailLogRow {
-  _id: string
-  familyId: string | null
-  familyName: string | null
-  to: string
-  subject: string
-  kind: string
-  status: string
-  openCount: number
-  clickCount: number
-  error: string | null
-  createdAt: string
-}
+import ComposeTab from './_components/ComposeTab'
+import EmailDetailDrawer from './_components/EmailDetailDrawer'
+import CampaignStatsModal from './_components/CampaignStatsModal'
+import type { EmailLogRow, FamilyOption } from './_components/types'
 
 type Tab = 'compose' | 'log'
 
@@ -61,11 +42,9 @@ export default function CommunicationsView() {
   const [loadingFamilies, setLoadingFamilies] = useState(true)
   const [logs, setLogs] = useState<EmailLogRow[]>([])
   const [loadingLogs, setLoadingLogs] = useState(true)
-  const [sending, setSending] = useState(false)
-
-  const [subject, setSubject] = useState('')
-  const [body, setBody] = useState('')
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [detailEmailId, setDetailEmailId] = useState<string | null>(null)
+  const [campaignId, setCampaignId] = useState<string | null>(null)
+  const [showCampaignStats, setShowCampaignStats] = useState(false)
 
   const loadFamilies = useCallback(async () => {
     setLoadingFamilies(true)
@@ -102,76 +81,16 @@ export default function CommunicationsView() {
   }, [loadFamilies, loadLogs])
 
   useOrgChanged(() => {
-    setSelectedIds(new Set())
     void loadFamilies()
     void loadLogs()
   })
 
-  const emailableFamilies = useMemo(() => families.filter((f) => f.email), [families])
-
-  const toggleFamily = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  const selectAll = () => {
-    setSelectedIds(new Set(emailableFamilies.map((f) => f._id)))
-  }
-
-  const sendBulk = async () => {
-    if (!subject.trim() || !body.trim()) {
-      toast.error(t('communications.error.missingFields'))
-      return
-    }
-    if (selectedIds.size === 0) {
-      toast.error(t('communications.error.noRecipients'))
-      return
-    }
-
-    const html = `<div style="font-family: Arial, sans-serif; line-height: 1.6;">${body
-      .split('\n')
-      .map((line) => `<p>${line.replace(/</g, '&lt;')}</p>`)
-      .join('')}</div>`
-
-    setSending(true)
-    try {
-      const res = await fetch('/api/emails/send-bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          familyIds: Array.from(selectedIds),
-          subject: subject.trim(),
-          html: html.replace(/\{\{familyName\}\}/g, '{{familyName}}'),
-          text: body,
-        }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || 'Send failed')
-      const sent = data.sent ?? 0
-      const failed = data.failed ?? 0
-      if (failed > 0 && Array.isArray(data.errors) && data.errors.length > 0) {
-        toast.error(data.errors.slice(0, 2).join(' · '))
-      }
-      if (sent > 0) {
-        toast.success(
-          (t('communications.sendResult') || 'Sent: {sent}, failed: {failed}')
-            .replace('{sent}', String(sent))
-            .replace('{failed}', String(failed)),
-        )
-      }
-      setSubject('')
-      setBody('')
-      setSelectedIds(new Set())
-      setTab('log')
-      void loadLogs()
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : t('communications.error.send'))
-    } finally {
-      setSending(false)
+  const handleSent = (result: { sent: number; failed: number; campaignId?: string }) => {
+    setTab('log')
+    void loadLogs()
+    if (result.campaignId && result.sent > 0) {
+      setCampaignId(result.campaignId)
+      setShowCampaignStats(true)
     }
   }
 
@@ -196,6 +115,7 @@ export default function CommunicationsView() {
           <Link
             href={`/families/${row.familyId}`}
             className="text-accent hover:underline font-medium"
+            onClick={(e) => e.stopPropagation()}
           >
             {row.familyName || row.to}
           </Link>
@@ -294,65 +214,7 @@ export default function CommunicationsView() {
         </div>
 
         {tab === 'compose' ? (
-          <Card className="p-4 sm:p-6 space-y-4">
-            <Input
-              label={t('communications.field.subject')}
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder={t('communications.field.subjectPlaceholder')}
-            />
-            <Textarea
-              label={t('communications.field.body')}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={8}
-              placeholder={t('communications.field.bodyPlaceholder')}
-              hint={t('communications.field.bodyHint')}
-            />
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-fg">
-                  {t('communications.field.recipients')}
-                </label>
-                <Button type="button" variant="ghost" size="sm" onClick={selectAll}>
-                  {t('communications.selectAll')}
-                </Button>
-              </div>
-              {loadingFamilies ? (
-                <SkeletonRows count={4} />
-              ) : emailableFamilies.length === 0 ? (
-                <p className="text-sm text-fg-muted">{t('communications.noEmailableFamilies')}</p>
-              ) : (
-                <div className="max-h-64 overflow-y-auto border border-border rounded-lg divide-y divide-border">
-                  {emailableFamilies.map((f) => (
-                    <label
-                      key={f._id}
-                      className="flex items-center gap-3 px-3 py-2 hover:bg-app-subtle cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(f._id)}
-                        onChange={() => toggleFamily(f._id)}
-                        className="rounded border-border"
-                      />
-                      <span className="font-medium text-fg flex-1">{f.name}</span>
-                      <span className="text-xs text-fg-muted truncate max-w-[12rem]">
-                        {f.email}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-            <p className="text-xs text-fg-muted">{t('communications.trackingNotice')}</p>
-            <Button
-              loading={sending}
-              onClick={() => void sendBulk()}
-              leftIcon={<PaperAirplaneIcon className="h-4 w-4" />}
-            >
-              {t('communications.send').replace('{count}', String(selectedIds.size))}
-            </Button>
-          </Card>
+          <ComposeTab families={families} loadingFamilies={loadingFamilies} onSent={handleSent} />
         ) : loadingLogs ? (
           <Card>
             <SkeletonRows count={6} />
@@ -365,8 +227,13 @@ export default function CommunicationsView() {
             rowKey={(r) => r._id}
             pageSize={15}
             exportFileName="email-log"
+            onRowClick={(row) => setDetailEmailId(row._id)}
             mobileCard={(row) => (
-              <Card compact>
+              <Card
+                compact
+                className="cursor-pointer hover:bg-app-subtle"
+                onClick={() => setDetailEmailId(row._id)}
+              >
                 <p className="font-medium text-fg truncate">{row.subject}</p>
                 <p className="text-sm text-fg-muted mt-1">
                   {row.familyName || row.to} ·{' '}
@@ -398,6 +265,21 @@ export default function CommunicationsView() {
           />
         )}
       </div>
+
+      <EmailDetailDrawer
+        emailId={detailEmailId}
+        onClose={() => setDetailEmailId(null)}
+        onRetrySuccess={() => void loadLogs()}
+      />
+
+      <CampaignStatsModal
+        open={showCampaignStats}
+        campaignId={campaignId}
+        onClose={() => {
+          setShowCampaignStats(false)
+          setCampaignId(null)
+        }}
+      />
     </div>
   )
 }

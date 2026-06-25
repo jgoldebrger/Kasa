@@ -1,0 +1,474 @@
+'use client'
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  BookmarkIcon,
+  ClockIcon,
+  EyeIcon,
+  PaperAirplaneIcon,
+  PaperClipIcon,
+  TrashIcon,
+} from '@heroicons/react/24/outline'
+import { useToast } from '@/app/components/Toast'
+import { Alert, Button, Card, Input, Select } from '@/app/components/ui'
+import { useT } from '@/lib/client/i18n'
+import EmailComposeEditor from './EmailComposeEditor'
+import EmailPreviewModal from './EmailPreviewModal'
+import RecipientList from './RecipientList'
+import { markdownToHtml, markdownToPlainText } from './email-utils'
+import type { EmailAttachment, EmailDraft, EmailTemplate, FamilyOption } from './types'
+
+const MAX_ATTACHMENTS = 3
+const MAX_FILE_BYTES = 5 * 1024 * 1024
+const DRAFT_DEBOUNCE_MS = 2000
+const QUOTA_THRESHOLD = 50
+
+interface ComposeTabProps {
+  families: FamilyOption[]
+  loadingFamilies: boolean
+  onSent: (result: { sent: number; failed: number; campaignId?: string }) => void
+}
+
+export default function ComposeTab({ families, loadingFamilies, onSent }: ComposeTabProps) {
+  const t = useT()
+  const toast = useToast()
+
+  const [subject, setSubject] = useState('')
+  const [body, setBody] = useState('')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [attachments, setAttachments] = useState<EmailAttachment[]>([])
+  const [scheduledAt, setScheduledAt] = useState('')
+  const [sending, setSending] = useState(false)
+  const [savingDraft, setSavingDraft] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
+
+  const [templates, setTemplates] = useState<EmailTemplate[]>([])
+  const [drafts, setDrafts] = useState<EmailDraft[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
+  const [selectedDraftId, setSelectedDraftId] = useState('')
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null)
+
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const skipAutoSaveRef = useRef(false)
+
+  const selectableFamilies = families.filter((f) => f.email && !f.emailOptOut)
+
+  const loadTemplates = useCallback(async () => {
+    try {
+      const res = await fetch('/api/email-templates')
+      if (!res.ok) return
+      const data = await res.json()
+      setTemplates((data.items ?? []) as EmailTemplate[])
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const loadDrafts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/email-drafts')
+      if (!res.ok) return
+      const data = await res.json()
+      setDrafts((data.items ?? []) as EmailDraft[])
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadTemplates()
+    void loadDrafts()
+  }, [loadTemplates, loadDrafts])
+
+  const toggleFamily = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const selectAll = () => {
+    setSelectedIds(new Set(selectableFamilies.map((f) => f._id)))
+  }
+
+  const applyTemplate = (templateId: string) => {
+    setSelectedTemplateId(templateId)
+    if (!templateId) return
+    const tpl = templates.find((x) => x._id === templateId)
+    if (!tpl) return
+    setSubject(tpl.subject)
+    setBody(tpl.body)
+  }
+
+  const applyDraft = (draftId: string) => {
+    setSelectedDraftId(draftId)
+    if (!draftId) return
+    const draft = drafts.find((x) => x._id === draftId)
+    if (!draft) return
+    skipAutoSaveRef.current = true
+    setCurrentDraftId(draft._id)
+    setSubject(draft.subject)
+    setBody(draft.body)
+    if (draft.familyIds?.length) setSelectedIds(new Set(draft.familyIds))
+  }
+
+  const saveAsTemplate = async () => {
+    if (!subject.trim() || !body.trim()) {
+      toast.error(t('communications.error.missingFields'))
+      return
+    }
+    const name = window.prompt(t('communications.template.namePrompt'))
+    if (!name?.trim()) return
+    try {
+      const res = await fetch('/api/email-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), subject: subject.trim(), body }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      toast.success(t('communications.template.saved'))
+      void loadTemplates()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : t('communications.template.error'))
+    }
+  }
+
+  const saveDraft = useCallback(
+    async (silent = false) => {
+      if (!subject.trim() && !body.trim()) return
+      setSavingDraft(true)
+      try {
+        const payload = {
+          subject: subject.trim(),
+          body,
+          familyIds: Array.from(selectedIds),
+        }
+        const url = currentDraftId ? `/api/email-drafts/${currentDraftId}` : '/api/email-drafts'
+        const method = currentDraftId ? 'PATCH' : 'POST'
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data.error || 'Failed')
+        const id = (data._id ?? data.draft?._id ?? currentDraftId) as string | undefined
+        if (id) setCurrentDraftId(id)
+        if (!silent) toast.success(t('communications.draft.saved'))
+        void loadDrafts()
+      } catch (err: unknown) {
+        if (!silent)
+          toast.error(err instanceof Error ? err.message : t('communications.draft.error'))
+      } finally {
+        setSavingDraft(false)
+      }
+    },
+    [subject, body, selectedIds, currentDraftId, toast, t, loadDrafts],
+  )
+
+  useEffect(() => {
+    if (skipAutoSaveRef.current) {
+      skipAutoSaveRef.current = false
+      return
+    }
+    if (!subject.trim() && !body.trim()) return
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+    draftTimerRef.current = setTimeout(() => {
+      void saveDraft(true)
+    }, DRAFT_DEBOUNCE_MS)
+    return () => {
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+    }
+  }, [subject, body, selectedIds, saveDraft])
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files?.length) return
+    const remaining = MAX_ATTACHMENTS - attachments.length
+    if (remaining <= 0) {
+      toast.error(t('communications.attachments.maxFiles'))
+      return
+    }
+    const toAdd = Array.from(files).slice(0, remaining)
+    const next: EmailAttachment[] = [...attachments]
+
+    for (const file of toAdd) {
+      if (file.size > MAX_FILE_BYTES) {
+        toast.error(t('communications.attachments.tooLarge').replace('{name}', file.name))
+        continue
+      }
+      const content = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const result = reader.result as string
+          const base64 = result.includes(',') ? result.split(',')[1] : result
+          resolve(base64)
+        }
+        reader.onerror = () => reject(reader.error)
+        reader.readAsDataURL(file)
+      })
+      next.push({
+        filename: file.name,
+        content,
+        contentType: file.type || 'application/octet-stream',
+      })
+    }
+    setAttachments(next)
+  }
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const buildPayload = () => {
+    const html = markdownToHtml(body)
+    const text = markdownToPlainText(body)
+    return {
+      familyIds: Array.from(selectedIds),
+      subject: subject.trim(),
+      html,
+      text,
+      attachments: attachments.length > 0 ? attachments : undefined,
+    }
+  }
+
+  const send = async () => {
+    if (!subject.trim() || !body.trim()) {
+      toast.error(t('communications.error.missingFields'))
+      return
+    }
+    if (selectedIds.size === 0) {
+      toast.error(t('communications.error.noRecipients'))
+      return
+    }
+
+    setSending(true)
+    try {
+      const payload = buildPayload()
+
+      if (scheduledAt) {
+        const res = await fetch('/api/scheduled-emails', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload, scheduledAt: new Date(scheduledAt).toISOString() }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data.error || 'Schedule failed')
+        toast.success(t('communications.schedule.success'))
+        setSubject('')
+        setBody('')
+        setSelectedIds(new Set())
+        setAttachments([])
+        setScheduledAt('')
+        setCurrentDraftId(null)
+        onSent({ sent: selectedIds.size, failed: 0 })
+        return
+      }
+
+      const res = await fetch('/api/emails/send-bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Send failed')
+
+      const sent = data.sent ?? 0
+      const failed = data.failed ?? 0
+      const campaignId = data.campaignId as string | undefined
+
+      if (failed > 0 && Array.isArray(data.errors) && data.errors.length > 0) {
+        toast.error(data.errors.slice(0, 2).join(' · '))
+      }
+      if (sent > 0) {
+        toast.success(
+          t('communications.sendResult')
+            .replace('{sent}', String(sent))
+            .replace('{failed}', String(failed)),
+        )
+      }
+
+      setSubject('')
+      setBody('')
+      setSelectedIds(new Set())
+      setAttachments([])
+      setScheduledAt('')
+      setCurrentDraftId(null)
+      onSent({ sent, failed, campaignId })
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : t('communications.error.send'))
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const sampleFamilyName =
+    selectableFamilies.find((f) => selectedIds.has(f._id))?.name ??
+    selectableFamilies[0]?.name ??
+    'Sample Family'
+
+  return (
+    <>
+      <Card className="p-4 sm:p-6 space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Select
+            label={t('communications.template.load')}
+            value={selectedTemplateId}
+            onChange={(e) => applyTemplate(e.target.value)}
+          >
+            <option value="">{t('communications.template.none')}</option>
+            {templates.map((tpl) => (
+              <option key={tpl._id} value={tpl._id}>
+                {tpl.name}
+              </option>
+            ))}
+          </Select>
+          <Select
+            label={t('communications.draft.load')}
+            value={selectedDraftId}
+            onChange={(e) => applyDraft(e.target.value)}
+          >
+            <option value="">{t('communications.draft.none')}</option>
+            {drafts.map((d) => (
+              <option key={d._id} value={d._id}>
+                {d.name || d.subject || t('communications.draft.unnamed')}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <Input
+          label={t('communications.field.subject')}
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          placeholder={t('communications.field.subjectPlaceholder')}
+        />
+
+        <EmailComposeEditor
+          label={t('communications.field.body')}
+          value={body}
+          onChange={setBody}
+          placeholder={t('communications.field.bodyPlaceholder')}
+          hint={t('communications.field.bodyHint')}
+        />
+
+        <RecipientList
+          families={families}
+          loading={loadingFamilies}
+          selectedIds={selectedIds}
+          onToggle={toggleFamily}
+          onSelectAll={selectAll}
+        />
+
+        <div>
+          <label className="text-sm font-medium text-fg">
+            {t('communications.attachments.label')}
+          </label>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-fg hover:bg-app-subtle">
+              <PaperClipIcon className="h-4 w-4 text-fg-muted" />
+              {t('communications.attachments.add')}
+              <input
+                type="file"
+                className="sr-only"
+                multiple
+                disabled={attachments.length >= MAX_ATTACHMENTS}
+                onChange={(e) => {
+                  void handleFiles(e.target.files)
+                  e.target.value = ''
+                }}
+              />
+            </label>
+            <span className="text-xs text-fg-muted">{t('communications.attachments.hint')}</span>
+          </div>
+          {attachments.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {attachments.map((a, i) => (
+                <li key={`${a.filename}-${i}`} className="flex items-center gap-2 text-sm text-fg">
+                  <span className="truncate flex-1">{a.filename}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(i)}
+                    className="text-fg-muted hover:text-danger"
+                    aria-label={t('communications.attachments.remove')}
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <Input
+          type="datetime-local"
+          label={t('communications.schedule.label')}
+          hint={t('communications.schedule.hint')}
+          value={scheduledAt}
+          onChange={(e) => setScheduledAt(e.target.value)}
+        />
+
+        {selectedIds.size > QUOTA_THRESHOLD && (
+          <Alert variant="warning" title={t('communications.quota.title')}>
+            {t('communications.quota.message').replace('{count}', String(selectedIds.size))}
+          </Alert>
+        )}
+
+        <p className="text-xs text-fg-muted">{t('communications.trackingNotice')}</p>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            leftIcon={<EyeIcon className="h-4 w-4" />}
+            onClick={() => setShowPreview(true)}
+          >
+            {t('communications.preview.button')}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            loading={savingDraft}
+            leftIcon={<BookmarkIcon className="h-4 w-4" />}
+            onClick={() => void saveDraft(false)}
+          >
+            {t('communications.draft.save')}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            leftIcon={<BookmarkIcon className="h-4 w-4" />}
+            onClick={() => void saveAsTemplate()}
+          >
+            {t('communications.template.save')}
+          </Button>
+          <Button
+            loading={sending}
+            leftIcon={
+              scheduledAt ? (
+                <ClockIcon className="h-4 w-4" />
+              ) : (
+                <PaperAirplaneIcon className="h-4 w-4" />
+              )
+            }
+            onClick={() => void send()}
+          >
+            {scheduledAt
+              ? t('communications.schedule.button').replace('{count}', String(selectedIds.size))
+              : t('communications.send').replace('{count}', String(selectedIds.size))}
+          </Button>
+        </div>
+      </Card>
+
+      <EmailPreviewModal
+        open={showPreview}
+        onClose={() => setShowPreview(false)}
+        subject={subject}
+        body={body}
+        sampleFamilyName={sampleFamilyName}
+      />
+    </>
+  )
+}

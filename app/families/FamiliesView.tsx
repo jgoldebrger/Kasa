@@ -41,6 +41,7 @@ import {
   type SortDir,
 } from '@/app/components/ui'
 import TaskFormModal from '@/app/components/tasks/TaskFormModal'
+import EmailFamiliesModal from '@/app/families/_components/EmailFamiliesModal'
 import { handleHebrewInput } from '@/lib/client/hebrew-input'
 
 const capitalizeName = (text: string): string => {
@@ -155,6 +156,7 @@ export default function FamiliesView({
   const [bulkBusy, setBulkBusy] = useState(false)
   const [exportExpanding, setExportExpanding] = useState(false)
   const [showBulkPlanModal, setShowBulkPlanModal] = useState(false)
+  const [showBulkEmailModal, setShowBulkEmailModal] = useState(false)
   const [bulkPlanValue, setBulkPlanValue] = useState<string>('')
   // StrictMode-safe gates: track whether each resource was server-prefetched.
   // Mutating a "first-run" flag inside the effect breaks under React 18 dev
@@ -899,6 +901,14 @@ export default function FamiliesView({
               size="sm"
               variant="secondary"
               disabled={bulkBusy}
+              onClick={() => setShowBulkEmailModal(true)}
+            >
+              {t('families.emailBulk.sendEmail')}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={bulkBusy}
               onClick={() => handleBulkSetEmailOptOut(true)}
             >
               {t('families.optOutEmail')}
@@ -1019,6 +1029,13 @@ export default function FamiliesView({
             email: taskFamily?.email || '',
           }}
           lockFamily
+        />
+
+        <EmailFamiliesModal
+          open={showBulkEmailModal}
+          onClose={() => setShowBulkEmailModal(false)}
+          families={families}
+          selectedIds={selectedIds}
         />
 
         <Modal

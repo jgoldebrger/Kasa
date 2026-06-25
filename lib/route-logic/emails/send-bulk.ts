@@ -1,9 +1,21 @@
+import { Types } from 'mongoose'
 import { Family } from '@/lib/models'
-import { sendEmail } from '@/lib/mail'
+import { sendEmail, applyMergeFields, delayBetweenSendsMs, sleep } from '@/lib/mail'
 import { escapeHtml } from '@/lib/html-escape'
+import { calculateFamilyBalance } from '@/lib/calculations'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { email as emailSchemas } from '@/lib/schemas'
 import { handler } from '@/lib/api/handler'
+
+function parseAttachments(
+  attachments?: { filename: string; contentBase64: string; contentType?: string }[],
+) {
+  return attachments?.map((a) => ({
+    filename: a.filename,
+    content: Buffer.from(a.contentBase64, 'base64'),
+    contentType: a.contentType,
+  }))
+}
 
 export const POST = handler({
   auth: 'org',
@@ -28,8 +40,17 @@ export const POST = handler({
 
     const byId = new Map(families.map((f) => [String(f._id), f]))
     const results = { sent: 0, failed: 0, errors: [] as string[] }
+    const campaignId = new Types.ObjectId()
+    const pacingMs = delayBetweenSendsMs(body.familyIds.length)
+    const attachments = parseAttachments(body.attachments)
+    let sendIndex = 0
 
     for (const id of body.familyIds) {
+      if (sendIndex > 0 && pacingMs > 0) {
+        await sleep(pacingMs)
+      }
+      sendIndex++
+
       const family = byId.get(id)
       if (!family) {
         results.failed++
@@ -47,8 +68,29 @@ export const POST = handler({
         continue
       }
 
-      const html = body.html.replace(/\{\{familyName\}\}/g, escapeHtml(family.name || ''))
-      const text = body.text?.replace(/\{\{familyName\}\}/g, family.name || '')
+      let balance: number | undefined
+      let dues: number | undefined
+      try {
+        const bal = await calculateFamilyBalance(String(family._id), ctx!.organizationId)
+        balance = bal.balance
+        dues = bal.planCost
+      } catch {
+        balance = 0
+        dues = 0
+      }
+
+      const mergeCtx = {
+        familyName: family.name || '',
+        balance,
+        dues,
+      }
+      const html = applyMergeFields(body.html, mergeCtx).replace(
+        /\{\{familyName\}\}/g,
+        escapeHtml(family.name || ''),
+      )
+      const text = body.text
+        ? applyMergeFields(body.text, mergeCtx).replace(/\{\{familyName\}\}/g, family.name || '')
+        : undefined
 
       const result = await sendEmail({
         organizationId: ctx!.organizationId,
@@ -58,7 +100,9 @@ export const POST = handler({
         subject: body.subject,
         html,
         text,
+        attachments,
         kind: 'custom',
+        campaignId: String(campaignId),
         tracking: { opens: true, clicks: true },
         auditRequest: request,
       })
@@ -70,6 +114,6 @@ export const POST = handler({
       }
     }
 
-    return { data: results }
+    return { data: { ...results, campaignId: String(campaignId) } }
   },
 })

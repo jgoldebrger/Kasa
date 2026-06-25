@@ -28,6 +28,7 @@ const EMPTY_ATTENTION: DashboardAttentionPayload = {
   dueTodayTasks: { count: 0, items: [] },
   upcomingEvents: { count: 0, items: [] },
   recentPayments: [],
+  emailSummary: { failedLast7Days: 0, lastSentAt: null, pendingScheduled: 0 },
 }
 
 export default function DashboardAttentionPanel({

@@ -1,12 +1,14 @@
 import { Types } from 'mongoose'
 import type nodemailer from 'nodemailer'
-import { EmailMessage } from '@/lib/models'
+import { EmailMessage, Organization } from '@/lib/models'
 import { audit } from '@/lib/audit'
 import { logError } from '@/lib/log'
 import { isAllowedOutboundRecipient } from '@/lib/email-recipients'
 import { createGmailTransport } from './create-transport'
 import { applyEmailTracking } from './tracking-html'
 import { loadOrgEmailConfig, type OrgEmailConfigCreds } from './load-org-email-config'
+import { wrapEmailHtml } from './email-wrapper'
+import { buildUnsubscribeUrl, createUnsubscribeToken } from './unsubscribe-token'
 
 export type EmailKind = 'custom' | 'statement' | 'tax-receipt' | 'task-reminder' | 'file'
 
@@ -28,6 +30,7 @@ export interface SendEmailInput {
   kind: EmailKind
   relatedResource?: { type: string; id: string }
   emailJobId?: string
+  campaignId?: string
   tracking?: { opens?: boolean; clicks?: boolean }
   transporter?: nodemailer.Transporter
   config?: OrgEmailConfigCreds
@@ -45,6 +48,55 @@ function appBaseUrl(): string {
   return url.replace(/\/$/, '')
 }
 
+function bodyPreviewFrom(html?: string, text?: string): string | undefined {
+  const raw = (
+    text?.trim() ||
+    html
+      ?.replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim() ||
+    ''
+  ).slice(0, 200)
+  return raw || undefined
+}
+
+async function loadOrgBranding(organizationId: string): Promise<{
+  orgName: string
+  logoDataUrl: string | null
+}> {
+  const org = await Organization.findById(organizationId)
+    .select('name branding.logoDataUrl')
+    .lean<{ name?: string; branding?: { logoDataUrl?: string } }>()
+  return {
+    orgName: org?.name || 'Kasa Family Management',
+    logoDataUrl: org?.branding?.logoDataUrl || null,
+  }
+}
+
+async function prepareCustomHtml(
+  input: SendEmailInput,
+  trackOpens: boolean,
+  trackClicks: boolean,
+): Promise<string | undefined> {
+  if (!input.html?.trim()) return input.html
+
+  const trackingEnabled = trackOpens || trackClicks
+  if (input.kind !== 'custom' || !trackingEnabled) return input.html
+
+  const branding = await loadOrgBranding(input.organizationId)
+  let unsubscribeUrl: string | null = null
+  if (input.familyId) {
+    const token = createUnsubscribeToken(input.organizationId, input.familyId)
+    unsubscribeUrl = buildUnsubscribeUrl(appBaseUrl(), token)
+  }
+
+  return wrapEmailHtml(input.html, {
+    orgName: branding.orgName,
+    logoDataUrl: branding.logoDataUrl,
+    unsubscribeUrl,
+  })
+}
+
 async function recordFailedEmail(
   input: SendEmailInput,
   to: string,
@@ -55,8 +107,12 @@ async function recordFailedEmail(
     organizationId: new Types.ObjectId(input.organizationId),
     familyId: input.familyId ? new Types.ObjectId(input.familyId) : undefined,
     userId: input.userId ? new Types.ObjectId(input.userId) : undefined,
+    campaignId: input.campaignId ? new Types.ObjectId(input.campaignId) : undefined,
     to,
     subject: subject.replace(/[\r\n]+/g, ' ').slice(0, 998),
+    bodyPreview: bodyPreviewFrom(input.html, input.text),
+    html: input.html,
+    text: input.text,
     kind: input.kind,
     provider: 'gmail',
     status: 'failed',
@@ -123,8 +179,12 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     familyId: input.familyId ? new Types.ObjectId(input.familyId) : undefined,
     userId: input.userId ? new Types.ObjectId(input.userId) : undefined,
     emailJobId: input.emailJobId ? new Types.ObjectId(input.emailJobId) : undefined,
+    campaignId: input.campaignId ? new Types.ObjectId(input.campaignId) : undefined,
     to,
     subject,
+    bodyPreview: bodyPreviewFrom(input.html, input.text),
+    html: input.html,
+    text: input.text,
     kind: input.kind,
     provider: 'gmail',
     status: 'queued',
@@ -137,7 +197,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   const emailMessageId = String(doc._id)
 
   try {
-    let html = input.html
+    let html = await prepareCustomHtml(input, trackOpens, trackClicks)
     if (html && (trackOpens || trackClicks)) {
       html = applyEmailTracking(html, {
         emailMessageId,

@@ -20,8 +20,12 @@ const EmailMessageSchema = new Schema(
     familyId: { type: Schema.Types.ObjectId, ref: 'Family', index: true },
     userId: { type: Schema.Types.ObjectId, ref: 'User' },
     emailJobId: { type: Schema.Types.ObjectId, ref: 'EmailJob' },
+    campaignId: { type: Schema.Types.ObjectId, index: true },
     to: { type: String, required: true },
     subject: { type: String, required: true },
+    bodyPreview: { type: String, maxlength: 200 },
+    html: { type: String, maxlength: 100_000 },
+    text: { type: String, maxlength: 100_000 },
     kind: {
       type: String,
       enum: ['custom', 'statement', 'tax-receipt', 'task-reminder', 'file'],

@@ -242,6 +242,10 @@ export default function SettingsView({
     password: '',
     fromName: seededEmailConfig?.fromName || 'Kasa Family Management',
   })
+  const [emailMessage, setEmailMessage] = useState<{
+    type: 'success' | 'error'
+    text: string
+  } | null>(null)
   // Inline status messages were replaced with toast notifications.
   // This shim keeps the existing call-sites compiling while routing the
   // user-visible message through the global toast system.
@@ -571,16 +575,16 @@ export default function SettingsView({
   const handleSaveEmailConfig = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    setMessage(null)
+    setEmailMessage(null)
 
     if (!emailFormData.email) {
-      setMessage({ type: 'error', text: 'Email address is required' })
+      setEmailMessage({ type: 'error', text: t('settings.email.errors.emailRequired') })
       setSaving(false)
       return
     }
 
     if (!emailConfig && !emailFormData.password) {
-      setMessage({ type: 'error', text: 'Password is required for new email configuration' })
+      setEmailMessage({ type: 'error', text: t('settings.email.errors.passwordRequired') })
       setSaving(false)
       return
     }
@@ -597,18 +601,21 @@ export default function SettingsView({
       if (res.ok) {
         setEmailConfig(result)
         setEmailFormData((prev) => ({ ...prev, password: '' }))
-        setMessage({
+        setEmailMessage({
           type: 'success',
           text: emailConfig
-            ? 'Email configuration updated successfully!'
-            : 'Email configuration saved successfully!',
+            ? t('settings.email.success.updated')
+            : t('settings.email.success.saved'),
         })
       } else {
-        setMessage({ type: 'error', text: result.error || 'Failed to save email configuration' })
+        setEmailMessage({
+          type: 'error',
+          text: result.error || t('settings.email.errors.saveFailed'),
+        })
       }
     } catch (error: any) {
       console.error('Error saving email config:', error)
-      setMessage({ type: 'error', text: 'Error saving email configuration' })
+      setEmailMessage({ type: 'error', text: t('settings.email.errors.saveError') })
     } finally {
       setSaving(false)
     }
@@ -616,12 +623,12 @@ export default function SettingsView({
 
   const handleTestEmail = async () => {
     if (!emailConfig?.email) {
-      setMessage({ type: 'error', text: 'Please save email configuration first' })
+      setEmailMessage({ type: 'error', text: t('settings.email.errors.saveFirst') })
       return
     }
 
     setSaving(true)
-    setMessage(null)
+    setEmailMessage(null)
 
     try {
       const res = await fetch('/api/email-config/test', {
@@ -632,15 +639,19 @@ export default function SettingsView({
       const result = await res.json().catch(() => ({}))
 
       if (res.ok) {
-        setMessage({ type: 'success', text: 'Test email sent successfully! Check your inbox.' })
+        setEmailMessage({ type: 'success', text: t('settings.email.success.testSent') })
       } else {
-        setMessage({ type: 'error', text: result.error || 'Failed to send test email' })
+        setEmailMessage({
+          type: 'error',
+          text: result.error || t('settings.email.errors.testFailed'),
+        })
       }
     } catch (error: any) {
       console.error('Error sending test email:', error)
-      setMessage({ type: 'error', text: 'Error sending test email' })
+      setEmailMessage({ type: 'error', text: t('settings.email.errors.testError') })
     } finally {
       setSaving(false)
+      await fetchEmailConfig()
     }
   }
 
@@ -1487,6 +1498,7 @@ export default function SettingsView({
                 emailFormData={emailFormData}
                 setEmailFormData={setEmailFormData}
                 saving={saving}
+                message={emailMessage}
                 onSubmit={handleSaveEmailConfig}
                 onTest={handleTestEmail}
               />

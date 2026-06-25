@@ -29,6 +29,7 @@ import { EmptyState, PageHeader, Tooltip } from './components/ui'
 import { Skeleton } from './components/ui/Skeleton'
 import OnboardingChecklist from './components/OnboardingChecklist'
 import DashboardAttentionPanel from './components/DashboardAttentionPanel'
+import EmailDashboardCard from './components/EmailDashboardCard'
 import type { DashboardAttentionPayload } from '@/lib/route-logic/dashboard-actions'
 import MemberWelcomeChecklist from './components/MemberWelcomeChecklist'
 import { openCreateTask, openRecordEvent, openRecordPayment } from '@/lib/client/command-events'
@@ -232,6 +233,7 @@ export default function DashboardView({
                   value={stats.totalMembers}
                   icon={UserGroupIcon}
                 />
+                {showFinancials && <EmailDashboardCard />}
               </>
             )}
           </div>

@@ -4,6 +4,16 @@ import { checkRateLimit } from '@/lib/rate-limit'
 import { email as emailSchemas } from '@/lib/schemas'
 import { handler } from '@/lib/api/handler'
 
+function parseAttachments(
+  attachments?: { filename: string; contentBase64: string; contentType?: string }[],
+) {
+  return attachments?.map((a) => ({
+    filename: a.filename,
+    content: Buffer.from(a.contentBase64, 'base64'),
+    contentType: a.contentType,
+  }))
+}
+
 export const POST = handler({
   auth: 'org',
   minRole: 'admin',
@@ -51,6 +61,7 @@ export const POST = handler({
       subject: body.subject,
       html: body.html,
       text: body.text,
+      attachments: parseAttachments(body.attachments),
       kind: 'custom',
       tracking: { opens: true, clicks: true },
       auditRequest: request,

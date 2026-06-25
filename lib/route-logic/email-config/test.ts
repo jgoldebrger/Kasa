@@ -1,3 +1,4 @@
+import { EmailConfig } from '@/lib/models'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { handler } from '@/lib/api/handler'
 import { logError } from '@/lib/log'
@@ -32,6 +33,12 @@ export const POST = handler({
       password: creds.password,
     })
 
+    const now = new Date()
+    const configDoc = await EmailConfig.findOne({
+      isActive: true,
+      organizationId: ctx!.organizationId,
+    })
+
     try {
       await transporter.sendMail({
         from: `"${creds.fromName}" <${creds.email}>`,
@@ -55,6 +62,13 @@ Kasa Family Management System`,
         </div>
       `,
       })
+
+      if (configDoc) {
+        await EmailConfig.updateOne(
+          { _id: configDoc._id },
+          { $set: { lastTestAt: now, lastTestStatus: 'success', lastTestError: null } },
+        )
+      }
     } catch (err: unknown) {
       const error = formatMailError(err)
       logError(err, {
@@ -62,6 +76,12 @@ Kasa Family Management System`,
         organizationId: ctx!.organizationId,
         email: creds.email,
       })
+      if (configDoc) {
+        await EmailConfig.updateOne(
+          { _id: configDoc._id },
+          { $set: { lastTestAt: now, lastTestStatus: 'failed', lastTestError: error } },
+        )
+      }
       return { status: 502, data: { error } }
     }
 

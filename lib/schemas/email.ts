@@ -1,6 +1,12 @@
 import { z } from 'zod'
 import { objectId } from './common'
 
+const emailAttachment = z.object({
+  filename: z.string().min(1).max(255),
+  contentBase64: z.string().min(1).max(10_000_000),
+  contentType: z.string().max(200).optional(),
+})
+
 export const sendEmailBody = z.object({
   familyId: objectId.optional(),
   to: z.string().email().optional(),
@@ -8,6 +14,7 @@ export const sendEmailBody = z.object({
   html: z.string().min(1).max(100_000),
   text: z.string().max(100_000).optional(),
   transactional: z.boolean().optional(),
+  attachments: z.array(emailAttachment).max(10).optional(),
 })
 
 export const sendBulkEmailBody = z.object({
@@ -16,6 +23,7 @@ export const sendBulkEmailBody = z.object({
   html: z.string().min(1).max(100_000),
   text: z.string().max(100_000).optional(),
   transactional: z.boolean().optional(),
+  attachments: z.array(emailAttachment).max(10).optional(),
 })
 
 export const listEmailsQuery = z.object({

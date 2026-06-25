@@ -1,5 +1,8 @@
 export * as email from './email'
 export * as emailConfig from './email-config'
+export * as emailTemplate from './email-template'
+export * as emailDraft from './email-draft'
+export * as scheduledEmail from './scheduled-email'
 export * as report from './report'
 export * from './common'
 export * as auth from './auth'

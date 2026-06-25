@@ -8,6 +8,7 @@ import {
   zonedWallClockToUtc,
 } from '@/lib/date-utils'
 import { formatLifecycleEventPayments } from '@/lib/route-logic/events'
+import { getEmailDashboardSummary } from '@/lib/route-logic/emails/dashboard-summary'
 import { PAYMENT_PUBLIC_SELECT, serializePaymentsPublic } from '@/lib/payments/select'
 import { loadByIdsInChunks } from '@/lib/org-pagination'
 
@@ -52,6 +53,12 @@ export interface DashboardAttentionPayload {
   dueTodayTasks: DashboardAttentionSection<DashboardAttentionTaskItem>
   upcomingEvents: DashboardAttentionSection<DashboardAttentionEventItem>
   recentPayments: DashboardAttentionPaymentItem[]
+  /** Populated by GET /api/dashboard-actions; optional for SSR defaults. */
+  emailSummary?: {
+    failedLast7Days: number
+    lastSentAt: Date | string | null
+    pendingScheduled: number
+  }
 }
 
 /** Half-open UTC range for lifecycle events in the next N calendar days (org tz). */
@@ -138,6 +145,7 @@ export async function loadDashboardAttention(
     upcomingCount,
     upcomingRows,
     recentPaymentRows,
+    emailSummary,
   ] = await Promise.all([
     Task.countDocuments(overdueFilter),
     Task.find(overdueFilter)
@@ -161,6 +169,7 @@ export async function loadDashboardAttention(
       .sort({ paymentDate: -1, _id: -1 })
       .limit(5)
       .lean<any[]>(),
+    getEmailDashboardSummary(organizationId),
   ])
 
   const formattedEvents = await formatLifecycleEventPayments(organizationId, upcomingRows)
@@ -193,6 +202,7 @@ export async function loadDashboardAttention(
     dueTodayTasks: buildAttentionSection(dueTodayCount, dueTodayRows.map(mapTaskAttentionItem), 3),
     upcomingEvents: buildAttentionSection(upcomingCount, formattedEvents, 5),
     recentPayments,
+    emailSummary,
   }
 }
 
