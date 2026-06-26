@@ -1,32 +1,71 @@
 'use client'
 
-import { PlusIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline'
+import { useState } from 'react'
+import { PaperAirplaneIcon, PlusIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline'
 import { Button, Card, Tooltip } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
+import EmailFamilyModal from '@/app/families/_components/EmailFamilyModal'
+import FamilyEmailIndicators from '@/app/families/_components/FamilyEmailIndicators'
 import { useFamilyDetail } from './FamilyDetailContext'
 
 export default function FamilyHeader() {
   const t = useT()
   const { data, isAdmin, formatMoney, getPlanNameById, setShowTaskModal } = useFamilyDetail()
+  const [showEmailModal, setShowEmailModal] = useState(false)
 
   if (!data?.family) return null
+
+  const family = data.family
+  const canEmail = isAdmin && Boolean(family.email?.trim())
 
   return (
     <Card className="mb-6">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight text-fg sm:text-2xl">
-          {data.family.name}
-        </h1>
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight text-fg sm:text-2xl">
+            {family.name}
+          </h1>
+          {family.email && (
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-fg-muted">
+              <span>{family.email}</span>
+              <FamilyEmailIndicators family={family} />
+            </p>
+          )}
+        </div>
         {isAdmin && (
-          <Button
-            size="sm"
-            onClick={() => setShowTaskModal(true)}
-            leftIcon={<PlusIcon className="h-4 w-4" aria-hidden="true" />}
-          >
-            {t('family.header.addTask')}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {canEmail && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setShowEmailModal(true)}
+                leftIcon={<PaperAirplaneIcon className="h-4 w-4" aria-hidden="true" />}
+              >
+                {t('families.email.sendToFamily')}
+              </Button>
+            )}
+            <Button
+              size="sm"
+              onClick={() => setShowTaskModal(true)}
+              leftIcon={<PlusIcon className="h-4 w-4" aria-hidden="true" />}
+            >
+              {t('family.header.addTask')}
+            </Button>
+          </div>
         )}
       </div>
+      <EmailFamilyModal
+        open={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        family={{
+          _id: String(family._id),
+          name: family.name || '',
+          email: family.email,
+          emailOptOut: family.emailOptOut,
+          emailDeliverabilityWarning: family.emailDeliverabilityWarning,
+          emailFormatInvalid: family.emailFormatInvalid,
+        }}
+      />
       <div
         className={`mt-4 grid grid-cols-2 gap-4 border-t border-border pt-4${isAdmin ? ' md:grid-cols-7' : ''}`}
       >

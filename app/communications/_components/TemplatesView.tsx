@@ -5,18 +5,27 @@ import { TrashIcon } from '@heroicons/react/24/outline'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useToast } from '@/app/components/Toast'
 import {
+  Badge,
   Button,
   Card,
   EmptyState,
   Input,
   PageHeader,
+  Select,
   SkeletonRows,
   Textarea,
 } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
 import CommunicationsNav from './CommunicationsNav'
-import type { EmailTemplate } from './types'
+import type { EmailTemplate, EmailTemplateCategory } from './types'
+
+const TEMPLATE_CATEGORIES: EmailTemplateCategory[] = [
+  'general',
+  'billing',
+  'events',
+  'announcements',
+]
 
 function tf(t: ReturnType<typeof useT>, key: string, fallback: string) {
   return t(key as MessageKey, fallback)
@@ -32,7 +41,19 @@ function normalizeTemplate(row: Record<string, unknown>): EditableTemplate {
     subject: String(row.subject ?? ''),
     body: html,
     html,
+    category: (row.category as EmailTemplateCategory) || 'general',
   }
+}
+
+function categoryLabel(category: string, t: ReturnType<typeof useT>) {
+  const key = `communications.template.category.${category}` as MessageKey
+  const fallbacks: Record<string, string> = {
+    general: 'General',
+    billing: 'Billing',
+    events: 'Events',
+    announcements: 'Announcements',
+  }
+  return t(key, fallbacks[category] ?? category)
 }
 
 export default function TemplatesView() {
@@ -40,6 +61,8 @@ export default function TemplatesView() {
   const toast = useToast()
   const [templates, setTemplates] = useState<EditableTemplate[]>([])
   const [loading, setLoading] = useState(true)
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [newCategory, setNewCategory] = useState<EmailTemplateCategory>('general')
 
   const loadTemplates = useCallback(async () => {
     setLoading(true)
@@ -83,7 +106,11 @@ export default function TemplatesView() {
       const res = await fetch(`/api/email-templates/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject: tpl.subject.trim(), html: tpl.html }),
+        body: JSON.stringify({
+          subject: tpl.subject.trim(),
+          html: tpl.html,
+          category: tpl.category || 'general',
+        }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Failed to save')
@@ -114,6 +141,33 @@ export default function TemplatesView() {
     }
   }
 
+  const filteredTemplates = categoryFilter
+    ? templates.filter((tpl) => (tpl.category || 'general') === categoryFilter)
+    : templates
+
+  const createTemplate = async () => {
+    const name = window.prompt(tf(t, 'communications.template.namePrompt', 'Template name'))
+    if (!name?.trim()) return
+    try {
+      const res = await fetch('/api/email-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          subject: tf(t, 'communications.template.newSubject', 'Subject line'),
+          html: '',
+          category: newCategory,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      toast.success(tf(t, 'communications.template.saved', 'Template saved'))
+      void loadTemplates()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : t('communications.template.error'))
+    }
+  }
+
   return (
     <div className="min-h-screen p-4 sm:p-6 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -128,11 +182,44 @@ export default function TemplatesView() {
 
         <CommunicationsNav />
 
+        <div className="flex flex-wrap items-end gap-3">
+          <Select
+            label={tf(t, 'communications.template.filterCategory', 'Category')}
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="min-w-[160px]"
+          >
+            <option value="">
+              {tf(t, 'communications.template.allCategories', 'All categories')}
+            </option>
+            {TEMPLATE_CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>
+                {categoryLabel(cat, t)}
+              </option>
+            ))}
+          </Select>
+          <Select
+            label={tf(t, 'communications.template.newCategory', 'New template category')}
+            value={newCategory}
+            onChange={(e) => setNewCategory(e.target.value as EmailTemplateCategory)}
+            className="min-w-[160px]"
+          >
+            {TEMPLATE_CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>
+                {categoryLabel(cat, t)}
+              </option>
+            ))}
+          </Select>
+          <Button type="button" variant="secondary" onClick={() => void createTemplate()}>
+            {tf(t, 'communications.template.create', 'Create template')}
+          </Button>
+        </div>
+
         {loading ? (
           <Card>
             <SkeletonRows count={4} />
           </Card>
-        ) : templates.length === 0 ? (
+        ) : filteredTemplates.length === 0 ? (
           <EmptyState
             title={tf(t, 'communications.templates.empty', 'No templates yet')}
             description={tf(
@@ -147,10 +234,15 @@ export default function TemplatesView() {
           />
         ) : (
           <div className="space-y-4">
-            {templates.map((tpl) => (
+            {filteredTemplates.map((tpl) => (
               <Card key={tpl._id} className="p-4 sm:p-5 space-y-3">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="font-medium text-fg">{tpl.name}</p>
+                  <div className="min-w-0">
+                    <p className="font-medium text-fg">{tpl.name}</p>
+                    <Badge size="sm" variant="default" className="mt-1">
+                      {categoryLabel(tpl.category || 'general', t)}
+                    </Badge>
+                  </div>
                   <button
                     type="button"
                     onClick={() => void deleteTemplate(tpl._id, tpl.name)}
@@ -165,6 +257,19 @@ export default function TemplatesView() {
                   value={tpl.subject}
                   onChange={(e) => updateLocal(tpl._id, { subject: e.target.value })}
                 />
+                <Select
+                  label={tf(t, 'communications.template.categoryLabel', 'Category')}
+                  value={tpl.category || 'general'}
+                  onChange={(e) =>
+                    updateLocal(tpl._id, { category: e.target.value as EmailTemplateCategory })
+                  }
+                >
+                  {TEMPLATE_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {categoryLabel(cat, t)}
+                    </option>
+                  ))}
+                </Select>
                 <Textarea
                   label={t('communications.field.body')}
                   rows={6}

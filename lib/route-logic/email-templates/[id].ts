@@ -51,6 +51,7 @@ export const PATCH = handler({
       data: {
         _id: String(updated._id),
         name: updated.name,
+        category: updated.category ?? 'general',
         subject: updated.subject,
         html: updated.html,
         text: updated.text ?? null,

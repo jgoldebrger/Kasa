@@ -1,8 +1,11 @@
 import { z } from 'zod'
 import { objectId, optionalTrimmedString } from './common'
 
+export const emailTemplateCategory = z.enum(['general', 'billing', 'events', 'announcements'])
+
 export const emailTemplateBody = z.object({
   name: z.string().min(1).max(200).trim(),
+  category: emailTemplateCategory.optional(),
   subject: z.string().min(1).max(998),
   html: z.string().min(1).max(100_000),
   text: z.string().max(100_000).optional(),

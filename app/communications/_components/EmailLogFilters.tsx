@@ -1,5 +1,6 @@
 'use client'
 
+import { type ReactNode } from 'react'
 import { Button, Input, Select } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
@@ -17,6 +18,7 @@ interface EmailLogFiltersProps {
   onApply: () => void
   onClear: () => void
   loading?: boolean
+  exportButton?: ReactNode
 }
 
 const STATUS_OPTIONS = ['', 'queued', 'sent', 'opened', 'clicked', 'failed'] as const
@@ -28,6 +30,7 @@ export default function EmailLogFilters({
   onApply,
   onClear,
   loading,
+  exportButton,
 }: EmailLogFiltersProps) {
   const t = useT()
 
@@ -89,6 +92,7 @@ export default function EmailLogFilters({
           {t('communications.filter.clear' as MessageKey, 'Clear')}
         </Button>
       )}
+      {exportButton}
     </div>
   )
 }

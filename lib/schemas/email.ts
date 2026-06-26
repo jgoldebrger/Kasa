@@ -42,4 +42,10 @@ export const listEmailsQuery = z.object({
   dateTo: z.coerce.date().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   cursor: z.string().optional(),
+  format: z.enum(['csv']).optional(),
+})
+
+export const attachStatementBody = z.object({
+  familyId: objectId,
+  statementId: objectId.optional(),
 })

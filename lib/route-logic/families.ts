@@ -3,6 +3,7 @@ import { handler } from '@/lib/api/handler'
 import { hasMinRole } from '@/lib/auth-helpers'
 import { Family, FamilyMember, PaymentPlan } from '@/lib/models'
 import { audit } from '@/lib/audit'
+import { emailFormatInvalidFlag } from '@/lib/mail/validate-email'
 import {
   compoundCursorFilter,
   decodeCompoundCursor,
@@ -297,6 +298,7 @@ export const POST = handler({
           ? Number(openBalance)
           : 0,
       emailOptOut: emailOptOut === true,
+      emailFormatInvalid: emailFormatInvalidFlag(email),
     })
 
     await audit({

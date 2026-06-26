@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { PaperAirplaneIcon } from '@heroicons/react/24/outline'
 import { useToast } from '@/app/components/Toast'
-import { Button, Input, Modal, Textarea } from '@/app/components/ui'
+import { Alert, Button, Input, Modal, Textarea } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
 
 export interface EmailFamilyRow {
@@ -11,6 +11,8 @@ export interface EmailFamilyRow {
   name: string
   email?: string
   emailOptOut?: boolean
+  emailDeliverabilityWarning?: boolean
+  emailFormatInvalid?: boolean
 }
 
 export interface EmailFamiliesModalProps {
@@ -34,17 +36,26 @@ export default function EmailFamiliesModal({
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
 
-  const { emailable, skippedNoEmail, skippedOptOut } = useMemo(() => {
-    const selected = families.filter((f) => selectedIds.has(f._id))
-    const noEmail = selected.filter((f) => !f.email?.trim())
-    const optedOut = selected.filter((f) => f.email?.trim() && f.emailOptOut)
-    const emailable = selected.filter((f) => f.email?.trim() && !f.emailOptOut)
-    return {
-      emailable,
-      skippedNoEmail: noEmail,
-      skippedOptOut: optedOut,
-    }
-  }, [families, selectedIds])
+  const { emailable, skippedNoEmail, skippedOptOut, skippedInvalidFormat, warnDeliverability } =
+    useMemo(() => {
+      const selected = families.filter((f) => selectedIds.has(f._id))
+      const noEmail = selected.filter((f) => !f.email?.trim())
+      const invalidFormat = selected.filter((f) => f.email?.trim() && f.emailFormatInvalid === true)
+      const optedOut = selected.filter(
+        (f) => f.email?.trim() && !f.emailFormatInvalid && f.emailOptOut,
+      )
+      const emailable = selected.filter(
+        (f) => f.email?.trim() && !f.emailFormatInvalid && !f.emailOptOut,
+      )
+      const deliverability = emailable.filter((f) => f.emailDeliverabilityWarning === true)
+      return {
+        emailable,
+        skippedNoEmail: noEmail,
+        skippedOptOut: optedOut,
+        skippedInvalidFormat: invalidFormat,
+        warnDeliverability: deliverability,
+      }
+    }, [families, selectedIds])
 
   const resetAndClose = () => {
     setSubject('')
@@ -122,6 +133,22 @@ export default function EmailFamiliesModal({
           <p className="text-sm text-fg-muted">
             {t('families.emailBulk.skippedOptOut').replace('{count}', String(skippedOptOut.length))}
           </p>
+        )}
+        {skippedInvalidFormat.length > 0 && (
+          <p className="text-sm text-warning">
+            {t('families.emailBulk.warnInvalidFormat').replace(
+              '{count}',
+              String(skippedInvalidFormat.length),
+            )}
+          </p>
+        )}
+        {warnDeliverability.length > 0 && (
+          <Alert variant="warning" title={t('families.email.deliverabilityWarningShort')}>
+            {t('families.emailBulk.warnDeliverability').replace(
+              '{count}',
+              String(warnDeliverability.length),
+            )}
+          </Alert>
         )}
         {emailable.length > 0 && (
           <p className="text-sm text-fg-muted">

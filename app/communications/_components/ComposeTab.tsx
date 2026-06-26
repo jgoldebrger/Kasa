@@ -4,12 +4,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   BookmarkIcon,
   ClockIcon,
+  DocumentTextIcon,
   EyeIcon,
   PaperAirplaneIcon,
   PaperClipIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline'
-import { useToast } from '@/app/components/Toast'
+import { useToast, useConfirm } from '@/app/components/Toast'
 import { Alert, Button, Card, Input, Select } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
@@ -28,11 +29,18 @@ interface ComposeTabProps {
   families: FamilyOption[]
   loadingFamilies: boolean
   onSent: (result: { sent: number; failed: number; campaignId?: string }) => void
+  onJobStarted?: (info: { jobId: string; totalFamilies: number; campaignId?: string }) => void
 }
 
-export default function ComposeTab({ families, loadingFamilies, onSent }: ComposeTabProps) {
+export default function ComposeTab({
+  families,
+  loadingFamilies,
+  onSent,
+  onJobStarted,
+}: ComposeTabProps) {
   const t = useT()
   const toast = useToast()
+  const confirm = useConfirm()
 
   const [subject, setSubject] = useState('')
   const [subjectB, setSubjectB] = useState('')
@@ -43,6 +51,7 @@ export default function ComposeTab({ families, loadingFamilies, onSent }: Compos
   const [sending, setSending] = useState(false)
   const [savingDraft, setSavingDraft] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [attachingStatement, setAttachingStatement] = useState(false)
 
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [drafts, setDrafts] = useState<EmailDraft[]>([])
@@ -54,6 +63,10 @@ export default function ComposeTab({ families, loadingFamilies, onSent }: Compos
   const skipAutoSaveRef = useRef(false)
 
   const selectableFamilies = families.filter((f) => f.email && !f.emailOptOut)
+
+  const selectedFamilies = selectableFamilies.filter((f) => selectedIds.has(f._id))
+  const deliverabilityWarnings = selectedFamilies.filter((f) => f.emailDeliverabilityWarning)
+  const singleSelectedFamilyId = selectedIds.size === 1 ? Array.from(selectedIds)[0] : undefined
 
   const loadTemplates = useCallback(async () => {
     try {
@@ -230,6 +243,43 @@ export default function ComposeTab({ families, loadingFamilies, onSent }: Compos
     setAttachments((prev) => prev.filter((_, i) => i !== index))
   }
 
+  const attachStatement = async () => {
+    if (!singleSelectedFamilyId) {
+      toast.error(t('communications.statement.selectOne'))
+      return
+    }
+    if (attachments.length >= MAX_ATTACHMENTS) {
+      toast.error(t('communications.attachments.maxFiles'))
+      return
+    }
+    setAttachingStatement(true)
+    try {
+      const res = await fetch('/api/emails/attach-statement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ familyId: singleSelectedFamilyId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Failed to attach statement')
+      const filename = String(data.filename ?? 'statement.pdf')
+      const content = String(data.contentBase64 ?? data.content ?? '')
+      if (!content) throw new Error('No PDF returned')
+      setAttachments((prev) => [
+        ...prev,
+        {
+          filename,
+          content,
+          contentType: 'application/pdf',
+        },
+      ])
+      toast.success(t('communications.statement.attached'))
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : t('communications.statement.error'))
+    } finally {
+      setAttachingStatement(false)
+    }
+  }
+
   const buildPayload = () => {
     const html = markdownToHtml(body)
     const text = markdownToPlainText(body)
@@ -252,6 +302,29 @@ export default function ComposeTab({ families, loadingFamilies, onSent }: Compos
     if (selectedIds.size === 0) {
       toast.error(t('communications.error.noRecipients'))
       return
+    }
+
+    if (deliverabilityWarnings.length > 0) {
+      const names = deliverabilityWarnings
+        .slice(0, 3)
+        .map((f) => f.name)
+        .join(', ')
+      const extra =
+        deliverabilityWarnings.length > 3
+          ? t('communications.deliverability.andMore').replace(
+              '{count}',
+              String(deliverabilityWarnings.length - 3),
+            )
+          : ''
+      const proceed = await confirm({
+        title: t('communications.deliverability.title'),
+        message: t('communications.deliverability.message')
+          .replace('{names}', `${names}${extra}`)
+          .replace('{count}', String(deliverabilityWarnings.length)),
+        confirmLabel: t('communications.deliverability.sendAnyway'),
+        cancelLabel: t('communications.deliverability.cancel'),
+      })
+      if (!proceed) return
     }
 
     setSending(true)
@@ -285,6 +358,29 @@ export default function ComposeTab({ families, loadingFamilies, onSent }: Compos
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Send failed')
+
+      const jobId = data.jobId as string | undefined
+      if (jobId) {
+        toast.success(
+          t('communications.job.queued').replace(
+            '{count}',
+            String(data.totalFamilies ?? selectedIds.size),
+          ),
+        )
+        setSubject('')
+        setSubjectB('')
+        setBody('')
+        setSelectedIds(new Set())
+        setAttachments([])
+        setScheduledAt('')
+        setCurrentDraftId(null)
+        onJobStarted?.({
+          jobId,
+          totalFamilies: (data.totalFamilies as number) ?? selectedIds.size,
+          campaignId: data.campaignId as string | undefined,
+        })
+        return
+      }
 
       const sent = data.sent ?? 0
       const failed = data.failed ?? 0
@@ -388,6 +484,15 @@ export default function ComposeTab({ families, loadingFamilies, onSent }: Compos
           onSelectAll={selectAll}
         />
 
+        {deliverabilityWarnings.length > 0 && (
+          <Alert variant="warning" title={t('communications.deliverability.title')}>
+            {t('communications.deliverability.banner').replace(
+              '{count}',
+              String(deliverabilityWarnings.length),
+            )}
+          </Alert>
+        )}
+
         <div>
           <label className="text-sm font-medium text-fg">
             {t('communications.attachments.label')}
@@ -407,13 +512,39 @@ export default function ComposeTab({ families, loadingFamilies, onSent }: Compos
                 }}
               />
             </label>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              loading={attachingStatement}
+              disabled={!singleSelectedFamilyId || attachments.length >= MAX_ATTACHMENTS}
+              leftIcon={<DocumentTextIcon className="h-4 w-4" />}
+              onClick={() => void attachStatement()}
+            >
+              {t('communications.statement.attach')}
+            </Button>
             <span className="text-xs text-fg-muted">{t('communications.attachments.hint')}</span>
           </div>
+          {!singleSelectedFamilyId && selectedIds.size > 1 && (
+            <p className="mt-1 text-xs text-fg-muted">
+              {t('communications.statement.selectOneHint')}
+            </p>
+          )}
           {attachments.length > 0 && (
             <ul className="mt-2 space-y-1">
               {attachments.map((a, i) => (
                 <li key={`${a.filename}-${i}`} className="flex items-center gap-2 text-sm text-fg">
                   <span className="truncate flex-1">{a.filename}</span>
+                  {a.contentType === 'application/pdf' && (
+                    <a
+                      href={`data:application/pdf;base64,${a.content}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-accent hover:underline shrink-0"
+                    >
+                      {t('communications.attachments.preview')}
+                    </a>
+                  )}
                   <button
                     type="button"
                     onClick={() => removeAttachment(i)}

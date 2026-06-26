@@ -9,6 +9,11 @@ const EmailTemplateSchema = new Schema(
       index: true,
     },
     name: { type: String, required: true, trim: true, maxlength: 200 },
+    category: {
+      type: String,
+      enum: ['general', 'billing', 'events', 'announcements'],
+      default: 'general',
+    },
     subject: { type: String, required: true, maxlength: 998 },
     html: { type: String, required: true, maxlength: 100_000 },
     text: { type: String, maxlength: 100_000 },

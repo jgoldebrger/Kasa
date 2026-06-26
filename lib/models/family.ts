@@ -42,6 +42,8 @@ const FamilySchema = new Schema(
     communicationsOptOut: { type: Boolean, default: false },
     // Set when 3+ send failures to this family's email occur within 7 days.
     emailDeliverabilityWarning: { type: Boolean, default: false },
+    // True when `email` is non-empty but fails basic format validation.
+    emailFormatInvalid: { type: Boolean, default: false },
   },
   { timestamps: true },
 )

@@ -23,6 +23,7 @@ import { loadAllByIdCursor } from '@/lib/org-pagination'
 import { collectCompoundCursorPages } from '@/lib/pagination'
 import { fetchFamilySummary } from '@/lib/family-detail-summary'
 import { checkMemberFamilyFinancialAccess } from '@/lib/member-family-access.server'
+import { emailFormatInvalidFlag } from '@/lib/mail/validate-email'
 
 const SUMMARY_CACHE_HEADERS = {
   'Cache-Control': 'private, max-age=15, stale-while-revalidate=60',
@@ -247,6 +248,10 @@ export const PUT = handler({
     }
 
     const update: Record<string, unknown> = { ...body }
+
+    if ('email' in body) {
+      update.emailFormatInvalid = emailFormatInvalidFlag(body.email)
+    }
 
     // Validate paymentPlanId belongs to this org and keep legacy currentPlan in sync.
     if ('paymentPlanId' in body) {

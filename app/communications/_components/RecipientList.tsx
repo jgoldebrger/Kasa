@@ -72,6 +72,11 @@ export default function RecipientList({
                     {t('communications.optedOut')}
                   </Badge>
                 )}
+                {f.emailDeliverabilityWarning && !optedOut && (
+                  <Badge size="sm" variant="danger">
+                    {t('communications.deliverability.badge')}
+                  </Badge>
+                )}
                 <span className="text-xs text-fg-muted truncate max-w-[12rem]">{f.email}</span>
               </label>
             )

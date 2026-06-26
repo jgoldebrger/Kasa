@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { EnvelopeIcon } from '@heroicons/react/24/outline'
+import { ArrowDownTrayIcon, EnvelopeIcon } from '@heroicons/react/24/outline'
 import { formatLocaleDate } from '@/lib/date-utils'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useToast } from '@/app/components/Toast'
@@ -13,6 +13,7 @@ import {
   EmptyState,
   PageHeader,
   SkeletonRows,
+  Button,
   type DataColumn,
 } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
@@ -21,6 +22,8 @@ import EmailDetailDrawer from './_components/EmailDetailDrawer'
 import CampaignStatsModal from './_components/CampaignStatsModal'
 import CommunicationsNav from './_components/CommunicationsNav'
 import EmailLogFilters, { type EmailLogFilterValues } from './_components/EmailLogFilters'
+import BulkJobProgressBanner from './_components/BulkJobProgressBanner'
+import { useBulkJobPoll } from './_components/useBulkJobPoll'
 import type { EmailLogRow, FamilyOption } from './_components/types'
 
 type Tab = 'compose' | 'log'
@@ -47,6 +50,8 @@ export default function CommunicationsView() {
   const [detailEmailId, setDetailEmailId] = useState<string | null>(null)
   const [campaignId, setCampaignId] = useState<string | null>(null)
   const [showCampaignStats, setShowCampaignStats] = useState(false)
+  const [exportingCsv, setExportingCsv] = useState(false)
+  const { status: jobStatus, polling: jobPolling, startPoll } = useBulkJobPoll()
   const [logFilters, setLogFilters] = useState<EmailLogFilterValues>({
     status: '',
     kind: '',
@@ -107,9 +112,50 @@ export default function CommunicationsView() {
   const handleSent = (result: { sent: number; failed: number; campaignId?: string }) => {
     setTab('log')
     void loadLogs()
-    if (result.campaignId && result.sent > 0) {
+    if (result.campaignId && (result.sent > 0 || result.failed > 0)) {
       setCampaignId(result.campaignId)
       setShowCampaignStats(true)
+    }
+  }
+
+  const handleJobStarted = (info: {
+    jobId: string
+    totalFamilies: number
+    campaignId?: string
+  }) => {
+    void startPoll(
+      info.jobId,
+      (result) => {
+        handleSent({ ...result, campaignId: result.campaignId ?? info.campaignId })
+      },
+      info.campaignId,
+    )
+  }
+
+  const exportCsv = async () => {
+    setExportingCsv(true)
+    try {
+      const params = new URLSearchParams({ format: 'csv' })
+      if (appliedFilters.status) params.set('status', appliedFilters.status)
+      if (appliedFilters.kind) params.set('kind', appliedFilters.kind)
+      if (appliedFilters.dateFrom) params.set('dateFrom', appliedFilters.dateFrom)
+      if (appliedFilters.dateTo) params.set('dateTo', appliedFilters.dateTo)
+      const res = await fetch(`/api/emails?${params.toString()}`)
+      if (!res.ok) throw new Error('Export failed')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `email-log-${new Date().toISOString().slice(0, 10)}.csv`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      toast.success(t('communications.export.success'))
+    } catch {
+      toast.error(t('communications.export.error'))
+    } finally {
+      setExportingCsv(false)
     }
   }
 
@@ -209,6 +255,8 @@ export default function CommunicationsView() {
 
         <CommunicationsNav />
 
+        {jobStatus && <BulkJobProgressBanner status={jobStatus} polling={jobPolling} />}
+
         <div className="flex gap-2 border-b border-border">
           <button
             type="button"
@@ -235,7 +283,12 @@ export default function CommunicationsView() {
         </div>
 
         {tab === 'compose' ? (
-          <ComposeTab families={families} loadingFamilies={loadingFamilies} onSent={handleSent} />
+          <ComposeTab
+            families={families}
+            loadingFamilies={loadingFamilies}
+            onSent={handleSent}
+            onJobStarted={handleJobStarted}
+          />
         ) : (
           <Card className="overflow-hidden">
             <EmailLogFilters
@@ -248,6 +301,18 @@ export default function CommunicationsView() {
                 setLogFilters(empty)
                 setAppliedFilters(empty)
               }}
+              exportButton={
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  loading={exportingCsv}
+                  leftIcon={<ArrowDownTrayIcon className="h-4 w-4" />}
+                  onClick={() => void exportCsv()}
+                >
+                  {t('communications.export.button')}
+                </Button>
+              }
             />
             {loadingLogs ? (
               <div className="p-4">
@@ -315,6 +380,7 @@ export default function CommunicationsView() {
           setShowCampaignStats(false)
           setCampaignId(null)
         }}
+        onRetrySuccess={() => void loadLogs()}
       />
     </div>
   )

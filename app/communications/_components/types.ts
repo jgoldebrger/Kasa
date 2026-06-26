@@ -4,6 +4,7 @@ export interface FamilyOption {
   email?: string
   emailOptOut?: boolean
   communicationsOptOut?: boolean
+  emailDeliverabilityWarning?: boolean
 }
 
 export interface EmailLogRow {
@@ -20,11 +21,14 @@ export interface EmailLogRow {
   createdAt: string
 }
 
+export type EmailTemplateCategory = 'general' | 'billing' | 'events' | 'announcements' | string
+
 export interface EmailTemplate {
   _id: string
   name: string
   subject: string
   body: string
+  category?: EmailTemplateCategory
 }
 
 export interface EmailDraft {
@@ -79,6 +83,41 @@ export interface CampaignStats {
   openRate?: number
   clickRate?: number
   topLinks?: CampaignLinkClick[]
+}
+
+export interface EmailJobRow {
+  jobId: string
+  kind: string
+  status: string
+  totalFamilies: number
+  processed: number
+  sent: number
+  failed: number
+  lastError?: string | null
+  createdAt?: string
+  startedAt?: string | null
+  completedAt?: string | null
+}
+
+export interface EmailAnalyticsBucket {
+  date: string
+  sent?: number
+  opened?: number
+  clicked?: number
+  failed?: number
+}
+
+export interface EmailAnalytics {
+  summary: {
+    sent: number
+    opened: number
+    clicked: number
+    failed: number
+    openRate?: number
+    clickRate?: number
+  }
+  buckets?: EmailAnalyticsBucket[]
+  daily?: EmailAnalyticsBucket[]
 }
 
 export interface ScheduledEmailRow {

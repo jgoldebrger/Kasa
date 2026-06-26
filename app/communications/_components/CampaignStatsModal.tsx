@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { ArrowPathIcon } from '@heroicons/react/24/outline'
 import { Modal, Button, SkeletonRows } from '@/app/components/ui'
+import { useToast } from '@/app/components/Toast'
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
 import type { CampaignStats } from './types'
@@ -10,6 +12,7 @@ interface CampaignStatsModalProps {
   open: boolean
   campaignId: string | null
   onClose: () => void
+  onRetrySuccess?: () => void
 }
 
 function resolveRates(stats: CampaignStats) {
@@ -19,11 +22,18 @@ function resolveRates(stats: CampaignStats) {
   return { openRate, clickRate }
 }
 
-export default function CampaignStatsModal({ open, campaignId, onClose }: CampaignStatsModalProps) {
+export default function CampaignStatsModal({
+  open,
+  campaignId,
+  onClose,
+  onRetrySuccess,
+}: CampaignStatsModalProps) {
   const t = useT()
+  const toast = useToast()
   const [stats, setStats] = useState<CampaignStats | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
 
   useEffect(() => {
     if (!open || !campaignId) {
@@ -60,6 +70,28 @@ export default function CampaignStatsModal({ open, campaignId, onClose }: Campai
   const formatRate = (rate: number) => `${Math.round(rate * 100)}%`
   const rates = stats ? resolveRates(stats) : null
   const topLinks = stats?.topLinks ?? []
+  const failedCount = stats?.failed ?? 0
+
+  const retryFailed = async () => {
+    if (!campaignId) return
+    setRetrying(true)
+    try {
+      const res = await fetch('/api/emails/retry-failed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Retry failed')
+      const retried = data.retried ?? data.sent ?? 0
+      toast.success(t('communications.retry.success').replace('{count}', String(retried)))
+      onRetrySuccess?.()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : t('communications.retry.error'))
+    } finally {
+      setRetrying(false)
+    }
+  }
 
   return (
     <Modal
@@ -68,9 +100,22 @@ export default function CampaignStatsModal({ open, campaignId, onClose }: Campai
       title={t('communications.campaign.title')}
       description={t('communications.campaign.description')}
       footer={
-        <Button type="button" variant="primary" onClick={onClose}>
-          {t('communications.campaign.close')}
-        </Button>
+        <div className="flex flex-wrap gap-2 justify-end w-full">
+          {failedCount > 0 && campaignId && (
+            <Button
+              type="button"
+              variant="secondary"
+              loading={retrying}
+              leftIcon={<ArrowPathIcon className="h-4 w-4" />}
+              onClick={() => void retryFailed()}
+            >
+              {t('communications.retry.button').replace('{count}', String(failedCount))}
+            </Button>
+          )}
+          <Button type="button" variant="primary" onClick={onClose}>
+            {t('communications.campaign.close')}
+          </Button>
+        </div>
       }
     >
       {loading ? (
@@ -84,6 +129,14 @@ export default function CampaignStatsModal({ open, campaignId, onClose }: Campai
               <dt className="text-xs text-fg-muted">{t('communications.campaign.sent')}</dt>
               <dd className="text-lg font-semibold tabular text-fg">{stats.sent}</dd>
             </div>
+            {(stats.failed ?? 0) > 0 && (
+              <div>
+                <dt className="text-xs text-fg-muted">
+                  {t('communications.campaign.failed' as MessageKey, 'Failed')}
+                </dt>
+                <dd className="text-lg font-semibold tabular text-danger">{stats.failed}</dd>
+              </div>
+            )}
             <div>
               <dt className="text-xs text-fg-muted">{t('communications.campaign.opened')}</dt>
               <dd className="text-lg font-semibold tabular text-fg">{stats.opened}</dd>

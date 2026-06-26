@@ -1,19 +1,19 @@
 {
-  "generatedAt": "2026-06-25T18:56:21.615Z",
+  "generatedAt": "2026-06-26T11:55:20.635Z",
   "summary": {
-    "total": 197,
+    "total": 204,
     "byAuth": {
       "admin": 8,
-      "org": 142,
+      "org": 147,
       "nextauth": 2,
       "public": 14,
-      "cron": 16,
+      "cron": 18,
       "session": 10,
       "org-or-cron": 4,
       "webhook": 1
     },
-    "mutating": 102,
-    "tenantScoped": 146
+    "mutating": 105,
+    "tenantScoped": 151
   },
   "routes": [
     {
@@ -504,6 +504,26 @@
       "source": "app/api/emails/[id]/retry/route.ts"
     },
     {
+      "path": "/api/emails/analytics",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/emails/analytics/route.ts"
+    },
+    {
+      "path": "/api/emails/attach-statement",
+      "method": "POST",
+      "auth": "org",
+      "minRole": "member",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/emails/attach-statement/route.ts"
+    },
+    {
       "path": "/api/emails/campaign/:campaignId",
       "method": "GET",
       "auth": "org",
@@ -512,6 +532,26 @@
       "tenantScoped": true,
       "dynamicParams": ["campaignId"],
       "source": "app/api/emails/campaign/[campaignId]/route.ts"
+    },
+    {
+      "path": "/api/emails/jobs",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/emails/jobs/route.ts"
+    },
+    {
+      "path": "/api/emails/retry-failed",
+      "method": "POST",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/emails/retry-failed/route.ts"
     },
     {
       "path": "/api/emails/send",
@@ -532,6 +572,16 @@
       "tenantScoped": true,
       "dynamicParams": [],
       "source": "app/api/emails/send-bulk/route.ts"
+    },
+    {
+      "path": "/api/emails/send-bulk/status",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/emails/send-bulk/status/route.ts"
     },
     {
       "path": "/api/emails/send-bulk/worker",
@@ -961,6 +1011,24 @@
       "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/jobs/process-recurring-payments/route.ts"
+    },
+    {
+      "path": "/api/jobs/run-email-drips",
+      "method": "GET",
+      "auth": "cron",
+      "csrf": false,
+      "tenantScoped": false,
+      "dynamicParams": [],
+      "source": "app/api/jobs/run-email-drips/route.ts"
+    },
+    {
+      "path": "/api/jobs/run-email-drips",
+      "method": "POST",
+      "auth": "cron",
+      "csrf": true,
+      "tenantScoped": false,
+      "dynamicParams": [],
+      "source": "app/api/jobs/run-email-drips/route.ts"
     },
     {
       "path": "/api/jobs/send-monthly-statements",

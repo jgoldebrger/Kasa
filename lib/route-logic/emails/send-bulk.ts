@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { Types } from 'mongoose'
 import type { NextRequest } from 'next/server'
 import type nodemailer from 'nodemailer'
@@ -11,12 +12,20 @@ import {
 } from '@/lib/mail'
 import { escapeHtml } from '@/lib/html-escape'
 import { checkRateLimit } from '@/lib/rate-limit'
-import { email as emailSchemas } from '@/lib/schemas'
+import { email as emailSchemas, objectId, UNBOUNDED_LIST_CAP } from '@/lib/schemas'
 import { handler } from '@/lib/api/handler'
 import { audit } from '@/lib/audit'
 import { findActiveEmailJob, sweepStaleEmailJobs, kickoffEmailWorker } from '@/lib/email-jobs'
+import { loadByIdsInChunks } from '@/lib/org-pagination'
 
-const ASYNC_FAMILY_THRESHOLD = 20
+const ASYNC_FAMILY_THRESHOLD = 100
+
+/** Wider than `emailSchemas.sendBulkEmailBody` so large campaigns enqueue via the worker. */
+const sendBulkEmailBody = emailSchemas.sendBulkEmailBody.omit({ familyIds: true }).extend({
+  familyIds: z.array(objectId).min(1).max(UNBOUNDED_LIST_CAP),
+})
+
+const FAMILY_ID_PAGE_SIZE = 100
 
 export interface BulkEmailPayload {
   subject: string
@@ -99,6 +108,27 @@ export async function sendBulkToFamily(opts: {
   return { ok: false, error: result.error || 'send failed' }
 }
 
+function dedupeFamilyIds(familyIds: string[]): string[] {
+  return [...new Set(familyIds)]
+}
+
+async function resolveFamilyIdsForJob(
+  organizationId: string,
+  familyIds: string[],
+): Promise<Types.ObjectId[]> {
+  const unique = dedupeFamilyIds(familyIds)
+  const found = await loadByIdsInChunks(
+    async (ids) =>
+      Family.find({ organizationId, _id: { $in: ids } })
+        .select('_id')
+        .lean<{ _id: Types.ObjectId }[]>(),
+    unique,
+    FAMILY_ID_PAGE_SIZE,
+  )
+  const valid = new Set(found.map((f) => String(f._id)))
+  return unique.filter((id) => valid.has(id)).map((id) => new Types.ObjectId(id))
+}
+
 async function enqueueBulkJob(opts: {
   organizationId: string
   userId: string
@@ -134,13 +164,21 @@ async function enqueueBulkJob(opts: {
     }
   }
 
+  const pending = await resolveFamilyIdsForJob(opts.organizationId, opts.familyIds)
+  if (pending.length === 0) {
+    return {
+      status: 400 as const,
+      data: { error: 'No valid family recipients found for this send.' },
+    }
+  }
+
   const job = await EmailJob.create({
     organizationId: opts.organizationId,
     userId: opts.userId,
     kind: 'communications',
     status: 'queued',
-    totalFamilies: opts.familyIds.length,
-    pending: opts.familyIds.map((id) => new Types.ObjectId(id)),
+    totalFamilies: pending.length,
+    pending,
     payload: opts.payload,
     startedAt: new Date(),
   })
@@ -152,7 +190,7 @@ async function enqueueBulkJob(opts: {
     resourceType: 'EmailJob',
     resourceId: job._id,
     metadata: {
-      familyCount: opts.familyIds.length,
+      familyCount: pending.length,
       campaignId: opts.payload.campaignId,
       subject: opts.payload.subject,
     },
@@ -177,7 +215,7 @@ async function enqueueBulkJob(opts: {
     status: 202 as const,
     data: {
       jobId: job._id.toString(),
-      totalFamilies: opts.familyIds.length,
+      totalFamilies: pending.length,
       status: 'queued',
       campaignId: opts.payload.campaignId,
     },
@@ -187,7 +225,7 @@ async function enqueueBulkJob(opts: {
 export const POST = handler({
   auth: 'org',
   minRole: 'admin',
-  body: emailSchemas.sendBulkEmailBody,
+  body: sendBulkEmailBody,
   query: emailSchemas.sendBulkEmailQuery,
   name: 'POST /api/emails/send-bulk',
   fn: async ({ ctx, body, query, request }) => {
@@ -212,29 +250,32 @@ export const POST = handler({
       campaignId: String(campaignId),
     }
 
-    const useAsync = query?.async === true || body.familyIds.length > ASYNC_FAMILY_THRESHOLD
+    const familyIds = dedupeFamilyIds(body.familyIds)
+    const useAsync = query?.async === true || familyIds.length > ASYNC_FAMILY_THRESHOLD
     if (useAsync) {
       return enqueueBulkJob({
         organizationId: ctx!.organizationId,
         userId: ctx!.userId,
-        familyIds: body.familyIds,
+        familyIds,
         payload,
         request: request as NextRequest,
       })
     }
 
-    const families = await Family.find({
-      organizationId: ctx!.organizationId,
-      _id: { $in: body.familyIds },
-    }).lean<any[]>()
+    const families = await loadByIdsInChunks(
+      async (ids) =>
+        Family.find({ organizationId: ctx!.organizationId, _id: { $in: ids } }).lean<any[]>(),
+      familyIds,
+      FAMILY_ID_PAGE_SIZE,
+    )
 
     const byId = new Map(families.map((f) => [String(f._id), f]))
     const results = { sent: 0, failed: 0, errors: [] as string[] }
-    const pacingMs = delayBetweenSendsMs(body.familyIds.length)
+    const pacingMs = delayBetweenSendsMs(familyIds.length)
     const attachments = parseBulkAttachments(body.attachments)
     let sendIndex = 0
 
-    for (const id of body.familyIds) {
+    for (const id of familyIds) {
       if (sendIndex > 0 && pacingMs > 0) {
         await sleep(pacingMs)
       }

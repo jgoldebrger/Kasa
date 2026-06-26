@@ -30,6 +30,7 @@ export const GET = handler({
         templates: rows.map((r) => ({
           _id: String(r._id),
           name: r.name,
+          category: r.category ?? 'general',
           subject: r.subject,
           html: r.html,
           text: r.text ?? null,
@@ -61,6 +62,7 @@ export const POST = handler({
     const doc = await EmailTemplate.create({
       organizationId: ctx!.organizationId,
       name: body.name,
+      category: body.category ?? 'general',
       subject: body.subject,
       html: body.html,
       text: body.text,
@@ -82,6 +84,7 @@ export const POST = handler({
       data: {
         _id: String(doc._id),
         name: doc.name,
+        category: doc.category ?? 'general',
         subject: doc.subject,
         html: doc.html,
         text: doc.text ?? null,

@@ -17,6 +17,7 @@ import { selfUrl } from '@/lib/jobs'
 import { logError } from '@/lib/log'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { createTransportWithFallback } from '@/lib/mail/create-transport'
+import { notifyAdmins } from '@/lib/notify'
 import {
   parseBulkAttachments,
   sendBulkToFamily,
@@ -26,6 +27,37 @@ import {
 export const dynamic = 'force-dynamic'
 
 const BATCH_SIZE = 5
+
+function isQuotaError(error: string | undefined): boolean {
+  return Boolean(error?.includes('Daily send quota exceeded'))
+}
+
+async function notifyJobFinished(opts: {
+  organizationId: string
+  jobId: string
+  status: 'completed' | 'failed'
+  sent: number
+  failed: number
+  lastError?: string | null
+  campaignId?: string
+}) {
+  const isFailed = opts.status === 'failed'
+  await notifyAdmins(opts.organizationId, {
+    kind: isFailed ? 'email.job.failed' : 'email.job.completed',
+    title: isFailed ? 'Bulk email job failed' : 'Bulk email job finished',
+    body: isFailed
+      ? opts.lastError || 'The communications email job did not complete.'
+      : `${opts.sent} sent, ${opts.failed} failed.`,
+    link: '/communications',
+    metadata: {
+      jobId: opts.jobId,
+      campaignId: opts.campaignId ?? null,
+      sent: opts.sent,
+      failed: opts.failed,
+      status: opts.status,
+    },
+  })
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -85,6 +117,14 @@ export async function POST(request: NextRequest) {
       job.lastError = 'Job payload is missing required fields'
       job.completedAt = new Date()
       await job.save()
+      await notifyJobFinished({
+        organizationId: String(job.organizationId),
+        jobId: String(job._id),
+        status: 'failed',
+        sent: job.sent ?? 0,
+        failed: job.failed ?? 0,
+        lastError: job.lastError,
+      })
       return NextResponse.json({ status: 'failed', error: job.lastError })
     }
 
@@ -103,6 +143,15 @@ export async function POST(request: NextRequest) {
       job.lastError = 'Email configuration was removed before completion'
       job.completedAt = new Date()
       await job.save()
+      await notifyJobFinished({
+        organizationId: String(job.organizationId),
+        jobId: String(job._id),
+        status: 'failed',
+        sent: job.sent ?? 0,
+        failed: job.failed ?? 0,
+        lastError: job.lastError,
+        campaignId: payload.campaignId,
+      })
       return NextResponse.json({ status: 'failed', error: job.lastError })
     }
 
@@ -112,6 +161,15 @@ export async function POST(request: NextRequest) {
       job.lastError = decryptFailureMessage(decrypted.reason)
       job.completedAt = new Date()
       await job.save()
+      await notifyJobFinished({
+        organizationId: String(job.organizationId),
+        jobId: String(job._id),
+        status: 'failed',
+        sent: job.sent ?? 0,
+        failed: job.failed ?? 0,
+        lastError: job.lastError,
+        campaignId: payload.campaignId,
+      })
       return NextResponse.json({ status: 'failed', error: job.lastError })
     }
 
@@ -154,6 +212,7 @@ export async function POST(request: NextRequest) {
     let failedInBatch = 0
     const newErrors: { familyId: string; email: string | null; error: string }[] = []
     let processedCount = 0
+    let quotaHit = false
 
     try {
       for (const familyId of batch) {
@@ -184,12 +243,18 @@ export async function POST(request: NextRequest) {
         if (result.ok) sentInBatch += 1
         else {
           failedInBatch += 1
+          const errMsg = result.error || 'Unknown error'
           if (job.errors.length + newErrors.length < 200) {
             newErrors.push({
               familyId: familyId.toString(),
               email: family.email || null,
-              error: result.error || 'Unknown error',
+              error: errMsg,
             })
+          }
+          if (isQuotaError(errMsg)) {
+            quotaHit = true
+            processedCount += 1
+            break
           }
         }
         processedCount += 1
@@ -237,6 +302,51 @@ export async function POST(request: NextRequest) {
       email: e.email || '',
       error: e.error,
     }))
+
+    if (quotaHit) {
+      const unprocessed = batch.slice(processedCount)
+      const requeue = [...unprocessed, ...remaining]
+      const quotaError =
+        newErrors.length > 0 ? newErrors[newErrors.length - 1].error : 'Daily send quota exceeded'
+
+      await EmailJob.updateOne(
+        { _id: job._id },
+        {
+          $inc: { sent: sentInBatch, failed: failedInBatch, processed: processedCount },
+          ...(errorPushes.length > 0 && { $push: { errors: { $each: errorPushes } } }),
+          $set: {
+            pending: requeue,
+            status: 'failed',
+            completedAt: new Date(),
+            lastError: quotaError,
+          },
+        },
+      )
+
+      await notifyAdmins(String(job.organizationId), {
+        kind: 'email.quota.exceeded',
+        title: 'Daily email send quota reached',
+        body: quotaError,
+        link: '/communications',
+        metadata: { jobId: String(job._id), campaignId: payload.campaignId },
+      })
+      await notifyJobFinished({
+        organizationId: String(job.organizationId),
+        jobId: String(job._id),
+        status: 'failed',
+        sent: (job.sent ?? 0) + sentInBatch,
+        failed: (job.failed ?? 0) + failedInBatch,
+        lastError: quotaError,
+        campaignId: payload.campaignId,
+      })
+
+      return NextResponse.json({
+        status: 'failed',
+        error: quotaError,
+        done: true,
+      })
+    }
+
     const hasMore = remaining.length > 0
     const set: Record<string, unknown> = {}
     if (newErrors.length > 0) {
@@ -255,6 +365,18 @@ export async function POST(request: NextRequest) {
         ...(Object.keys(set).length > 0 && { $set: set }),
       },
     )
+
+    if (!hasMore) {
+      await notifyJobFinished({
+        organizationId: String(job.organizationId),
+        jobId: String(job._id),
+        status: 'completed',
+        sent: (job.sent ?? 0) + sentInBatch,
+        failed: (job.failed ?? 0) + failedInBatch,
+        lastError: newErrors.length > 0 ? newErrors[newErrors.length - 1].error : null,
+        campaignId: payload.campaignId,
+      })
+    }
 
     if (hasMore) {
       const url = selfUrl(request, '/api/emails/send-bulk/worker')

@@ -7,7 +7,8 @@ import { isAllowedOutboundRecipient } from '@/lib/email-recipients'
 import { createTransportWithFallback } from './create-transport'
 import { applyEmailTracking } from './tracking-html'
 import { loadOrgEmailConfig, type OrgEmailConfigCreds } from './load-org-email-config'
-import { wrapEmailHtml } from './email-wrapper'
+import { notifyAdmins } from '@/lib/notify'
+import { wrapEmailHtml, type OrgPhysicalAddress } from './email-wrapper'
 import { buildUnsubscribeUrl, createUnsubscribeToken } from './unsubscribe-token'
 import { checkDailySendQuota } from './daily-send-quota'
 
@@ -87,13 +88,35 @@ async function trackDeliverabilityFailure(organizationId: string, to: string): P
 async function loadOrgBranding(organizationId: string): Promise<{
   orgName: string
   logoDataUrl: string | null
+  physicalAddress: OrgPhysicalAddress | null
 }> {
   const org = await Organization.findById(organizationId)
-    .select('name branding.logoDataUrl')
-    .lean<{ name?: string; branding?: { logoDataUrl?: string } }>()
+    .select('name branding.logoDataUrl letterhead')
+    .lean<{
+      name?: string
+      branding?: { logoDataUrl?: string }
+      letterhead?: OrgPhysicalAddress
+    }>()
+  const letterhead = org?.letterhead
+  const physicalAddress =
+    letterhead &&
+    (letterhead.addressLine1?.trim() ||
+      letterhead.addressLine2?.trim() ||
+      letterhead.city?.trim() ||
+      letterhead.state?.trim() ||
+      letterhead.zip?.trim())
+      ? {
+          addressLine1: letterhead.addressLine1,
+          addressLine2: letterhead.addressLine2,
+          city: letterhead.city,
+          state: letterhead.state,
+          zip: letterhead.zip,
+        }
+      : null
   return {
     orgName: org?.name || 'Kasa Family Management',
     logoDataUrl: org?.branding?.logoDataUrl || null,
+    physicalAddress,
   }
 }
 
@@ -118,6 +141,7 @@ async function prepareCustomHtml(
     orgName: branding.orgName,
     logoDataUrl: branding.logoDataUrl,
     unsubscribeUrl,
+    physicalAddress: branding.physicalAddress,
   })
 }
 
@@ -269,6 +293,16 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         resourceId: doc._id,
         metadata: { kind: input.kind, familyId: input.familyId ?? null },
         request: input.auditRequest,
+      })
+    }
+
+    if (input.kind === 'custom' || input.kind === 'statement' || input.kind === 'tax-receipt') {
+      void notifyAdmins(input.organizationId, {
+        kind: 'email.sent',
+        title: `Email sent (${input.kind})`,
+        body: `${subject} — ${to}`,
+        link: input.familyId ? `/families/${input.familyId}` : '',
+        metadata: { kind: input.kind, familyId: input.familyId ?? null, to },
       })
     }
 

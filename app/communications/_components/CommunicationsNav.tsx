@@ -17,6 +17,16 @@ const LINKS = [
     labelKey: 'communications.nav.scheduled',
     fallback: 'Scheduled',
   },
+  {
+    href: '/communications/jobs',
+    labelKey: 'communications.nav.jobs',
+    fallback: 'Job history',
+  },
+  {
+    href: '/communications/analytics',
+    labelKey: 'communications.nav.analytics',
+    fallback: 'Analytics',
+  },
 ] as const
 
 export default function CommunicationsNav() {

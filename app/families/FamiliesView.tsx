@@ -42,6 +42,7 @@ import {
 } from '@/app/components/ui'
 import TaskFormModal from '@/app/components/tasks/TaskFormModal'
 import EmailFamiliesModal from '@/app/families/_components/EmailFamiliesModal'
+import FamilyEmailIndicators from '@/app/families/_components/FamilyEmailIndicators'
 import { handleHebrewInput } from '@/lib/client/hebrew-input'
 
 const capitalizeName = (text: string): string => {
@@ -87,6 +88,8 @@ interface Family {
   memberCount?: number
   emailOptOut?: boolean
   communicationsOptOut?: boolean
+  emailDeliverabilityWarning?: boolean
+  emailFormatInvalid?: boolean
 }
 
 interface PaymentPlan {
@@ -741,12 +744,15 @@ export default function FamiliesView({
       headerText: t('common.name'),
       sortable: true,
       cell: (f) => (
-        <Link
-          href={`/families/${f._id}`}
-          className="font-medium text-accent hover:text-accent-hover hover:underline focus-ring rounded"
-        >
-          {f.name}
-        </Link>
+        <span className="inline-flex items-center gap-1.5">
+          <Link
+            href={`/families/${f._id}`}
+            className="font-medium text-accent hover:text-accent-hover hover:underline focus-ring rounded"
+          >
+            {f.name}
+          </Link>
+          <FamilyEmailIndicators family={f} compact />
+        </span>
       ),
       exportValue: (f) => f.name,
       filter: { type: 'text', placeholder: t('families.nameFilterPlaceholder') },
@@ -801,7 +807,12 @@ export default function FamiliesView({
       header: t('common.email'),
       headerText: t('common.email'),
       defaultHidden: true,
-      cell: (f) => <span className="text-fg-muted">{f.email || '—'}</span>,
+      cell: (f) => (
+        <span className="inline-flex items-center gap-1.5 text-fg-muted">
+          <span>{f.email || '—'}</span>
+          <FamilyEmailIndicators family={f} compact />
+        </span>
+      ),
       exportValue: (f) => f.email || '',
     },
     {

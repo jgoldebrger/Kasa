@@ -26,14 +26,9 @@
 
  */
 
-
-
 import { Notification, OrgMembership } from './models'
 
-
-
 export interface NotifyInput {
-
   kind: string
 
   title: string
@@ -43,15 +38,11 @@ export interface NotifyInput {
   link?: string
 
   metadata?: Record<string, unknown>
-
 }
-
-
 
 /** Kinds that must not be visible to org `member` role (legacy org-wide rows too). */
 
 export const ADMIN_ONLY_NOTIFICATION_KINDS = new Set([
-
   'dispute.opened',
 
   'payment.canceled',
@@ -60,24 +51,20 @@ export const ADMIN_ONLY_NOTIFICATION_KINDS = new Set([
 
   'invite.accepted',
 
+  'email.job.failed',
+
+  'email.quota.exceeded',
 ])
 
-
-
 export async function notifyUser(
-
   organizationId: string | unknown,
 
   userId: string | unknown,
 
   input: NotifyInput,
-
 ): Promise<void> {
-
   try {
-
     await Notification.create({
-
       organizationId,
 
       userId,
@@ -91,53 +78,34 @@ export async function notifyUser(
       link: input.link || '',
 
       metadata: input.metadata || {},
-
     })
-
   } catch (err) {
-
     console.error('[notify] notifyUser failed:', err)
-
   }
-
 }
-
-
 
 /** Notify every owner and admin in the org (per-user rows). */
 
 export async function notifyAdmins(
-
   organizationId: string | unknown,
 
   input: NotifyInput,
-
 ): Promise<void> {
-
   try {
-
     const admins = await OrgMembership.find({
-
       organizationId,
 
       role: { $in: ['owner', 'admin'] },
-
     })
 
       .select('userId')
 
       .lean<{ userId: unknown }[]>()
 
-
-
     if (admins.length === 0) return
 
-
-
     await Notification.insertMany(
-
       admins.map((m) => ({
-
         organizationId,
 
         userId: m.userId,
@@ -151,35 +119,22 @@ export async function notifyAdmins(
         link: input.link || '',
 
         metadata: input.metadata || {},
-
       })),
 
       { ordered: false },
-
     )
-
   } catch (err) {
-
     console.error('[notify] notifyAdmins failed:', err)
-
   }
-
 }
 
-
-
 export async function notifyOrg(
-
   organizationId: string | unknown,
 
   input: NotifyInput,
-
 ): Promise<void> {
-
   try {
-
     await Notification.create({
-
       organizationId,
 
       userId: null,
@@ -193,15 +148,8 @@ export async function notifyOrg(
       link: input.link || '',
 
       metadata: input.metadata || {},
-
     })
-
   } catch (err) {
-
     console.error('[notify] notifyOrg failed:', err)
-
   }
-
 }
-
-
