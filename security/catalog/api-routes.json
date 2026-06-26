@@ -1,18 +1,18 @@
 {
-  "generatedAt": "2026-06-26T11:55:20.635Z",
+  "generatedAt": "2026-06-26T12:08:51.065Z",
   "summary": {
-    "total": 204,
+    "total": 206,
     "byAuth": {
       "admin": 8,
       "org": 147,
       "nextauth": 2,
       "public": 14,
-      "cron": 18,
+      "cron": 20,
       "session": 10,
       "org-or-cron": 4,
       "webhook": 1
     },
-    "mutating": 105,
+    "mutating": 106,
     "tenantScoped": 151
   },
   "routes": [
@@ -1065,6 +1065,24 @@
       "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/jobs/send-scheduled-emails/route.ts"
+    },
+    {
+      "path": "/api/jobs/tick",
+      "method": "GET",
+      "auth": "cron",
+      "csrf": false,
+      "tenantScoped": false,
+      "dynamicParams": [],
+      "source": "app/api/jobs/tick/route.ts"
+    },
+    {
+      "path": "/api/jobs/tick",
+      "method": "POST",
+      "auth": "cron",
+      "csrf": true,
+      "tenantScoped": false,
+      "dynamicParams": [],
+      "source": "app/api/jobs/tick/route.ts"
     },
     {
       "path": "/api/jobs/wedding-converter",

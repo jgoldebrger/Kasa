@@ -24,31 +24,7 @@
   },
   "crons": [
     {
-      "path": "/api/jobs/generate-monthly-statements",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/jobs/send-monthly-statements",
-      "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/jobs/process-recurring-payments",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/jobs/cycle-rollover",
-      "schedule": "0 1 * * *"
-    },
-    {
-      "path": "/api/jobs/wedding-converter",
-      "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/jobs/ops-digest",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/api/jobs/send-scheduled-emails",
+      "path": "/api/jobs/tick",
       "schedule": "*/15 * * * *"
     }
   ]

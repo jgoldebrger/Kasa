@@ -57,15 +57,17 @@ Wait for CI / Vercel to finish the new deployment, then re-run the smoke test ab
 
 ## Verify cron jobs after deploy
 
-KASA defines five crons in `vercel.json` (requires **Vercel Pro** for more than two cron jobs):
+KASA uses a **single** Vercel cron on Hobby (`/api/jobs/tick` every 15 minutes). That dispatcher fans out to the individual job routes on their original UTC schedules (see `lib/route-logic/jobs/cron-schedule.ts`).
 
-| Path | Schedule (UTC) |
-| ---- | -------------- |
-| `/api/jobs/cycle-rollover` | `0 1 * * *` |
-| `/api/jobs/generate-monthly-statements` | `0 2 * * *` |
-| `/api/jobs/process-recurring-payments` | `0 2 * * *` |
-| `/api/jobs/send-monthly-statements` | `0 3 * * *` |
-| `/api/jobs/wedding-converter` | `0 4 * * *` |
+| Trigger         | Path(s)                                                                         |
+| --------------- | ------------------------------------------------------------------------------- |
+| Every 15 min    | `/api/jobs/send-scheduled-emails`                                               |
+| Daily 01:00 UTC | `/api/jobs/cycle-rollover`                                                      |
+| Daily 02:00 UTC | `/api/jobs/generate-monthly-statements`, `/api/jobs/process-recurring-payments` |
+| Daily 03:00 UTC | `/api/jobs/send-monthly-statements`                                             |
+| Daily 04:00 UTC | `/api/jobs/wedding-converter`                                                   |
+| Daily 05:00 UTC | `/api/jobs/run-email-drips`                                                     |
+| Daily 08:00 UTC | `/api/jobs/ops-digest`                                                          |
 
 After rollback, confirm `CRON_SECRET` in Vercel env matches what cron invocations send (`Authorization: Bearer` or `x-cron-secret`).
 

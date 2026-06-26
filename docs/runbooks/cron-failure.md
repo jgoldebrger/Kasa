@@ -8,7 +8,9 @@
 
 ## Architecture
 
-Cron entry points live under `/api/jobs/*` (see `vercel.json`). Each route:
+Cron entry points live under `/api/jobs/*`. **Vercel Hobby** runs one scheduled trigger: `GET/POST /api/jobs/tick` every 15 minutes (`vercel.json`), which invokes the job routes below. Individual routes remain available for manual replay.
+
+Each route:
 
 - Authenticates via `CRON_SECRET` (`x-cron-secret` or `Authorization: Bearer`)
 - Uses distributed locks (`lib/cron-lock.ts`) to prevent duplicate runs
@@ -22,6 +24,9 @@ Cron entry points live under `/api/jobs/*` (see `vercel.json`). Each route:
 | Process recurring   | `/api/jobs/process-recurring-payments`  | Saved cards not charged            |
 | Send statements     | `/api/jobs/send-monthly-statements`     | Families did not receive PDF email |
 | Wedding converter   | `/api/jobs/wedding-converter`           | Children not converted to families |
+| Scheduled comms     | `/api/jobs/send-scheduled-emails`       | Pending communications not sent    |
+| Email drips         | `/api/jobs/run-email-drips`             | Automation rules not firing        |
+| Ops digest          | `/api/jobs/ops-digest`                  | No daily failure email to admins   |
 
 CLI equivalents exist for some jobs (`npm run generate-statements`, etc.) but production should use the API routes with `CRON_SECRET`.
 
@@ -77,7 +82,7 @@ curl -X POST "https://<domain>/api/jobs/generate-monthly-statements?cursor=<orgI
 
 - Keep `CRON_SECRET` rotated only with a coordinated Vercel env update.
 - Monitor `/api/health` — cron jobs depend on MongoDB.
-- Vercel **Pro** plan is required for all five crons in `vercel.json`.
+- Hobby plan: one Vercel cron (`/api/jobs/tick`); Pro is only needed if you split jobs into separate `vercel.json` entries again.
 - Set `SENTRY_DSN` so cron 500s page on-call.
 
 ## Escalation
