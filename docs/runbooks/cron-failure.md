@@ -8,7 +8,7 @@
 
 ## Architecture
 
-Cron entry points live under `/api/jobs/*`. **Vercel Hobby** runs one scheduled trigger: `GET/POST /api/jobs/tick` every 15 minutes (`vercel.json`), which invokes the job routes below. Individual routes remain available for manual replay.
+Cron entry points live under `/api/jobs/*`. **Vercel Hobby** runs one scheduled trigger: `GET/POST /api/jobs/tick` once per day (`0 8 * * *` in `vercel.json`), which invokes all job routes in sequence. Individual routes remain available for manual replay.
 
 Each route:
 
@@ -82,7 +82,7 @@ curl -X POST "https://<domain>/api/jobs/generate-monthly-statements?cursor=<orgI
 
 - Keep `CRON_SECRET` rotated only with a coordinated Vercel env update.
 - Monitor `/api/health` — cron jobs depend on MongoDB.
-- Hobby plan: one Vercel cron (`/api/jobs/tick`); Pro is only needed if you split jobs into separate `vercel.json` entries again.
+- Hobby plan: one daily Vercel cron (`/api/jobs/tick`); set `CRON_TICK_MODE=frequent` and `*/15 * * * *` on Pro for finer scheduling.
 - Set `SENTRY_DSN` so cron 500s page on-call.
 
 ## Escalation

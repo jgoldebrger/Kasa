@@ -57,17 +57,11 @@ Wait for CI / Vercel to finish the new deployment, then re-run the smoke test ab
 
 ## Verify cron jobs after deploy
 
-KASA uses a **single** Vercel cron on Hobby (`/api/jobs/tick` every 15 minutes). That dispatcher fans out to the individual job routes on their original UTC schedules (see `lib/route-logic/jobs/cron-schedule.ts`).
+KASA uses a **single** Vercel cron: `/api/jobs/tick` at **`0 8 * * *`** (once daily, ~8:00–8:59 UTC on Hobby).
 
-| Trigger         | Path(s)                                                                         |
-| --------------- | ------------------------------------------------------------------------------- |
-| Every 15 min    | `/api/jobs/send-scheduled-emails`                                               |
-| Daily 01:00 UTC | `/api/jobs/cycle-rollover`                                                      |
-| Daily 02:00 UTC | `/api/jobs/generate-monthly-statements`, `/api/jobs/process-recurring-payments` |
-| Daily 03:00 UTC | `/api/jobs/send-monthly-statements`                                             |
-| Daily 04:00 UTC | `/api/jobs/wedding-converter`                                                   |
-| Daily 05:00 UTC | `/api/jobs/run-email-drips`                                                     |
-| Daily 08:00 UTC | `/api/jobs/ops-digest`                                                          |
+**Hobby limit:** Vercel only allows cron expressions that run **once per day**. The tick runs all background jobs in one batch (see `ALL_DAILY_TICK_JOBS` in `lib/route-logic/jobs/cron-schedule.ts`). Scheduled communications emails therefore process at most once per day on Hobby.
+
+**Pro upgrade:** Set Vercel env `CRON_TICK_MODE=frequent` and change `vercel.json` schedule to `*/15 * * * *` to restore 15-minute scheduled-email processing and staggered hourly daily jobs.
 
 After rollback, confirm `CRON_SECRET` in Vercel env matches what cron invocations send (`Authorization: Bearer` or `x-cron-secret`).
 

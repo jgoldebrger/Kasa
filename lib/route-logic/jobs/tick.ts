@@ -1,12 +1,10 @@
 /**
- * Unified cron dispatcher for Vercel Hobby (single crons[] slot).
+ * Unified cron dispatcher (single vercel.json crons[] entry).
  *
  * GET/POST /api/jobs/tick — secured by CRON_SECRET.
  *
- * Schedule: every 15 minutes via vercel.json.
- *   - Always runs send-scheduled-emails.
- *   - At UTC :00, also triggers daily jobs for that hour (separate
- *     serverless invocations via internal fetch).
+ * Hobby (default): vercel.json `0 8 * * *` — runs all jobs once per day.
+ * Pro: set CRON_TICK_MODE=frequent and a 15-minute vercel.json schedule.
  */
 
 import { handler } from '@/lib/api/handler'
