@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/app/components/Toast'
+import { notifySupportModeChanged } from '@/lib/client/support-mode'
 import { PLATFORM_ADMIN_2FA_REQUIRED_CODE } from '@/lib/platform-admin-constants'
 import {
   Alert,
@@ -102,6 +103,7 @@ export default function AdminHubPage() {
         return
       }
       toast.success('Exited support mode.')
+      notifySupportModeChanged({ active: false })
       await load()
       router.refresh()
     } catch {

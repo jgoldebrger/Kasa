@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/app/components/Toast'
+import { notifySupportModeChanged } from '@/lib/client/support-mode'
 import { PLATFORM_ADMIN_2FA_REQUIRED_CODE } from '@/lib/platform-admin-constants'
 import {
   Alert,
@@ -119,6 +120,10 @@ export default function OnboardingAdminPage() {
         return
       }
       toast.success(`Now viewing ${org.name} as admin.`)
+      notifySupportModeChanged({
+        active: true,
+        organizationName: data.organizationName || org.name,
+      })
       router.push(data.redirectTo || '/')
       router.refresh()
     } catch {

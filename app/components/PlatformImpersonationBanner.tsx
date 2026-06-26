@@ -1,10 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Button } from '@/app/components/ui'
 import { useToast } from '@/app/components/Toast'
+import {
+  SUPPORT_MODE_CHANGED,
+  notifySupportModeChanged,
+  type SupportModeDetail,
+} from '@/lib/client/support-mode'
 
 interface ImpersonationState {
   active: boolean
@@ -13,6 +18,7 @@ interface ImpersonationState {
 
 export default function PlatformImpersonationBanner() {
   const router = useRouter()
+  const pathname = usePathname()
   const toast = useToast()
   const { data: session } = useSession()
   const [state, setState] = useState<ImpersonationState | null>(null)
@@ -45,7 +51,20 @@ export default function PlatformImpersonationBanner() {
 
   useEffect(() => {
     void refresh()
-  }, [refresh])
+  }, [refresh, pathname])
+
+  useEffect(() => {
+    const onSupportModeChanged = (event: Event) => {
+      const detail = (event as CustomEvent<SupportModeDetail>).detail
+      if (!detail || typeof detail.active !== 'boolean') return
+      setState({
+        active: detail.active,
+        organizationName: detail.organizationName,
+      })
+    }
+    window.addEventListener(SUPPORT_MODE_CHANGED, onSupportModeChanged)
+    return () => window.removeEventListener(SUPPORT_MODE_CHANGED, onSupportModeChanged)
+  }, [])
 
   if (!isPlatformAdmin) return null
 
@@ -59,7 +78,7 @@ export default function PlatformImpersonationBanner() {
         return
       }
       toast.success('Exited support mode.')
-      setState({ active: false })
+      notifySupportModeChanged({ active: false })
       router.push('/admin')
       router.refresh()
     } catch {
