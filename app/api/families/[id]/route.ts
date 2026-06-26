@@ -1,1 +1,1 @@
-export { DELETE, GET, PUT } from '@/lib/api-handlers/families/[id]/handler'
+export { DELETE, GET, PATCH, PUT } from '@/lib/api-handlers/families/[id]/handler'

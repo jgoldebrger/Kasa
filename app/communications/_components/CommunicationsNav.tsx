@@ -27,6 +27,11 @@ const LINKS = [
     labelKey: 'communications.nav.analytics',
     fallback: 'Analytics',
   },
+  {
+    href: '/communications/automations',
+    labelKey: 'communications.nav.automations',
+    fallback: 'Automations',
+  },
 ] as const
 
 export default function CommunicationsNav() {

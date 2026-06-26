@@ -8,6 +8,7 @@
  */
 
 import { handler } from '@/lib/api/handler'
+import { JobRun } from '@/lib/models'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { selfUrl } from '@/lib/jobs'
 import { jobsForTick } from './cron-schedule'
@@ -67,21 +68,58 @@ export const POST = handler({
     const utcMinute = now.getUTCMinutes()
     const paths = jobsForTick(utcHour, utcMinute)
 
-    const results: CronJobResult[] = []
-    for (const path of paths) {
-      results.push(await invokeCronJob(request, path))
-    }
+    const jobRun = await JobRun.create({
+      name: JOB_NAME,
+      status: 'running',
+      startedAt: now,
+      metadata: { utcHour, utcMinute, jobs: paths },
+    })
 
-    const failed = results.filter((r) => !r.ok)
-    return {
-      data: {
-        ranAt: now.toISOString(),
-        utcHour,
-        utcMinute,
-        jobs: paths,
-        results,
-        ok: failed.length === 0,
-      },
+    try {
+      const results: CronJobResult[] = []
+      for (const path of paths) {
+        results.push(await invokeCronJob(request, path))
+      }
+
+      const failed = results.filter((r) => !r.ok)
+      await JobRun.findByIdAndUpdate(jobRun._id, {
+        status: 'completed',
+        completedAt: new Date(),
+        processed: results.length,
+        failed: failed.length,
+        metadata: {
+          utcHour,
+          utcMinute,
+          jobs: paths,
+          results,
+          ok: failed.length === 0,
+          ranAt: now.toISOString(),
+        },
+        lastError:
+          failed.length > 0
+            ? `Child jobs failed: ${failed.map((r) => r.path).join(', ')}`
+            : undefined,
+      })
+
+      return {
+        data: {
+          jobRunId: String(jobRun._id),
+          ranAt: now.toISOString(),
+          utcHour,
+          utcMinute,
+          jobs: paths,
+          results,
+          ok: failed.length === 0,
+        },
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      await JobRun.findByIdAndUpdate(jobRun._id, {
+        status: 'failed',
+        completedAt: new Date(),
+        lastError: message,
+      })
+      throw err
     }
   },
 })

@@ -58,6 +58,10 @@ export const GET = handler({
     since.setUTCDate(since.getUTCDate() - days)
     since.setUTCHours(0, 0, 0, 0)
 
+    const topCampaignsSince = new Date()
+    topCampaignsSince.setUTCDate(topCampaignsSince.getUTCDate() - 30)
+    topCampaignsSince.setUTCHours(0, 0, 0, 0)
+
     const orgOid = new Types.ObjectId(ctx!.organizationId)
     const baseMatch = {
       organizationId: orgOid,
@@ -65,7 +69,7 @@ export const GET = handler({
       createdAt: { $gte: since },
     }
 
-    const [statusAgg, openedAgg, clickedAgg] = await Promise.all([
+    const [statusAgg, openedAgg, clickedAgg, topCampaignsAgg] = await Promise.all([
       EmailMessage.aggregate([
         { $match: baseMatch },
         {
@@ -105,6 +109,26 @@ export const GET = handler({
             count: { $sum: 1 },
           },
         },
+      ]),
+      EmailMessage.aggregate([
+        {
+          $match: {
+            organizationId: orgOid,
+            kind: 'custom',
+            campaignId: { $exists: true, $ne: null },
+            createdAt: { $gte: topCampaignsSince },
+            status: { $in: [...SENT_STATUSES] },
+          },
+        },
+        {
+          $group: {
+            _id: '$campaignId',
+            sent: { $sum: 1 },
+            subject: { $first: '$subject' },
+          },
+        },
+        { $sort: { sent: -1 } },
+        { $limit: 10 },
       ]),
     ])
 
@@ -158,12 +182,19 @@ export const GET = handler({
       failureRate: delivered + totals.failed > 0 ? totals.failed / (delivered + totals.failed) : 0,
     }
 
+    const topCampaigns = topCampaignsAgg.map((row) => ({
+      campaignId: String(row._id),
+      subject: row.subject ?? '',
+      sent: row.sent ?? 0,
+    }))
+
     return {
       data: {
         days,
         totals: { ...totals, total: delivered + totals.failed },
         rates,
         buckets,
+        topCampaigns,
       },
     }
   },

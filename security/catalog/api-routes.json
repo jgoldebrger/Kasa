@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-06-26T12:08:51.065Z",
+  "generatedAt": "2026-06-26T12:31:12.562Z",
   "summary": {
-    "total": 206,
+    "total": 216,
     "byAuth": {
       "admin": 8,
-      "org": 147,
+      "org": 157,
       "nextauth": 2,
       "public": 14,
       "cron": 20,
@@ -12,8 +12,8 @@
       "org-or-cron": 4,
       "webhook": 1
     },
-    "mutating": 106,
-    "tenantScoped": 151
+    "mutating": 112,
+    "tenantScoped": 161
   },
   "routes": [
     {
@@ -327,6 +327,66 @@
       "source": "app/api/dues-recommendation/route.ts"
     },
     {
+      "path": "/api/email-automation-rules",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "member",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/email-automation-rules/route.ts"
+    },
+    {
+      "path": "/api/email-automation-rules",
+      "method": "POST",
+      "auth": "org",
+      "minRole": "member",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/email-automation-rules/route.ts"
+    },
+    {
+      "path": "/api/email-automation-rules/:id",
+      "method": "DELETE",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": ["id"],
+      "source": "app/api/email-automation-rules/[id]/route.ts"
+    },
+    {
+      "path": "/api/email-automation-rules/:id",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": ["id"],
+      "source": "app/api/email-automation-rules/[id]/route.ts"
+    },
+    {
+      "path": "/api/email-automation-rules/:id",
+      "method": "PUT",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": ["id"],
+      "source": "app/api/email-automation-rules/[id]/route.ts"
+    },
+    {
+      "path": "/api/email-automation-rules/:id/run",
+      "method": "POST",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": ["id"],
+      "source": "app/api/email-automation-rules/[id]/run/route.ts"
+    },
+    {
       "path": "/api/email-config",
       "method": "GET",
       "auth": "org",
@@ -524,6 +584,16 @@
       "source": "app/api/emails/attach-statement/route.ts"
     },
     {
+      "path": "/api/emails/attach-tax-receipt",
+      "method": "POST",
+      "auth": "org",
+      "minRole": "member",
+      "csrf": true,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/emails/attach-tax-receipt/route.ts"
+    },
+    {
       "path": "/api/emails/campaign/:campaignId",
       "method": "GET",
       "auth": "org",
@@ -542,6 +612,16 @@
       "tenantScoped": true,
       "dynamicParams": [],
       "source": "app/api/emails/jobs/route.ts"
+    },
+    {
+      "path": "/api/emails/quota",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/emails/quota/route.ts"
     },
     {
       "path": "/api/emails/retry-failed",
@@ -639,6 +719,16 @@
       "auth": "org",
       "minRole": "member",
       "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": ["id"],
+      "source": "app/api/families/[id]/route.ts"
+    },
+    {
+      "path": "/api/families/:id",
+      "method": "PATCH",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": true,
       "tenantScoped": true,
       "dynamicParams": ["id"],
       "source": "app/api/families/[id]/route.ts"
@@ -1083,6 +1173,16 @@
       "tenantScoped": false,
       "dynamicParams": [],
       "source": "app/api/jobs/tick/route.ts"
+    },
+    {
+      "path": "/api/jobs/tick-status",
+      "method": "GET",
+      "auth": "org",
+      "minRole": "admin",
+      "csrf": false,
+      "tenantScoped": true,
+      "dynamicParams": [],
+      "source": "app/api/jobs/tick-status/route.ts"
     },
     {
       "path": "/api/jobs/wedding-converter",

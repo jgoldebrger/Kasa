@@ -7,7 +7,7 @@ import { useToast } from '@/app/components/Toast'
 import { Button, Card, EmptyState, PageHeader, Select, SkeletonRows } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
 import CommunicationsNav from './CommunicationsNav'
-import type { EmailAnalytics } from './types'
+import type { EmailAnalytics, TopCampaignRow } from './types'
 
 const PERIOD_OPTIONS = ['30', '90'] as const
 
@@ -24,7 +24,22 @@ export default function AnalyticsView() {
       const res = await fetch(`/api/emails/analytics?days=${period}`)
       if (!res.ok) throw new Error('Failed to load analytics')
       const json = await res.json()
-      setData((json.data ?? json) as EmailAnalytics)
+      const raw = (json.data ?? json) as Record<string, unknown>
+      const totals = (raw.totals ?? raw.summary ?? {}) as Record<string, number | undefined>
+      const rates = (raw.rates ?? {}) as Record<string, number | undefined>
+      const normalized: EmailAnalytics = {
+        summary: {
+          sent: totals.sent ?? 0,
+          opened: totals.opened ?? 0,
+          clicked: totals.clicked ?? 0,
+          failed: totals.failed ?? 0,
+          openRate: rates.openRate ?? (raw.summary as EmailAnalytics['summary'])?.openRate,
+          clickRate: rates.clickRate ?? (raw.summary as EmailAnalytics['summary'])?.clickRate,
+        },
+        buckets: (raw.buckets ?? raw.daily) as EmailAnalytics['buckets'],
+        topCampaigns: raw.topCampaigns as TopCampaignRow[] | undefined,
+      }
+      setData(normalized)
     } catch {
       toast.error(t('communications.analytics.loadError'))
       setData(null)
@@ -43,6 +58,7 @@ export default function AnalyticsView() {
 
   const summary = data?.summary
   const buckets = data?.buckets ?? data?.daily ?? []
+  const topCampaigns = data?.topCampaigns ?? []
 
   const formatRate = (rate?: number) => (rate != null ? `${Math.round(rate * 100)}%` : '—')
 
@@ -143,6 +159,52 @@ export default function AnalyticsView() {
                           <td className="px-4 py-2 tabular text-right">{row.clicked ?? 0}</td>
                           <td className="px-4 py-2 tabular text-right text-danger">
                             {row.failed ?? 0}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+
+            {topCampaigns.length > 0 && (
+              <Card className="overflow-hidden">
+                <div className="p-4 border-b border-border">
+                  <h2 className="text-sm font-medium text-fg">
+                    {t('communications.analytics.topCampaigns')}
+                  </h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-app-subtle/50 text-left text-fg-muted">
+                        <th className="px-4 py-2 font-medium">
+                          {t('communications.analytics.campaignSubject')}
+                        </th>
+                        <th className="px-4 py-2 font-medium text-right">
+                          {t('communications.analytics.sent')}
+                        </th>
+                        <th className="px-4 py-2 font-medium text-right">
+                          {t('communications.analytics.openRate')}
+                        </th>
+                        <th className="px-4 py-2 font-medium text-right">
+                          {t('communications.analytics.clickRate')}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {topCampaigns.map((row) => (
+                        <tr key={row.campaignId} className="border-b border-border last:border-0">
+                          <td className="px-4 py-2 text-fg max-w-xs truncate">
+                            {row.subject || row.campaignId}
+                          </td>
+                          <td className="px-4 py-2 tabular text-right">{row.sent ?? 0}</td>
+                          <td className="px-4 py-2 tabular text-right">
+                            {formatRate(row.openRate)}
+                          </td>
+                          <td className="px-4 py-2 tabular text-right">
+                            {formatRate(row.clickRate)}
                           </td>
                         </tr>
                       ))}

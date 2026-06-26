@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { ArrowPathIcon } from '@heroicons/react/24/outline'
-import { Modal, Button, SkeletonRows } from '@/app/components/ui'
+import { Modal, Button, SkeletonRows, Badge } from '@/app/components/ui'
 import { useToast } from '@/app/components/Toast'
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
-import type { CampaignStats } from './types'
+import type { CampaignStats, CampaignSubjectVariantStats } from './types'
 
 interface CampaignStatsModalProps {
   open: boolean
@@ -20,6 +20,14 @@ function resolveRates(stats: CampaignStats) {
   const openRate = stats.openRate ?? (sent > 0 ? stats.opened / sent : 0)
   const clickRate = stats.clickRate ?? (sent > 0 ? stats.clicked / sent : 0)
   return { openRate, clickRate }
+}
+
+function resolveVariantRates(variant: CampaignSubjectVariantStats) {
+  const sentA = variant.sentA ?? 0
+  const sentB = variant.sentB ?? 0
+  const openRateA = variant.openRateA ?? (sentA > 0 ? (variant.openedA ?? 0) / sentA : 0)
+  const openRateB = variant.openRateB ?? (sentB > 0 ? (variant.openedB ?? 0) / sentB : 0)
+  return { openRateA, openRateB }
 }
 
 export default function CampaignStatsModal({
@@ -71,6 +79,10 @@ export default function CampaignStatsModal({
   const rates = stats ? resolveRates(stats) : null
   const topLinks = stats?.topLinks ?? []
   const failedCount = stats?.failed ?? 0
+  const subjectVariant = stats?.subjectVariant
+  const variantRates = subjectVariant ? resolveVariantRates(subjectVariant) : null
+  const hasAbTest =
+    subjectVariant && ((subjectVariant.sentA ?? 0) > 0 || (subjectVariant.sentB ?? 0) > 0)
 
   const retryFailed = async () => {
     if (!campaignId) return
@@ -152,6 +164,73 @@ export default function CampaignStatsModal({
               </dd>
             </div>
           </dl>
+
+          {hasAbTest && subjectVariant && variantRates && (
+            <div>
+              <h3 className="text-sm font-medium text-fg mb-3">
+                {t('communications.abTest.title' as MessageKey, 'A/B subject test')}
+              </h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {(
+                  [
+                    {
+                      key: 'A' as const,
+                      subject: subjectVariant.subjectA,
+                      sent: subjectVariant.sentA ?? 0,
+                      opened: subjectVariant.openedA ?? 0,
+                      rate: variantRates.openRateA,
+                    },
+                    {
+                      key: 'B' as const,
+                      subject: subjectVariant.subjectB,
+                      sent: subjectVariant.sentB ?? 0,
+                      opened: subjectVariant.openedB ?? 0,
+                      rate: variantRates.openRateB,
+                    },
+                  ] as const
+                ).map((row) => {
+                  const isWinner = subjectVariant.winner === row.key
+                  const isTie = subjectVariant.winner === 'tie'
+                  return (
+                    <div
+                      key={row.key}
+                      className={`rounded-lg border p-3 ${
+                        isWinner ? 'border-accent bg-accent/5' : 'border-border'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-semibold text-fg-muted">
+                          {row.key === 'A'
+                            ? t('communications.abTest.subjectA')
+                            : t('communications.abTest.subjectB')}
+                        </span>
+                        {isWinner && (
+                          <Badge size="sm" variant="success">
+                            {t('communications.abTest.winner')}
+                          </Badge>
+                        )}
+                        {isTie && (
+                          <Badge size="sm" variant="default">
+                            {t('communications.abTest.tie')}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-fg font-medium truncate" title={row.subject}>
+                        {row.subject || '—'}
+                      </p>
+                      <p className="text-xs text-fg-muted mt-2 tabular">
+                        {t('communications.abTest.stats')
+                          .replace('{opened}', String(row.opened))
+                          .replace('{sent}', String(row.sent))
+                          .replace('{rate}', formatRate(row.rate))}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+              <p className="text-xs text-fg-muted mt-2">{t('communications.abTest.hint')}</p>
+            </div>
+          )}
 
           {topLinks.length > 0 && (
             <div>

@@ -17,7 +17,13 @@ import type { MessageKey } from '@/lib/i18n/load-locale'
 import EmailComposeEditor from './EmailComposeEditor'
 import EmailPreviewModal from './EmailPreviewModal'
 import RecipientList from './RecipientList'
+import {
+  filterFamiliesBySegment,
+  isSelectableFamily,
+  type RecipientSegment,
+} from './recipient-segments'
 import { markdownToHtml, markdownToPlainText } from './email-utils'
+import { tomorrowMorningLocal, useEmailQuota } from './useEmailQuota'
 import type { EmailAttachment, EmailDraft, EmailTemplate, FamilyOption } from './types'
 
 const MAX_ATTACHMENTS = 3
@@ -28,6 +34,8 @@ const QUOTA_THRESHOLD = 50
 interface ComposeTabProps {
   families: FamilyOption[]
   loadingFamilies: boolean
+  hasBalanceData?: boolean
+  initialFamilyId?: string | null
   onSent: (result: { sent: number; failed: number; campaignId?: string }) => void
   onJobStarted?: (info: { jobId: string; totalFamilies: number; campaignId?: string }) => void
 }
@@ -35,6 +43,8 @@ interface ComposeTabProps {
 export default function ComposeTab({
   families,
   loadingFamilies,
+  hasBalanceData = true,
+  initialFamilyId,
   onSent,
   onJobStarted,
 }: ComposeTabProps) {
@@ -52,6 +62,9 @@ export default function ComposeTab({
   const [savingDraft, setSavingDraft] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [attachingStatement, setAttachingStatement] = useState(false)
+  const [attachingTaxReceipt, setAttachingTaxReceipt] = useState(false)
+  const [recipientSegment, setRecipientSegment] = useState<RecipientSegment>('all')
+  const { quota } = useEmailQuota()
 
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [drafts, setDrafts] = useState<EmailDraft[]>([])
@@ -62,7 +75,7 @@ export default function ComposeTab({
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const skipAutoSaveRef = useRef(false)
 
-  const selectableFamilies = families.filter((f) => f.email && !f.emailOptOut)
+  const selectableFamilies = families.filter(isSelectableFamily)
 
   const selectedFamilies = selectableFamilies.filter((f) => selectedIds.has(f._id))
   const deliverabilityWarnings = selectedFamilies.filter((f) => f.emailDeliverabilityWarning)
@@ -111,8 +124,18 @@ export default function ComposeTab({
   }
 
   const selectAll = () => {
-    setSelectedIds(new Set(selectableFamilies.map((f) => f._id)))
+    const inSegment = filterFamiliesBySegment(families, recipientSegment).filter(isSelectableFamily)
+    setSelectedIds(new Set(inSegment.map((f) => f._id)))
   }
+
+  useEffect(() => {
+    if (!initialFamilyId || loadingFamilies) return
+    const match = families.find((f) => f._id === initialFamilyId)
+    if (match && isSelectableFamily(match)) {
+      setSelectedIds(new Set([initialFamilyId]))
+      setRecipientSegment('all')
+    }
+  }, [initialFamilyId, loadingFamilies, families])
 
   const applyTemplate = (templateId: string) => {
     setSelectedTemplateId(templateId)
@@ -280,6 +303,43 @@ export default function ComposeTab({
     }
   }
 
+  const attachTaxReceipt = async () => {
+    if (!singleSelectedFamilyId) {
+      toast.error(t('communications.taxReceipt.selectOne'))
+      return
+    }
+    if (attachments.length >= MAX_ATTACHMENTS) {
+      toast.error(t('communications.attachments.maxFiles'))
+      return
+    }
+    setAttachingTaxReceipt(true)
+    try {
+      const res = await fetch('/api/emails/attach-tax-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ familyId: singleSelectedFamilyId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Failed to attach tax receipt')
+      const filename = String(data.filename ?? 'tax-receipt.pdf')
+      const content = String(data.contentBase64 ?? data.content ?? '')
+      if (!content) throw new Error('No PDF returned')
+      setAttachments((prev) => [
+        ...prev,
+        {
+          filename,
+          content,
+          contentType: 'application/pdf',
+        },
+      ])
+      toast.success(t('communications.taxReceipt.attached'))
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : t('communications.taxReceipt.error'))
+    } finally {
+      setAttachingTaxReceipt(false)
+    }
+  }
+
   const buildPayload = () => {
     const html = markdownToHtml(body)
     const text = markdownToPlainText(body)
@@ -417,6 +477,15 @@ export default function ComposeTab({
     selectableFamilies[0]?.name ??
     'Sample Family'
 
+  const remainingQuota = quota?.remaining
+  const overQuota =
+    remainingQuota != null && selectedIds.size > 0 && selectedIds.size > remainingQuota
+  const scheduleSuggested = overQuota && !scheduledAt
+
+  const applyTomorrowSchedule = () => {
+    setScheduledAt(tomorrowMorningLocal())
+  }
+
   return (
     <>
       <Card className="p-4 sm:p-6 space-y-4">
@@ -480,6 +549,9 @@ export default function ComposeTab({
           families={families}
           loading={loadingFamilies}
           selectedIds={selectedIds}
+          segment={recipientSegment}
+          onSegmentChange={setRecipientSegment}
+          hasBalanceData={hasBalanceData}
           onToggle={toggleFamily}
           onSelectAll={selectAll}
         />
@@ -522,6 +594,17 @@ export default function ComposeTab({
               onClick={() => void attachStatement()}
             >
               {t('communications.statement.attach')}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              loading={attachingTaxReceipt}
+              disabled={!singleSelectedFamilyId || attachments.length >= MAX_ATTACHMENTS}
+              leftIcon={<DocumentTextIcon className="h-4 w-4" />}
+              onClick={() => void attachTaxReceipt()}
+            >
+              {t('communications.taxReceipt.attach')}
             </Button>
             <span className="text-xs text-fg-muted">{t('communications.attachments.hint')}</span>
           </div>
@@ -567,6 +650,26 @@ export default function ComposeTab({
           onChange={(e) => setScheduledAt(e.target.value)}
         />
 
+        {scheduleSuggested && (
+          <Alert variant="warning" title={t('communications.quota.exceededTitle')}>
+            <p className="text-sm">
+              {t('communications.quota.exceededMessage')
+                .replace('{selected}', String(selectedIds.size))
+                .replace('{remaining}', String(remainingQuota ?? 0))}
+            </p>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="mt-2"
+              leftIcon={<ClockIcon className="h-4 w-4" />}
+              onClick={applyTomorrowSchedule}
+            >
+              {t('communications.quota.scheduleTomorrow')}
+            </Button>
+          </Alert>
+        )}
+
         {selectedIds.size > QUOTA_THRESHOLD && (
           <Alert variant="warning" title={t('communications.quota.title')}>
             {t('communications.quota.message').replace('{count}', String(selectedIds.size))}
@@ -575,7 +678,18 @@ export default function ComposeTab({
 
         <p className="text-xs text-fg-muted">{t('communications.trackingNotice')}</p>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {quota != null && (
+            <p
+              className={`text-xs tabular mr-auto ${overQuota ? 'text-danger font-medium' : 'text-fg-muted'}`}
+            >
+              {t('communications.quota.daily')
+                .replace('{sent}', String(quota.sent))
+                .replace('{limit}', String(quota.limit))}
+              {overQuota &&
+                ` · ${t('communications.quota.overSelected').replace('{count}', String(selectedIds.size - (remainingQuota ?? 0)))}`}
+            </p>
+          )}
           <Button
             type="button"
             variant="secondary"

@@ -5,12 +5,14 @@ import { PaperAirplaneIcon, PlusIcon, QuestionMarkCircleIcon } from '@heroicons/
 import { Button, Card, Tooltip } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
 import EmailFamilyModal from '@/app/families/_components/EmailFamilyModal'
+import FamilyEmailAdminActions from '@/app/families/_components/FamilyEmailAdminActions'
 import FamilyEmailIndicators from '@/app/families/_components/FamilyEmailIndicators'
 import { useFamilyDetail } from './FamilyDetailContext'
 
 export default function FamilyHeader() {
   const t = useT()
-  const { data, isAdmin, formatMoney, getPlanNameById, setShowTaskModal } = useFamilyDetail()
+  const { data, isAdmin, formatMoney, getPlanNameById, setShowTaskModal, setData } =
+    useFamilyDetail()
   const [showEmailModal, setShowEmailModal] = useState(false)
 
   if (!data?.family) return null
@@ -26,10 +28,23 @@ export default function FamilyHeader() {
             {family.name}
           </h1>
           {family.email && (
-            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-fg-muted">
-              <span>{family.email}</span>
-              <FamilyEmailIndicators family={family} />
-            </p>
+            <div className="mt-1 space-y-2">
+              <p className="flex flex-wrap items-center gap-2 text-sm text-fg-muted">
+                <span>{family.email}</span>
+                <FamilyEmailIndicators family={family} />
+              </p>
+              {isAdmin && (
+                <FamilyEmailAdminActions
+                  familyId={String(family._id)}
+                  family={family}
+                  onUpdated={(patch) =>
+                    setData((prev: typeof data) =>
+                      prev ? { ...prev, family: { ...prev.family, ...patch } } : prev,
+                    )
+                  }
+                />
+              )}
+            </div>
           )}
         </div>
         {isAdmin && (

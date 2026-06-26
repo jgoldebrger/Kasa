@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { ArrowDownTrayIcon, EnvelopeIcon } from '@heroicons/react/24/outline'
 import { formatLocaleDate } from '@/lib/date-utils'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
@@ -26,6 +27,8 @@ import BulkJobProgressBanner from './_components/BulkJobProgressBanner'
 import { useBulkJobPoll } from './_components/useBulkJobPoll'
 import type { EmailLogRow, FamilyOption } from './_components/types'
 
+const FAMILY_BALANCES_IDS_CAP = 100
+
 type Tab = 'compose' | 'log'
 
 function statusBadge(status: string) {
@@ -42,8 +45,11 @@ function statusBadge(status: string) {
 export default function CommunicationsView() {
   const t = useT()
   const toast = useToast()
+  const searchParams = useSearchParams()
+  const deepLinkFamilyId = searchParams.get('familyId')
   const [tab, setTab] = useState<Tab>('compose')
   const [families, setFamilies] = useState<FamilyOption[]>([])
+  const [hasBalanceData, setHasBalanceData] = useState(false)
   const [loadingFamilies, setLoadingFamilies] = useState(true)
   const [logs, setLogs] = useState<EmailLogRow[]>([])
   const [loadingLogs, setLoadingLogs] = useState(true)
@@ -65,6 +71,45 @@ export default function CommunicationsView() {
     dateTo: '',
   })
 
+  const mergeBalances = useCallback(async (list: FamilyOption[]): Promise<FamilyOption[]> => {
+    if (list.length === 0) return list
+    const hasInlineBalance = list.some((f) => f.openBalance != null)
+    if (hasInlineBalance) {
+      setHasBalanceData(true)
+      return list
+    }
+    try {
+      const ids = list.map((f) => f._id)
+      const balancesUrl =
+        ids.length <= FAMILY_BALANCES_IDS_CAP
+          ? `/api/families/balances?familyIds=${ids.join(',')}`
+          : '/api/families/balances'
+      const res = await fetch(balancesUrl)
+      if (!res.ok) {
+        setHasBalanceData(false)
+        return list
+      }
+      const data = await res.json()
+      const rows = (data.items ?? data.balances ?? data) as Array<{
+        familyId: string
+        balance: number
+      }>
+      if (!Array.isArray(rows)) {
+        setHasBalanceData(false)
+        return list
+      }
+      const byId = new Map(rows.map((b) => [String(b.familyId), Number(b.balance)]))
+      setHasBalanceData(byId.size > 0)
+      return list.map((f) => ({
+        ...f,
+        openBalance: byId.get(f._id) ?? f.openBalance ?? 0,
+      }))
+    } catch {
+      setHasBalanceData(false)
+      return list
+    }
+  }, [])
+
   const loadFamilies = useCallback(async () => {
     setLoadingFamilies(true)
     try {
@@ -72,13 +117,14 @@ export default function CommunicationsView() {
       if (!res.ok) throw new Error('Failed to load families')
       const data = await res.json()
       const list = (data.items ?? []) as FamilyOption[]
-      setFamilies(list)
+      const withBalances = await mergeBalances(list)
+      setFamilies(withBalances)
     } catch {
       toast.error(t('communications.error.loadFamilies'))
     } finally {
       setLoadingFamilies(false)
     }
-  }, [toast, t])
+  }, [toast, t, mergeBalances])
 
   const loadLogs = useCallback(async () => {
     setLoadingLogs(true)
@@ -286,6 +332,8 @@ export default function CommunicationsView() {
           <ComposeTab
             families={families}
             loadingFamilies={loadingFamilies}
+            hasBalanceData={hasBalanceData}
+            initialFamilyId={deepLinkFamilyId}
             onSent={handleSent}
             onJobStarted={handleJobStarted}
           />

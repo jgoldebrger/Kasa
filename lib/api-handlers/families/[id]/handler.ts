@@ -1,1 +1,1 @@
-export { DELETE, GET, PUT } from '@/lib/route-logic/families/[id]'
+export { DELETE, GET, PATCH, PUT } from '@/lib/route-logic/families/[id]'

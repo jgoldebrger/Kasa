@@ -33,6 +33,7 @@ export interface SendEmailInput {
   relatedResource?: { type: string; id: string }
   emailJobId?: string
   campaignId?: string
+  subjectVariant?: 'A' | 'B'
   tracking?: { opens?: boolean; clicks?: boolean }
   transporter?: nodemailer.Transporter
   config?: OrgEmailConfigCreds
@@ -60,6 +61,20 @@ function bodyPreviewFrom(html?: string, text?: string): string | undefined {
     ''
   ).slice(0, 200)
   return raw || undefined
+}
+
+async function clearDeliverabilityWarning(organizationId: string, to: string): Promise<void> {
+  const normalized = to.trim().toLowerCase()
+  if (!normalized) return
+  await Family.updateMany(
+    {
+      organizationId: new Types.ObjectId(organizationId),
+      email: {
+        $regex: new RegExp(`^${normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+      },
+    },
+    { $set: { emailDeliverabilityWarning: false } },
+  )
 }
 
 async function trackDeliverabilityFailure(organizationId: string, to: string): Promise<void> {
@@ -234,6 +249,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     userId: input.userId ? new Types.ObjectId(input.userId) : undefined,
     emailJobId: input.emailJobId ? new Types.ObjectId(input.emailJobId) : undefined,
     campaignId: input.campaignId ? new Types.ObjectId(input.campaignId) : undefined,
+    subjectVariant: input.subjectVariant,
     to,
     subject,
     bodyPreview: bodyPreviewFrom(input.html, input.text),
@@ -295,6 +311,8 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         request: input.auditRequest,
       })
     }
+
+    void clearDeliverabilityWarning(input.organizationId, to)
 
     if (input.kind === 'custom' || input.kind === 'statement' || input.kind === 'tax-receipt') {
       void notifyAdmins(input.organizationId, {

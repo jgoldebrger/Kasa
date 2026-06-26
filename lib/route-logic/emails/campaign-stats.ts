@@ -31,22 +31,47 @@ export const GET = handler({
       campaignId: new Types.ObjectId(campaignId),
     }
 
-    const [total, sent, failed, opened, clicked, messageRows] = await Promise.all([
-      EmailMessage.countDocuments(filter),
-      EmailMessage.countDocuments({ ...filter, status: { $in: ['sent', 'opened', 'clicked'] } }),
-      EmailMessage.countDocuments({ ...filter, status: 'failed' }),
-      EmailMessage.countDocuments({
-        ...filter,
-        $or: [{ status: 'opened' }, { status: 'clicked' }, { openCount: { $gt: 0 } }],
-      }),
-      EmailMessage.countDocuments({
-        ...filter,
-        $or: [{ status: 'clicked' }, { clickCount: { $gt: 0 } }],
-      }),
-      EmailMessage.find(filter)
-        .select('events')
-        .lean<{ events?: Array<{ type?: string; meta?: { url?: string } }> }[]>(),
-    ])
+    const [total, sent, failed, opened, clicked, messageRows, subjectAStats, subjectBStats] =
+      await Promise.all([
+        EmailMessage.countDocuments(filter),
+        EmailMessage.countDocuments({ ...filter, status: { $in: ['sent', 'opened', 'clicked'] } }),
+        EmailMessage.countDocuments({ ...filter, status: 'failed' }),
+        EmailMessage.countDocuments({
+          ...filter,
+          $or: [{ status: 'opened' }, { status: 'clicked' }, { openCount: { $gt: 0 } }],
+        }),
+        EmailMessage.countDocuments({
+          ...filter,
+          $or: [{ status: 'clicked' }, { clickCount: { $gt: 0 } }],
+        }),
+        EmailMessage.find(filter)
+          .select('events')
+          .lean<{ events?: Array<{ type?: string; meta?: { url?: string } }> }[]>(),
+        Promise.all([
+          EmailMessage.countDocuments({
+            ...filter,
+            subjectVariant: 'A',
+            status: { $in: ['sent', 'opened', 'clicked'] },
+          }),
+          EmailMessage.countDocuments({
+            ...filter,
+            subjectVariant: 'A',
+            $or: [{ status: 'opened' }, { status: 'clicked' }, { openCount: { $gt: 0 } }],
+          }),
+        ]),
+        Promise.all([
+          EmailMessage.countDocuments({
+            ...filter,
+            subjectVariant: 'B',
+            status: { $in: ['sent', 'opened', 'clicked'] },
+          }),
+          EmailMessage.countDocuments({
+            ...filter,
+            subjectVariant: 'B',
+            $or: [{ status: 'opened' }, { status: 'clicked' }, { openCount: { $gt: 0 } }],
+          }),
+        ]),
+      ])
 
     const urlCounts = new Map<string, number>()
     for (const row of messageRows) {
@@ -62,6 +87,26 @@ export const GET = handler({
       .sort((a, b) => b.count - a.count)
       .slice(0, 20)
 
-    return { data: { sent, failed, opened, clicked, total, topLinks } }
+    const subjectA = { sent: subjectAStats[0], opened: subjectAStats[1] }
+    const subjectB = { sent: subjectBStats[0], opened: subjectBStats[1] }
+    const rateA = subjectA.sent > 0 ? subjectA.opened / subjectA.sent : 0
+    const rateB = subjectB.sent > 0 ? subjectB.opened / subjectB.sent : 0
+    let winner: 'A' | 'B' | null = null
+    if (subjectA.sent > 0 && subjectB.sent > 0) {
+      if (rateA > rateB) winner = 'A'
+      else if (rateB > rateA) winner = 'B'
+    }
+
+    return {
+      data: {
+        sent,
+        failed,
+        opened,
+        clicked,
+        total,
+        topLinks,
+        abStats: { subjectA, subjectB, winner },
+      },
+    }
   },
 })

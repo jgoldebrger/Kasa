@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { objectId } from './common'
+import { objectId, yearParam } from './common'
 
 const emailAttachment = z.object({
   filename: z.string().min(1).max(255),
@@ -48,4 +48,9 @@ export const listEmailsQuery = z.object({
 export const attachStatementBody = z.object({
   familyId: objectId,
   statementId: objectId.optional(),
+})
+
+export const attachTaxReceiptBody = z.object({
+  familyId: objectId,
+  year: yearParam,
 })

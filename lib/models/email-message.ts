@@ -51,6 +51,7 @@ const EmailMessageSchema = new Schema(
     firstClickedAt: Date,
     openTracking: { type: Boolean, default: false },
     clickTracking: { type: Boolean, default: false },
+    subjectVariant: { type: String, enum: ['A', 'B'] },
   },
   { timestamps: true },
 )

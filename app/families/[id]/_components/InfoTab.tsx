@@ -4,6 +4,8 @@
 import type { ReactNode } from 'react'
 import { PencilSquareIcon } from '@heroicons/react/24/outline'
 import { Alert, Button, Card } from '@/app/components/ui'
+import FamilyEmailAdminActions from '@/app/families/_components/FamilyEmailAdminActions'
+import FamilyEmailIndicators from '@/app/families/_components/FamilyEmailIndicators'
 import type { FamilyDetailContextValue } from '../FamilyDetailContext'
 import { useFamilyDetail } from '../FamilyDetailContext'
 import { normalizePlanId } from '@/lib/payment-plan-display'
@@ -50,6 +52,7 @@ function InfoTabContent(props: FamilyDetailContextValue) {
     setInfoForm,
     setShowInfoModal,
     renderEditableField,
+    setData,
   } = props
 
   const family = data?.family
@@ -228,7 +231,21 @@ function InfoTabContent(props: FamilyDetailContextValue) {
         <InfoField label="Email">
           {renderEditableField(
             'email',
-            <p className="font-medium text-fg break-all">{family.email || emptyValue()}</p>,
+            <div className="space-y-2">
+              <p className="font-medium text-fg break-all">{family.email || emptyValue()}</p>
+              {family.email && <FamilyEmailIndicators family={family} />}
+              {isAdmin && family.email && (
+                <FamilyEmailAdminActions
+                  familyId={familyId}
+                  family={family}
+                  onUpdated={(patch) =>
+                    setData((prev) =>
+                      prev ? { ...prev, family: { ...prev.family, ...patch } } : prev,
+                    )
+                  }
+                />
+              )}
+            </div>,
             'email',
           )}
         </InfoField>

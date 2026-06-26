@@ -50,11 +50,14 @@ export function parseBulkAttachments(
 export function pickBulkSubject(
   payload: Pick<BulkEmailPayload, 'subject' | 'subjectB'>,
   familyId: string,
-): string {
-  if (!payload.subjectB?.trim()) return payload.subject
-  // Stable per-family A/B assignment from family id hash.
+): { subject: string; subjectVariant?: 'A' | 'B' } {
+  if (!payload.subjectB?.trim()) return { subject: payload.subject }
   const hash = familyId.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0)
-  return hash % 2 === 0 ? payload.subject : payload.subjectB
+  const useB = hash % 2 !== 0
+  return {
+    subject: useB ? payload.subjectB : payload.subject,
+    subjectVariant: useB ? 'B' : 'A',
+  }
 }
 
 export async function sendBulkToFamily(opts: {
@@ -87,12 +90,15 @@ export async function sendBulkToFamily(opts: {
       )
     : undefined
 
+  const picked = pickBulkSubject(opts.payload, familyId)
+
   const result = await sendEmail({
     organizationId: opts.organizationId,
     userId: opts.userId,
     familyId,
     to: opts.family.email,
-    subject: pickBulkSubject(opts.payload, familyId),
+    subject: picked.subject,
+    subjectVariant: picked.subjectVariant,
     html,
     text,
     attachments: opts.attachments,

@@ -33,6 +33,13 @@ const getQuery = z.object({
   view: z.enum(['summary', 'full']).optional(),
 })
 
+const familyEmailFlagsPatchBody = z
+  .object({
+    emailDeliverabilityWarning: z.literal(false).optional(),
+    emailFormatInvalid: z.literal(false).optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: 'At least one field is required' })
+
 // GET /api/families/[id] — family + members for all org roles; ledger
 // detail (payments, balance, etc.) is admin-only.
 // `?view=summary` returns family + members + balance only (fast path).
@@ -298,6 +305,59 @@ export const PUT = handler({
       resourceType: 'Family',
       resourceId: fam._id,
       metadata: { fields: Object.keys(body) },
+      request,
+    })
+
+    return { data: fam }
+  },
+})
+
+// PATCH /api/families/[id] — clear email deliverability / format flags (admin-only).
+export const PATCH = handler({
+  auth: 'org',
+  minRole: 'admin',
+  idParams: ['id'],
+  body: familyEmailFlagsPatchBody,
+  name: 'PATCH /api/families/[id]',
+  fn: async ({ params, ctx, body, request }) => {
+    const rateVerdict = await checkRateLimit(
+      request,
+      'family-email-flags-patch',
+      { limit: 60, windowMs: 60 * 60_000 },
+      ctx!.organizationId,
+    )
+    if (!rateVerdict.allowed) {
+      return { status: 429, data: { error: 'Too many requests' } }
+    }
+
+    const id = params.id as string
+    /* v8 ignore next 3 -- idParams validates ObjectId before fn */
+    if (!Types.ObjectId.isValid(id)) {
+      return { status: 400, data: { error: 'Invalid family id' } }
+    }
+
+    const update: Record<string, unknown> = {}
+    if (body.emailDeliverabilityWarning === false) {
+      update.emailDeliverabilityWarning = false
+    }
+    if (body.emailFormatInvalid === false) {
+      update.emailFormatInvalid = false
+    }
+
+    const fam = await Family.findOneAndUpdate(
+      { _id: id, organizationId: ctx!.organizationId },
+      { $set: update },
+      { new: true, runValidators: true },
+    )
+    if (!fam) return { status: 404, data: { error: 'Family not found' } }
+
+    await audit({
+      organizationId: ctx!.organizationId,
+      userId: ctx!.userId,
+      action: 'family.email_flags.clear',
+      resourceType: 'Family',
+      resourceId: fam._id,
+      metadata: { fields: Object.keys(update) },
       request,
     })
 

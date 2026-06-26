@@ -11,9 +11,8 @@ import { Button, Input, Textarea } from '@/app/components/ui'
  * downstream PDF / email renderers, so a half-populated letterhead
  * still produces a clean-looking document.
  *
- * Currently consumed by the tax-receipt PDF generator; statement PDFs
- * still use the hardcoded "Kasa Family Management" header until a
- * follow-up wires them to `letterhead.*`.
+ * Consumed by statement PDFs, tax-receipt PDFs, and HTML email footers
+ * via `letterhead.*` in lib/email-utils.ts.
  */
 
 export interface LetterheadShape {
@@ -58,7 +57,7 @@ export default function LetterheadPanel({ letterhead, setLetterhead, saving, onS
     <SettingsPanel
       icon={<IdentificationIcon />}
       title="Letterhead"
-      description="Address, tax ID, and signature lines used on tax receipts."
+      description="Address, tax ID, and signature lines used on statements, receipts, and emails."
     >
       <form onSubmit={onSubmit} className="space-y-8">
         {/* Mailing address */}
@@ -135,15 +134,15 @@ export default function LetterheadPanel({ letterhead, setLetterhead, saving, onS
           </div>
         </section>
 
-        {/* Statement footer — saved here but not yet wired to PDFs/emails. */}
+        {/* Statement footer — printed on statement PDFs and email footers when set. */}
         <section>
           <h3 className="text-sm font-semibold text-fg-muted uppercase tracking-wide mb-3">
             Statement footer
           </h3>
           <Textarea
-            label="Footer text (statements)"
+            label="Footer text (statements & emails)"
             rows={2}
-            hint="Reserved for an upcoming change that will print this under each statement PDF. Saved now so it's ready when the statements wire-through ships."
+            hint="Optional text printed at the bottom of statement PDFs and included in HTML email footers when configured."
             {...bindTextarea('statementFooter')}
           />
         </section>

@@ -5,6 +5,8 @@ export interface FamilyOption {
   emailOptOut?: boolean
   communicationsOptOut?: boolean
   emailDeliverabilityWarning?: boolean
+  emailFormatInvalid?: boolean
+  openBalance?: number
 }
 
 export interface EmailLogRow {
@@ -73,6 +75,18 @@ export interface CampaignLinkClick {
   clicks?: number
 }
 
+export interface CampaignSubjectVariantStats {
+  subjectA?: string
+  subjectB?: string
+  sentA?: number
+  sentB?: number
+  openedA?: number
+  openedB?: number
+  openRateA?: number
+  openRateB?: number
+  winner?: 'A' | 'B' | 'tie' | null
+}
+
 export interface CampaignStats {
   campaignId?: string
   sent: number
@@ -83,6 +97,35 @@ export interface CampaignStats {
   openRate?: number
   clickRate?: number
   topLinks?: CampaignLinkClick[]
+  subjectVariant?: CampaignSubjectVariantStats
+}
+
+export interface EmailQuota {
+  sent: number
+  limit: number
+  remaining: number
+}
+
+export interface TopCampaignRow {
+  campaignId: string
+  subject?: string
+  sent?: number
+  opened?: number
+  clicked?: number
+  openRate?: number
+  clickRate?: number
+}
+
+export interface EmailAutomationRuleRow {
+  _id: string
+  name: string
+  enabled: boolean
+  templateId: string
+  templateName?: string
+  ruleType: 'balance_gt_zero' | 'event_within_30_days'
+  lastRunAt?: string | null
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface EmailJobRow {
@@ -118,6 +161,7 @@ export interface EmailAnalytics {
   }
   buckets?: EmailAnalyticsBucket[]
   daily?: EmailAnalyticsBucket[]
+  topCampaigns?: TopCampaignRow[]
 }
 
 export interface ScheduledEmailRow {

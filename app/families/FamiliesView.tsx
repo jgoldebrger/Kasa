@@ -42,6 +42,7 @@ import {
 } from '@/app/components/ui'
 import TaskFormModal from '@/app/components/tasks/TaskFormModal'
 import EmailFamiliesModal from '@/app/families/_components/EmailFamiliesModal'
+import FamilyEmailAdminActions from '@/app/families/_components/FamilyEmailAdminActions'
 import FamilyEmailIndicators from '@/app/families/_components/FamilyEmailIndicators'
 import { handleHebrewInput } from '@/lib/client/hebrew-input'
 
@@ -1074,6 +1075,16 @@ export default function FamiliesView({
             onSubmit={handleSubmit}
             onClose={resetFamilyModal}
             editing={!!editingFamily}
+            editingFamily={editingFamily}
+            onEmailStatusUpdated={(patch) => {
+              if (!editingFamily) return
+              setEditingFamily((prev) => (prev ? { ...prev, ...patch } : prev))
+              setFamilies((prev) =>
+                prev.map((f) =>
+                  String(f._id) === String(editingFamily._id) ? { ...f, ...patch } : f,
+                ),
+              )
+            }}
             paymentPlans={paymentPlans}
             submitting={formSubmitting}
           />
@@ -1235,6 +1246,8 @@ function FamilyModalBody({
   onSubmit,
   onClose,
   editing,
+  editingFamily,
+  onEmailStatusUpdated,
   paymentPlans,
   submitting,
 }: {
@@ -1243,6 +1256,8 @@ function FamilyModalBody({
   onSubmit: (e: React.FormEvent) => void
   onClose: () => void
   editing: boolean
+  editingFamily: Family | null
+  onEmailStatusUpdated: (patch: Partial<Family>) => void
   paymentPlans: PaymentPlan[]
   submitting: boolean
 }) {
@@ -1537,6 +1552,14 @@ function FamilyModalBody({
               </span>
             </span>
           </label>
+          {editing && editingFamily && (
+            <FamilyEmailAdminActions
+              familyId={editingFamily._id}
+              family={{ ...editingFamily, email: formData.email || editingFamily.email }}
+              onUpdated={onEmailStatusUpdated}
+              className="mt-3"
+            />
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-fg mb-1.5">{t('common.phone')}</label>
