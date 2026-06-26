@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer'
 import { escapeHtml } from '@/lib/html-escape'
+import { normalizeGmailAppPassword } from '@/lib/mail/normalize-app-password'
 
 function getPlatformAdminEmails(): string[] {
   const raw = process.env.PLATFORM_ADMIN_EMAILS || ''
@@ -38,12 +39,30 @@ export interface SendResult {
 
 export function isPlatformEmailConfigured(): boolean {
   return Boolean(
-    process.env.PLATFORM_SMTP_HOST &&
-    process.env.PLATFORM_SMTP_PORT &&
-    process.env.PLATFORM_SMTP_USER &&
-    process.env.PLATFORM_SMTP_PASS &&
-    process.env.PLATFORM_SMTP_FROM,
+    process.env.PLATFORM_SMTP_HOST?.trim() &&
+    process.env.PLATFORM_SMTP_PORT?.trim() &&
+    process.env.PLATFORM_SMTP_USER?.trim() &&
+    process.env.PLATFORM_SMTP_PASS?.trim() &&
+    process.env.PLATFORM_SMTP_FROM?.trim(),
   )
+}
+
+function createPlatformTransport(): nodemailer.Transporter {
+  const host = process.env.PLATFORM_SMTP_HOST!.trim()
+  const port = parseInt(process.env.PLATFORM_SMTP_PORT!, 10)
+  const secure = process.env.PLATFORM_SMTP_SECURE !== 'false'
+  const user = process.env.PLATFORM_SMTP_USER!.trim()
+  const pass = normalizeGmailAppPassword(process.env.PLATFORM_SMTP_PASS!)
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
+  })
 }
 
 export async function sendPlatformEmail(msg: PlatformEmail): Promise<SendResult> {
@@ -57,15 +76,7 @@ export async function sendPlatformEmail(msg: PlatformEmail): Promise<SendResult>
       return { sent: false, reason: 'invalid PLATFORM_SMTP_PORT' }
     }
 
-    const transporter = nodemailer.createTransport({
-      host: process.env.PLATFORM_SMTP_HOST!,
-      port,
-      secure: process.env.PLATFORM_SMTP_SECURE !== 'false',
-      auth: {
-        user: process.env.PLATFORM_SMTP_USER!,
-        pass: process.env.PLATFORM_SMTP_PASS!,
-      },
-    })
+    const transporter = createPlatformTransport()
 
     await transporter.sendMail({
       from: process.env.PLATFORM_SMTP_FROM!,

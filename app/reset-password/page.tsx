@@ -23,22 +23,26 @@ export default function ForgotPasswordPage() {
   const form = useFormState({
     schema,
     initialValues: { email: '' },
-    onSubmit: async (values) => {
+    onSubmit: async (values, { setFieldError }) => {
       try {
         const res = await fetch('/api/auth/reset-password', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: values.email }),
         })
-        if (res.ok) {
+        if (!res.ok) {
           const data = await res.json().catch(() => ({}))
-          if (data?.resetUrl) setDevResetUrl(data.resetUrl)
+          setFieldError(
+            'email',
+            typeof data?.error === 'string' ? data.error : t('resetPassword.failed'),
+          )
+          return
         }
+        const data = await res.json().catch(() => ({}))
+        if (data?.resetUrl) setDevResetUrl(data.resetUrl)
         setSubmittedEmail(values.email)
       } catch {
-        // Server intentionally returns 200 for unknown emails to prevent
-        // enumeration — treat any thrown error as a network failure.
-        setSubmittedEmail(values.email)
+        setFieldError('email', t('resetPassword.failed'))
       }
     },
   })

@@ -6255,6 +6255,29 @@ describe.sequential('route-logic finish coverage', () => {
       }
     })
 
+    it('returns 200 when platform email send throws', async () => {
+      const platformEmail = await import('@/lib/platform-email')
+      const configuredSpy = vi
+        .spyOn(platformEmail, 'isPlatformEmailConfigured')
+        .mockReturnValue(true)
+      const sendSpy = vi
+        .spyOn(platformEmail, 'sendPlatformEmail')
+        .mockRejectedValue(new Error('SMTP timeout'))
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      try {
+        const { POST } = await import('@/lib/route-logic/auth/reset-password')
+        const res = await POST(
+          publicJsonReq('/api/auth/reset-password', 'POST', { email: ctx.email }),
+        )
+        expect(res.status).toBe(200)
+        expect(sendSpy).toHaveBeenCalled()
+      } finally {
+        configuredSpy.mockRestore()
+        sendSpy.mockRestore()
+        errSpy.mockRestore()
+      }
+    })
+
     it('returns 429 when reset requests are rate limited', async () => {
       const rateLimit = await import('@/lib/rate-limit')
       const spy = vi.spyOn(rateLimit, 'checkRateLimit').mockResolvedValue({

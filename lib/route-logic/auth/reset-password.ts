@@ -53,44 +53,40 @@ export const POST = handler({
     const user = await User.findOne({ email: body.email })
     if (!user) return { data: { ok: true } }
 
-    await PasswordResetToken.deleteMany({ userId: user._id })
+    try {
+      await PasswordResetToken.deleteMany({ userId: user._id })
 
-    const token = crypto.randomBytes(32).toString('base64url')
-    const expiresAt = new Date(Date.now() + RESET_TTL_MS)
-    // Store only the hash. The cleartext `token` lives only in this
-    // request's outbound email below.
-    await PasswordResetToken.create({
-      userId: user._id,
-      token: hashToken(token),
-      expiresAt,
-    })
+      const token = crypto.randomBytes(32).toString('base64url')
+      const expiresAt = new Date(Date.now() + RESET_TTL_MS)
+      await PasswordResetToken.create({
+        userId: user._id,
+        token: hashToken(token),
+        expiresAt,
+      })
 
-    await audit({
-      userId: user._id.toString(),
-      action: 'auth.password_reset.requested',
-      resourceType: 'User',
-      resourceId: user._id,
-      metadata: { email: body.email },
-      request,
-    })
+      await audit({
+        userId: user._id.toString(),
+        action: 'auth.password_reset.requested',
+        resourceType: 'User',
+        resourceId: user._id,
+        metadata: { email: body.email },
+        request,
+      })
 
-    const resetUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/reset-password/${token}`
+      const resetUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/reset-password/${token}`
 
-    // Actually email the user. Falls back to logging the URL only when
-    // platform SMTP is not configured (dev environments without SMTP).
-    // The response is always 200 with `{ ok: true }` so we don't leak
-    // which emails exist (also no `resetUrl` in the response body).
-    if (isPlatformEmailConfigured()) {
-      const safeEmail = escapeHtml(body.email)
-      const safeUrl = escapeHtml(resetUrl)
-      await sendPlatformEmail({
-        to: body.email,
-        subject: 'Reset your Kasa password',
-        text:
-          `We received a request to reset the password for ${body.email}.\n\n` +
-          `Open this link to set a new one (valid for 1 hour):\n${resetUrl}\n\n` +
-          `If you didn't ask to reset your password, you can ignore this email.`,
-        html: `
+      if (isPlatformEmailConfigured()) {
+        try {
+          const safeEmail = escapeHtml(body.email)
+          const safeUrl = escapeHtml(resetUrl)
+          const result = await sendPlatformEmail({
+            to: body.email,
+            subject: 'Reset your Kasa password',
+            text:
+              `We received a request to reset the password for ${body.email}.\n\n` +
+              `Open this link to set a new one (valid for 1 hour):\n${resetUrl}\n\n` +
+              `If you didn't ask to reset your password, you can ignore this email.`,
+            html: `
           <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             <p>We received a request to reset the password for <strong>${safeEmail}</strong>.</p>
             <p><a href="${safeUrl}" style="display:inline-block;padding:10px 16px;background:#4F46E5;color:#fff;text-decoration:none;border-radius:6px;">Reset your password</a></p>
@@ -98,13 +94,33 @@ export const POST = handler({
             <p style="font-size:12px;color:#666;">If you didn't ask to reset your password, you can ignore this email.</p>
           </div>
         `,
-      })
-    } else if (process.env.NODE_ENV !== 'production') {
-      // No SMTP wired in dev — surface the link via server log only.
-      console.log(`[reset-password] Reset link for ${body.email}: ${resetUrl}`)
-    } else {
-      // Production with no SMTP configured: log a warning so ops knows.
-      console.warn('[reset-password] Platform SMTP not configured; reset email not delivered.')
+          })
+          if (!result.sent) {
+            console.warn(
+              '[reset-password] Platform email not sent:',
+              result.reason || result.error || 'unknown',
+            )
+          }
+        } catch (err: unknown) {
+          console.error(
+            '[reset-password] Platform email error:',
+            err instanceof Error ? err.message : err,
+          )
+        }
+      } else if (process.env.NODE_ENV !== 'production') {
+        console.log(`[reset-password] Reset link for ${body.email}: ${resetUrl}`)
+      } else {
+        console.warn('[reset-password] Platform SMTP not configured; reset email not delivered.')
+      }
+    } catch (err: unknown) {
+      console.error(
+        '[reset-password] Failed to create reset token:',
+        err instanceof Error ? err.message : err,
+      )
+      return {
+        status: 503,
+        data: { error: 'Password reset is temporarily unavailable. Try again shortly.' },
+      }
     }
 
     return { data: { ok: true } }
@@ -119,7 +135,10 @@ export const PUT = handler({
   body: authSchemas.resetPasswordConfirmBody,
   name: 'PUT /api/auth/reset-password',
   fn: async ({ body, request }) => {
-    const verdict = await checkRateLimit(request, 'pwd-reset-confirm', { limit: 10, windowMs: 15 * 60_000 })
+    const verdict = await checkRateLimit(request, 'pwd-reset-confirm', {
+      limit: 10,
+      windowMs: 15 * 60_000,
+    })
     if (!verdict.allowed) {
       return { status: 429, data: { error: 'Too many attempts. Try again later.' } }
     }

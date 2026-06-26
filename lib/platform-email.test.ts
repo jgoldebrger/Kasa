@@ -121,6 +121,9 @@ describe('sendPlatformEmail', () => {
       port: 587,
       secure: false,
       auth: { user: 'user', pass: 'pass' },
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
     })
     expect(sendMail).toHaveBeenCalledWith({
       from: 'Kasa <noreply@example.com>',
@@ -129,6 +132,21 @@ describe('sendPlatformEmail', () => {
       text: 'plain',
       html: '<p>html</p>',
     })
+  })
+
+  it('strips spaces from Gmail app passwords', async () => {
+    setConfiguredSmtp({ PLATFORM_SMTP_PASS: 'abcd efgh ijkl mnop' })
+    const result = await sendPlatformEmail({
+      to: 'admin@example.com',
+      subject: 'Hello',
+      text: 'body',
+    })
+    expect(result).toEqual({ sent: true })
+    expect(createTransport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auth: { user: 'user', pass: 'abcdefghijklmnop' },
+      }),
+    )
   })
 
   it('returns send failed when transport throws', async () => {
@@ -143,10 +161,7 @@ describe('sendPlatformEmail', () => {
     })
 
     expect(result).toEqual({ sent: false, error: 'send failed' })
-    expect(errSpy).toHaveBeenCalledWith(
-      '[platform-email] send failed:',
-      'SMTP connection refused',
-    )
+    expect(errSpy).toHaveBeenCalledWith('[platform-email] send failed:', 'SMTP connection refused')
     errSpy.mockRestore()
   })
 })
