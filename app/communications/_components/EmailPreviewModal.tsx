@@ -2,7 +2,7 @@
 
 import { Modal, Button } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
-import { markdownToHtml, substituteMergeFields } from './email-utils'
+import { bodyToEmailHtml, substituteMergeFields } from './email-utils'
 
 interface EmailPreviewModalProps {
   open: boolean
@@ -23,7 +23,7 @@ export default function EmailPreviewModal({
 
   const overrides: Record<string, string> = sampleFamilyName ? { familyName: sampleFamilyName } : {}
   const previewSubject = substituteMergeFields(subject, overrides)
-  const previewHtml = markdownToHtml(substituteMergeFields(body, overrides))
+  const previewHtml = bodyToEmailHtml(substituteMergeFields(body, overrides))
 
   return (
     <Modal

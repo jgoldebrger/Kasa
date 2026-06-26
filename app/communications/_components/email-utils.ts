@@ -1,3 +1,6 @@
+import { mergeFieldSamples } from '@/lib/mail/merge-field-definitions'
+import { sanitizeEmailHtml } from '@/lib/client/sanitize-email-html'
+
 /** Escape HTML entities in plain text. */
 function escapeHtml(text: string): string {
   return text
@@ -7,16 +10,93 @@ function escapeHtml(text: string): string {
     .replace(/"/g, '&quot;')
 }
 
-/** Process inline markdown: bold, italic, links. */
+/** Process inline markdown: links, bold, italic. */
 function processInline(text: string): string {
   let out = escapeHtml(text)
-  out = out.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  out = out.replace(/\*(.+?)\*/g, '<em>$1</em>')
   out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
     const safeUrl = escapeHtml(url)
     return `<a href="${safeUrl}" style="color: #2563eb;">${label}</a>`
   })
+  out = out.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  out = out.replace(/(?<!\*)\*([^*\n]+?)\*(?!\*)/g, '<em>$1</em>')
   return out
+}
+
+const EMAIL_WRAPPER_STYLE = 'font-family: Arial, sans-serif; line-height: 1.6;'
+
+function wrapEmailHtml(inner: string): string {
+  return `<div style="${EMAIL_WRAPPER_STYLE}">${inner}</div>`
+}
+
+/** True when body was saved from the rich editor (or other HTML source). */
+export function isLikelyHtmlBody(text: string): boolean {
+  return /<\s*(p|div|br|ul|ol|li|strong|b|em|i|a)\b/i.test(text)
+}
+
+/** Convert lightweight markdown body to an HTML fragment (no outer wrapper). */
+export function markdownToEditorHtml(md: string): string {
+  const wrapped = markdownToHtml(md)
+  const match = /^<div[^>]*>([\s\S]*)<\/div>$/i.exec(wrapped)
+  return match ? match[1] : wrapped
+}
+
+/** Convert compose body to HTML for the rich editor. */
+export function bodyToEditorHtml(body: string): string {
+  if (!body.trim()) return ''
+  if (isLikelyHtmlBody(body)) return body
+  return markdownToEditorHtml(body)
+}
+
+/** Convert compose body to HTML for sending. */
+export function bodyToEmailHtml(body: string): string {
+  if (!body.trim()) return ''
+  if (isLikelyHtmlBody(body)) {
+    return wrapEmailHtml(sanitizeEmailHtml(body))
+  }
+  return markdownToHtml(body)
+}
+
+/** Strip HTML to plain text for the text fallback. */
+export function htmlToPlainText(html: string): string {
+  if (!html.trim()) return ''
+  if (typeof document === 'undefined') {
+    return html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<\/div>/gi, '\n')
+      .replace(/<li[^>]*>/gi, '• ')
+      .replace(/<\/li>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  }
+
+  const root = document.createElement('div')
+  root.innerHTML = html
+  root.querySelectorAll('li').forEach((li) => {
+    const prefix = document.createTextNode('• ')
+    li.insertBefore(prefix, li.firstChild)
+  })
+  root.querySelectorAll('br').forEach((br) => {
+    br.replaceWith(document.createTextNode('\n'))
+  })
+  root.querySelectorAll('p, div').forEach((block) => {
+    block.append(document.createTextNode('\n'))
+  })
+
+  return (root.textContent || '').replace(/\n{3,}/g, '\n\n').trim()
+}
+
+/** Plain-text fallback for any compose body format. */
+export function bodyToPlainText(body: string): string {
+  if (!body.trim()) return ''
+  if (isLikelyHtmlBody(body)) return htmlToPlainText(body)
+  return markdownToPlainText(body)
+}
+
+/** Whether the compose body has no visible text. */
+export function composeBodyIsEmpty(body: string): boolean {
+  return !bodyToPlainText(body).trim()
 }
 
 /** Convert lightweight markdown body to HTML for sending. */
@@ -45,19 +125,17 @@ export function markdownToHtml(md: string): string {
   }
   if (inList) parts.push('</ul>')
 
-  return `<div style="font-family: Arial, sans-serif; line-height: 1.6;">${parts.join('')}</div>`
+  return wrapEmailHtml(parts.join(''))
 }
 
 /** Strip markdown to plain text for the text fallback. */
 export function markdownToPlainText(md: string): string {
   return md
     .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/(?<!\*)\*([^*\n]+?)\*(?!\*)/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/^[-*]\s+/gm, '• ')
 }
-
-import { mergeFieldSamples } from '@/lib/mail/merge-field-definitions'
 
 /** Substitute merge fields for preview (sample values). */
 export function substituteMergeFields(

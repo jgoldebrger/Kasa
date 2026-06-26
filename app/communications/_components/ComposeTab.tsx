@@ -26,9 +26,10 @@ import {
 import {
   apiErrorMessage,
   attachmentsForApi,
+  bodyToEmailHtml,
+  bodyToPlainText,
+  composeBodyIsEmpty,
   defaultTaxReceiptYear,
-  markdownToHtml,
-  markdownToPlainText,
   taxReceiptYearOptions,
 } from './email-utils'
 import { tomorrowMorningLocal, useEmailQuota } from './useEmailQuota'
@@ -169,7 +170,7 @@ export default function ComposeTab({
   }
 
   const saveAsTemplate = async () => {
-    if (!subject.trim() || !body.trim()) {
+    if (!subject.trim() || composeBodyIsEmpty(body)) {
       toast.error(t('communications.error.missingFields'))
       return
     }
@@ -192,7 +193,7 @@ export default function ComposeTab({
 
   const saveDraft = useCallback(
     async (silent = false) => {
-      if (!subject.trim() && !body.trim()) return
+      if (!subject.trim() && composeBodyIsEmpty(body)) return
       setSavingDraft(true)
       try {
         const payload = {
@@ -228,7 +229,7 @@ export default function ComposeTab({
       skipAutoSaveRef.current = false
       return
     }
-    if (!subject.trim() && !body.trim()) return
+    if (!subject.trim() && composeBodyIsEmpty(body)) return
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
     draftTimerRef.current = setTimeout(() => {
       void saveDraft(true)
@@ -351,8 +352,8 @@ export default function ComposeTab({
   }
 
   const buildPayload = () => {
-    const html = markdownToHtml(body)
-    const text = markdownToPlainText(body)
+    const html = bodyToEmailHtml(body)
+    const text = bodyToPlainText(body)
     const payload: Record<string, unknown> = {
       familyIds: Array.from(selectedIds),
       subject: subject.trim(),
@@ -365,7 +366,7 @@ export default function ComposeTab({
   }
 
   const send = async () => {
-    if (!subject.trim() || !body.trim()) {
+    if (!subject.trim() || composeBodyIsEmpty(body)) {
       toast.error(t('communications.error.missingFields'))
       return
     }
