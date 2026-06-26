@@ -40,6 +40,16 @@ export function markdownToEditorHtml(md: string): string {
   return match ? match[1] : wrapped
 }
 
+/** Convert stored email HTML back into the rich editor fragment. */
+export function emailHtmlToEditorHtml(html: string): string {
+  if (!html.trim()) return ''
+  const wrapped = /^<div[^>]*>([\s\S]*)<\/div>\s*$/i.exec(html.trim())
+  if (wrapped && /font-family:\s*Arial/i.test(html)) {
+    return wrapped[1]
+  }
+  return bodyToEditorHtml(html)
+}
+
 /** Convert compose body to HTML for the rich editor. */
 export function bodyToEditorHtml(body: string): string {
   if (!body.trim()) return ''

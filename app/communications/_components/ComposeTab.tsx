@@ -27,9 +27,11 @@ import {
   apiErrorMessage,
   attachmentsForApi,
   bodyToEmailHtml,
+  bodyToEditorHtml,
   bodyToPlainText,
   composeBodyIsEmpty,
   defaultTaxReceiptYear,
+  emailHtmlToEditorHtml,
   taxReceiptYearOptions,
 } from './email-utils'
 import { tomorrowMorningLocal, useEmailQuota } from './useEmailQuota'
@@ -114,7 +116,15 @@ export default function ComposeTab({
       const res = await fetch('/api/email-drafts')
       if (!res.ok) return
       const data = await res.json()
-      setDrafts((data.items ?? []) as EmailDraft[])
+      const rows = (data.drafts ?? data.items ?? []) as Array<
+        EmailDraft & { selectedFamilyIds?: string[] }
+      >
+      setDrafts(
+        rows.map((d) => ({
+          ...d,
+          familyIds: d.familyIds ?? d.selectedFamilyIds ?? [],
+        })),
+      )
     } catch {
       /* ignore */
     }
@@ -154,7 +164,7 @@ export default function ComposeTab({
     const tpl = templates.find((x) => x._id === templateId)
     if (!tpl) return
     setSubject(tpl.subject)
-    setBody(tpl.body)
+    setBody(emailHtmlToEditorHtml(tpl.body))
   }
 
   const applyDraft = (draftId: string) => {
@@ -165,7 +175,7 @@ export default function ComposeTab({
     skipAutoSaveRef.current = true
     setCurrentDraftId(draft._id)
     setSubject(draft.subject)
-    setBody(draft.body)
+    setBody(bodyToEditorHtml(draft.body || draft.html || ''))
     if (draft.familyIds?.length) setSelectedIds(new Set(draft.familyIds))
   }
 
@@ -180,10 +190,15 @@ export default function ComposeTab({
       const res = await fetch('/api/email-templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), subject: subject.trim(), body }),
+        body: JSON.stringify({
+          name: name.trim(),
+          subject: subject.trim(),
+          html: bodyToEmailHtml(body),
+          text: bodyToPlainText(body),
+        }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || 'Failed')
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Failed to save template'))
       toast.success(t('communications.template.saved'))
       void loadTemplates()
     } catch (err: unknown) {
@@ -199,7 +214,7 @@ export default function ComposeTab({
         const payload = {
           subject: subject.trim(),
           body,
-          familyIds: Array.from(selectedIds),
+          selectedFamilyIds: Array.from(selectedIds),
         }
         const url = currentDraftId ? `/api/email-drafts/${currentDraftId}` : '/api/email-drafts'
         const method = currentDraftId ? 'PATCH' : 'POST'

@@ -155,7 +155,7 @@ export default function TemplatesView() {
         body: JSON.stringify({
           name: name.trim(),
           subject: tf(t, 'communications.template.newSubject', 'Subject line'),
-          html: '',
+          html: '<p></p>',
           category: newCategory,
         }),
       })

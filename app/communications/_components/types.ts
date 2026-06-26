@@ -38,6 +38,7 @@ export interface EmailDraft {
   name?: string
   subject: string
   body: string
+  html?: string
   familyIds?: string[]
   updatedAt?: string
 }

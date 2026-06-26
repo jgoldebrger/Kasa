@@ -3,6 +3,7 @@ import {
   bodyToEmailHtml,
   bodyToPlainText,
   composeBodyIsEmpty,
+  emailHtmlToEditorHtml,
   isLikelyHtmlBody,
   markdownToHtml,
 } from './email-utils'
@@ -33,5 +34,11 @@ describe('compose email body formatting', () => {
   it('treats empty rich editor markup as empty', () => {
     expect(composeBodyIsEmpty('<p><br></p>')).toBe(true)
     expect(composeBodyIsEmpty('<p>Hi</p>')).toBe(false)
+  })
+
+  it('unwraps stored email HTML for the rich editor', () => {
+    const stored = bodyToEmailHtml('<p>Hello <strong>world</strong></p>')
+    expect(emailHtmlToEditorHtml(stored)).toContain('<strong>world</strong>')
+    expect(emailHtmlToEditorHtml(stored)).not.toContain('font-family: Arial')
   })
 })
