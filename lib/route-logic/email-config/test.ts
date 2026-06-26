@@ -2,7 +2,7 @@ import { EmailConfig } from '@/lib/models'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { handler } from '@/lib/api/handler'
 import { logError } from '@/lib/log'
-import { createGmailTransport } from '@/lib/mail/create-transport'
+import { createTransportWithFallback } from '@/lib/mail/create-transport'
 import { formatMailError } from '@/lib/mail/format-mail-error'
 import { loadOrgEmailConfig } from '@/lib/mail/load-org-email-config'
 
@@ -28,7 +28,7 @@ export const POST = handler({
     }
     const creds = credsResult.config
 
-    const transporter = createGmailTransport({
+    const transporter = createTransportWithFallback({
       email: creds.email,
       password: creds.password,
     })

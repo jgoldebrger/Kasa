@@ -1,6 +1,8 @@
 import nodemailer from 'nodemailer'
 import { escapeHtml } from '@/lib/html-escape'
 import { normalizeGmailAppPassword } from '@/lib/mail/normalize-app-password'
+import { createTransportWithFallback, normalizeTransportCreds } from '@/lib/mail/create-transport'
+import { formatMailError } from '@/lib/mail/format-mail-error'
 
 function getPlatformAdminEmails(): string[] {
   const raw = process.env.PLATFORM_ADMIN_EMAILS || ''
@@ -48,17 +50,24 @@ export function isPlatformEmailConfigured(): boolean {
 }
 
 function createPlatformTransport(): nodemailer.Transporter {
-  const host = process.env.PLATFORM_SMTP_HOST!.trim()
+  const host = process.env.PLATFORM_SMTP_HOST!.trim().toLowerCase()
+  const user = process.env.PLATFORM_SMTP_USER!.trim()
+  const pass = process.env.PLATFORM_SMTP_PASS!
+
+  if (host === 'smtp.gmail.com') {
+    return createTransportWithFallback({ email: user, password: pass })
+  }
+
   const port = parseInt(process.env.PLATFORM_SMTP_PORT!, 10)
   const secure = process.env.PLATFORM_SMTP_SECURE !== 'false'
-  const user = process.env.PLATFORM_SMTP_USER!.trim()
-  const pass = normalizeGmailAppPassword(process.env.PLATFORM_SMTP_PASS!)
+  const normalized = normalizeTransportCreds({ email: user, password: pass })
 
   return nodemailer.createTransport({
     host,
     port,
     secure,
-    auth: { user, pass },
+    requireTLS: !secure,
+    auth: { user: normalized.email, pass: normalized.password },
     connectionTimeout: 10_000,
     greetingTimeout: 10_000,
     socketTimeout: 15_000,
@@ -88,9 +97,10 @@ export async function sendPlatformEmail(msg: PlatformEmail): Promise<SendResult>
     })
 
     return { sent: true }
-  } catch (err: any) {
-    console.error('[platform-email] send failed:', err?.message)
-    return { sent: false, error: 'send failed' }
+  } catch (err: unknown) {
+    const message = formatMailError(err)
+    console.error('[platform-email] send failed:', message)
+    return { sent: false, error: message }
   }
 }
 

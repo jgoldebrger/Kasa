@@ -7,6 +7,7 @@ import { isAllowedOutboundRecipient } from '@/lib/email-recipients'
 import { createTransportWithFallback } from './create-transport'
 import { applyEmailTracking } from './tracking-html'
 import { loadOrgEmailConfig, type OrgEmailConfigCreds } from './load-org-email-config'
+import { formatMailError } from './format-mail-error'
 import { notifyAdmins } from '@/lib/notify'
 import { wrapEmailHtml, type OrgPhysicalAddress } from './email-wrapper'
 import { buildUnsubscribeUrl, createUnsubscribeToken } from './unsubscribe-token'
@@ -326,7 +327,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
 
     return { ok: true, emailMessageId }
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err)
+    const message = formatMailError(err)
     logError(err, {
       module: 'mail.sendEmail',
       organizationId: input.organizationId,

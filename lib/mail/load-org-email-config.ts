@@ -1,6 +1,7 @@
 import { EmailConfig } from '@/lib/models'
 import { safeDecrypt, decryptFailureMessage } from '@/lib/encryption'
 import { sanitizeFromName } from '@/lib/email-from-name'
+import { normalizeGmailAppPassword } from '@/lib/mail/normalize-app-password'
 
 export interface OrgEmailConfigCreds {
   email: string
@@ -39,7 +40,7 @@ export async function loadOrgEmailConfig(
     ok: true,
     config: {
       email: doc.email,
-      password: decrypted.value,
+      password: normalizeGmailAppPassword(decrypted.value),
       fromName: sanitizeFromName(doc.fromName),
       replyTo: doc.replyTo?.trim() || undefined,
     },

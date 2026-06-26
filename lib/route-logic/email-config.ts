@@ -5,7 +5,7 @@ import { sanitizeFromName } from '@/lib/email-from-name'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { emailConfig as emailConfigSchemas } from '@/lib/schemas'
 import { handler } from '@/lib/api/handler'
-import { createGmailTransport } from '@/lib/mail/create-transport'
+import { verifyGmailCreds } from '@/lib/mail/create-transport'
 import { formatMailError } from '@/lib/mail/format-mail-error'
 import { normalizeGmailAppPassword } from '@/lib/mail/normalize-app-password'
 
@@ -13,9 +13,8 @@ async function verifySmtpCreds(creds: {
   email: string
   password: string
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  const transporter = createGmailTransport(creds)
   try {
-    await transporter.verify()
+    await verifyGmailCreds(creds)
     return { ok: true }
   } catch (err: unknown) {
     return { ok: false, error: formatMailError(err) }

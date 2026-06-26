@@ -120,6 +120,7 @@ describe('sendPlatformEmail', () => {
       host: 'smtp.example.com',
       port: 587,
       secure: false,
+      requireTLS: true,
       auth: { user: 'user', pass: 'pass' },
       connectionTimeout: 10_000,
       greetingTimeout: 10_000,
@@ -160,7 +161,8 @@ describe('sendPlatformEmail', () => {
       text: 'body',
     })
 
-    expect(result).toEqual({ sent: false, error: 'send failed' })
+    expect(result.sent).toBe(false)
+    expect(result.error).toContain('SMTP connection refused')
     expect(errSpy).toHaveBeenCalledWith('[platform-email] send failed:', 'SMTP connection refused')
     errSpy.mockRestore()
   })

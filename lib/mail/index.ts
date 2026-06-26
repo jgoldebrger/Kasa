@@ -1,6 +1,10 @@
 export { sendEmail, type SendEmailInput, type SendEmailResult, type EmailKind } from './send-email'
 export { loadOrgEmailConfig } from './load-org-email-config'
-export { createGmailTransport, createTransportWithFallback } from './create-transport'
+export {
+  createGmailTransport,
+  createTransportWithFallback,
+  verifyGmailCreds,
+} from './create-transport'
 export { formatMailError } from './format-mail-error'
 export { normalizeGmailAppPassword } from './normalize-app-password'
 export {
