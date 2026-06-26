@@ -40,5 +40,10 @@ describe('compose email body formatting', () => {
     const stored = bodyToEmailHtml('<p>Hello <strong>world</strong></p>')
     expect(emailHtmlToEditorHtml(stored)).toContain('<strong>world</strong>')
     expect(emailHtmlToEditorHtml(stored)).not.toContain('font-family: Arial')
+    expect(
+      emailHtmlToEditorHtml(
+        '<div style="font-family: Arial, sans-serif; line-height: 1.6;"><p style="margin: 0.5em 0;">fykil</p></div>',
+      ),
+    ).toBe('<p>fykil</p>')
   })
 })

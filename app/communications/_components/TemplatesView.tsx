@@ -13,11 +13,18 @@ import {
   PageHeader,
   Select,
   SkeletonRows,
-  Textarea,
 } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
 import CommunicationsNav from './CommunicationsNav'
+import EmailComposeEditor from './EmailComposeEditor'
+import {
+  apiErrorMessage,
+  bodyToEmailHtml,
+  bodyToPlainText,
+  composeBodyIsEmpty,
+  emailHtmlToEditorHtml,
+} from './email-utils'
 import type { EmailTemplate, EmailTemplateCategory } from './types'
 
 const TEMPLATE_CATEGORIES: EmailTemplateCategory[] = [
@@ -34,7 +41,8 @@ function tf(t: ReturnType<typeof useT>, key: string, fallback: string) {
 type EditableTemplate = EmailTemplate & { html: string; dirty?: boolean; saving?: boolean }
 
 function normalizeTemplate(row: Record<string, unknown>): EditableTemplate {
-  const html = String(row.html ?? row.body ?? '')
+  const stored = String(row.html ?? row.body ?? '')
+  const html = emailHtmlToEditorHtml(stored)
   return {
     _id: String(row._id),
     name: String(row.name ?? ''),
@@ -96,7 +104,7 @@ export default function TemplatesView() {
   const saveTemplate = async (id: string) => {
     const tpl = templates.find((x) => x._id === id)
     if (!tpl) return
-    if (!tpl.subject.trim() || !tpl.html.trim()) {
+    if (!tpl.subject.trim() || composeBodyIsEmpty(tpl.html)) {
       toast.error(t('communications.error.missingFields'))
       return
     }
@@ -108,12 +116,13 @@ export default function TemplatesView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subject: tpl.subject.trim(),
-          html: tpl.html,
+          html: bodyToEmailHtml(tpl.html),
+          text: bodyToPlainText(tpl.html),
           category: tpl.category || 'general',
         }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || 'Failed to save')
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Failed to save'))
       toast.success(tf(t, 'communications.template.updated', 'Template saved'))
       updateLocal(id, { dirty: false, saving: false })
     } catch (err: unknown) {
@@ -160,7 +169,7 @@ export default function TemplatesView() {
         }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || 'Failed')
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Failed to create template'))
       toast.success(tf(t, 'communications.template.saved', 'Template saved'))
       void loadTemplates()
     } catch (err: unknown) {
@@ -270,13 +279,11 @@ export default function TemplatesView() {
                     </option>
                   ))}
                 </Select>
-                <Textarea
+                <EmailComposeEditor
                   label={t('communications.field.body')}
                   rows={6}
                   value={tpl.html}
-                  onChange={(e) =>
-                    updateLocal(tpl._id, { html: e.target.value, body: e.target.value })
-                  }
+                  onChange={(html) => updateLocal(tpl._id, { html, body: html })}
                 />
                 <div className="flex justify-end">
                   <Button

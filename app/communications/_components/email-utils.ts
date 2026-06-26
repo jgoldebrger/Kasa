@@ -43,11 +43,15 @@ export function markdownToEditorHtml(md: string): string {
 /** Convert stored email HTML back into the rich editor fragment. */
 export function emailHtmlToEditorHtml(html: string): string {
   if (!html.trim()) return ''
-  const wrapped = /^<div[^>]*>([\s\S]*)<\/div>\s*$/i.exec(html.trim())
-  if (wrapped && /font-family:\s*Arial/i.test(html)) {
-    return wrapped[1]
+  let fragment = html.trim()
+  const wrapped = /^<div[^>]*>([\s\S]*)<\/div>\s*$/i.exec(fragment)
+  if (wrapped && /font-family:\s*Arial/i.test(fragment)) {
+    fragment = wrapped[1]
+  } else {
+    fragment = bodyToEditorHtml(fragment)
   }
-  return bodyToEditorHtml(html)
+  // Drop inline styles from markdown-generated paragraphs/lists.
+  return fragment.replace(/<p\s+style="[^"]*">/gi, '<p>').replace(/<ul\s+style="[^"]*">/gi, '<ul>')
 }
 
 /** Convert compose body to HTML for the rich editor. */
