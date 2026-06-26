@@ -1,15 +1,9 @@
 import { Types } from 'mongoose'
-import { Family, PaymentPlan, LifecycleEventPayment, CycleConfig } from '@/lib/models'
+import { Family, PaymentPlan, LifecycleEventPayment, CycleConfig, Organization } from '@/lib/models'
 import { calculateFamilyBalance } from '@/lib/calculations'
+import { MERGE_FIELD_DEFINITIONS, type MergeFieldKey } from './merge-field-definitions'
 
-export interface MergeFieldContext {
-  familyName?: string
-  balance?: number
-  dues?: number
-  planName?: string
-  eventDate?: string
-  nextDue?: string
-}
+export type MergeFieldContext = Partial<Record<MergeFieldKey, string | number>>
 
 function formatMoney(value: number): string {
   if (!Number.isFinite(value)) return '$0.00'
@@ -39,26 +33,37 @@ function computeNextCycleDueDate(
   return new Date(nextYear, month, nextDay)
 }
 
+function formatFullAddress(family: {
+  street?: string
+  address?: string
+  city?: string
+  state?: string
+  zip?: string
+}): string {
+  const line1 = (family.street || family.address || '').trim()
+  const cityState = [family.city?.trim(), family.state?.trim()].filter(Boolean).join(', ')
+  const line2 = [cityState, family.zip?.trim()]
+    .filter(Boolean)
+    .join(cityState && family.zip ? ' ' : '')
+  return [line1, line2].filter(Boolean).join(', ')
+}
+
+function formatMergeValue(key: MergeFieldKey, raw: string | number): string {
+  if (key === 'balance' || key === 'dues') {
+    const n = typeof raw === 'number' ? raw : Number(raw)
+    return formatMoney(Number.isFinite(n) ? n : 0)
+  }
+  return String(raw)
+}
+
 /** Replace merge tokens in a template string. */
 export function applyMergeFields(template: string, ctx: MergeFieldContext): string {
   let out = template
-  if (ctx.familyName != null) {
-    out = out.replace(/\{\{familyName\}\}/g, ctx.familyName)
-  }
-  if (ctx.balance != null) {
-    out = out.replace(/\{\{balance\}\}/g, formatMoney(ctx.balance))
-  }
-  if (ctx.dues != null) {
-    out = out.replace(/\{\{dues\}\}/g, formatMoney(ctx.dues))
-  }
-  if (ctx.planName != null) {
-    out = out.replace(/\{\{planName\}\}/g, ctx.planName)
-  }
-  if (ctx.eventDate != null) {
-    out = out.replace(/\{\{eventDate\}\}/g, ctx.eventDate)
-  }
-  if (ctx.nextDue != null) {
-    out = out.replace(/\{\{nextDue\}\}/g, ctx.nextDue)
+  for (const def of MERGE_FIELD_DEFINITIONS) {
+    const raw = ctx[def.key]
+    if (raw == null || raw === '') continue
+    const formatted = formatMergeValue(def.key, raw)
+    out = out.replace(new RegExp(`\\{\\{${def.key}\\}\\}`, 'g'), formatted)
   }
   return out
 }
@@ -68,11 +73,35 @@ export async function loadMergeFieldContext(
   familyId: string,
   organizationId: string,
 ): Promise<MergeFieldContext> {
-  const family = await Family.findOne({ _id: familyId, organizationId })
-    .select('name paymentPlanId')
-    .lean<{ name?: string; paymentPlanId?: Types.ObjectId }>()
+  const orgId = new Types.ObjectId(organizationId)
+
+  const [family, org, cycleConfig] = await Promise.all([
+    Family.findOne({ _id: familyId, organizationId: orgId })
+      .select(
+        'name hebrewName email phone husbandCellPhone wifeCellPhone street address city state zip paymentPlanId',
+      )
+      .lean<{
+        name?: string
+        hebrewName?: string
+        email?: string
+        phone?: string
+        husbandCellPhone?: string
+        wifeCellPhone?: string
+        street?: string
+        address?: string
+        city?: string
+        state?: string
+        zip?: string
+        paymentPlanId?: Types.ObjectId
+      }>(),
+    Organization.findById(orgId).select('name').lean<{ name?: string }>(),
+    CycleConfig.findOne({ organizationId: orgId, isActive: true })
+      .select('cycleStartMonth cycleStartDay')
+      .lean<{ cycleStartMonth?: number; cycleStartDay?: number }>(),
+  ])
+
   if (!family) {
-    return { familyName: '' }
+    return { familyName: '', orgName: org?.name || '' }
   }
 
   let balance = 0
@@ -89,7 +118,7 @@ export async function loadMergeFieldContext(
   if (family.paymentPlanId) {
     const plan = await PaymentPlan.findOne({
       _id: family.paymentPlanId,
-      organizationId,
+      organizationId: orgId,
     })
       .select('name')
       .lean<{ name?: string }>()
@@ -98,7 +127,7 @@ export async function loadMergeFieldContext(
 
   const now = new Date()
   const upcoming = await LifecycleEventPayment.findOne({
-    organizationId,
+    organizationId: orgId,
     familyId,
     eventDate: { $gte: now },
     deletedAt: null,
@@ -107,18 +136,32 @@ export async function loadMergeFieldContext(
     .select('eventDate')
     .lean<{ eventDate?: Date }>()
 
-  const cycleConfig = await CycleConfig.findOne({ organizationId, isActive: true })
-    .select('cycleStartMonth cycleStartDay')
-    .lean<{ cycleStartMonth?: number; cycleStartDay?: number }>()
-
   const nextDueDate = computeNextCycleDueDate(cycleConfig, now)
+  const fullAddress = formatFullAddress(family)
 
   return {
     familyName: family.name || '',
+    hebrewName: family.hebrewName || '',
+    email: family.email || '',
+    phone: family.phone || '',
+    husbandCellPhone: family.husbandCellPhone || '',
+    wifeCellPhone: family.wifeCellPhone || '',
+    street: family.street || family.address || '',
+    city: family.city || '',
+    state: family.state || '',
+    zip: family.zip || '',
+    fullAddress,
     balance,
     dues,
     planName,
     eventDate: upcoming?.eventDate ? formatDate(new Date(upcoming.eventDate)) : '',
     nextDue: nextDueDate ? formatDate(nextDueDate) : '',
+    orgName: org?.name || '',
   }
 }
+
+export {
+  MERGE_FIELD_DEFINITIONS,
+  mergeFieldToken,
+  mergeFieldSamples,
+} from './merge-field-definitions'

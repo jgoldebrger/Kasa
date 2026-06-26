@@ -91,13 +91,14 @@ export async function sendBulkToFamily(opts: {
     : undefined
 
   const picked = pickBulkSubject(opts.payload, familyId)
+  const subject = applyMergeFields(picked.subject, mergeCtx)
 
   const result = await sendEmail({
     organizationId: opts.organizationId,
     userId: opts.userId,
     familyId,
     to: opts.family.email,
-    subject: picked.subject,
+    subject,
     subjectVariant: picked.subjectVariant,
     html,
     text,

@@ -1,10 +1,13 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { PaperAirplaneIcon } from '@heroicons/react/24/outline'
 import { useToast } from '@/app/components/Toast'
-import { Alert, Button, Input, Modal, Textarea } from '@/app/components/ui'
+import { Alert, Button, Modal, Textarea } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
+import { insertAtCursor } from '@/lib/client/insert-at-cursor'
+import MergeFieldSelector from '@/app/communications/_components/MergeFieldSelector'
+import SubjectFieldWithMergeFields from '@/app/communications/_components/SubjectFieldWithMergeFields'
 
 export interface EmailFamilyRow {
   _id: string
@@ -35,6 +38,7 @@ export default function EmailFamiliesModal({
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
+  const bodyRef = useRef<HTMLTextAreaElement>(null)
 
   const { emailable, skippedNoEmail, skippedOptOut, skippedInvalidFormat, warnDeliverability } =
     useMemo(() => {
@@ -155,20 +159,35 @@ export default function EmailFamiliesModal({
             {t('families.emailBulk.recipients').replace('{count}', String(emailable.length))}
           </p>
         )}
-        <Input
+        <SubjectFieldWithMergeFields
           label={t('families.emailBulk.subject')}
           value={subject}
-          onChange={(e) => setSubject(e.target.value)}
+          onChange={setSubject}
           placeholder={t('families.emailBulk.subjectPlaceholder')}
         />
-        <Textarea
-          label={t('families.emailBulk.body')}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          rows={8}
-          placeholder={t('families.emailBulk.bodyPlaceholder')}
-          hint={t('families.emailBulk.bodyHint')}
-        />
+        <div className="flex flex-col gap-1.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm font-medium text-fg">{t('families.emailBulk.body')}</span>
+            <MergeFieldSelector
+              className="h-9 min-w-[11rem] max-w-[14rem]"
+              onInsert={(token) => {
+                const el = bodyRef.current
+                if (!el) return
+                insertAtCursor(el, body, token, setBody)
+              }}
+            />
+          </div>
+          <Textarea
+            ref={bodyRef}
+            labelHidden
+            aria-label={t('families.emailBulk.body')}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={8}
+            placeholder={t('families.emailBulk.bodyPlaceholder')}
+            hint={t('families.emailBulk.bodyHint')}
+          />
+        </div>
         <div className="flex justify-end gap-2 pt-1">
           <Button type="button" variant="ghost" onClick={resetAndClose} disabled={sending}>
             {t('common.cancel')}

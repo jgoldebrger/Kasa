@@ -3,6 +3,8 @@
 import { useRef } from 'react'
 import { BoldIcon, ItalicIcon, LinkIcon, ListBulletIcon } from '@heroicons/react/24/outline'
 import { useT } from '@/lib/client/i18n'
+import { insertAtCursor } from '@/lib/client/insert-at-cursor'
+import MergeFieldSelector from './MergeFieldSelector'
 
 interface EmailComposeEditorProps {
   value: string
@@ -115,6 +117,16 @@ export default function EmailComposeEditor({
           >
             <ListBulletIcon className="h-4 w-4" />
           </button>
+          <div className="ml-auto min-w-[10rem] max-w-[14rem]">
+            <MergeFieldSelector
+              className="h-8 text-xs"
+              onInsert={(token) => {
+                const el = textareaRef.current
+                if (!el) return
+                insertAtCursor(el, value, token, onChange)
+              }}
+            />
+          </div>
         </div>
         <textarea
           ref={textareaRef}

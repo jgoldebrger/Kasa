@@ -15,6 +15,7 @@ import { Alert, Button, Card, Input, Select } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
 import EmailComposeEditor from './EmailComposeEditor'
+import SubjectFieldWithMergeFields from './SubjectFieldWithMergeFields'
 import EmailPreviewModal from './EmailPreviewModal'
 import RecipientList from './RecipientList'
 import {
@@ -525,21 +526,21 @@ export default function ComposeTab({
           </Select>
         </div>
 
-        <Input
+        <SubjectFieldWithMergeFields
           label={t('communications.field.subject')}
           value={subject}
-          onChange={(e) => setSubject(e.target.value)}
+          onChange={setSubject}
           placeholder={t('communications.field.subjectPlaceholder')}
         />
 
-        <Input
+        <SubjectFieldWithMergeFields
           label={t('communications.field.subjectB' as MessageKey, 'Subject B (A/B test)')}
           hint={t(
             'communications.field.subjectBHint' as MessageKey,
             'Optional. Half of recipients get this subject line instead.',
           )}
           value={subjectB}
-          onChange={(e) => setSubjectB(e.target.value)}
+          onChange={setSubjectB}
           placeholder={t(
             'communications.field.subjectBPlaceholder' as MessageKey,
             'Alternate subject line',

@@ -132,11 +132,13 @@ export async function executeEmailAutomationRule(
       ? applyMergeFields(template.text, mergeCtx).replace(/\{\{familyName\}\}/g, family.name || '')
       : undefined
 
+    const subject = applyMergeFields(template.subject, mergeCtx)
+
     const result = await sendEmail({
       organizationId,
       familyId,
       to: family.email,
-      subject: template.subject,
+      subject,
       html,
       text,
       kind: 'custom',

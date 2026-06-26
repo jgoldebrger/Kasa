@@ -13,22 +13,28 @@ describe('normalizeGmailAppPassword', () => {
 describe('applyMergeFields', () => {
   it('replaces merge tokens', () => {
     const out = applyMergeFields(
-      'Hi {{familyName}}, balance {{balance}}, dues {{dues}}, plan {{planName}}, event {{eventDate}}, due {{nextDue}}',
+      'Hi {{familyName}} ({{hebrewName}}), balance {{balance}}, dues {{dues}}, plan {{planName}}, event {{eventDate}}, due {{nextDue}}, org {{orgName}}, addr {{fullAddress}}',
       {
         familyName: 'Cohen',
+        hebrewName: 'כהן',
         balance: 100,
         dues: 500,
         planName: 'Standard',
         eventDate: 'June 1, 2026',
         nextDue: 'September 1, 2026',
+        orgName: 'Kasa Shul',
+        fullAddress: '1 Main St, Brooklyn, NY 11201',
       },
     )
     expect(out).toContain('Cohen')
+    expect(out).toContain('כהן')
     expect(out).toContain('$100.00')
     expect(out).toContain('$500.00')
     expect(out).toContain('Standard')
     expect(out).toContain('June 1, 2026')
     expect(out).toContain('September 1, 2026')
+    expect(out).toContain('Kasa Shul')
+    expect(out).toContain('1 Main St, Brooklyn, NY 11201')
   })
 })
 

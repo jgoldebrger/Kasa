@@ -3,7 +3,14 @@ export { loadOrgEmailConfig } from './load-org-email-config'
 export { createGmailTransport, createTransportWithFallback } from './create-transport'
 export { formatMailError } from './format-mail-error'
 export { normalizeGmailAppPassword } from './normalize-app-password'
-export { applyMergeFields, loadMergeFieldContext } from './merge-fields'
+export {
+  applyMergeFields,
+  loadMergeFieldContext,
+  MERGE_FIELD_DEFINITIONS,
+  mergeFieldToken,
+  mergeFieldSamples,
+  type MergeFieldContext,
+} from './merge-fields'
 export { checkDailySendQuota, getDailySendLimit, getTodaySentCount } from './daily-send-quota'
 export { wrapEmailHtml, type OrgPhysicalAddress, type WrapEmailHtmlOpts } from './email-wrapper'
 export { isValidEmailFormat, emailFormatInvalidFlag } from './validate-email'

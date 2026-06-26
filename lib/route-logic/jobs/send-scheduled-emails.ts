@@ -81,11 +81,13 @@ export const POST = handler({
           ? applyMergeFields(job.text, mergeCtx).replace(/\{\{familyName\}\}/g, family.name || '')
           : undefined
 
+        const subject = applyMergeFields(job.subject, mergeCtx)
+
         const result = await sendEmail({
           organizationId: orgId,
           familyId,
           to: family.email,
-          subject: job.subject,
+          subject,
           html,
           text,
           kind: 'custom',

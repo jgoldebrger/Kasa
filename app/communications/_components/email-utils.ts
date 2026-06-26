@@ -57,18 +57,20 @@ export function markdownToPlainText(md: string): string {
     .replace(/^[-*]\s+/gm, '• ')
 }
 
+import { mergeFieldSamples } from '@/lib/mail/merge-field-definitions'
+
 /** Substitute merge fields for preview (sample values). */
 export function substituteMergeFields(
   text: string,
-  sample: { familyName?: string; balance?: string; dues?: string } = {},
+  overrides: Record<string, string> = {},
 ): string {
-  const familyName = sample.familyName ?? 'Sample Family'
-  const balance = sample.balance ?? '$0.00'
-  const dues = sample.dues ?? '$0.00'
-  return text
-    .replace(/\{\{familyName\}\}/gi, familyName)
-    .replace(/\{\{balance\}\}/gi, balance)
-    .replace(/\{\{dues\}\}/gi, dues)
+  const samples = { ...mergeFieldSamples(), ...overrides }
+  let out = text
+  for (const [key, sample] of Object.entries(samples)) {
+    if (!sample) continue
+    out = out.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'gi'), sample)
+  }
+  return out
 }
 
 /** Default tax receipt year — last completed calendar year. */

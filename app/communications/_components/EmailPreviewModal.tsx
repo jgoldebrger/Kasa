@@ -21,14 +21,9 @@ export default function EmailPreviewModal({
 }: EmailPreviewModalProps) {
   const t = useT()
 
-  const previewSubject = substituteMergeFields(subject, { familyName: sampleFamilyName })
-  const previewHtml = markdownToHtml(
-    substituteMergeFields(body, {
-      familyName: sampleFamilyName,
-      balance: '$125.00',
-      dues: '$50.00',
-    }),
-  )
+  const overrides: Record<string, string> = sampleFamilyName ? { familyName: sampleFamilyName } : {}
+  const previewSubject = substituteMergeFields(subject, overrides)
+  const previewHtml = markdownToHtml(substituteMergeFields(body, overrides))
 
   return (
     <Modal
