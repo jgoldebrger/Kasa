@@ -52,5 +52,5 @@ export const attachStatementBody = z.object({
 
 export const attachTaxReceiptBody = z.object({
   familyId: objectId,
-  year: yearParam,
+  year: yearParam.optional().default(() => new Date().getFullYear() - 1),
 })

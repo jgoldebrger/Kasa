@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BookmarkIcon,
   ClockIcon,
@@ -22,7 +22,14 @@ import {
   isSelectableFamily,
   type RecipientSegment,
 } from './recipient-segments'
-import { markdownToHtml, markdownToPlainText } from './email-utils'
+import {
+  apiErrorMessage,
+  attachmentsForApi,
+  defaultTaxReceiptYear,
+  markdownToHtml,
+  markdownToPlainText,
+  taxReceiptYearOptions,
+} from './email-utils'
 import { tomorrowMorningLocal, useEmailQuota } from './useEmailQuota'
 import type { EmailAttachment, EmailDraft, EmailTemplate, FamilyOption } from './types'
 
@@ -57,6 +64,8 @@ export default function ComposeTab({
   const [body, setBody] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [attachments, setAttachments] = useState<EmailAttachment[]>([])
+  const [taxReceiptYear, setTaxReceiptYear] = useState(defaultTaxReceiptYear)
+  const taxYearOptions = useMemo(() => taxReceiptYearOptions(), [])
   const [scheduledAt, setScheduledAt] = useState('')
   const [sending, setSending] = useState(false)
   const [savingDraft, setSavingDraft] = useState(false)
@@ -283,7 +292,7 @@ export default function ComposeTab({
         body: JSON.stringify({ familyId: singleSelectedFamilyId }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || 'Failed to attach statement')
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Failed to attach statement'))
       const filename = String(data.filename ?? 'statement.pdf')
       const content = String(data.contentBase64 ?? data.content ?? '')
       if (!content) throw new Error('No PDF returned')
@@ -317,10 +326,10 @@ export default function ComposeTab({
       const res = await fetch('/api/emails/attach-tax-receipt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ familyId: singleSelectedFamilyId }),
+        body: JSON.stringify({ familyId: singleSelectedFamilyId, year: taxReceiptYear }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || 'Failed to attach tax receipt')
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Failed to attach tax receipt'))
       const filename = String(data.filename ?? 'tax-receipt.pdf')
       const content = String(data.contentBase64 ?? data.content ?? '')
       if (!content) throw new Error('No PDF returned')
@@ -348,7 +357,7 @@ export default function ComposeTab({
       subject: subject.trim(),
       html,
       text,
-      attachments: attachments.length > 0 ? attachments : undefined,
+      attachments: attachments.length > 0 ? attachmentsForApi(attachments) : undefined,
     }
     if (subjectB.trim()) payload.subjectB = subjectB.trim()
     return payload
@@ -398,7 +407,7 @@ export default function ComposeTab({
           body: JSON.stringify({ ...payload, scheduledAt: new Date(scheduledAt).toISOString() }),
         })
         const data = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(data.error || 'Schedule failed')
+        if (!res.ok) throw new Error(apiErrorMessage(data, 'Schedule failed'))
         toast.success(t('communications.schedule.success'))
         setSubject('')
         setSubjectB('')
@@ -417,7 +426,7 @@ export default function ComposeTab({
         body: JSON.stringify(payload),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || 'Send failed')
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Send failed'))
 
       const jobId = data.jobId as string | undefined
       if (jobId) {
@@ -606,6 +615,19 @@ export default function ComposeTab({
             >
               {t('communications.taxReceipt.attach')}
             </Button>
+            <Select
+              aria-label={t('communications.taxReceipt.year')}
+              value={String(taxReceiptYear)}
+              onChange={(e) => setTaxReceiptYear(Number(e.target.value))}
+              className="w-auto min-w-[5.5rem]"
+              disabled={!singleSelectedFamilyId}
+            >
+              {taxYearOptions.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </Select>
             <span className="text-xs text-fg-muted">{t('communications.attachments.hint')}</span>
           </div>
           {!singleSelectedFamilyId && selectedIds.size > 1 && (

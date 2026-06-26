@@ -859,6 +859,7 @@
   "communications.taxReceipt.attached": "Tax receipt PDF attached.",
   "communications.taxReceipt.error": "Could not attach tax receipt PDF.",
   "communications.taxReceipt.selectOne": "Select exactly one family to attach a tax receipt.",
+  "communications.taxReceipt.year": "Tax year",
   "communications.segment.all": "All",
   "communications.segment.hasEmail": "Has email",
   "communications.segment.optedOut": "Opted out",

@@ -70,3 +70,42 @@ export function substituteMergeFields(
     .replace(/\{\{balance\}\}/gi, balance)
     .replace(/\{\{dues\}\}/gi, dues)
 }
+
+/** Default tax receipt year — last completed calendar year. */
+export function defaultTaxReceiptYear(): number {
+  return new Date().getFullYear() - 1
+}
+
+export function taxReceiptYearOptions(): number[] {
+  const max = new Date().getFullYear()
+  const years: number[] = []
+  for (let y = max; y >= max - 8; y--) years.push(y)
+  return years
+}
+
+/** Map compose attachments to API shape (`contentBase64`). */
+export function attachmentsForApi(
+  attachments: { filename: string; content: string; contentType: string }[],
+) {
+  return attachments.map((a) => ({
+    filename: a.filename,
+    contentBase64: a.content,
+    contentType: a.contentType,
+  }))
+}
+
+/** Extract a user-visible message from handler JSON (incl. Zod validation). */
+export function apiErrorMessage(data: unknown, fallback: string): string {
+  if (!data || typeof data !== 'object') return fallback
+  const d = data as Record<string, unknown>
+  if (typeof d.error !== 'string') return fallback
+  const issues = d.issues as Array<{ message?: string }> | undefined
+  if (Array.isArray(issues) && issues.length > 0) {
+    const detail = issues
+      .map((i) => i.message)
+      .filter(Boolean)
+      .join(', ')
+    return detail ? `${d.error}: ${detail}` : d.error
+  }
+  return d.error
+}
