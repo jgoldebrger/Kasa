@@ -8,6 +8,7 @@ import { createTransportWithFallback } from './create-transport'
 import { applyEmailTracking } from './tracking-html'
 import { loadOrgEmailConfig, type OrgEmailConfigCreds } from './load-org-email-config'
 import { formatMailError } from './format-mail-error'
+import { resolveAppBaseUrl } from '@/lib/app-base-url'
 import { notifyAdmins } from '@/lib/notify'
 import { wrapEmailHtml, type OrgPhysicalAddress } from './email-wrapper'
 import { buildUnsubscribeUrl, createUnsubscribeToken } from './unsubscribe-token'
@@ -48,8 +49,7 @@ export interface SendEmailResult {
 }
 
 function appBaseUrl(): string {
-  const url = process.env.NEXTAUTH_URL || process.env.AUTH_URL || 'http://localhost:3000'
-  return url.replace(/\/$/, '')
+  return resolveAppBaseUrl()
 }
 
 function bodyPreviewFrom(html?: string, text?: string): string | undefined {

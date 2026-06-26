@@ -47,11 +47,13 @@ export function applyEmailTracking(
     })
   }
   if (opts.trackOpens) {
-    const pixel = `<img src="${buildOpenTrackingUrl(opts.baseUrl, opts.emailMessageId)}" width="1" height="1" alt="" style="display:none;border:0;" />`
-    if (/<\/body>/i.test(out)) {
-      out = out.replace(/<\/body>/i, `${pixel}</body>`)
+    const pixel = `<img src="${buildOpenTrackingUrl(opts.baseUrl, opts.emailMessageId)}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0;opacity:0;" />`
+    if (/<body[^>]*>/i.test(out)) {
+      out = out.replace(/<body([^>]*)>/i, `<body$1>${pixel}`)
+    } else if (/<div[^>]*>/i.test(out)) {
+      out = out.replace(/<div([^>]*)>/i, `<div$1>${pixel}`)
     } else {
-      out = `${out}${pixel}`
+      out = `${pixel}${out}`
     }
   }
   return out

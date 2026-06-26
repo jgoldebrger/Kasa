@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { applyEmailTracking, decodeClickTarget } from './tracking-html'
 
 describe('applyEmailTracking', () => {
-  it('injects open pixel before closing body', () => {
+  it('injects open pixel at the start of the body', () => {
     const html = '<html><body><p>Hi</p></body></html>'
     const out = applyEmailTracking(html, {
       emailMessageId: 'abc123',
@@ -11,7 +11,7 @@ describe('applyEmailTracking', () => {
       trackClicks: false,
     })
     expect(out).toContain('/api/email/track/open/abc123')
-    expect(out).toContain('</body>')
+    expect(out.indexOf('/api/email/track/open/abc123')).toBeLessThan(out.indexOf('<p>Hi</p>'))
   })
 
   it('rewrites http links for click tracking', () => {

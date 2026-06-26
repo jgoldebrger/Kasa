@@ -735,6 +735,7 @@
   "communications.detail.event.clicked": "Clicked",
   "communications.detail.event.failed": "Failed",
   "communications.detail.event.bounced": "Bounced",
+  "communications.detail.openTrackingHint": "Opens are counted when the recipient's email client loads images. Gmail and others may block images until \"Display images\" is enabled.",
   "communications.field.recipients": "Recipients",
   "communications.selectAll": "Select all with email",
   "communications.noEmailableFamilies": "No families have an email address on file.",

@@ -122,4 +122,28 @@ describe('auth.config authorized — cron secret middleware gate', () => {
       ]),
     )
   })
+
+  it('allows unauthenticated email tracking pixel requests', () => {
+    const open = authorized({
+      auth: null,
+      request: apiRequest('/api/email/track/open/507f1f77bcf86cd799439011'),
+    })
+    expect(open).toBe(true)
+
+    const click = authorized({
+      auth: null,
+      request: apiRequest(
+        '/api/email/track/click/507f1f77bcf86cd799439011?u=aHR0cHM6Ly9leGFtcGxlLmNvbQ',
+      ),
+    })
+    expect(click).toBe(true)
+  })
+
+  it('allows unauthenticated email unsubscribe requests', () => {
+    const result = authorized({
+      auth: null,
+      request: apiRequest('/api/email/unsubscribe?token=abc'),
+    })
+    expect(result).toBe(true)
+  })
 })

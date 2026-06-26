@@ -28,6 +28,10 @@ const PUBLIC_API_PREFIXES = [
   // never reach the handler.
   '/api/stripe/webhook',
   '/api/billing/plans',
+  // Email open/click pixels and unsubscribe links are loaded by recipients'
+  // mail clients without a session cookie.
+  '/api/email/track',
+  '/api/email/unsubscribe',
 ]
 
 /** API routes that may bypass session auth when `CRON_SECRET` matches. Handlers re-verify. */

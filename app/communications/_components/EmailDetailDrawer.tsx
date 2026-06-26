@@ -78,6 +78,14 @@ export default function EmailDetailDrawer({
 
   useEffect(() => {
     if (!emailId) return
+    const timer = window.setInterval(() => {
+      void load()
+    }, 12_000)
+    return () => window.clearInterval(timer)
+  }, [emailId, load])
+
+  useEffect(() => {
+    if (!emailId) return
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
     }
@@ -161,6 +169,13 @@ export default function EmailDetailDrawer({
                 {detail.status === 'failed' && detail.error && (
                   <p className="text-sm text-danger">{detail.error}</p>
                 )}
+                {detail.openTracking &&
+                  detail.openCount === 0 &&
+                  (detail.status === 'sent' || detail.status === 'opened') && (
+                    <p className="text-xs text-fg-muted">
+                      {t('communications.detail.openTrackingHint')}
+                    </p>
+                  )}
               </div>
 
               {detail.events && detail.events.length > 0 && (

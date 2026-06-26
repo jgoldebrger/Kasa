@@ -66,6 +66,8 @@ export interface EmailDetail {
   error: string | null
   openCount: number
   clickCount: number
+  openTracking?: boolean
+  clickTracking?: boolean
   createdAt: string
   events: EmailEvent[]
 }
