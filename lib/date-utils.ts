@@ -265,10 +265,7 @@ export function previousStatementPeriodBounds(
  * tick on Jan 1 at 00:30 in NY books a Dec 31 charge that
  * `paymentDate.getFullYear()` would file under the *new* year.
  */
-export function getYearInTimeZone(
-  tz: string | undefined | null,
-  ref: Date = new Date(),
-): number {
+export function getYearInTimeZone(tz: string | undefined | null, ref: Date = new Date()): number {
   const zone = tz && tz.trim() ? tz : 'UTC'
   try {
     const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric' })
@@ -281,10 +278,7 @@ export function getYearInTimeZone(
 }
 
 /** Calendar month (1–12) for `ref` in the org's wall-clock timezone. */
-export function getMonthInTimeZone(
-  tz: string | undefined | null,
-  ref: Date = new Date(),
-): number {
+export function getMonthInTimeZone(tz: string | undefined | null, ref: Date = new Date()): number {
   const zone = tz && tz.trim() ? tz : 'UTC'
   try {
     const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: zone, month: 'numeric' })
@@ -297,10 +291,7 @@ export function getMonthInTimeZone(
 }
 
 /** Calendar day-of-month (1–31) for `ref` in the org's wall-clock timezone. */
-export function getDayInTimeZone(
-  tz: string | undefined | null,
-  ref: Date = new Date(),
-): number {
+export function getDayInTimeZone(tz: string | undefined | null, ref: Date = new Date()): number {
   const zone = tz && tz.trim() ? tz : 'UTC'
   try {
     const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: zone, day: 'numeric' })
@@ -371,6 +362,83 @@ export function calendarYearBoundsInTimeZone(
     start: zonedWallClockToUtc(year, 1, 1, 0, 0, 0, 0, tz),
     endExclusive: zonedWallClockToUtc(year + 1, 1, 1, 0, 0, 0, 0, tz),
   }
+}
+
+/** `YYYY-MM-DD` wall-clock key for `ref` in the org timezone. */
+export function dateKeyInTimeZone(tz: string | undefined | null, ref: Date = new Date()): string {
+  const y = getYearInTimeZone(tz, ref)
+  const m = getMonthInTimeZone(tz, ref)
+  const d = getDayInTimeZone(tz, ref)
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
+
+/** Parse a `YYYY-MM-DD` key produced by `dateKeyInTimeZone`. */
+export function parseDateKey(key: string): { year: number; month: number; day: number } | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key.trim())
+  if (!m) return null
+  const year = Number(m[1])
+  const month = Number(m[2])
+  const day = Number(m[3])
+  if (!Number.isFinite(year) || month < 1 || month > 12 || day < 1 || day > 31) return null
+  return { year, month, day }
+}
+
+/** Inclusive UTC bounds for one org-timezone calendar day from a date key. */
+export function calendarDayBoundsFromDateKey(
+  key: string,
+  tz: string | undefined | null,
+): { fromDate: Date; toDate: Date } | null {
+  const parsed = parseDateKey(key)
+  if (!parsed) return null
+  const { year, month, day } = parsed
+  return {
+    fromDate: zonedWallClockToUtc(year, month, day, 0, 0, 0, 0, tz),
+    toDate: zonedWallClockToUtc(year, month, day, 23, 59, 59, 999, tz),
+  }
+}
+
+const WEEKDAY_INDEX: Record<string, number> = {
+  Sunday: 0,
+  Monday: 1,
+  Tuesday: 2,
+  Wednesday: 3,
+  Thursday: 4,
+  Friday: 5,
+  Saturday: 6,
+}
+
+/** Day-of-week index (0 = Sunday) for `ref` in the org wall-clock timezone. */
+export function getWeekdayInTimeZone(
+  tz: string | undefined | null,
+  ref: Date = new Date(),
+): number {
+  const zone = tz && tz.trim() ? tz : 'UTC'
+  try {
+    const day = new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'long' }).format(ref)
+    const idx = WEEKDAY_INDEX[day]
+    if (idx !== undefined) return idx
+  } catch {
+    /* fall through */
+  }
+  return ref.getDay()
+}
+
+/** Shift a date key by `delta` calendar days (Gregorian). */
+export function addCalendarDaysToDateKey(
+  key: string,
+  delta: number,
+  tz: string | undefined | null,
+): string {
+  const parsed = parseDateKey(key)
+  if (!parsed) return key
+  const anchor = zonedWallClockToUtc(parsed.year, parsed.month, parsed.day, 12, 0, 0, 0, tz)
+  const shifted = new Date(anchor.getTime() + delta * 86_400_000)
+  return dateKeyInTimeZone(tz, shifted)
+}
+
+/** Last calendar day (1–31) for a Gregorian month. */
+export function daysInGregorianMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate()
 }
 
 export function startOfDayInTimeZone(tz: string | undefined | null, ref: Date = new Date()): Date {

@@ -7,6 +7,7 @@ import { SettingsPanel } from '@/app/components/settings/SettingsPanel'
 import { Alert, Card } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
 import { useSupportModeReadOnly } from '@/lib/client/support-mode'
+import ApiKeysPanel from './ApiKeysPanel'
 
 export interface SecurityPanelProps {
   isOwner: boolean
@@ -19,18 +20,37 @@ export default function SecurityPanel({ isOwner }: SecurityPanelProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [loadError, setLoadError] = useState(false)
+  const [oidcStatus, setOidcStatus] = useState<{
+    enabled: boolean
+    providerName: string
+    hasDomainMapping: boolean
+  } | null>(null)
 
   const loadSecurity = useCallback(async () => {
     setLoading(true)
     setLoadError(false)
     try {
-      const res = await fetch('/api/organizations/security')
-      if (!res.ok) {
+      const [securityRes, oidcRes] = await Promise.all([
+        fetch('/api/organizations/security'),
+        fetch('/api/auth/oidc-status'),
+      ])
+      if (!securityRes.ok) {
         setLoadError(true)
         return
       }
-      const data = await res.json().catch(() => ({}))
+      const data = await securityRes.json().catch(() => ({}))
       setNotifyOwnerOnSupportAccess(data.notifyOwnerOnSupportAccess !== false)
+
+      if (oidcRes.ok) {
+        const oidc = await oidcRes.json().catch(() => null)
+        if (oidc) {
+          setOidcStatus({
+            enabled: !!oidc.enabled,
+            providerName: oidc.providerName || 'SSO',
+            hasDomainMapping: !!oidc.hasDomainMapping,
+          })
+        }
+      }
     } catch {
       setLoadError(true)
     } finally {
@@ -102,6 +122,22 @@ export default function SecurityPanel({ isOwner }: SecurityPanelProps) {
           <p className="mt-2 text-xs text-fg-muted">{t('settings.security.ownerOnly')}</p>
         )}
       </Card>
+
+      <Card compact className="mt-4">
+        <h3 className="text-sm font-medium text-fg">{t('settings.security.sso.title')}</h3>
+        <p className="mt-1 text-xs text-fg-muted">{t('settings.security.sso.description')}</p>
+        {loading ? (
+          <p className="mt-3 text-sm text-fg-muted">{t('settings.security.loading')}</p>
+        ) : oidcStatus?.enabled ? (
+          <p className="mt-3 text-sm text-fg">
+            {t('settings.security.sso.enabled').replace('{provider}', oidcStatus.providerName)}
+          </p>
+        ) : (
+          <p className="mt-3 text-sm text-fg-muted">{t('settings.security.sso.disabled')}</p>
+        )}
+      </Card>
+
+      <ApiKeysPanel isOwner={isOwner} />
     </SettingsPanel>
   )
 }

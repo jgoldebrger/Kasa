@@ -38,11 +38,7 @@ describe('sendOneFamilyTaxReceipt (integration)', () => {
     sendMail.mockClear()
     createTransport.mockClear()
     const { Organization, Family, Payment } = await import('../models')
-    await Promise.all([
-      Payment.deleteMany({}),
-      Family.deleteMany({}),
-      Organization.deleteMany({}),
-    ])
+    await Promise.all([Payment.deleteMany({}), Family.deleteMany({}), Organization.deleteMany({})])
   })
 
   async function seedOrgAndFamily(opts?: {
@@ -180,7 +176,10 @@ describe('sendOneFamilyTaxReceipt (integration)', () => {
     const result = await sendOneFamilyTaxReceipt({ ...baseInput(), transporter })
 
     expect(result.ok).toBe(true)
-    const mail = (sendMail.mock.calls as unknown as unknown[][])[0]?.[0] as unknown as { text: string; html: string }
+    const mail = (sendMail.mock.calls as unknown as unknown[][])[0]?.[0] as unknown as {
+      text: string
+      html: string
+    }
     expect(mail.text).toMatch(/\$75\.00/)
     expect(mail.html).toContain('$75.00')
   })
@@ -227,7 +226,9 @@ describe('sendOneFamilyTaxReceipt (integration)', () => {
     expect(result.ok).toBe(false)
     expect(result.email).toBe('levy@example.com')
     expect(result.totalPaid).toBe(100)
-    expect(result.error).toBe('SMTP timeout')
+    expect(result.error).toBe(
+      'Could not reach Gmail SMTP (SMTP timeout). Try again in a few minutes.',
+    )
     consoleSpy.mockRestore()
   })
 })

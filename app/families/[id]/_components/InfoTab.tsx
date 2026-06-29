@@ -1,8 +1,9 @@
 // @ts-nocheck
 'use client'
 
-import type { ReactNode } from 'react'
-import { PencilSquareIcon } from '@heroicons/react/24/outline'
+import { useState, type ReactNode } from 'react'
+import Link from 'next/link'
+import { PencilSquareIcon, ArrowsRightLeftIcon } from '@heroicons/react/24/outline'
 import { Alert, Button, Card } from '@/app/components/ui'
 import FamilyEmailAdminActions from '@/app/families/_components/FamilyEmailAdminActions'
 import FamilyEmailIndicators from '@/app/families/_components/FamilyEmailIndicators'
@@ -10,6 +11,7 @@ import type { FamilyDetailContextValue } from '../FamilyDetailContext'
 import { useFamilyDetail } from '../FamilyDetailContext'
 import { normalizePlanId } from '@/lib/payment-plan-display'
 import MemberFinancialPanel from './MemberFinancialPanel'
+import MergeFamilyModal from './MergeFamilyModal'
 
 function InfoSection({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -54,6 +56,8 @@ function InfoTabContent(props: FamilyDetailContextValue) {
     renderEditableField,
     setData,
   } = props
+
+  const [showMergeModal, setShowMergeModal] = useState(false)
 
   const family = data?.family
   if (!family) return null
@@ -161,7 +165,43 @@ function InfoTabContent(props: FamilyDetailContextValue) {
             )}
           </InfoField>
         )}
+        {family.parentFamilyId && (
+          <InfoField label="Parent household">
+            <Link
+              href={`/families/${family.parentFamilyId}`}
+              className="font-medium text-accent hover:underline"
+            >
+              View parent family
+            </Link>
+          </InfoField>
+        )}
       </InfoSection>
+
+      {isAdmin && (
+        <InfoSection title="Household actions">
+          <div className="col-span-full flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-fg-muted">
+              Merge this household into another family. Members, payments, and events move to the
+              target; this record is archived.
+            </p>
+            <Button
+              size="sm"
+              variant="secondary"
+              leftIcon={<ArrowsRightLeftIcon className="h-4 w-4" aria-hidden="true" />}
+              onClick={() => setShowMergeModal(true)}
+            >
+              Merge household
+            </Button>
+          </div>
+        </InfoSection>
+      )}
+
+      <MergeFamilyModal
+        open={showMergeModal}
+        onClose={() => setShowMergeModal(false)}
+        sourceFamilyId={familyId}
+        sourceFamilyName={family.name || ''}
+      />
 
       <InfoSection title="Husband">
         <InfoField label="First name">

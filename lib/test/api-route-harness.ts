@@ -246,6 +246,55 @@ const API_HANDLER_ALIASES: Record<string, string> = {
   'jobs/generate-monthly-statements/worker': 'jobs/generate-monthly-statements-worker',
 }
 
+function resolveTsImportPath(importPath: string): string | null {
+  let rel = importPath.replace(/^@\//, '').replace(/\\/g, '/')
+  if (!rel.endsWith('.ts')) rel += '.ts'
+  const full = path.join(process.cwd(), rel)
+  return fs.existsSync(full) ? full : null
+}
+
+/** Collect `export { … } from '@/lib/…'` targets from a route or handler file. */
+function extractReexportTargets(content: string): string[] {
+  const targets: string[] = []
+  for (const m of content.matchAll(/export\s*\{[^}]+\}\s*from\s+['"](@\/lib\/[^'"]+)['"]/g)) {
+    if (!targets.includes(m[1])) targets.push(m[1])
+  }
+  return targets
+}
+
+/** Prefer api-handlers (when route re-exports both) then route-logic. */
+function pickHandlerModule(targets: string[]): string | null {
+  const apiHandler = targets.find((t) => t.includes('/api-handlers/'))
+  if (apiHandler) return apiHandler
+  const routeLogic = targets.find((t) => t.includes('/route-logic/'))
+  if (routeLogic) return routeLogic
+  return targets[0] ?? null
+}
+
+/** Follow thin re-export chain from `app/api/.../route.ts` to the handler module. */
+function resolveRouteHandlerModule(source: string): string | null {
+  const routeFile = path.join(process.cwd(), source.replace(/\\/g, '/'))
+  if (!fs.existsSync(routeFile)) return null
+
+  const seen = new Set<string>()
+  let currentFile = routeFile
+
+  for (let depth = 0; depth < 8; depth++) {
+    const content = fs.readFileSync(currentFile, 'utf8')
+    const picked = pickHandlerModule(extractReexportTargets(content))
+    if (picked) return picked
+
+    const fromMatch = content.match(/from\s+['"](@\/lib\/[^'"]+)['"]/)
+    if (!fromMatch || seen.has(fromMatch[1])) break
+    seen.add(fromMatch[1])
+    const next = resolveTsImportPath(fromMatch[1])
+    if (!next) break
+    currentFile = next
+  }
+
+  return null
+}
+
 function apiHandlerModuleForRoute(rel: string): string | null {
   const handlerRel = API_HANDLER_ALIASES[rel] ?? rel
   const handlerPath = path.join(API_HANDLERS_ROOT, ...handlerRel.split('/'), 'handler.ts')
@@ -257,6 +306,9 @@ function apiHandlerModuleForRoute(rel: string): string | null {
 
 /** Map catalog `app/api/.../route.ts` to handler implementation (api-handlers or route-logic). */
 export function routeSourceToLogicModule(source: string): string {
+  const resolved = resolveRouteHandlerModule(source)
+  if (resolved) return resolved
+
   const rel = source
     .replace(/\\/g, '/')
     .replace(/^app\/api\//, '')

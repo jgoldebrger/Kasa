@@ -28,26 +28,27 @@ const listQuery = z.object({
 })
 
 // GET /api/payments — list payments for the active org, optionally filtered.
-// Admin-only: exposes org-wide ledger data (amounts, families, card last4).
+// Requires payments:read (admin/owner/treasurer, or API key with scope).
 export const GET = handler({
-  auth: 'org',
-  minRole: 'admin',
+  auth: 'org-or-api-key',
+  permission: 'payments:read',
   query: listQuery,
   name: 'GET /api/payments',
-  fn: async ({ ctx, query, request }) => {
+  fn: async ({ ctx, apiKey, query, request }) => {
+    const organizationId = ctx?.organizationId ?? apiKey!.organizationId
     const rateVerdict = await checkRateLimit(
       request,
       'payments-list',
       { limit: 120, windowMs: 60_000 },
-      ctx!.organizationId,
+      organizationId,
     )
     if (!rateVerdict.allowed) {
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    let filter: Record<string, unknown> = { organizationId: ctx!.organizationId }
+    let filter: Record<string, unknown> = { organizationId }
     if (query.year !== undefined) {
-      const org = await Organization.findById(ctx!.organizationId)
+      const org = await Organization.findById(organizationId)
         .select('timezone')
         .lean<{ timezone?: string }>()
       filter = {

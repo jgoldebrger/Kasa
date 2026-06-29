@@ -10,13 +10,16 @@ import {
   readImpersonationScope,
 } from '@/lib/platform-impersonation'
 import type { SupportModeScope } from '@/lib/support-mode-scope'
-import type { Role, SessionMembership } from '@/types/auth'
+import type { Role, SessionMembership, OrgPermission } from '@/types/auth'
+import { hasOrgPermission } from '@/lib/org-permissions'
 
-export type { Role, SessionMembership } from '@/types/auth'
+export type { Role, SessionMembership, OrgPermission } from '@/types/auth'
 export const ACTIVE_ORG_COOKIE = 'kasa_active_org'
 
 const ROLE_RANK: Record<Role, number> = {
   member: 1,
+  treasurer: 1,
+  communications: 1,
   admin: 2,
   owner: 3,
 }
@@ -205,6 +208,23 @@ export async function requireOrg(
     organizationId: orgId,
     role,
   }
+}
+
+/**
+ * Session org auth with an optional permission gate (preset roles).
+ * Owners/admins satisfy any permission; specialist roles are checked
+ * against lib/org-permissions.ts.
+ */
+export async function requireOrgAccess(
+  request?: NextRequest,
+  options: { minRole?: Role; permission?: OrgPermission; orgId?: string } = {},
+): Promise<OrgContext | NextResponse> {
+  const ctx = await requireOrg(request, { minRole: options.minRole, orgId: options.orgId })
+  if (ctx instanceof NextResponse) return ctx
+  if (options.permission && !hasOrgPermission(ctx.role, options.permission)) {
+    return forbidden('Insufficient permissions')
+  }
+  return ctx
 }
 
 /**

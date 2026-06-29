@@ -199,10 +199,21 @@ describe('sendOneFamilyStatement (integration)', () => {
     const result = await sendOneFamilyStatement(baseInput())
 
     expect(result.ok).toBe(true)
-    expect(createTransport).toHaveBeenCalledWith({
-      service: 'gmail',
-      auth: { user: emailConfig.email, pass: emailConfig.password },
-    })
+    expect(createTransport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        host: 'smtp.gmail.com',
+        port: 465,
+        auth: { user: emailConfig.email, pass: emailConfig.password },
+      }),
+    )
+    expect(createTransport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        host: 'smtp.gmail.com',
+        port: 587,
+        requireTLS: true,
+        auth: { user: emailConfig.email, pass: emailConfig.password },
+      }),
+    )
     expect(sendMail).toHaveBeenCalled()
   })
 
@@ -226,7 +237,10 @@ describe('sendOneFamilyStatement (integration)', () => {
       transporter: { sendMail } as any,
     })
 
-    const mail = (sendMail.mock.calls as unknown as unknown[][]).at(-1)?.[0] as unknown as { text: string; html: string }
+    const mail = (sendMail.mock.calls as unknown as unknown[][]).at(-1)?.[0] as unknown as {
+      text: string
+      html: string
+    }
     expect(mail.text).toContain('Annual Dues Charged')
     expect(mail.html).toContain('Annual Dues Charged')
   })
@@ -246,7 +260,9 @@ describe('sendOneFamilyStatement (integration)', () => {
     })
 
     expect(result.ok).toBe(true)
-    const mail = (sendMail.mock.calls as unknown as unknown[][]).at(-1)?.[0] as unknown as { text: string }
+    const mail = (sendMail.mock.calls as unknown as unknown[][]).at(-1)?.[0] as unknown as {
+      text: string
+    }
     expect(mail.text).toMatch(/\$[\d,.]+/)
   })
 
@@ -279,18 +295,19 @@ describe('sendOneFamilyStatement (integration)', () => {
       { $set: { locale: 'invalid-locale-tag', currency: 'USD' } },
     )
 
-    const localeSpy = vi
-      .spyOn(Date.prototype, 'toLocaleDateString')
-      .mockImplementation(function (this: Date, locales?: string | string[]) {
-        if (locales === 'invalid-locale-tag') {
-          throw new RangeError('invalid language tag')
-        }
-        return new Intl.DateTimeFormat('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        }).format(this)
-      })
+    const localeSpy = vi.spyOn(Date.prototype, 'toLocaleDateString').mockImplementation(function (
+      this: Date,
+      locales?: string | string[],
+    ) {
+      if (locales === 'invalid-locale-tag') {
+        throw new RangeError('invalid language tag')
+      }
+      return new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }).format(this)
+    })
 
     const result = await sendOneFamilyStatement({
       ...baseInput(),
@@ -299,8 +316,12 @@ describe('sendOneFamilyStatement (integration)', () => {
 
     localeSpy.mockRestore()
     expect(result.ok).toBe(true)
-    const mail = (sendMail.mock.calls as unknown as unknown[][]).at(-1)?.[0] as unknown as { text: string }
-    expect(mail.text).toMatch(/January|February|March|April|May|June|July|August|September|October|November|December/)
+    const mail = (sendMail.mock.calls as unknown as unknown[][]).at(-1)?.[0] as unknown as {
+      text: string
+    }
+    expect(mail.text).toMatch(
+      /January|February|March|April|May|June|July|August|September|October|November|December/,
+    )
   })
 
   it('recovers from duplicate-key races by reusing the existing statement', async () => {

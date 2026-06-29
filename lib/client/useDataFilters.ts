@@ -39,7 +39,7 @@ export interface FilterOption {
 export interface ColumnFilterConfig<T> {
   type: FilterType
   /** Value getter used for filtering. Falls back to `exportValue` then to plain-text of `cell()`. */
-  getValue?: (row: T) => string | number | Date | boolean | null | undefined
+  getValue?: (row: T) => string | number | Date | boolean | string[] | null | undefined
   /** Predefined options for `select` / `multiselect`. When omitted, options are auto-extracted from rows. */
   options?: FilterOption[]
   /** Placeholder for the filter input. */
@@ -122,7 +122,7 @@ function getRowText<T>(row: T, col: FilterableColumn<T>): string {
 function getRowValue<T>(
   row: T,
   col: FilterableColumn<T>,
-): string | number | Date | boolean | null | undefined {
+): string | number | Date | boolean | string[] | null | undefined {
   if (col.filter?.getValue) return col.filter.getValue(row)
   if (col.exportValue) return col.exportValue(row, 0)
   try {
@@ -182,6 +182,9 @@ function matchValue<T>(value: ReturnType<typeof getRowValue<T>>, filter: FilterV
     }
     case 'multiselect': {
       if (filter.value.length === 0) return true
+      if (Array.isArray(value)) {
+        return value.some((item) => filter.value.includes(rawToText(item)))
+      }
       return filter.value.includes(rawToText(value))
     }
     case 'number': {
@@ -365,6 +368,15 @@ export function useDataFilters<T>(
         if (seen.size >= max) break
         const v = getRowValue(row, col)
         if (v == null || v === '') continue
+        if (Array.isArray(v)) {
+          for (const item of v) {
+            if (seen.size >= max) break
+            const key = rawToText(item)
+            if (!key) continue
+            if (!seen.has(key)) seen.set(key, key)
+          }
+          continue
+        }
         const key = rawToText(v)
         if (!seen.has(key)) seen.set(key, key)
       }
@@ -411,7 +423,15 @@ export function useDataFilters<T>(
         filterableColumns,
         globalGetText,
       }),
-    [rows, debouncedSearch, columnFilters, filterableColumns, globalGetText, columns, opts.globalSearch],
+    [
+      rows,
+      debouncedSearch,
+      columnFilters,
+      filterableColumns,
+      globalGetText,
+      columns,
+      opts.globalSearch,
+    ],
   )
 
   const activeFilters = useMemo<ActiveFilter[]>(() => {

@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { Types } from 'mongoose'
 import type { NextRequest } from 'next/server'
 import type nodemailer from 'nodemailer'
-import { Family, EmailJob, EmailConfig } from '@/lib/models'
+import { Family, EmailJob, EmailConfig, Organization } from '@/lib/models'
 import {
   sendEmail,
   applyMergeFields,
@@ -11,7 +11,7 @@ import {
   sleep,
 } from '@/lib/mail'
 import { escapeHtml } from '@/lib/html-escape'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { checkOrgBulkRateLimit, orgBulkRateLimit429 } from '@/lib/org-bulk-rate-limit'
 import { email as emailSchemas, objectId, UNBOUNDED_LIST_CAP } from '@/lib/schemas'
 import { handler } from '@/lib/api/handler'
 import { audit } from '@/lib/audit'
@@ -237,14 +237,17 @@ export const POST = handler({
   query: emailSchemas.sendBulkEmailQuery,
   name: 'POST /api/emails/send-bulk',
   fn: async ({ ctx, body, query, request }) => {
-    const rateVerdict = await checkRateLimit(
+    const org = await Organization.findById(ctx!.organizationId).select('rateLimits').lean<{
+      rateLimits?: { sendBulkPerHour?: number | null }
+    }>()
+    const rateVerdict = await checkOrgBulkRateLimit(
       request,
-      'email-send-bulk',
-      { limit: 10, windowMs: 60 * 60_000 },
       ctx!.organizationId,
+      'send-bulk',
+      org?.rateLimits,
     )
     if (!rateVerdict.allowed) {
-      return { status: 429, data: { error: 'Too many requests' } }
+      return orgBulkRateLimit429(rateVerdict, 'Too many bulk email requests. Try again later.')
     }
 
     const deliverability = await getDeliverabilityStatus(ctx!.organizationId)

@@ -12,6 +12,7 @@ export interface TaskSortRow {
   status?: string | null
   familyName?: string | null
   email?: string | null
+  assigneeName?: string | null
 }
 
 const PRIORITY_ORDER: Record<string, number> = {
@@ -71,8 +72,9 @@ export function sortTaskRows<T extends TaskSortRow>(rows: T[], sort: TaskSort | 
         bVal = (b.familyName || '').toLowerCase()
         break
       case 'email':
-        aVal = (a.email || '').toLowerCase()
-        bVal = (b.email || '').toLowerCase()
+      case 'assignee':
+        aVal = (a.assigneeName || a.email || '').toLowerCase()
+        bVal = (b.assigneeName || b.email || '').toLowerCase()
         break
       default:
         return 0

@@ -1,7 +1,79 @@
 import { describe, expect, it } from 'vitest'
-import { familyCreateBody, familyMemberCreateBody } from './family'
+import {
+  familyCreateBody,
+  familyMemberCreateBody,
+  familyPatchBody,
+  familyTag,
+  familyTags,
+  familiesBulkBody,
+  normalizeFamilyTags,
+} from './family'
 
 const VALID_OID = '507f1f77bcf86cd799439011'
+
+describe('family tag schemas', () => {
+  it('accepts valid tags', () => {
+    expect(familyTag.safeParse('VIP').success).toBe(true)
+    expect(familyTags.safeParse(['Board', '2024']).success).toBe(true)
+  })
+
+  it('rejects empty and overlong tags', () => {
+    expect(familyTag.safeParse('').success).toBe(false)
+    expect(familyTag.safeParse('a'.repeat(51)).success).toBe(false)
+    expect(familyTags.safeParse(Array.from({ length: 21 }, (_, i) => `t${i}`)).success).toBe(false)
+  })
+
+  it('normalizes tags by trimming and deduping case-insensitively', () => {
+    expect(normalizeFamilyTags([' VIP ', 'vip', 'Board', ''])).toEqual(['VIP', 'Board'])
+  })
+
+  describe('familyPatchBody', () => {
+    it('accepts tags and email flag clears', () => {
+      expect(familyPatchBody.safeParse({ tags: ['VIP'] }).success).toBe(true)
+      expect(familyPatchBody.safeParse({ emailFormatInvalid: false }).success).toBe(true)
+    })
+
+    it('rejects empty body', () => {
+      expect(familyPatchBody.safeParse({}).success).toBe(false)
+    })
+
+    it('rejects invalid tags', () => {
+      expect(familyPatchBody.safeParse({ tags: [''] }).success).toBe(false)
+    })
+  })
+
+  describe('familiesBulkBody setTags', () => {
+    it('accepts valid setTags payload', () => {
+      const result = familiesBulkBody.safeParse({
+        action: 'setTags',
+        ids: [VALID_OID],
+        mode: 'add',
+        tags: ['VIP'],
+      })
+      expect(result.success).toBe(true)
+    })
+
+    it('rejects setTags without tags', () => {
+      const result = familiesBulkBody.safeParse({
+        action: 'setTags',
+        ids: [VALID_OID],
+        mode: 'add',
+        tags: [],
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects invalid mode', () => {
+      const result = familiesBulkBody.safeParse({
+        action: 'setTags',
+        ids: [VALID_OID],
+        mode: 'merge',
+        tags: ['VIP'],
+      })
+      expect(result.success).toBe(false)
+    })
+  })
+})
 
 describe('family schemas', () => {
   describe('familyCreateBody', () => {

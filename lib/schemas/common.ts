@@ -7,16 +7,9 @@
 
 import { z } from 'zod'
 
-export const objectId = z
-  .string()
-  .regex(/^[a-f0-9]{24}$/i, 'Invalid id')
+export const objectId = z.string().regex(/^[a-f0-9]{24}$/i, 'Invalid id')
 
-export const email = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .email('Invalid email address')
-  .max(254)
+export const email = z.string().trim().toLowerCase().email('Invalid email address').max(254)
 
 /**
  * Password policy.
@@ -65,8 +58,7 @@ export const password = z
       return classes >= 3
     },
     {
-      message:
-        'Password must include at least three of: lowercase, uppercase, number, symbol.',
+      message: 'Password must include at least three of: lowercase, uppercase, number, symbol.',
     },
   )
   .refine((s) => !WEAK_PASSWORDS.has(s.trim().toLowerCase()), {
@@ -106,9 +98,7 @@ export const optionalString = (max = 1000) =>
     .transform((v) => (v ? v : undefined))
 
 /** Coerce strings <-> dates so JSON bodies (with ISO strings) just work. */
-export const isoDate = z.coerce
-  .date()
-  .refine((d) => !Number.isNaN(d.getTime()), 'Invalid date')
+export const isoDate = z.coerce.date().refine((d) => !Number.isNaN(d.getTime()), 'Invalid date')
 
 /** Money value. Two decimal places max; bounded for sanity. */
 export const moneyAmount = z
@@ -129,7 +119,7 @@ export const moneyAmount = z
     { message: 'Amount must have at most 2 decimal places' },
   )
 
-export const role = z.enum(['owner', 'admin', 'member'])
+export const role = z.enum(['owner', 'admin', 'member', 'treasurer', 'communications'])
 
 /**
  * Cursor pagination primitives used by list endpoints.

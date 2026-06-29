@@ -1,16 +1,16 @@
 # SSO Evaluation for Kasa (Institution Tier)
 
 **Date:** June 23, 2026  
-**Status:** Evaluation complete — not implemented  
+**Status:** OIDC foundation implemented (env-configured); SAML not implemented  
 **Audience:** Product and engineering planning for enterprise (Institution) customers
 
 ## Executive summary
 
-Kasa currently uses **credentials-based authentication** via NextAuth v5 (email + password, JWT sessions, optional TOTP 2FA). **SSO (SAML 2.0 / OIDC) is not implemented.** For Institution-tier buyers and larger kehillos with IT departments, SSO is frequently a procurement requirement.
+Kasa uses **credentials-based authentication** via NextAuth v5 (email + password, JWT sessions, optional TOTP 2FA). **OIDC SSO** is available when platform env vars are set (`OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`). **SAML 2.0 is not implemented.** Per-organization IdP configuration in Settings is planned for a follow-up.
 
-**Recommendation:** Defer SSO until the first Institution customer with a firm requirement. When needed, implement **OIDC first** (faster integration with Google Workspace and Microsoft Entra ID), then add **SAML 2.0** if a customer requires it.
+**Recommendation:** Use the env-configured OIDC path for the first Institution customer; add per-org Settings UI when a second IdP is needed. Add **SAML 2.0** only if a customer requires it.
 
-Estimated effort: **4–6 engineering weeks** for OIDC + JIT provisioning; **+2–3 weeks** for SAML and SCIM directory sync.
+Estimated effort remaining: **2–4 engineering weeks** for per-org OIDC config + enforced SSO; **+2–3 weeks** for SAML and SCIM directory sync.
 
 ---
 
@@ -18,15 +18,19 @@ Estimated effort: **4–6 engineering weeks** for OIDC + JIT provisioning; **+2�
 
 | Component  | Implementation                                                        |
 | ---------- | --------------------------------------------------------------------- |
-| Provider   | NextAuth v5 beta (`Credentials` provider only)                        |
+| Provider   | NextAuth v5 (`Credentials` + optional env-configured `OIDC`)          |
 | Session    | JWT, 7-day max, 24h sliding refresh                                   |
 | 2FA        | TOTP + backup codes (optional per user, required for platform admins) |
 | User model | Global `User` with `OrgMembership` pivot                              |
 | Multi-org  | Users can belong to multiple organizations                            |
+| OIDC JIT   | Pending invite or `OIDC_DOMAIN_ORG_MAP` domain→org slug               |
 
 Relevant files:
 
-- `app/auth.config.ts` — NextAuth configuration
+- `app/auth.config.ts` — NextAuth edge configuration
+- `app/auth.ts` — Credentials + OIDC providers, JIT provisioning hook
+- `lib/oidc-config.ts` — env parsing (`OIDC_*`)
+- `lib/oidc-provisioning.ts` — User + OrgMembership on first SSO login
 - `lib/auth-helpers.ts` — `requireOrg()`, role checks
 - `lib/models/user.ts`, `lib/models/org-membership.ts`
 
@@ -34,14 +38,14 @@ Relevant files:
 
 ## Enterprise buyer requirements (typical)
 
-| Requirement                     | Priority                           | Kasa today    |
-| ------------------------------- | ---------------------------------- | ------------- |
-| SAML 2.0 SSO                    | High for universities, federations | Not supported |
-| OIDC (Google / Microsoft)       | High for modern IT                 | Not supported |
-| SCIM provisioning               | Medium                             | Not supported |
-| Enforced SSO (disable password) | Medium                             | Not supported |
-| Domain verification             | Medium                             | Not supported |
-| Per-org IdP configuration       | High                               | Not supported |
+| Requirement                     | Priority                           | Kasa today          |
+| ------------------------------- | ---------------------------------- | ------------------- |
+| SAML 2.0 SSO                    | High for universities, federations | Not supported       |
+| OIDC (Google / Microsoft)       | High for modern IT                 | Env-configured (v1) |
+| SCIM provisioning               | Medium                             | Not supported       |
+| Enforced SSO (disable password) | Medium                             | Not supported       |
+| Domain verification             | Medium                             | Not supported       |
+| Per-org IdP configuration       | High                               | Not supported       |
 
 ---
 
@@ -49,18 +53,39 @@ Relevant files:
 
 ### Phase A — OIDC (preferred first ship)
 
+**Status (June 2026):** v1 foundation shipped — platform env vars only.
+
+**Environment variables:**
+
+| Variable              | Required | Description                                         |
+| --------------------- | -------- | --------------------------------------------------- |
+| `OIDC_ISSUER`         | Yes      | IdP issuer URL (e.g. `https://accounts.google.com`) |
+| `OIDC_CLIENT_ID`      | Yes      | OAuth client ID                                     |
+| `OIDC_CLIENT_SECRET`  | Yes      | OAuth client secret                                 |
+| `OIDC_PROVIDER_NAME`  | No       | Login button label (default: `SSO`)                 |
+| `OIDC_DOMAIN_ORG_MAP` | No       | `domain:org-slug` pairs for JIT provisioning        |
+
+**Login flow:**
+
+1. User opens `/login` → "Sign in with {provider}" when OIDC env is complete.
+2. NextAuth redirects to the IdP (`openid email profile`).
+3. On callback, `provisionOidcUser` runs:
+   - **Existing user** with org membership → sign in.
+   - **Pending invite** for email → create/link user, accept invite, assign invite role.
+   - **Domain map** match → create/link user, add `member` role on mapped org.
+   - **Otherwise** → reject (`AccessDenied`); credentials login still works for provisioned users.
+4. JWT session is issued; org memberships refresh on the same path as credentials login.
+
 **Why OIDC first:** Most kehilla IT stacks use Google Workspace or Microsoft 365. NextAuth supports OIDC providers natively. SAML often requires a bridge (e.g., BoxyHQ Jackson, WorkOS, or custom `samlify`).
 
-**Scope:**
+**Remaining scope (v2):**
 
-1. Add `OidcProvider` (or per-org dynamic OIDC) to NextAuth
-2. Store per-organization IdP settings on `Organization`:
+1. Per-organization IdP settings on `Organization`:
    - `ssoEnabled`, `ssoProvider` (`oidc`), `oidcIssuer`, `oidcClientId`, encrypted `oidcClientSecret`
    - `ssoEnforced` (disable password login for org members)
    - `ssoAllowedDomains` (e.g., `@kehilla.org`)
-3. JIT provisioning: on first SSO login, create `User` + `OrgMembership` with default `member` role (admin promotes in Settings)
-4. Admin UI in Settings → Security (owner-only) to configure and test SSO
-5. Login page: "Sign in with SSO" when email domain matches configured org
+2. Admin UI in Settings → Security (owner-only) to configure and test per-org SSO
+3. Login page: domain-aware SSO button when org IdP is configured
 
 **Dependencies:**
 

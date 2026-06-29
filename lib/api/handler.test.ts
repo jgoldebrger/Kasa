@@ -3,6 +3,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
+// All cases use `noDb: true` so handlers never call connectDB(). The database mock
+// below must stay hoisted — if it fails to apply, Vitest can hang on Mongo
+// connection timeouts in CI when MONGODB_URI is unset or unreachable.
 vi.mock('@/lib/database', () => ({
   default: vi.fn().mockResolvedValue(undefined),
 }))

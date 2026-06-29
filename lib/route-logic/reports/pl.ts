@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic'
 // GET - Get P&L report data
 export const GET = handler({
   auth: 'org',
-  minRole: 'admin',
+  permission: 'reports:read',
   name: 'GET /api/reports/pl',
   fn: async ({ ctx, request }) => {
     const rateVerdict = await checkRateLimit(

@@ -92,6 +92,7 @@ interface Family {
   communicationsOptOut?: boolean
   emailDeliverabilityWarning?: boolean
   emailFormatInvalid?: boolean
+  tags?: string[]
 }
 
 interface PaymentPlan {
@@ -164,8 +165,12 @@ export default function FamiliesView({
   const [bulkBusy, setBulkBusy] = useState(false)
   const [exportExpanding, setExportExpanding] = useState(false)
   const [showBulkPlanModal, setShowBulkPlanModal] = useState(false)
+  const [showBulkTagsModal, setShowBulkTagsModal] = useState(false)
   const [showBulkEmailModal, setShowBulkEmailModal] = useState(false)
   const [bulkPlanValue, setBulkPlanValue] = useState<string>('')
+  const [bulkTagMode, setBulkTagMode] = useState<'add' | 'remove' | 'replace'>('add')
+  const [bulkTagInput, setBulkTagInput] = useState('')
+  const [bulkTags, setBulkTags] = useState<string[]>([])
   // StrictMode-safe gates: track whether each resource was server-prefetched.
   // Mutating a "first-run" flag inside the effect breaks under React 18 dev
   // strict-mode (the second pass sees the flag flipped to false and runs).
@@ -394,6 +399,22 @@ export default function FamiliesView({
       if (res.ok) {
         const updated = await res.json().catch(() => null)
         const savedFamilyId = editingFamily?._id
+        if (
+          updated &&
+          typeof updated === 'object' &&
+          Array.isArray(updated.similarFamilies) &&
+          updated.similarFamilies.length > 0
+        ) {
+          const names = updated.similarFamilies
+            .map((m: { name?: string }) => m.name)
+            .filter(Boolean)
+            .join(', ')
+          toast.info(
+            t('families.duplicateWarning')
+              .replace('{plural}', updated.similarFamilies.length === 1 ? 'y' : 'ies')
+              .replace('{names}', names),
+          )
+        }
         resetFamilyModal()
         invalidateCache(/^\/api\/families/)
         invalidateCache(/^\/api\/dashboard-stats/)
@@ -678,6 +699,63 @@ export default function FamiliesView({
     }
   }
 
+  const addBulkTag = (raw: string) => {
+    const trimmed = raw.trim()
+    if (!trimmed) return
+    if (trimmed.length > 50) {
+      toast.error(t('families.tags.tooLong'))
+      return
+    }
+    const key = trimmed.toLowerCase()
+    if (bulkTags.some((tag) => tag.toLowerCase() === key)) {
+      setBulkTagInput('')
+      return
+    }
+    if (bulkTags.length >= 20) {
+      toast.error(t('families.tags.tooMany'))
+      return
+    }
+    setBulkTags((prev) => [...prev, trimmed])
+    setBulkTagInput('')
+  }
+
+  const handleBulkSetTags = async () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0 || bulkTags.length === 0) return
+    setBulkBusy(true)
+    try {
+      const res = await fetch('/api/families/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'setTags',
+          ids,
+          mode: bulkTagMode,
+          tags: bulkTags,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data.error || t('families.error.bulkTags'))
+        return
+      }
+      toast.success(
+        t('families.success.bulkUpdated').replace('{count}', String(data.modified || ids.length)),
+      )
+      setShowBulkTagsModal(false)
+      setBulkTags([])
+      setBulkTagInput('')
+      setBulkTagMode('add')
+      clearSelection()
+      invalidateCache(/^\/api\/families/)
+      fetchFamilies()
+    } catch {
+      toast.error(t('common.networkErrorShort'))
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   const handleBulkSetCommunicationsOptOut = async (communicationsOptOut: boolean) => {
     const ids = Array.from(selectedIds)
     if (ids.length === 0) return
@@ -759,6 +837,33 @@ export default function FamiliesView({
       ),
       exportValue: (f) => f.name,
       filter: { type: 'text', placeholder: t('families.nameFilterPlaceholder') },
+    },
+    {
+      id: 'tags',
+      header: t('families.tags.label'),
+      headerText: t('families.tags.label'),
+      defaultHidden: true,
+      cell: (f) =>
+        f.tags && f.tags.length > 0 ? (
+          <span className="flex flex-wrap gap-1">
+            {f.tags.map((tag) => (
+              <span
+                key={tag}
+                className="inline-flex rounded-sm bg-fg/10 px-1.5 py-0.5 text-xs text-fg-muted"
+              >
+                {tag}
+              </span>
+            ))}
+          </span>
+        ) : (
+          <span className="text-fg-muted">—</span>
+        ),
+      exportValue: (f) => (f.tags && f.tags.length > 0 ? f.tags.join(', ') : ''),
+      filter: {
+        type: 'multiselect',
+        label: t('families.tags.filterLabel'),
+        getValue: (f) => f.tags ?? [],
+      },
     },
     {
       id: 'hebrewName',
@@ -937,6 +1042,19 @@ export default function FamiliesView({
               variant="secondary"
               disabled={bulkBusy}
               onClick={() => {
+                setBulkTagMode('add')
+                setBulkTags([])
+                setBulkTagInput('')
+                setShowBulkTagsModal(true)
+              }}
+            >
+              {t('families.tags.bulkAction')}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={bulkBusy}
+              onClick={() => {
                 setBulkPlanValue('')
                 setShowBulkPlanModal(true)
               }}
@@ -1109,6 +1227,103 @@ export default function FamiliesView({
           families={families}
           selectedIds={selectedIds}
         />
+
+        <Modal
+          open={showBulkTagsModal}
+          onClose={() => {
+            setShowBulkTagsModal(false)
+            setBulkTags([])
+            setBulkTagInput('')
+            setBulkTagMode('add')
+          }}
+          title={t('families.tags.bulkTitle')
+            .replace('{count}', String(selectedIds.size))
+            .replace(
+              '{unit}',
+              selectedIds.size === 1 ? t('families.familyUnit') : t('families.familiesUnit'),
+            )}
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-4 p-4">
+            <p className="text-sm text-fg-muted">{t('families.tags.bulkDesc')}</p>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-fg" htmlFor="bulk-tag-mode">
+                {t('families.tags.bulkMode')}
+              </label>
+              <select
+                id="bulk-tag-mode"
+                value={bulkTagMode}
+                onChange={(e) => setBulkTagMode(e.target.value as 'add' | 'remove' | 'replace')}
+                className="focus-ring w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg"
+              >
+                <option value="add">{t('families.tags.modeAdd')}</option>
+                <option value="remove">{t('families.tags.modeRemove')}</option>
+                <option value="replace">{t('families.tags.modeReplace')}</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-fg" htmlFor="bulk-tag-input">
+                {t('families.tags.bulkTags')}
+              </label>
+              <div className="flex min-h-[2.25rem] flex-wrap items-center gap-1.5 rounded-md border border-border bg-app px-2 py-1.5">
+                {bulkTags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-0.5 rounded-sm bg-fg/10 px-2 py-0.5 text-xs text-fg"
+                  >
+                    {tag}
+                    <button
+                      type="button"
+                      className="rounded p-0.5 text-fg-muted hover:text-fg"
+                      aria-label={t('families.tags.remove').replace('{tag}', tag)}
+                      onClick={() => setBulkTags((prev) => prev.filter((t) => t !== tag))}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <input
+                  id="bulk-tag-input"
+                  type="text"
+                  value={bulkTagInput}
+                  disabled={bulkTags.length >= 20}
+                  onChange={(e) => setBulkTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ',') {
+                      e.preventDefault()
+                      addBulkTag(bulkTagInput)
+                    }
+                  }}
+                  onBlur={() => {
+                    if (bulkTagInput.trim()) addBulkTag(bulkTagInput)
+                  }}
+                  placeholder={t('families.tags.placeholder')}
+                  className="min-w-[6rem] flex-1 border-0 bg-transparent py-0.5 text-sm text-fg placeholder:text-fg-muted focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowBulkTagsModal(false)
+                  setBulkTags([])
+                  setBulkTagInput('')
+                  setBulkTagMode('add')
+                }}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button
+                onClick={handleBulkSetTags}
+                loading={bulkBusy}
+                disabled={bulkTags.length === 0}
+              >
+                {t('common.apply')}
+              </Button>
+            </div>
+          </div>
+        </Modal>
 
         <Modal
           open={showBulkPlanModal}

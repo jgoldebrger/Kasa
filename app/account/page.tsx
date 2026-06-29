@@ -13,6 +13,11 @@ interface Profile {
   image: string | null
   twoFactorEnabled: boolean
   createdAt: string | null
+  notificationPreferences: {
+    tasks: boolean
+    payments: boolean
+    statements: boolean
+  }
 }
 
 export default function AccountPage() {
@@ -28,6 +33,7 @@ export default function AccountPage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [savingPassword, setSavingPassword] = useState(false)
+  const [savingNotifications, setSavingNotifications] = useState(false)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -39,7 +45,14 @@ export default function AccountPage() {
       }
       const data = (await res.json().catch(() => null)) as Profile | null
       if (data) {
-        setProfile(data)
+        setProfile({
+          ...data,
+          notificationPreferences: data.notificationPreferences ?? {
+            tasks: true,
+            payments: true,
+            statements: true,
+          },
+        })
         setName(data.name || '')
       }
     } catch {
@@ -86,6 +99,33 @@ export default function AccountPage() {
       toast.error('Network error — please try again.')
     } finally {
       setSavingProfile(false)
+    }
+  }
+
+  const handleSaveNotificationPref = async (
+    key: 'tasks' | 'payments' | 'statements',
+    enabled: boolean,
+  ) => {
+    if (!profile) return
+    setSavingNotifications(true)
+    try {
+      const res = await fetch('/api/user', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notificationPreferences: { [key]: enabled } }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data.error || 'Could not save notification preferences.')
+        return
+      }
+      toast.success('Notification preferences updated.')
+      invalidateCache('/api/user')
+      void refresh()
+    } catch {
+      toast.error('Network error — please try again.')
+    } finally {
+      setSavingNotifications(false)
     }
   }
 
@@ -192,6 +232,42 @@ export default function AccountPage() {
                   </Button>
                 </div>
               </form>
+            </Card>
+
+            <Card>
+              <h2 className="text-base font-semibold text-fg mb-1">In-app notifications</h2>
+              <p className="text-sm text-fg-muted mb-4">
+                Choose which notification types appear in your inbox.
+              </p>
+              <ul className="space-y-3">
+                {(
+                  [
+                    ['tasks', 'Tasks', 'Reminders and updates about tasks assigned to you.'],
+                    ['payments', 'Payments', 'Payment confirmations and billing activity.'],
+                    ['statements', 'Statements', 'When new statements are available.'],
+                  ] as const
+                ).map(([key, label, hint]) => (
+                  <li
+                    key={key}
+                    className="flex items-start justify-between gap-4 rounded-md border border-border px-3 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-fg">{label}</p>
+                      <p className="text-xs text-fg-muted mt-0.5">{hint}</p>
+                    </div>
+                    <label className="inline-flex items-center gap-2 shrink-0">
+                      <input
+                        type="checkbox"
+                        className="rounded"
+                        checked={profile.notificationPreferences[key]}
+                        disabled={savingNotifications}
+                        onChange={(e) => void handleSaveNotificationPref(key, e.target.checked)}
+                      />
+                      <span className="sr-only">{label}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
             </Card>
 
             <TwoFactorSection enabled={profile.twoFactorEnabled} onChange={refresh} />

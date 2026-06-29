@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowPathIcon, InformationCircleIcon } from '@heroicons/react/24/outline'
 import { Button, Card, PageHeader, Tooltip } from '@/app/components/ui'
 import { useCurrency } from '@/lib/client/useCurrency'
@@ -8,6 +8,7 @@ import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useToast } from '@/app/components/Toast'
 import { useT } from '@/lib/client/i18n'
 import ContextualHelpLink from '@/app/components/ContextualHelpLink'
+import { applyDuesScenario, formatScenarioAdjustment } from '@/lib/projections/scenario'
 
 interface PerEventRow {
   eventTypeId: string
@@ -93,6 +94,7 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
   )
   const [loading, setLoading] = useState(false)
   const [hasError, setHasError] = useState(false)
+  const [duesChangePct, setDuesChangePct] = useState(0)
   const mountedRef = useRef(true)
   const requestGenRef = useRef(0)
 
@@ -173,6 +175,20 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
     r?.multiYear.find((row) => row.year === currentYear) ?? r?.multiYear[0] ?? null
   const startYearExpenses = r?.perEvent.reduce((s, e) => s + e.projectedExpenseStartYear, 0) ?? 0
   const hasShortfall = r?.multiYear.some((row) => !row.fundSolvent) ?? false
+
+  const scenario = useMemo(() => {
+    if (!r || !headlineRow || headlineRow.projectedPlanIncome <= 0) return null
+    return applyDuesScenario(
+      {
+        openingFundBalance: headlineRow.openingFundBalance,
+        projectedExpenses: headlineRow.projectedExpenses,
+        projectedPlanIncome: headlineRow.projectedPlanIncome,
+        scaleFactor: headlineRow.scaleFactor,
+        plans: headlineRow.planRecommendations,
+      },
+      duesChangePct,
+    )
+  }, [r, headlineRow, duesChangePct])
 
   return (
     <div className="min-h-screen p-4 sm:p-6 md:p-8">
@@ -296,6 +312,80 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                 <p className="text-xs text-fg-muted">{t('projections.headline.noIncome')}</p>
               )}
             </Card>
+
+            {headlineRow && headlineRow.projectedPlanIncome > 0 && (
+              <Card compact className="space-y-4">
+                <h2 className="text-sm font-semibold text-fg">{t('projections.scenario.title')}</h2>
+                <div>
+                  <label className="block text-xs text-fg-muted mb-2">
+                    {t('projections.scenario.duesChange')}: {duesChangePct >= 0 ? '+' : ''}
+                    {duesChangePct}%
+                  </label>
+                  <input
+                    type="range"
+                    min={-20}
+                    max={30}
+                    step={5}
+                    value={duesChangePct}
+                    onChange={(e) => setDuesChangePct(Number(e.target.value))}
+                    className="w-full accent-accent"
+                  />
+                </div>
+                {scenario && (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm border-t border-border pt-3">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wide text-fg-muted">
+                          {t('projections.scenario.adjustedIncome')}
+                        </div>
+                        <div className="tabular font-semibold text-fg">
+                          {formatMoney(scenario.adjustedPlanIncome)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wide text-fg-muted">
+                          {t('projections.scenario.adjustedClosing')}
+                        </div>
+                        <div
+                          className={`tabular font-semibold ${
+                            scenario.fundSolvent ? 'text-fg' : 'text-danger'
+                          }`}
+                        >
+                          {formatMoney(scenario.adjustedClosingBalance)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wide text-fg-muted">
+                          {t('projections.scenario.adjustment')}
+                        </div>
+                        <div className="tabular font-semibold text-fg">
+                          {formatScenarioAdjustment(scenario.adjustedScaleFactor)}
+                        </div>
+                      </div>
+                    </div>
+                    <p
+                      className={`text-xs ${scenario.fundSolvent ? 'text-success' : 'text-danger'}`}
+                    >
+                      {scenario.fundSolvent
+                        ? t('projections.scenario.solvent')
+                        : t('projections.scenario.shortfall')}
+                    </p>
+                    {duesChangePct !== 0 && (
+                      <ul className="space-y-1 text-xs text-fg-muted border-t border-border pt-3">
+                        {scenario.planRecommendations.map((p) => (
+                          <li key={p.planId} className="tabular">
+                            {t('projections.scenario.planRow')
+                              .replace('{name}', p.planName)
+                              .replace('{current}', formatMoney(p.currentPrice))
+                              .replace('{recommended}', formatMoney(p.recommendedPrice))}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                )}
+              </Card>
+            )}
 
             <Card
               compact

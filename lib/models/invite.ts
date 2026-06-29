@@ -9,7 +9,12 @@ const InviteSchema = new Schema(
       index: true,
     },
     email: { type: String, required: true, lowercase: true, trim: true },
-    role: { type: String, enum: ['owner', 'admin', 'member'], required: true, default: 'member' },
+    role: {
+      type: String,
+      enum: ['owner', 'admin', 'member', 'treasurer', 'communications'],
+      required: true,
+      default: 'member',
+    },
     // SHA-256 hash of the bearer token (see lib/invite-token.ts). Legacy rows
     // may still hold cleartext until they expire.
     token: { type: String, required: true, unique: true, index: true },

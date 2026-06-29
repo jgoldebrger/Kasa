@@ -13,6 +13,11 @@ import {
   encodeCompoundCursor,
   collectCompoundCursorPages,
 } from '@/lib/pagination'
+import {
+  assignedToMeFilter,
+  resolveTaskAssignee,
+  TASK_ASSIGNEE_POPULATE,
+} from '@/lib/tasks/assignee'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +27,7 @@ const listQuery = z.object({
   status: z.enum(['pending', 'in_progress', 'completed', 'cancelled']).optional(),
   priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
   dueDate: z.enum(['today', 'overdue', 'upcoming']).optional(),
+  assignedToMe: z.enum(['true', '1']).optional(),
   relatedFamilyId: objectId.optional(),
   relatedMemberId: objectId.optional(),
   limit: paginationLimit,
@@ -80,11 +86,18 @@ export { assertRelatedScoped }
 async function buildTaskListFilter(
   organizationId: string,
   query: z.infer<typeof listQuery>,
-): Promise<{ ok: true; filter: Record<string, unknown> } | { ok: false; status: number; error: string }> {
+  ctx?: { userId: string; userEmail: string },
+): Promise<
+  { ok: true; filter: Record<string, unknown> } | { ok: false; status: number; error: string }
+> {
   const filter: Record<string, unknown> = { organizationId }
 
   if (query.status) filter.status = query.status
   if (query.priority) filter.priority = query.priority
+
+  if (query.assignedToMe && ctx) {
+    Object.assign(filter, assignedToMeFilter(ctx.userId, ctx.userEmail))
+  }
 
   if (query.relatedFamilyId) {
     const scopeCheck = await assertRelatedScoped(organizationId, {
@@ -106,7 +119,9 @@ async function buildTaskListFilter(
   }
 
   if (query.dueDate === 'today' || query.dueDate === 'overdue' || query.dueDate === 'upcoming') {
-    const org = await Organization.findById(organizationId).select('timezone').lean<{ timezone?: string }>()
+    const org = await Organization.findById(organizationId)
+      .select('timezone')
+      .lean<{ timezone?: string }>()
     const { from, toExclusive } = calendarDayBoundsInTimeZone(org?.timezone)
     if (query.dueDate === 'today') {
       filter.dueDate = { $gte: from, $lt: toExclusive }
@@ -138,7 +153,15 @@ export const GET = handler({
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    const built = await buildTaskListFilter(ctx!.organizationId, query)
+    const assigneeCtx =
+      query.assignedToMe && ctx && 'userId' in ctx
+        ? { userId: ctx.userId, userEmail: ctx.session.user.email }
+        : undefined
+    if (query.assignedToMe && !assigneeCtx) {
+      return { status: 401, data: { error: 'Authentication required for assignedToMe filter' } }
+    }
+
+    const built = await buildTaskListFilter(ctx!.organizationId, query, assigneeCtx)
     if (!built.ok) {
       return { status: built.status, data: { error: built.error } }
     }
@@ -158,6 +181,7 @@ export const GET = handler({
 
     const loadTaskPage = async (pageFilter: Record<string, unknown>, limit: number) =>
       Task.find(pageFilter)
+        .populate(TASK_ASSIGNEE_POPULATE)
         .populate({
           path: 'relatedFamilyId',
           select: 'name organizationId',
@@ -188,16 +212,10 @@ export const GET = handler({
         }
       }
     } else {
-      tasks = await collectCompoundCursorPages(
-        loadTaskPage,
-        filter,
-        'dueDate',
-        1,
-        (last) => ({
-          v: last.dueDate ? new Date(last.dueDate as string | Date).getTime() : null,
-          id: String(last._id),
-        }),
-      )
+      tasks = await collectCompoundCursorPages(loadTaskPage, filter, 'dueDate', 1, (last) => ({
+        v: last.dueDate ? new Date(last.dueDate as string | Date).getTime() : null,
+        id: String(last._id),
+      }))
     }
 
     return {
@@ -239,12 +257,24 @@ export const POST = handler({
       return { status: scopeCheck.status, data: { error: scopeCheck.error } }
     }
 
+    const assigneeResult = await resolveTaskAssignee(ctx!.organizationId, {
+      assigneeMembershipId: body.assigneeMembershipId ?? undefined,
+      assigneeUserId: body.assigneeUserId ?? undefined,
+      email: body.email ?? undefined,
+    })
+    if (!assigneeResult.ok) {
+      return { status: assigneeResult.status, data: { error: assigneeResult.error } }
+    }
+    const { assignee } = assigneeResult
+
     const task = await Task.create({
       organizationId: ctx!.organizationId,
       title: body.title,
       description: body.description,
       dueDate: body.dueDate,
-      email: body.email,
+      email: assignee.email,
+      assigneeUserId: assignee.assigneeUserId || undefined,
+      assigneeMembershipId: assignee.assigneeMembershipId || undefined,
       status: body.status || 'pending',
       priority: body.priority || 'medium',
       relatedFamilyId: body.relatedFamilyId || undefined,

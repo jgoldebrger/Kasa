@@ -13,6 +13,10 @@ import { User } from '@/lib/models'
 import { audit } from '@/lib/audit'
 import { auth as authSchemas } from '@/lib/schemas'
 import { checkRateLimit } from '@/lib/rate-limit'
+import {
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  normalizeNotificationPreferences,
+} from '@/lib/notification-preferences'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,13 +35,14 @@ export const GET = handler({
     }
 
     const user = await User.findById(session!.user.id)
-      .select('name email image twoFactorEnabled createdAt')
+      .select('name email image twoFactorEnabled createdAt preferences.notificationPreferences')
       .lean<{
         name?: string
         email?: string
         image?: string
         twoFactorEnabled?: boolean
         createdAt?: Date
+        preferences?: { notificationPreferences?: Record<string, boolean> }
       }>()
     if (!user) return { status: 404, data: { error: 'User not found' } }
     return {
@@ -47,6 +52,9 @@ export const GET = handler({
         image: user.image || null,
         twoFactorEnabled: !!user.twoFactorEnabled,
         createdAt: user.createdAt || null,
+        notificationPreferences: normalizeNotificationPreferences(
+          user.preferences?.notificationPreferences,
+        ),
       },
     }
   },
@@ -69,18 +77,29 @@ export const PATCH = handler({
 
     const update: Record<string, unknown> = {}
     if (typeof body.name === 'string') update.name = body.name
+    if (body.notificationPreferences) {
+      const current = await User.findById(session!.user.id)
+        .select('preferences.notificationPreferences')
+        .lean<{ preferences?: { notificationPreferences?: Record<string, boolean> } }>()
+      const merged = {
+        ...DEFAULT_NOTIFICATION_PREFERENCES,
+        ...normalizeNotificationPreferences(current?.preferences?.notificationPreferences),
+        ...body.notificationPreferences,
+      }
+      update['preferences.notificationPreferences'] = merged
+    }
 
     if (Object.keys(update).length === 0) {
       return { status: 400, data: { error: 'Nothing to update.' } }
     }
 
-    const updated = await User.findByIdAndUpdate(
-      session!.user.id,
-      { $set: update },
-      { new: true },
-    )
-      .select('name email')
-      .lean<{ name?: string; email?: string }>()
+    const updated = await User.findByIdAndUpdate(session!.user.id, { $set: update }, { new: true })
+      .select('name email preferences.notificationPreferences')
+      .lean<{
+        name?: string
+        email?: string
+        preferences?: { notificationPreferences?: Record<string, boolean> }
+      }>()
     if (!updated) return { status: 404, data: { error: 'User not found' } }
 
     await audit({
@@ -92,6 +111,14 @@ export const PATCH = handler({
       request,
     })
 
-    return { data: { name: updated.name, email: updated.email } }
+    return {
+      data: {
+        name: updated.name,
+        email: updated.email,
+        notificationPreferences: normalizeNotificationPreferences(
+          updated.preferences?.notificationPreferences,
+        ),
+      },
+    }
   },
 })

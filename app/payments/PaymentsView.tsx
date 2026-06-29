@@ -11,6 +11,7 @@ import {
   PlusIcon,
 } from '@heroicons/react/24/outline'
 import RecordPaymentModal from '@/app/components/payments/RecordPaymentModal'
+import BatchChargeModal from '@/app/payments/_components/BatchChargeModal'
 import { useToast } from '@/app/components/Toast'
 import {
   Button,
@@ -29,6 +30,7 @@ import { useCurrency } from '@/lib/client/useCurrency'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { useSupportModeReadOnly } from '@/lib/client/support-mode'
+import PaymentsNav from './_components/PaymentsNav'
 import { PAYMENTS_LIST_PAGE_SIZE, parsePaymentsListResponse } from '@/lib/client/payments-list'
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
@@ -104,6 +106,7 @@ export default function PaymentsView({
   const [visiblePayments, setVisiblePayments] = useState<Payment[]>([])
   const [sort, setSort] = useState<{ id: string; dir: SortDir } | null>(null)
   const [showRecordModal, setShowRecordModal] = useState(false)
+  const [showBatchChargeModal, setShowBatchChargeModal] = useState(false)
   const hasFetchedRef = useRef(serverHydrated)
   const { begin, invalidate, isStale } = useRequestGeneration()
 
@@ -344,12 +347,21 @@ export default function PaymentsView({
           actions={
             <div className="flex flex-col sm:flex-row sm:items-end gap-3">
               {!supportReadOnly && (
-                <Button
-                  leftIcon={<PlusIcon className="h-5 w-5" />}
-                  onClick={() => setShowRecordModal(true)}
-                >
-                  {t('payments.recordPayment')}
-                </Button>
+                <>
+                  <Button
+                    variant="secondary"
+                    leftIcon={<CreditCardIcon className="h-5 w-5" aria-hidden="true" />}
+                    onClick={() => setShowBatchChargeModal(true)}
+                  >
+                    {t('payments.batchCharge.action')}
+                  </Button>
+                  <Button
+                    leftIcon={<PlusIcon className="h-5 w-5" />}
+                    onClick={() => setShowRecordModal(true)}
+                  >
+                    {t('payments.recordPayment')}
+                  </Button>
+                </>
               )}
               <div className="text-right">
                 <div className="text-xs text-fg-muted">{t('payments.totalAmount')}</div>
@@ -360,6 +372,10 @@ export default function PaymentsView({
             </div>
           }
         />
+
+        <div className="mt-4">
+          <PaymentsNav />
+        </div>
 
         {loading ? (
           <Card>
@@ -484,6 +500,11 @@ export default function PaymentsView({
         open={showRecordModal}
         onClose={() => setShowRecordModal(false)}
         onCreated={() => fetchPayments()}
+      />
+      <BatchChargeModal
+        open={showBatchChargeModal}
+        onClose={() => setShowBatchChargeModal(false)}
+        onComplete={() => fetchPayments()}
       />
     </div>
   )

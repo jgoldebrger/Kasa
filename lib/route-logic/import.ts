@@ -11,7 +11,7 @@ import {
 import { audit } from '@/lib/audit'
 import { roundMoney } from '@/lib/money'
 import { getYearInTimeZone } from '@/lib/date-utils'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { checkOrgBulkRateLimit, orgBulkRateLimit429 } from '@/lib/org-bulk-rate-limit'
 import { sanitizeBatchErrors, sanitizeStripeErrorMessage } from '@/lib/payments/sanitize'
 import { loadAllByIdCursor } from '@/lib/org-pagination'
 import { sanitizeUploadFilename, validateImportFile } from '@/lib/upload-validation'
@@ -22,8 +22,30 @@ import {
   loadOrgBillingSnapshot,
 } from '@/lib/billing/feature-gate'
 import { scheduleYearlyCalculationRefreshForYears } from '@/lib/calculations'
+import { buildHeaderMap } from '@/lib/import-column-mapping'
+import { normalizeColumnName } from '@/lib/import-utils'
+import {
+  findSimilarFamilies,
+  type ExistingFamilyRecord,
+  type SimilarFamilyMatch,
+} from '@/lib/family-duplicate-match'
 
 export const dynamic = 'force-dynamic'
+
+export type ImportRowAction = 'import' | 'skip' | 'error'
+
+export interface ImportPreviewRow {
+  rowNumber: number
+  action: ImportRowAction
+  label?: string
+  reason?: string
+  similarFamilies?: SimilarFamilyMatch[]
+}
+
+interface ImportRunOptions {
+  dryRun: boolean
+  preview: ImportPreviewRow[]
+}
 
 // Helper function to parse CSV
 /**
@@ -167,10 +189,8 @@ export function xlsxCellToString(v: unknown): string {
   return String(v)
 }
 
-// Helper to normalize column names
-export function normalizeColumnName(name: string): string {
-  return name.toLowerCase().trim().replace(/\s+/g, '').replace(/[_-]/g, '')
-}
+// Helper to normalize column names — re-exported for callers that already import from here.
+export { normalizeColumnName } from '@/lib/import-utils'
 
 // Helper to parse date.
 //
@@ -268,17 +288,17 @@ export const POST = handler({
   minRole: 'admin',
   name: 'POST /api/import',
   fn: async ({ ctx, request }) => {
-    const rateVerdict = await checkRateLimit(
+    const org = await Organization.findById(ctx!.organizationId).select('rateLimits').lean<{
+      rateLimits?: { importPerHour?: number | null }
+    }>()
+    const rateVerdict = await checkOrgBulkRateLimit(
       request,
-      'import',
-      {
-        limit: 10,
-        windowMs: 60 * 60_000,
-      },
       ctx!.organizationId,
+      'import',
+      org?.rateLimits,
     )
     if (!rateVerdict.allowed) {
-      return { status: 429, data: { error: 'Too many requests' } }
+      return orgBulkRateLimit429(rateVerdict, 'Too many import requests. Try again later.')
     }
 
     const contentLength = requestContentLength(request)
@@ -354,12 +374,23 @@ export const POST = handler({
       return { status: 400, data: { error: 'File is empty or invalid' } }
     }
 
-    // Normalize headers
-    const normalizedHeaders = headers.map((h) => normalizeColumnName(h))
-    const headerMap: { [key: string]: number } = {}
-    normalizedHeaders.forEach((h, i) => {
-      headerMap[h] = i
-    })
+    const dryRun = new URL(request.url).searchParams.get('dryRun') === 'true'
+
+    let columnMapping: Record<string, string> | undefined
+    const columnMappingRaw = (formData.get('columnMapping') as string | null)?.trim()
+    if (columnMappingRaw) {
+      try {
+        const parsed = JSON.parse(columnMappingRaw) as unknown
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          return { status: 400, data: { error: 'Invalid columnMapping JSON' } }
+        }
+        columnMapping = parsed as Record<string, string>
+      } catch {
+        return { status: 400, data: { error: 'Invalid columnMapping JSON' } }
+      }
+    }
+
+    const headerMap = buildHeaderMap(headers, columnMapping)
 
     // Validate the optional bound family / member once up front so we don't
     // hit the DB for every row. The bound family must belong to the caller's
@@ -401,8 +432,11 @@ export const POST = handler({
     }
 
     const imported: number[] = []
+    const skipped: number[] = []
     const errors: string[] = []
     const warnings: string[] = []
+    const preview: ImportPreviewRow[] = []
+    const runOpts: ImportRunOptions = { dryRun, preview }
 
     const orgDoc = await Organization.findById(ctx!.organizationId)
       .select('timezone')
@@ -411,7 +445,16 @@ export const POST = handler({
 
     switch (importType) {
       case 'families':
-        await importFamilies(ctx!.organizationId, rows, headerMap, imported, errors, warnings)
+        await importFamilies(
+          ctx!.organizationId,
+          rows,
+          headerMap,
+          imported,
+          skipped,
+          errors,
+          warnings,
+          runOpts,
+        )
         break
       case 'members':
         await importMembers(
@@ -419,7 +462,10 @@ export const POST = handler({
           rows,
           headerMap,
           imported,
+          skipped,
           errors,
+          warnings,
+          runOpts,
           boundFamilyId || undefined,
         )
         break
@@ -429,7 +475,10 @@ export const POST = handler({
           rows,
           headerMap,
           imported,
+          skipped,
           errors,
+          warnings,
+          runOpts,
           orgTimezone,
           boundFamilyId || undefined,
           boundMemberObjectId,
@@ -441,7 +490,10 @@ export const POST = handler({
           rows,
           headerMap,
           imported,
+          skipped,
           errors,
+          warnings,
+          runOpts,
           orgTimezone,
           boundFamilyId || undefined,
           boundMemberObjectId,
@@ -452,30 +504,36 @@ export const POST = handler({
         return { status: 400, data: { error: `Unknown import type: ${importType}` } }
     }
 
-    await audit({
-      organizationId: ctx!.organizationId,
-      userId: ctx!.userId,
-      action: 'import.csv',
-      resourceType: 'Import',
-      metadata: {
-        importType,
-        importedCount: imported.length,
-        failedCount: errors.length,
-        warningCount: warnings.length,
-        sampleErrors: errors.slice(0, 5),
-        boundFamilyId: boundFamilyId || undefined,
-        boundMemberId: boundMemberObjectId || undefined,
-      },
-      request,
-    })
+    if (!dryRun) {
+      await audit({
+        organizationId: ctx!.organizationId,
+        userId: ctx!.userId,
+        action: 'import.csv',
+        resourceType: 'Import',
+        metadata: {
+          importType,
+          importedCount: imported.length,
+          skippedCount: skipped.length,
+          failedCount: errors.length,
+          warningCount: warnings.length,
+          sampleErrors: errors.slice(0, 5),
+          boundFamilyId: boundFamilyId || undefined,
+          boundMemberId: boundMemberObjectId || undefined,
+        },
+        request,
+      })
+    }
 
     return {
       data: {
         success: true,
+        dryRun,
         imported: imported.length,
+        skipped: skipped.length,
         failed: errors.length,
         errors: sanitizeBatchErrors(errors),
         warnings,
+        preview: dryRun ? preview : undefined,
       },
     }
   },
@@ -486,12 +544,19 @@ async function importFamilies(
   rows: string[][],
   headerMap: { [key: string]: number },
   imported: number[],
+  skipped: number[],
   errors: string[],
   warnings: string[],
+  runOpts: ImportRunOptions,
 ) {
+  const { dryRun, preview } = runOpts
   const getValue = (row: string[], field: string): string => {
     const index = headerMap[normalizeColumnName(field)]
     return index !== undefined ? (row[index] || '').trim() : ''
+  }
+
+  const pushPreview = (row: ImportPreviewRow) => {
+    if (dryRun) preview.push(row)
   }
 
   // Get payment plans for lookup
@@ -500,13 +565,6 @@ async function importFamilies(
     { organizationId },
   )
   const planMap: { [key: number]: string } = {}
-  // Set of valid plan ids for the importing org. Used to validate
-  // `paymentPlanId` cells in the CSV — without this, an admin
-  // importing a maliciously (or accidentally) crafted CSV could stamp
-  // families with a foreign org's plan id. `calculateFamilyBalance`
-  // re-filters by org so the practical effect today is `planCost = 0`,
-  // but the dangling reference is a cross-tenant smell that breaks
-  // downstream tooling and audit trails.
   const validPlanIds = new Set<string>()
   paymentPlans.forEach((plan: any) => {
     validPlanIds.add(String(plan._id))
@@ -515,35 +573,52 @@ async function importFamilies(
     }
   })
 
+  const existingFamilies: ExistingFamilyRecord[] = (
+    await Family.find({ organizationId })
+      .select('name email')
+      .lean<Array<{ _id: unknown; name?: string; email?: string }>>()
+  ).map((f) => ({
+    familyId: String(f._id),
+    name: f.name || '',
+    email: f.email || undefined,
+  }))
+
   const billing = (await loadOrgBillingSnapshot(organizationId)) ?? {}
   let familyCount = await countOrgFamilies(organizationId)
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
+    const rowNumber = i + 2
     try {
       const name = getValue(row, 'name')
       if (!name) {
-        errors.push(`Row ${i + 2}: Family name is required`)
+        errors.push(`Row ${rowNumber}: Family name is required`)
+        pushPreview({ rowNumber, action: 'error', reason: 'Family name is required' })
         continue
       }
 
       const weddingDate = parseDate(getValue(row, 'weddingDate'))
       if (!weddingDate) {
-        errors.push(`Row ${i + 2}: Valid wedding date is required`)
+        errors.push(`Row ${rowNumber}: Valid wedding date is required`)
+        pushPreview({
+          rowNumber,
+          action: 'error',
+          label: name,
+          reason: 'Valid wedding date is required',
+        })
         continue
       }
 
-      // Find payment plan
       let paymentPlanId = null
       const planIdStr = getValue(row, 'paymentPlanId')
       const planNumber = getValue(row, 'paymentPlanNumber') || getValue(row, 'planNumber')
 
       if (planIdStr) {
         if (!Types.ObjectId.isValid(planIdStr)) {
-          warnings.push(`Row ${i + 2}: Invalid paymentPlanId '${planIdStr}', ignoring`)
+          warnings.push(`Row ${rowNumber}: Invalid paymentPlanId '${planIdStr}', ignoring`)
         } else if (!validPlanIds.has(planIdStr)) {
           warnings.push(
-            `Row ${i + 2}: Payment plan ${planIdStr} not found in this organization, ignoring`,
+            `Row ${rowNumber}: Payment plan ${planIdStr} not found in this organization, ignoring`,
           )
         } else {
           paymentPlanId = planIdStr
@@ -551,67 +626,85 @@ async function importFamilies(
       } else if (planNumber) {
         const planNum = parseInt(planNumber, 10)
         if (!Number.isFinite(planNum)) {
-          warnings.push(`Row ${i + 2}: Invalid payment plan number '${planNumber}', using default`)
+          warnings.push(
+            `Row ${rowNumber}: Invalid payment plan number '${planNumber}', using default`,
+          )
         } else if (planMap[planNum]) {
           paymentPlanId = planMap[planNum]
         } else {
-          warnings.push(`Row ${i + 2}: Payment plan ${planNum} not found, using default`)
+          warnings.push(`Row ${rowNumber}: Payment plan ${planNum} not found, using default`)
         }
       }
 
-      // Check if family already exists. The escape + anchored pattern
-      // is critical: passing the raw CSV `name` into a RegExp let an
-      // attacker submit a regex like `(a+)+$` and trigger catastrophic
-      // backtracking on every row of the import — admin-triggered, but
-      // a foot-gun that locks up the request and the Mongo query
-      // planner for seconds.
       const existing = await Family.findOne({
         name: new RegExp(`^${escapeRegex(name)}$`, 'i'),
         organizationId,
       })
       if (existing) {
-        warnings.push(`Row ${i + 2}: Family "${name}" already exists, skipping`)
+        const reason = `Family "${name}" already exists`
+        warnings.push(`Row ${rowNumber}: ${reason}, skipping`)
+        skipped.push(i)
+        pushPreview({ rowNumber, action: 'skip', label: name, reason })
         continue
+      }
+
+      const email = getValue(row, 'email') || undefined
+      const similarFamilies = findSimilarFamilies({ name, email }, existingFamilies, {
+        excludeExactName: true,
+      })
+      if (similarFamilies.length > 0) {
+        warnings.push(
+          `Row ${rowNumber}: Similar famil${similarFamilies.length === 1 ? 'y' : 'ies'} found for "${name}"`,
+        )
       }
 
       const familyGate = assertCanAddFamily(billing, familyCount)
       if (!familyGate.ok) {
-        errors.push(`Row ${i + 2}: ${familyGate.error}`)
+        errors.push(`Row ${rowNumber}: ${familyGate.error}`)
+        pushPreview({ rowNumber, action: 'error', label: name, reason: familyGate.error })
         continue
       }
 
-      await Family.create({
-        organizationId,
-        name,
-        hebrewName: getValue(row, 'hebrewName') || undefined,
-        weddingDate,
-        husbandFirstName: getValue(row, 'husbandFirstName') || undefined,
-        husbandHebrewName: getValue(row, 'husbandHebrewName') || undefined,
-        husbandFatherHebrewName: getValue(row, 'husbandFatherHebrewName') || undefined,
-        wifeFirstName: getValue(row, 'wifeFirstName') || undefined,
-        wifeHebrewName: getValue(row, 'wifeHebrewName') || undefined,
-        wifeFatherHebrewName: getValue(row, 'wifeFatherHebrewName') || undefined,
-        email: getValue(row, 'email') || undefined,
-        phone: getValue(row, 'phone') || undefined,
-        address: getValue(row, 'address') || getValue(row, 'street') || undefined,
-        street: getValue(row, 'street') || getValue(row, 'address') || undefined,
-        city: getValue(row, 'city') || undefined,
-        state: getValue(row, 'state') || undefined,
-        zip: getValue(row, 'zip') || undefined,
-        husbandCellPhone: getValue(row, 'husbandCellPhone') || undefined,
-        wifeCellPhone: getValue(row, 'wifeCellPhone') || undefined,
-        paymentPlanId: paymentPlanId || undefined,
-        currentPlan:
-          planNumber && Number.isFinite(parseInt(planNumber, 10)) ? parseInt(planNumber, 10) : 1,
-        openBalance: 0,
-      })
+      if (!dryRun) {
+        await Family.create({
+          organizationId,
+          name,
+          hebrewName: getValue(row, 'hebrewName') || undefined,
+          weddingDate,
+          husbandFirstName: getValue(row, 'husbandFirstName') || undefined,
+          husbandHebrewName: getValue(row, 'husbandHebrewName') || undefined,
+          husbandFatherHebrewName: getValue(row, 'husbandFatherHebrewName') || undefined,
+          wifeFirstName: getValue(row, 'wifeFirstName') || undefined,
+          wifeHebrewName: getValue(row, 'wifeHebrewName') || undefined,
+          wifeFatherHebrewName: getValue(row, 'wifeFatherHebrewName') || undefined,
+          email,
+          phone: getValue(row, 'phone') || undefined,
+          address: getValue(row, 'address') || getValue(row, 'street') || undefined,
+          street: getValue(row, 'street') || getValue(row, 'address') || undefined,
+          city: getValue(row, 'city') || undefined,
+          state: getValue(row, 'state') || undefined,
+          zip: getValue(row, 'zip') || undefined,
+          husbandCellPhone: getValue(row, 'husbandCellPhone') || undefined,
+          wifeCellPhone: getValue(row, 'wifeCellPhone') || undefined,
+          paymentPlanId: paymentPlanId || undefined,
+          currentPlan:
+            planNumber && Number.isFinite(parseInt(planNumber, 10)) ? parseInt(planNumber, 10) : 1,
+          openBalance: 0,
+        })
+      }
 
       familyCount += 1
       imported.push(i)
+      pushPreview({
+        rowNumber,
+        action: 'import',
+        label: name,
+        similarFamilies: similarFamilies.length > 0 ? similarFamilies : undefined,
+      })
     } catch (error: any) {
-      errors.push(
-        `Row ${i + 2}: ${sanitizeStripeErrorMessage(error.message) || 'Failed to import family'}`,
-      )
+      const msg = sanitizeStripeErrorMessage(error.message) || 'Failed to import family'
+      errors.push(`Row ${rowNumber}: ${msg}`)
+      pushPreview({ rowNumber, action: 'error', reason: msg })
     }
   }
 }
@@ -621,27 +714,35 @@ async function importMembers(
   rows: string[][],
   headerMap: { [key: string]: number },
   imported: number[],
+  skipped: number[],
   errors: string[],
+  warnings: string[],
+  runOpts: ImportRunOptions,
   boundFamilyId?: string,
 ) {
+  const { dryRun, preview } = runOpts
   const getValue = (row: string[], field: string): string => {
     const index = headerMap[normalizeColumnName(field)]
     return index !== undefined ? (row[index] || '').trim() : ''
   }
 
+  const pushPreview = (row: ImportPreviewRow) => {
+    if (dryRun) preview.push(row)
+  }
+
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
+    const rowNumber = i + 2
     try {
       const firstName = getValue(row, 'firstName')
       const lastName = getValue(row, 'lastName')
+      const label = [firstName, lastName].filter(Boolean).join(' ')
       if (!firstName || !lastName) {
-        errors.push(`Row ${i + 2}: First name and last name are required`)
+        errors.push(`Row ${rowNumber}: First name and last name are required`)
+        pushPreview({ rowNumber, action: 'error', reason: 'First name and last name are required' })
         continue
       }
 
-      // When the request was bound to a family up-front we skip the per-row
-      // lookup entirely. Otherwise fall back to the existing name/email match
-      // (or the optional `familyId` CSV column).
       let familyId: string
       if (boundFamilyId) {
         familyId = boundFamilyId
@@ -655,47 +756,68 @@ async function importMembers(
           if (family) {
             resolvedId = family._id.toString()
           } else {
-            errors.push(
-              `Row ${i + 2}: Family not found (name: ${familyName}, email: ${familyEmail})`,
-            )
+            const reason = `Family not found (name: ${familyName}, email: ${familyEmail})`
+            errors.push(`Row ${rowNumber}: ${reason}`)
+            pushPreview({ rowNumber, action: 'error', label, reason })
             continue
           }
         } else if (resolvedId) {
           if (!Types.ObjectId.isValid(resolvedId)) {
-            errors.push(`Row ${i + 2}: Invalid familyId '${resolvedId}'`)
+            errors.push(`Row ${rowNumber}: Invalid familyId '${resolvedId}'`)
+            pushPreview({
+              rowNumber,
+              action: 'error',
+              label,
+              reason: `Invalid familyId '${resolvedId}'`,
+            })
             continue
           }
           const fam = await Family.findOne({ _id: resolvedId, organizationId }).select('_id')
           if (!fam) {
-            errors.push(`Row ${i + 2}: Family ID does not belong to this organization`)
+            errors.push(`Row ${rowNumber}: Family ID does not belong to this organization`)
+            pushPreview({
+              rowNumber,
+              action: 'error',
+              label,
+              reason: 'Family ID does not belong to this organization',
+            })
             continue
           }
         } else {
-          errors.push(`Row ${i + 2}: Family name or email is required`)
+          errors.push(`Row ${rowNumber}: Family name or email is required`)
+          pushPreview({
+            rowNumber,
+            action: 'error',
+            label,
+            reason: 'Family name or email is required',
+          })
           continue
         }
         familyId = resolvedId
       }
 
-      await FamilyMember.create({
-        organizationId,
-        familyId,
-        firstName,
-        lastName,
-        hebrewFirstName: getValue(row, 'hebrewFirstName') || undefined,
-        hebrewLastName: getValue(row, 'hebrewLastName') || undefined,
-        birthDate: parseDate(getValue(row, 'birthDate')) || undefined,
-        gender: getValue(row, 'gender') || undefined,
-        barMitzvahDate: parseDate(getValue(row, 'barMitzvahDate')) || undefined,
-        batMitzvahDate: parseDate(getValue(row, 'batMitzvahDate')) || undefined,
-        weddingDate: parseDate(getValue(row, 'weddingDate')) || undefined,
-      })
+      if (!dryRun) {
+        await FamilyMember.create({
+          organizationId,
+          familyId,
+          firstName,
+          lastName,
+          hebrewFirstName: getValue(row, 'hebrewFirstName') || undefined,
+          hebrewLastName: getValue(row, 'hebrewLastName') || undefined,
+          birthDate: parseDate(getValue(row, 'birthDate')) || undefined,
+          gender: getValue(row, 'gender') || undefined,
+          barMitzvahDate: parseDate(getValue(row, 'barMitzvahDate')) || undefined,
+          batMitzvahDate: parseDate(getValue(row, 'batMitzvahDate')) || undefined,
+          weddingDate: parseDate(getValue(row, 'weddingDate')) || undefined,
+        })
+      }
 
       imported.push(i)
+      pushPreview({ rowNumber, action: 'import', label })
     } catch (error: any) {
-      errors.push(
-        `Row ${i + 2}: ${sanitizeStripeErrorMessage(error.message) || 'Failed to import member'}`,
-      )
+      const msg = sanitizeStripeErrorMessage(error.message) || 'Failed to import member'
+      errors.push(`Row ${rowNumber}: ${msg}`)
+      pushPreview({ rowNumber, action: 'error', reason: msg })
     }
   }
 }
@@ -705,34 +827,46 @@ async function importPayments(
   rows: string[][],
   headerMap: { [key: string]: number },
   imported: number[],
+  skipped: number[],
   errors: string[],
+  warnings: string[],
+  runOpts: ImportRunOptions,
   orgTimezone?: string,
   boundFamilyId?: string,
   boundMemberId?: string,
 ) {
+  const { dryRun, preview } = runOpts
   const yearsToRefresh = new Set<number>()
   const getValue = (row: string[], field: string): string => {
     const index = headerMap[normalizeColumnName(field)]
     return index !== undefined ? (row[index] || '').trim() : ''
   }
 
+  const pushPreview = (row: ImportPreviewRow) => {
+    if (dryRun) preview.push(row)
+  }
+
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
+    const rowNumber = i + 2
     try {
       const amountStr = getValue(row, 'amount')
       const amount = parseMoneyAmount(amountStr)
       if (amount === null) {
-        errors.push(`Row ${i + 2}: Valid amount is required`)
+        errors.push(`Row ${rowNumber}: Valid amount is required`)
+        pushPreview({ rowNumber, action: 'error', reason: 'Valid amount is required' })
         continue
       }
 
       const paymentDate = parseDate(getValue(row, 'paymentDate'))
       if (!paymentDate) {
-        errors.push(`Row ${i + 2}: Valid payment date is required`)
+        errors.push(`Row ${rowNumber}: Valid payment date is required`)
+        pushPreview({ rowNumber, action: 'error', reason: 'Valid payment date is required' })
         continue
       }
 
       let familyId: string
+      let label = amountStr
       if (boundFamilyId) {
         familyId = boundFamilyId
       } else {
@@ -744,24 +878,44 @@ async function importPayments(
           const family = await findFamilyByNameOrEmail(organizationId, familyName, familyEmail)
           if (family) {
             resolvedId = family._id.toString()
+            label = familyName || amountStr
           } else {
-            errors.push(
-              `Row ${i + 2}: Family not found (name: ${familyName}, email: ${familyEmail})`,
-            )
+            const reason = `Family not found (name: ${familyName}, email: ${familyEmail})`
+            errors.push(`Row ${rowNumber}: ${reason}`)
+            pushPreview({ rowNumber, action: 'error', label: amountStr, reason })
             continue
           }
         } else if (resolvedId) {
           if (!Types.ObjectId.isValid(resolvedId)) {
-            errors.push(`Row ${i + 2}: Invalid familyId '${resolvedId}'`)
+            errors.push(`Row ${rowNumber}: Invalid familyId '${resolvedId}'`)
+            pushPreview({
+              rowNumber,
+              action: 'error',
+              label: amountStr,
+              reason: `Invalid familyId '${resolvedId}'`,
+            })
             continue
           }
-          const fam = await Family.findOne({ _id: resolvedId, organizationId }).select('_id')
+          const fam = await Family.findOne({ _id: resolvedId, organizationId }).select('_id name')
           if (!fam) {
-            errors.push(`Row ${i + 2}: Family ID does not belong to this organization`)
+            errors.push(`Row ${rowNumber}: Family ID does not belong to this organization`)
+            pushPreview({
+              rowNumber,
+              action: 'error',
+              label: amountStr,
+              reason: 'Family ID does not belong to this organization',
+            })
             continue
           }
+          label = (fam as { name?: string }).name || amountStr
         } else {
-          errors.push(`Row ${i + 2}: Family name or email is required`)
+          errors.push(`Row ${rowNumber}: Family name or email is required`)
+          pushPreview({
+            rowNumber,
+            action: 'error',
+            label: amountStr,
+            reason: 'Family name or email is required',
+          })
           continue
         }
         familyId = resolvedId
@@ -772,7 +926,8 @@ async function importPayments(
       if (yearRaw) {
         year = parseInt(yearRaw, 10)
         if (!Number.isFinite(year) || year < 1900 || year > 2200) {
-          errors.push(`Row ${i + 2}: Invalid year '${yearRaw}'`)
+          errors.push(`Row ${rowNumber}: Invalid year '${yearRaw}'`)
+          pushPreview({ rowNumber, action: 'error', label, reason: `Invalid year '${yearRaw}'` })
           continue
         }
       } else {
@@ -783,7 +938,13 @@ async function importPayments(
       const rowMemberId = getValue(row, 'memberId')
       if (rowMemberId) {
         if (!Types.ObjectId.isValid(rowMemberId)) {
-          errors.push(`Row ${i + 2}: Invalid memberId '${rowMemberId}'`)
+          errors.push(`Row ${rowNumber}: Invalid memberId '${rowMemberId}'`)
+          pushPreview({
+            rowNumber,
+            action: 'error',
+            label,
+            reason: `Invalid memberId '${rowMemberId}'`,
+          })
           continue
         }
         const mem = await FamilyMember.findOne({
@@ -792,7 +953,8 @@ async function importPayments(
           organizationId,
         }).select('_id')
         if (!mem) {
-          errors.push(`Row ${i + 2}: Member not found in family`)
+          errors.push(`Row ${rowNumber}: Member not found in family`)
+          pushPreview({ rowNumber, action: 'error', label, reason: 'Member not found in family' })
           continue
         }
         memberId = rowMemberId
@@ -804,41 +966,50 @@ async function importPayments(
         const cleaned = refundedRaw.trim().replace(/[$,\s]/g, '')
         const parsed = Number(cleaned)
         if (!Number.isFinite(parsed) || parsed < 0) {
-          errors.push(`Row ${i + 2}: Invalid refundedAmount '${refundedRaw}'`)
+          errors.push(`Row ${rowNumber}: Invalid refundedAmount '${refundedRaw}'`)
+          pushPreview({
+            rowNumber,
+            action: 'error',
+            label,
+            reason: `Invalid refundedAmount '${refundedRaw}'`,
+          })
           continue
         }
         refundedAmount = roundMoney(parsed)
         if (refundedAmount > amount) {
-          errors.push(
-            `Row ${i + 2}: refundedAmount (${refundedRaw}) cannot exceed amount (${amountStr})`,
-          )
+          const reason = `refundedAmount (${refundedRaw}) cannot exceed amount (${amountStr})`
+          errors.push(`Row ${rowNumber}: ${reason}`)
+          pushPreview({ rowNumber, action: 'error', label, reason })
           continue
         }
       }
 
-      await Payment.create({
-        organizationId,
-        familyId,
-        memberId: memberId || undefined,
-        amount,
-        paymentDate,
-        year,
-        type: getValue(row, 'type') || 'membership',
-        paymentMethod: getValue(row, 'paymentMethod') || 'cash',
-        notes: getValue(row, 'notes') || undefined,
-        ...(refundedAmount > 0 ? { refundedAmount } : {}),
-      })
+      if (!dryRun) {
+        await Payment.create({
+          organizationId,
+          familyId,
+          memberId: memberId || undefined,
+          amount,
+          paymentDate,
+          year,
+          type: getValue(row, 'type') || 'membership',
+          paymentMethod: getValue(row, 'paymentMethod') || 'cash',
+          notes: getValue(row, 'notes') || undefined,
+          ...(refundedAmount > 0 ? { refundedAmount } : {}),
+        })
+      }
 
       yearsToRefresh.add(year)
       imported.push(i)
+      pushPreview({ rowNumber, action: 'import', label })
     } catch (error: any) {
-      errors.push(
-        `Row ${i + 2}: ${sanitizeStripeErrorMessage(error.message) || 'Failed to import payment'}`,
-      )
+      const msg = sanitizeStripeErrorMessage(error.message) || 'Failed to import payment'
+      errors.push(`Row ${rowNumber}: ${msg}`)
+      pushPreview({ rowNumber, action: 'error', reason: msg })
     }
   }
 
-  if (yearsToRefresh.size > 0) {
+  if (!dryRun && yearsToRefresh.size > 0) {
     scheduleYearlyCalculationRefreshForYears(yearsToRefresh, organizationId)
   }
 }
@@ -848,28 +1019,39 @@ async function importLifecycleEvents(
   rows: string[][],
   headerMap: { [key: string]: number },
   imported: number[],
+  skipped: number[],
   errors: string[],
+  warnings: string[],
+  runOpts: ImportRunOptions,
   orgTimezone?: string,
   boundFamilyId?: string,
   boundMemberId?: string,
 ) {
+  const { dryRun, preview } = runOpts
   const getValue = (row: string[], field: string): string => {
     const index = headerMap[normalizeColumnName(field)]
     return index !== undefined ? (row[index] || '').trim() : ''
   }
 
+  const pushPreview = (row: ImportPreviewRow) => {
+    if (dryRun) preview.push(row)
+  }
+
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
+    const rowNumber = i + 2
     try {
       const eventType = getValue(row, 'eventType')
       if (!eventType) {
-        errors.push(`Row ${i + 2}: Event type is required`)
+        errors.push(`Row ${rowNumber}: Event type is required`)
+        pushPreview({ rowNumber, action: 'error', reason: 'Event type is required' })
         continue
       }
 
       const eventDate = parseDate(getValue(row, 'eventDate'))
       if (!eventDate) {
-        errors.push(`Row ${i + 2}: Valid event date is required`)
+        errors.push(`Row ${rowNumber}: Valid event date is required`)
+        pushPreview({ rowNumber, action: 'error', reason: 'Valid event date is required' })
         continue
       }
 
@@ -879,7 +1061,8 @@ async function importLifecycleEvents(
       if (amountStr) {
         const parsed = parseMoneyAmount(amountStr)
         if (parsed === null) {
-          errors.push(`Row ${i + 2}: Invalid amount '${amountStr}'`)
+          errors.push(`Row ${rowNumber}: Invalid amount '${amountStr}'`)
+          pushPreview({ rowNumber, action: 'error', reason: `Invalid amount '${amountStr}'` })
           continue
         }
         amount = parsed
@@ -889,19 +1072,21 @@ async function importLifecycleEvents(
           organizationId,
         }).select('amount')
         if (!eventTypeRecord) {
-          errors.push(
-            `Row ${i + 2}: Event type '${eventType}' not found in this organization; provide an amount`,
-          )
+          const reason = `Event type '${eventType}' not found in this organization; provide an amount`
+          errors.push(`Row ${rowNumber}: ${reason}`)
+          pushPreview({ rowNumber, action: 'error', reason })
           continue
         }
         amount = Number(eventTypeRecord.amount || 0)
       }
       if (!Number.isFinite(amount) || amount < 0) {
-        errors.push(`Row ${i + 2}: Invalid event amount`)
+        errors.push(`Row ${rowNumber}: Invalid event amount`)
+        pushPreview({ rowNumber, action: 'error', reason: 'Invalid event amount' })
         continue
       }
 
       let familyId: string
+      let label = eventType
       if (boundFamilyId) {
         familyId = boundFamilyId
       } else {
@@ -913,24 +1098,44 @@ async function importLifecycleEvents(
           const family = await findFamilyByNameOrEmail(organizationId, familyName, familyEmail)
           if (family) {
             resolvedId = family._id.toString()
+            label = familyName || eventType
           } else {
-            errors.push(
-              `Row ${i + 2}: Family not found (name: ${familyName}, email: ${familyEmail})`,
-            )
+            const reason = `Family not found (name: ${familyName}, email: ${familyEmail})`
+            errors.push(`Row ${rowNumber}: ${reason}`)
+            pushPreview({ rowNumber, action: 'error', label: eventType, reason })
             continue
           }
         } else if (resolvedId) {
           if (!Types.ObjectId.isValid(resolvedId)) {
-            errors.push(`Row ${i + 2}: Invalid familyId '${resolvedId}'`)
+            errors.push(`Row ${rowNumber}: Invalid familyId '${resolvedId}'`)
+            pushPreview({
+              rowNumber,
+              action: 'error',
+              label: eventType,
+              reason: `Invalid familyId '${resolvedId}'`,
+            })
             continue
           }
-          const fam = await Family.findOne({ _id: resolvedId, organizationId }).select('_id')
+          const fam = await Family.findOne({ _id: resolvedId, organizationId }).select('_id name')
           if (!fam) {
-            errors.push(`Row ${i + 2}: Family ID does not belong to this organization`)
+            errors.push(`Row ${rowNumber}: Family ID does not belong to this organization`)
+            pushPreview({
+              rowNumber,
+              action: 'error',
+              label: eventType,
+              reason: 'Family ID does not belong to this organization',
+            })
             continue
           }
+          label = (fam as { name?: string }).name || eventType
         } else {
-          errors.push(`Row ${i + 2}: Family name or email is required`)
+          errors.push(`Row ${rowNumber}: Family name or email is required`)
+          pushPreview({
+            rowNumber,
+            action: 'error',
+            label: eventType,
+            reason: 'Family name or email is required',
+          })
           continue
         }
         familyId = resolvedId
@@ -941,7 +1146,8 @@ async function importLifecycleEvents(
       if (yearRaw) {
         year = parseInt(yearRaw, 10)
         if (!Number.isFinite(year) || year < 1900 || year > 2200) {
-          errors.push(`Row ${i + 2}: Invalid year '${yearRaw}'`)
+          errors.push(`Row ${rowNumber}: Invalid year '${yearRaw}'`)
+          pushPreview({ rowNumber, action: 'error', label, reason: `Invalid year '${yearRaw}'` })
           continue
         }
       } else {
@@ -952,7 +1158,13 @@ async function importLifecycleEvents(
       const rowMemberId = getValue(row, 'memberId')
       if (rowMemberId) {
         if (!Types.ObjectId.isValid(rowMemberId)) {
-          errors.push(`Row ${i + 2}: Invalid memberId '${rowMemberId}'`)
+          errors.push(`Row ${rowNumber}: Invalid memberId '${rowMemberId}'`)
+          pushPreview({
+            rowNumber,
+            action: 'error',
+            label,
+            reason: `Invalid memberId '${rowMemberId}'`,
+          })
           continue
         }
         const mem = await FamilyMember.findOne({
@@ -961,28 +1173,32 @@ async function importLifecycleEvents(
           organizationId,
         }).select('_id')
         if (!mem) {
-          errors.push(`Row ${i + 2}: Member not found in family`)
+          errors.push(`Row ${rowNumber}: Member not found in family`)
+          pushPreview({ rowNumber, action: 'error', label, reason: 'Member not found in family' })
           continue
         }
         memberId = rowMemberId
       }
 
-      await LifecycleEventPayment.create({
-        organizationId,
-        familyId,
-        memberId: memberId || undefined,
-        eventType: normalizedEventType,
-        eventDate,
-        year,
-        amount,
-        notes: getValue(row, 'notes') || undefined,
-      })
+      if (!dryRun) {
+        await LifecycleEventPayment.create({
+          organizationId,
+          familyId,
+          memberId: memberId || undefined,
+          eventType: normalizedEventType,
+          eventDate,
+          year,
+          amount,
+          notes: getValue(row, 'notes') || undefined,
+        })
+      }
 
       imported.push(i)
+      pushPreview({ rowNumber, action: 'import', label })
     } catch (error: any) {
-      errors.push(
-        `Row ${i + 2}: ${sanitizeStripeErrorMessage(error.message) || 'Failed to import lifecycle event'}`,
-      )
+      const msg = sanitizeStripeErrorMessage(error.message) || 'Failed to import lifecycle event'
+      errors.push(`Row ${rowNumber}: ${msg}`)
+      pushPreview({ rowNumber, action: 'error', reason: msg })
     }
   }
 }

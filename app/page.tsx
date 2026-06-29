@@ -8,24 +8,35 @@ import { calculateYearlyExpenses } from '@/lib/calculations'
 import { loadSetupProgress } from '@/lib/organizations/setup-progress-data'
 import { loadDashboardAttention } from '@/lib/route-logic/dashboard-actions'
 import { serializeForRsc } from '@/lib/serialize-rsc'
+import { countAssignedFamilyStats } from '@/lib/member-family-access.server'
 import DashboardView from './DashboardView'
 import Loading from './loading'
 
 export const dynamic = 'force-dynamic'
 
-async function fetchInitialDashboardData(organizationId: string, includeFinancials: boolean) {
+async function fetchInitialDashboardData(
+  organizationId: string,
+  includeFinancials: boolean,
+  userId?: string,
+) {
   await connectDB()
   const year = new Date().getFullYear()
 
-  // Only pull what the first paint actually shows: family + member counts and
-  // the cached yearly calc (if any) for balance / income / expense totals.
-  const [totalFamilies, totalMembers, calcDoc] = await Promise.all([
-    Family.countDocuments({ organizationId }),
-    FamilyMember.countDocuments({ organizationId, convertedToFamily: { $ne: true } }),
+  const [counts, calcDoc] = await Promise.all([
+    includeFinancials
+      ? Promise.all([
+          Family.countDocuments({ organizationId }),
+          FamilyMember.countDocuments({ organizationId, convertedToFamily: { $ne: true } }),
+        ]).then(([totalFamilies, totalMembers]) => ({ totalFamilies, totalMembers }))
+      : userId
+        ? countAssignedFamilyStats(organizationId, userId)
+        : Promise.resolve({ totalFamilies: 0, totalMembers: 0 }),
     includeFinancials
       ? YearlyCalculation.findOne({ year, organizationId }).lean<any>()
       : Promise.resolve(null),
   ])
+
+  const { totalFamilies, totalMembers } = counts
 
   let calculatedIncome = 0
   let calculatedExpenses = 0
@@ -90,7 +101,11 @@ async function DashboardServer() {
 
   const showFinancials = hasMinRole(ctx.role, 'admin')
   try {
-    const data = await fetchInitialDashboardData(ctx.organizationId, showFinancials)
+    const data = await fetchInitialDashboardData(
+      ctx.organizationId,
+      showFinancials,
+      showFinancials ? undefined : ctx.userId,
+    )
     return (
       <DashboardView
         initialStats={data.initialStats}

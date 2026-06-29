@@ -26,7 +26,12 @@
 
  */
 
-import { Notification, OrgMembership } from './models'
+import { Notification, OrgMembership, User } from './models'
+import {
+  normalizeNotificationPreferences,
+  shouldDeliverInAppNotification,
+  type NotificationPreferences,
+} from './notification-preferences'
 
 export interface NotifyInput {
   kind: string
@@ -64,6 +69,14 @@ export async function notifyUser(
   input: NotifyInput,
 ): Promise<void> {
   try {
+    const user = await User.findById(userId)
+      .select('preferences.notificationPreferences')
+      .lean<{ preferences?: { notificationPreferences?: Partial<NotificationPreferences> } }>()
+    const prefs = normalizeNotificationPreferences(user?.preferences?.notificationPreferences)
+    if (!shouldDeliverInAppNotification(input.kind, prefs)) {
+      return
+    }
+
     await Notification.create({
       organizationId,
 

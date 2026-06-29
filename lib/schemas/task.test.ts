@@ -5,11 +5,20 @@ const VALID_OID = '507f1f77bcf86cd799439011'
 
 describe('task schemas', () => {
   describe('taskBody', () => {
-    it('accepts a valid task payload', () => {
+    it('accepts a valid task payload with legacy email', () => {
       const result = taskBody.safeParse({
         title: 'Follow up on payment',
         dueDate: '2025-07-01',
         email: 'assignee@example.com',
+      })
+      expect(result.success).toBe(true)
+    })
+
+    it('accepts assigneeMembershipId instead of email', () => {
+      const result = taskBody.safeParse({
+        title: 'Follow up on payment',
+        dueDate: '2025-07-01',
+        assigneeMembershipId: VALID_OID,
       })
       expect(result.success).toBe(true)
     })
@@ -19,7 +28,7 @@ describe('task schemas', () => {
         title: 'Follow up',
         description: 'Call the family',
         dueDate: '2025-07-01',
-        email: 'assignee@example.com',
+        assigneeMembershipId: VALID_OID,
         status: 'pending',
         priority: 'high',
         relatedFamilyId: VALID_OID,
@@ -32,6 +41,14 @@ describe('task schemas', () => {
       const result = taskBody.safeParse({
         dueDate: '2025-07-01',
         email: 'assignee@example.com',
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects missing assignee and email', () => {
+      const result = taskBody.safeParse({
+        title: 'Task',
+        dueDate: '2025-07-01',
       })
       expect(result.success).toBe(false)
     })
@@ -57,9 +74,16 @@ describe('task schemas', () => {
   })
 
   describe('taskUpdateBody', () => {
-    it('accepts a partial update', () => {
+    it('accepts a partial update without assignee', () => {
       const result = taskUpdateBody.safeParse({
         status: 'completed',
+      })
+      expect(result.success).toBe(true)
+    })
+
+    it('accepts assigneeMembershipId on update', () => {
+      const result = taskUpdateBody.safeParse({
+        assigneeMembershipId: VALID_OID,
       })
       expect(result.success).toBe(true)
     })

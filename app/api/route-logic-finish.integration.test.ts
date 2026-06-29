@@ -188,7 +188,7 @@ describe.sequential('route-logic finish coverage', () => {
       mockAuth.mockResolvedValueOnce({
         user: {
           id: ctx.fixtures.memberUserId,
-          email: 'member@example.com',
+          email: ctx.memberEmail,
           name: 'Member',
           memberships: [{ o: ctx.orgId, r: 'member' }],
         },
@@ -197,7 +197,15 @@ describe.sequential('route-logic finish coverage', () => {
       expect(memberList.status).toBe(200)
       const rows = await memberList.json()
       expect(Array.isArray(rows)).toBe(true)
-      if (rows.length > 0) expect(rows[0].openBalance).toBeUndefined()
+      expect(rows.length).toBe(1)
+      expect(rows[0]._id).toBe(ctx.fixtures.familyId)
+      expect(rows[0].openBalance).toBeUndefined()
+
+      const unassigned = await GET(
+        orgJsonReq(`/api/families/${ctx.fixtures.unassignedFamilyId}`, 'GET'),
+        { params: { id: ctx.fixtures.unassignedFamilyId } },
+      )
+      expect(unassigned.status).toBe(404)
       bindSession(ctx)
     })
   })
@@ -354,6 +362,28 @@ describe.sequential('route-logic finish coverage', () => {
     })
   })
 
+  describe('member assigned-families', () => {
+    it('returns email-linked families for members', async () => {
+      mockAuth.mockResolvedValueOnce({
+        user: {
+          id: ctx.fixtures.memberUserId,
+          email: ctx.memberEmail,
+          name: 'Member',
+          memberships: [{ o: ctx.orgId, r: 'member' }],
+        },
+      } as never)
+
+      const { GET } = await import('@/lib/route-logic/member/assigned-families')
+      const res = await GET(orgJsonReq('/api/member/assigned-families', 'GET'))
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.families).toEqual([
+        expect.objectContaining({ id: ctx.fixtures.familyId, name: expect.any(String) }),
+      ])
+      bindSession(ctx)
+    })
+  })
+
   describe('dashboard-stats', () => {
     it('returns stats for admin and redacted view for members', async () => {
       const { GET } = await import('@/lib/route-logic/dashboard-stats')
@@ -366,14 +396,16 @@ describe.sequential('route-logic finish coverage', () => {
       mockAuth.mockResolvedValueOnce({
         user: {
           id: ctx.fixtures.memberUserId,
-          email: 'member@example.com',
+          email: ctx.memberEmail,
           name: 'Member',
           memberships: [{ o: ctx.orgId, r: 'member' }],
         },
       } as never)
       const memberRes = await GET(orgJsonReq('/api/dashboard-stats', 'GET'))
       expect(memberRes.status).toBe(200)
-      expect((await memberRes.json()).balance).toBeUndefined()
+      const memberBody = await memberRes.json()
+      expect(memberBody.balance).toBeUndefined()
+      expect(memberBody.totalFamilies).toBe(1)
       bindSession(ctx)
 
       expect(
@@ -3690,7 +3722,7 @@ describe.sequential('route-logic finish coverage', () => {
       mockAuth.mockResolvedValueOnce({
         user: {
           id: ctx.fixtures.memberUserId,
-          email: 'member@example.com',
+          email: ctx.memberEmail,
           name: 'Member',
           memberships: [{ o: ctx.orgId, r: 'member' }],
         },
@@ -3702,7 +3734,8 @@ describe.sequential('route-logic finish coverage', () => {
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.family.openBalance).toBeUndefined()
-      expect(body.payments).toEqual([])
+      expect(body.memberFinancialAccess).toBe(true)
+      expect(Array.isArray(body.payments)).toBe(true)
       bindSession(ctx)
     })
   })
@@ -4390,7 +4423,7 @@ describe.sequential('route-logic finish coverage', () => {
       mockAuth.mockResolvedValueOnce({
         user: {
           id: ctx.fixtures.memberUserId,
-          email: 'member@example.com',
+          email: ctx.memberEmail,
           name: 'Member',
           memberships: [{ o: ctx.orgId, r: 'admin' }],
         },
@@ -7203,7 +7236,7 @@ describe.sequential('route-logic finish coverage', () => {
       mockAuth.mockResolvedValueOnce({
         user: {
           id: ctx.fixtures.memberUserId,
-          email: 'member@example.com',
+          email: ctx.memberEmail,
           name: 'Member',
           memberships: [{ o: ctx.orgId, r: 'member' }],
         },

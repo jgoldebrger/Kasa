@@ -19,6 +19,7 @@ export interface ActivityPanelProps {
   setToDate: (s: string) => void
   onLoadMore: () => void
   onExportCsv: () => void
+  isOwner: boolean
 }
 
 export default function ActivityPanel(props: ActivityPanelProps) {

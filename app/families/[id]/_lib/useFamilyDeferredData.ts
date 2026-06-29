@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, type Dispatch, type SetStateAction } from 'react'
 import { cachedFetch } from '@/lib/client-cache'
+import { mutateWithOfflineQueue } from '@/lib/client/offline-write-queue'
 import { getPlanDisplayName } from '@/lib/payment-plan-display'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import type { PaymentPlan, LifecycleEventType } from './helpers'
@@ -10,7 +11,11 @@ export interface UseFamilyDeferredDataOptions {
   familyId: string
   isFamilyFetchStale: (gen: number) => boolean
   beginFamilyFetch: () => number
-  toast: { success: (msg: string) => void; error: (msg: string) => void }
+  toast: {
+    success: (msg: string) => void
+    error: (msg: string) => void
+    info?: (msg: string) => void
+  }
   confirm: (opts: {
     title?: string
     message: string
@@ -39,6 +44,8 @@ export function useFamilyDeferredData({
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [subFamilies, setSubFamilies] = useState<any[]>([])
   const [loadingSubFamilies, setLoadingSubFamilies] = useState(false)
+  const [familyTree, setFamilyTree] = useState<any>(null)
+  const [loadingFamilyTree, setLoadingFamilyTree] = useState(false)
 
   const {
     begin: beginTasksFetch,
@@ -64,6 +71,29 @@ export function useFamilyDeferredData({
         console.error('Error fetching sub-families:', error)
       } finally {
         if (!isFamilyFetchStale(gen)) setLoadingSubFamilies(false)
+      }
+    },
+    [familyId, beginFamilyFetch, isFamilyFetchStale],
+  )
+
+  const fetchFamilyTree = useCallback(
+    async (sharedGen?: number) => {
+      if (!familyId) return
+      const gen = sharedGen ?? beginFamilyFetch()
+      setLoadingFamilyTree(true)
+      try {
+        const res = await fetch(`/api/families/${familyId}/sub-families/tree`)
+        if (isFamilyFetchStale(gen)) return
+        if (res.ok) {
+          const data = await res.json().catch(() => null)
+          if (isFamilyFetchStale(gen)) return
+          setFamilyTree(data || null)
+        }
+      } catch (error) {
+        if (isFamilyFetchStale(gen)) return
+        console.error('Error fetching family tree:', error)
+      } finally {
+        if (!isFamilyFetchStale(gen)) setLoadingFamilyTree(false)
       }
     },
     [familyId, beginFamilyFetch, isFamilyFetchStale],
@@ -100,13 +130,22 @@ export function useFamilyDeferredData({
         cur.map((t) => (t._id === taskId ? { ...t, status: 'completed' } : t)),
       )
       try {
-        const res = await fetch(`/api/tasks/${taskId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'completed' }),
-        })
-        if (!res.ok) throw new Error()
-        toast.success('Task completed.')
+        const result = await mutateWithOfflineQueue(
+          `/api/tasks/${taskId}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'completed' }),
+          },
+          { type: 'task-status-update', taskId, status: 'completed' },
+        )
+        if (result.ok) {
+          toast.success('Task completed.')
+        } else if (result.queued) {
+          toast.info?.('Saved offline — will sync when you reconnect.')
+        } else {
+          throw new Error()
+        }
       } catch {
         setFamilyTasks(prev)
         toast.error('Could not complete task.')
@@ -258,6 +297,9 @@ export function useFamilyDeferredData({
     subFamilies,
     loadingSubFamilies,
     fetchSubFamilies,
+    familyTree,
+    loadingFamilyTree,
+    fetchFamilyTree,
     fetchFamilyTasks,
     completeFamilyTask,
     deleteFamilyTask,

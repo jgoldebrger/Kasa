@@ -23,6 +23,7 @@ import {
   Tooltip,
 } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
+import { buildYoYMetrics } from '@/lib/reports/yoy'
 
 interface PlanBreakdown {
   planId?: string
@@ -262,6 +263,39 @@ export default function CalculationsView({ initialCalculations }: CalculationsVi
     )
   }, [normalized])
 
+  const yoyPair = useMemo(() => {
+    if (detail) {
+      const prior = normalized.find((c) => c.year === detail.year - 1)
+      return prior ? { current: detail, prior } : null
+    }
+    if (normalized.length >= 2) {
+      const [current, prior] = normalized
+      return { current, prior }
+    }
+    return null
+  }, [detail, normalized])
+
+  const yoyMetrics = useMemo(() => {
+    if (!yoyPair) return null
+    return buildYoYMetrics(
+      {
+        income: yoyPair.current.calculatedIncome,
+        expenses: yoyPair.current.calculatedExpenses,
+        balance: yoyPair.current.balance,
+      },
+      {
+        income: yoyPair.prior.calculatedIncome,
+        expenses: yoyPair.prior.calculatedExpenses,
+        balance: yoyPair.prior.balance,
+      },
+      {
+        income: t('calculations.column.totalIn'),
+        expenses: t('calculations.column.expenses'),
+        balance: t('calculations.column.balance'),
+      },
+    )
+  }, [yoyPair, t])
+
   return (
     <main className="min-h-screen bg-app-subtle px-4 py-6 sm:px-6 md:px-8">
       <div className="mx-auto max-w-7xl">
@@ -492,6 +526,62 @@ export default function CalculationsView({ initialCalculations }: CalculationsVi
                 </Card>
               )}
             />
+          </Card>
+        )}
+
+        {yoyMetrics && yoyPair && (
+          <Card className="mb-6">
+            <h3 className="text-sm font-semibold text-fg mb-3">{t('calculations.yoy.title')}</h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-fg-muted">
+                    <th className="py-2 pr-4 font-medium">{t('calculations.yoy.metric')}</th>
+                    <th className="py-2 px-4 font-medium text-right">
+                      {t('calculations.yoy.priorYear').replace(
+                        '{year}',
+                        String(yoyPair.prior.year),
+                      )}
+                    </th>
+                    <th className="py-2 px-4 font-medium text-right">
+                      {t('calculations.yoy.currentYear').replace(
+                        '{year}',
+                        String(yoyPair.current.year),
+                      )}
+                    </th>
+                    <th className="py-2 pl-4 font-medium text-right">
+                      {t('calculations.yoy.change')}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {yoyMetrics.map((row) => (
+                    <tr key={row.label} className="border-b border-border">
+                      <td className="py-2 pr-4 text-fg">{row.label}</td>
+                      <td className="py-2 px-4 text-right tabular text-fg-muted">
+                        {formatMoney(row.prior)}
+                      </td>
+                      <td className="py-2 px-4 text-right tabular text-fg">
+                        {formatMoney(row.current)}
+                      </td>
+                      <td
+                        className={`py-2 pl-4 text-right tabular font-medium ${
+                          row.delta >= 0 ? 'text-success' : 'text-danger'
+                        }`}
+                      >
+                        {formatMoney(row.delta)}
+                        {row.deltaPct != null && (
+                          <span className="text-xs text-fg-muted ml-1">
+                            ({row.deltaPct >= 0 ? '+' : ''}
+                            {row.deltaPct.toFixed(1)}%)
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </Card>
         )}
 

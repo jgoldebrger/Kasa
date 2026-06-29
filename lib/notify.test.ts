@@ -5,6 +5,13 @@ const mocks = vi.hoisted(() => ({
   insertMany: vi.fn(async () => []),
   create: vi.fn(async () => ({})),
   orgFindLean: vi.fn(async () => [] as { userId: string }[]),
+  userFindById: vi.fn(() => ({
+    select: vi.fn(() => ({
+      lean: vi.fn(async () => ({
+        preferences: { notificationPreferences: { tasks: true, payments: true, statements: true } },
+      })),
+    })),
+  })),
 }))
 
 vi.mock('./database', () => ({
@@ -19,7 +26,9 @@ vi.mock('./models', () => ({
       })),
     })),
   },
-  User: {},
+  User: {
+    findById: mocks.userFindById,
+  },
   Notification: {
     insertMany: mocks.insertMany,
     create: mocks.create,
@@ -41,10 +50,7 @@ describe('notifyAdmins', () => {
   })
 
   it('creates one notification per owner/admin membership', async () => {
-    mocks.orgFindLean.mockResolvedValue([
-      { userId: 'user-owner' },
-      { userId: 'user-admin' },
-    ])
+    mocks.orgFindLean.mockResolvedValue([{ userId: 'user-owner' }, { userId: 'user-admin' }])
 
     await notifyAdmins('org-1', {
       kind: 'payment.failed',
@@ -91,9 +97,7 @@ describe('notifyAdmins', () => {
     mocks.orgFindLean.mockRejectedValue(new Error('db down'))
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    await expect(
-      notifyAdmins('org-1', { kind: 'test', title: 'T' }),
-    ).resolves.toBeUndefined()
+    await expect(notifyAdmins('org-1', { kind: 'test', title: 'T' })).resolves.toBeUndefined()
 
     expect(errSpy).toHaveBeenCalled()
     errSpy.mockRestore()
@@ -130,6 +134,22 @@ describe('notifyUser', () => {
     await expect(notifyUser('org-1', 'u', { kind: 'k', title: 't' })).resolves.toBeUndefined()
     errSpy.mockRestore()
   })
+
+  it('skips create when user disabled the notification category', async () => {
+    mocks.userFindById.mockReturnValueOnce({
+      select: vi.fn(() => ({
+        lean: vi.fn(async () => ({
+          preferences: {
+            notificationPreferences: { tasks: false, payments: true, statements: true },
+          },
+        })),
+      })),
+    } as never)
+
+    await notifyUser('org-1', 'user-1', { kind: 'task.due', title: 'Due' })
+
+    expect(mocks.create).not.toHaveBeenCalled()
+  })
 })
 
 describe('notifyOrg', () => {
@@ -154,9 +174,7 @@ describe('notifyOrg', () => {
     mocks.create.mockRejectedValue(new Error('write failed'))
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    await expect(
-      notifyOrg('org-1', { kind: 'system', title: 'Down' }),
-    ).resolves.toBeUndefined()
+    await expect(notifyOrg('org-1', { kind: 'system', title: 'Down' })).resolves.toBeUndefined()
 
     expect(errSpy).toHaveBeenCalledWith('[notify] notifyOrg failed:', expect.any(Error))
     errSpy.mockRestore()

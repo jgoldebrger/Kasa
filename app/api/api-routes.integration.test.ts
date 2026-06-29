@@ -1,9 +1,10 @@
 /**
-
  * Executes every catalogued app/api route handler against in-memory Mongo
-
  * with mocked NextAuth session + org headers. Drives line coverage for route.ts files.
-
+ *
+ * Handler imports resolve via `routeSourceToLogicModule` (follows route.ts re-exports).
+ * Member-role probes must call `bindMemberSession` — `mockResolvedValueOnce` is unreliable
+ * when `bindSession` also sets `mockResolvedValue` in beforeEach.
  */
 
 import crypto from 'crypto'
@@ -109,27 +110,45 @@ async function stripeTestClient() {
 }
 
 function bindSession(ctx: ApiTestContext) {
-  mockAuth.mockResolvedValue({
-    user: {
-      id: ctx.userId,
+  mockAuth.mockImplementation(
+    async () =>
+      ({
+        user: {
+          id: ctx.userId,
 
-      email: ctx.email,
+          email: ctx.email,
 
-      name: ctx.userName,
+          name: ctx.userName,
 
-      memberships: [
-        { o: ctx.orgId, r: 'owner' },
+          memberships: [
+            { o: ctx.orgId, r: 'owner' as const },
 
-        { o: ctx.betaOrgId, r: 'owner' },
-      ],
-    },
-  } as never)
+            { o: ctx.betaOrgId, r: 'owner' as const },
+          ],
+        },
+      }) as never,
+  )
 
   mockCookieGet.mockImplementation((name: string) => {
     if (name === 'kasa_active_org') return { value: ctx.orgId }
 
     return undefined
   })
+}
+
+/** Switch mocked session to the seeded member user (restore with bindSession). */
+function bindMemberSession(ctx: ApiTestContext) {
+  mockAuth.mockImplementation(
+    async () =>
+      ({
+        user: {
+          id: ctx.fixtures.memberUserId,
+          email: ctx.memberEmail,
+          name: 'API Route Member',
+          memberships: [{ o: ctx.orgId, r: 'member' as const }],
+        },
+      }) as never,
+  )
 }
 
 const METHOD_ORDER: Record<string, number> = {
@@ -1257,6 +1276,7 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
   describe('families/[id]', () => {
     it('returns full ledger for admins and redacted data for members', async () => {
+      const { User, FamilyMember, OrgMembership } = await import('@/lib/models')
       const params = { id: ctx.fixtures.familyId }
       const { GET } = await import('@/lib/route-logic/families/[id]')
 
@@ -1270,14 +1290,40 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       expect(adminBody.payments.length).toBeGreaterThan(0)
       expect(adminBody.balance).toBeTruthy()
 
-      mockAuth.mockResolvedValueOnce({
-        user: {
-          id: ctx.fixtures.memberUserId,
-          email: 'member@example.com',
-          name: 'API Route Member',
-          memberships: [{ o: ctx.orgId, r: 'member' }],
-        },
-      } as never)
+      // Fresh member user + email link — concurrent catalog probes can mutate shared seed users.
+      const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+      const ledgerMemberEmail = `ledger-member-${suffix}@example.com`
+      const ledgerMember = await User.create({
+        email: ledgerMemberEmail,
+        hashedPassword: 'hashed-test-password',
+        name: 'Ledger Member',
+      })
+      await OrgMembership.create({
+        userId: ledgerMember._id,
+        organizationId: ctx.orgId,
+        role: 'member',
+      })
+      await FamilyMember.create({
+        organizationId: ctx.orgId,
+        familyId: ctx.fixtures.familyId,
+        firstName: 'Ledger',
+        lastName: 'Member',
+        gender: 'male',
+        birthDate: new Date('2010-01-01'),
+        email: ledgerMemberEmail,
+      })
+
+      mockAuth.mockImplementation(
+        async () =>
+          ({
+            user: {
+              id: ledgerMember._id.toString(),
+              email: ledgerMemberEmail,
+              name: 'Ledger Member',
+              memberships: [{ o: ctx.orgId, r: 'member' as const }],
+            },
+          }) as never,
+      )
 
       const memberRes = await invokeRouteLogic(
         GET,
@@ -1286,8 +1332,11 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
       expect(memberRes.status).toBe(200)
       const memberBody = await memberRes.json()
-      expect(memberBody.payments).toEqual([])
-      expect(memberBody.balance.balance).toBe(0)
+      // Email-linked members may view financials; family ledger fields are redacted.
+      expect(memberBody.memberFinancialAccess).toBe(true)
+      expect(memberBody.payments.length).toBeGreaterThan(0)
+      expect(memberBody.family.openBalance).toBeUndefined()
+      expect(memberBody.withdrawals).toEqual([])
       bindSession(ctx)
     })
 
@@ -1300,7 +1349,7 @@ describe.sequential('route-logic row coverage (gap order)', () => {
         paymentPlanId: ctx.fixtures.paymentPlanId,
       })
       const params = { id: disposable._id.toString() }
-      const { GET, PUT, DELETE } = await import('@/lib/route-logic/families/[id]')
+      const { GET, PUT, PATCH, DELETE } = await import('@/lib/route-logic/families/[id]')
 
       const badId = await invokeRouteLogic(GET, orgJsonReq('/api/families/not-valid', 'GET'), {
         id: 'not-valid',
@@ -1361,6 +1410,21 @@ describe.sequential('route-logic row coverage (gap order)', () => {
         params,
       )
       expect(badPlan.status).toBe(400)
+
+      const patchTags = await invokeRouteLogic(
+        PATCH,
+        orgJsonReq(`/api/families/${disposable._id}`, 'PATCH', { tags: ['VIP', 'Board'] }),
+        params,
+      )
+      expect(patchTags.status).toBe(200)
+      expect((await patchTags.json()).tags).toEqual(['VIP', 'Board'])
+
+      const badPatch = await invokeRouteLogic(
+        PATCH,
+        orgJsonReq(`/api/families/${disposable._id}`, 'PATCH', { tags: [''] }),
+        params,
+      )
+      expect(badPatch.status).toBe(400)
 
       const delRes = await invokeRouteLogic(
         DELETE,
@@ -2095,6 +2159,28 @@ describe.sequential('route-logic row coverage (gap order)', () => {
         }),
       )
       expect(badPlan.status).toBe(404)
+
+      const tagRes = await invokeRouteLogic(
+        POST,
+        orgJsonReq('/api/families/bulk', 'POST', {
+          action: 'setTags',
+          ids: [ctx.fixtures.familyId],
+          mode: 'add',
+          tags: ['VIP', 'Board'],
+        }),
+      )
+      expect(tagRes.status).toBe(200)
+
+      const badTags = await invokeRouteLogic(
+        POST,
+        orgJsonReq('/api/families/bulk', 'POST', {
+          action: 'setTags',
+          ids: [ctx.fixtures.familyId],
+          mode: 'add',
+          tags: [],
+        }),
+      )
+      expect(badTags.status).toBe(400)
     })
 
     it('soft-deletes a disposable family via bulk delete', async () => {
@@ -2375,14 +2461,7 @@ describe.sequential('route-logic row coverage (gap order)', () => {
       )
       expect(adminList[0].openBalance).toBeDefined()
 
-      mockAuth.mockResolvedValueOnce({
-        user: {
-          id: ctx.fixtures.memberUserId,
-          email: 'member@example.com',
-          name: 'API Route Member',
-          memberships: [{ o: ctx.orgId, r: 'member' }],
-        },
-      } as never)
+      bindMemberSession(ctx)
 
       const memberRes = await invokeRouteLogic(
         GET,
@@ -2413,14 +2492,7 @@ describe.sequential('route-logic row coverage (gap order)', () => {
 
   describe('families/[id]/members', () => {
     it('lists members for members without payment plan fields', async () => {
-      mockAuth.mockResolvedValueOnce({
-        user: {
-          id: ctx.fixtures.memberUserId,
-          email: 'member@example.com',
-          name: 'API Route Member',
-          memberships: [{ o: ctx.orgId, r: 'member' }],
-        },
-      } as never)
+      bindMemberSession(ctx)
 
       const { GET } = await import('@/lib/route-logic/families/[id]/members')
       const res = await invokeRouteLogic(

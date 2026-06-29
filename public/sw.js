@@ -11,9 +11,10 @@
  *     `/api/statements` GETs — these are read-heavy and OK to serve a
  *     few-minute-old copy while we re-fetch in the background
  *   - Cache-first with revalidation for static `/_next/static/*` assets
- *   - Never touch POST/PATCH/DELETE — pass them straight through. Mutation
- *     queueing would need Background Sync + a richer offline contract,
- *     and silently re-firing a payment on reconnect is too dangerous
+ *   - Never touch POST/PATCH/DELETE — pass them straight through. Offline
+ *     mutation queueing is handled in-app (IndexedDB + reconnect sync in
+ *     lib/client/offline-write-queue) for a small set of safe updates;
+ *     the SW does not replay writes.
  *
  * Versioning: bump `CACHE_VERSION` on any worker logic change so old
  * caches are flushed on the next activate.

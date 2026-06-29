@@ -38,6 +38,7 @@ export default function MemberFinancialPanel({
   const [payments, setPayments] = useState<MemberPayment[]>(initialPayments ?? [])
   const [cardPaymentsEnabled, setCardPaymentsEnabled] = useState(false)
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  const [payBalanceMode, setPayBalanceMode] = useState(false)
   const [loading, setLoading] = useState(memberFinancialAccess && initialBalance == null)
   const [denied, setDenied] = useState(!memberFinancialAccess)
 
@@ -104,10 +105,28 @@ export default function MemberFinancialPanel({
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
+          {(balance ?? 0) > 0 && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                setPayBalanceMode(true)
+                setPaymentModalOpen(true)
+              }}
+              className="inline-flex items-center gap-1.5"
+            >
+              <CurrencyDollarIcon className="h-4 w-4" aria-hidden="true" />
+              {t('memberPortal.payBalance')}
+            </Button>
+          )}
           <Button
             type="button"
             size="sm"
-            onClick={() => setPaymentModalOpen(true)}
+            variant="secondary"
+            onClick={() => {
+              setPayBalanceMode(false)
+              setPaymentModalOpen(true)
+            }}
             className="inline-flex items-center gap-1.5"
           >
             <PlusIcon className="h-4 w-4" aria-hidden="true" />
@@ -125,9 +144,13 @@ export default function MemberFinancialPanel({
 
       <MemberMakePaymentModal
         open={paymentModalOpen}
-        onClose={() => setPaymentModalOpen(false)}
+        onClose={() => {
+          setPaymentModalOpen(false)
+          setPayBalanceMode(false)
+        }}
         familyId={familyId}
         cardPaymentsEnabled={cardPaymentsEnabled}
+        initialAmount={payBalanceMode ? (balance ?? 0) : undefined}
         onSuccess={() => void load()}
       />
 

@@ -4,6 +4,7 @@ import { handler } from '@/lib/api/handler'
 import { task as taskSchemas } from '@/lib/schemas'
 import { softDeleteOne } from '@/lib/recycle-bin'
 import { assertRelatedScoped } from '@/lib/route-logic/tasks'
+import { resolveTaskAssignee, TASK_ASSIGNEE_POPULATE } from '@/lib/tasks/assignee'
 import { PAYMENT_PUBLIC_SELECT, serializePaymentPublic } from '@/lib/payments/select'
 import { checkRateLimit } from '@/lib/rate-limit'
 
@@ -38,6 +39,7 @@ export const GET = handler({
       return { status: 400, data: { error: 'Invalid task id' } }
     }
     const task = await Task.findOne({ _id: id, organizationId: ctx!.organizationId })
+      .populate(TASK_ASSIGNEE_POPULATE)
       .populate({
         path: 'relatedFamilyId',
         select: 'name organizationId',
@@ -111,6 +113,25 @@ export const PUT = handler({
 
     const update: Record<string, unknown> = { ...body }
 
+    if (
+      body.assigneeMembershipId !== undefined ||
+      body.assigneeUserId !== undefined ||
+      body.email !== undefined
+    ) {
+      const assigneeResult = await resolveTaskAssignee(ctx!.organizationId, {
+        assigneeMembershipId: body.assigneeMembershipId ?? undefined,
+        assigneeUserId: body.assigneeUserId ?? undefined,
+        email: body.email ?? undefined,
+      })
+      if (!assigneeResult.ok) {
+        return { status: assigneeResult.status, data: { error: assigneeResult.error } }
+      }
+      const { assignee } = assigneeResult
+      update.email = assignee.email
+      update.assigneeUserId = assignee.assigneeUserId ?? null
+      update.assigneeMembershipId = assignee.assigneeMembershipId ?? null
+    }
+
     // Auto-stamp completedAt when transitioning to completed, unless the
     // caller explicitly set it (eg restoring an old record).
     if (body.status === 'completed' && body.completedAt === undefined) {
@@ -125,6 +146,7 @@ export const PUT = handler({
       update,
       { new: true, runValidators: true },
     )
+      .populate(TASK_ASSIGNEE_POPULATE)
       .populate({
         path: 'relatedFamilyId',
         select: 'name organizationId',

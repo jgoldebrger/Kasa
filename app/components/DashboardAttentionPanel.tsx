@@ -9,6 +9,8 @@ import {
   CurrencyDollarIcon,
   ChevronRightIcon,
   ArrowPathIcon,
+  BanknotesIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline'
 import { cachedFetch } from '@/lib/client-cache'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
@@ -16,6 +18,11 @@ import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { formatLocaleDate } from '@/lib/date-utils'
 import { useT } from '@/lib/client/i18n'
+import {
+  isAttentionItemHidden,
+  snoozeAttentionForDays,
+  type AttentionItemKey,
+} from '@/lib/client/attention-snooze'
 import { Skeleton } from './ui/Skeleton'
 import type { DashboardAttentionPayload } from '@/lib/route-logic/dashboard-actions'
 
@@ -23,11 +30,14 @@ export interface DashboardAttentionPanelProps {
   initialAttention?: DashboardAttentionPayload | null
 }
 
+const DELINQUENT_SNOOZE_KEY: AttentionItemKey = 'delinquentFamilies'
+
 const EMPTY_ATTENTION: DashboardAttentionPayload = {
   overdueTasks: { count: 0, items: [] },
   dueTodayTasks: { count: 0, items: [] },
   upcomingEvents: { count: 0, items: [] },
   recentPayments: [],
+  delinquentFamilies: { count: 0, items: [], aging: null },
   emailSummary: { failedLast7Days: 0, lastSentAt: null, pendingScheduled: 0 },
 }
 
@@ -42,8 +52,34 @@ export default function DashboardAttentionPanel({
   )
   const [loading, setLoading] = useState(!hasInitial)
   const [error, setError] = useState(false)
+  const [orgId, setOrgId] = useState<string | null>(null)
+  const [delinquentHidden, setDelinquentHidden] = useState(false)
+  const [snoozeMenuOpen, setSnoozeMenuOpen] = useState(false)
   const hasFetchedRef = useRef(hasInitial)
   const { begin, invalidate, isStale } = useRequestGeneration()
+
+  const refreshDelinquentHidden = useCallback((activeOrgId: string | null) => {
+    if (!activeOrgId) {
+      setDelinquentHidden(false)
+      return
+    }
+    setDelinquentHidden(isAttentionItemHidden(activeOrgId, DELINQUENT_SNOOZE_KEY))
+  }, [])
+
+  const fetchOrgId = useCallback(async () => {
+    try {
+      const data = await cachedFetch<{
+        activeOrgId?: string | null
+        organizations?: { id: string }[]
+      }>('/api/organizations', { ttl: 60_000 })
+      const id = data.activeOrgId ?? data.organizations?.[0]?.id ?? null
+      setOrgId(id)
+      refreshDelinquentHidden(id)
+    } catch {
+      setOrgId(null)
+      setDelinquentHidden(false)
+    }
+  }, [refreshDelinquentHidden])
 
   const fetchAttention = useCallback(async () => {
     const gen = begin()
@@ -63,6 +99,10 @@ export default function DashboardAttentionPanel({
   }, [begin, isStale])
 
   useEffect(() => {
+    void fetchOrgId()
+  }, [fetchOrgId])
+
+  useEffect(() => {
     if (hasFetchedRef.current) return
     hasFetchedRef.current = true
     fetchAttention()
@@ -73,9 +113,17 @@ export default function DashboardAttentionPanel({
       invalidate()
       hasFetchedRef.current = false
       setLoading(true)
+      void fetchOrgId()
       fetchAttention()
-    }, [fetchAttention, invalidate]),
+    }, [fetchAttention, fetchOrgId, invalidate]),
   )
+
+  const handleSnoozeDelinquent = (days: number) => {
+    if (!orgId) return
+    snoozeAttentionForDays(orgId, DELINQUENT_SNOOZE_KEY, days)
+    setDelinquentHidden(true)
+    setSnoozeMenuOpen(false)
+  }
 
   if (loading) {
     return (
@@ -84,7 +132,7 @@ export default function DashboardAttentionPanel({
           {t('dashboard.attention.title')}
         </h2>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, i) => (
+          {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="surface-card p-5">
               <Skeleton h={16} w="45%" />
               <div className="mt-4 space-y-3">
@@ -122,12 +170,76 @@ export default function DashboardAttentionPanel({
     )
   }
 
+  const aging = attention.delinquentFamilies.aging
+  const agingSummary =
+    aging &&
+    [
+      aging.days30 > 0
+        ? t('dashboard.attention.agingSummary30').replace('{count}', String(aging.days30))
+        : null,
+      aging.days60 > 0
+        ? t('dashboard.attention.agingSummary60').replace('{count}', String(aging.days60))
+        : null,
+      aging.days90 > 0
+        ? t('dashboard.attention.agingSummary90').replace('{count}', String(aging.days90))
+        : null,
+    ]
+      .filter(Boolean)
+      .join(' · ')
+
   return (
     <section className="mb-8" aria-labelledby="dashboard-attention-title">
       <h2 id="dashboard-attention-title" className="text-base font-semibold text-fg mb-4">
         {t('dashboard.attention.title')}
       </h2>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {!delinquentHidden && (
+          <AttentionCard
+            title={t('dashboard.attention.delinquentFamilies')}
+            count={attention.delinquentFamilies.count}
+            href="/collections"
+            icon={BanknotesIcon}
+            iconClassName="text-danger"
+            emptyLabel={t('dashboard.attention.noDelinquentFamilies')}
+            footer={agingSummary || undefined}
+            headerAction={
+              attention.delinquentFamilies.count > 0 ? (
+                <AttentionSnoozeMenu
+                  open={snoozeMenuOpen}
+                  onOpenChange={setSnoozeMenuOpen}
+                  onSnooze={handleSnoozeDelinquent}
+                />
+              ) : undefined
+            }
+          >
+            {attention.delinquentFamilies.items.map((family) => (
+              <AttentionRow
+                key={family.familyId}
+                href={`/families/${family.familyId}`}
+                primary={family.familyName}
+                secondary={
+                  family.lastPaymentDate
+                    ? t('dashboard.attention.lastPayment').replace(
+                        '{date}',
+                        formatLocaleDate(family.lastPaymentDate),
+                      )
+                    : t('dashboard.attention.noLastPayment')
+                }
+                trailing={formatMoney(-family.amountOwed)}
+                badge={
+                  family.daysOverdue != null && family.daysOverdue >= 30
+                    ? t('dashboard.attention.daysOverdueBadge').replace(
+                        '{days}',
+                        String(family.daysOverdue),
+                      )
+                    : undefined
+                }
+                badgeClassName="text-danger bg-danger/10"
+              />
+            ))}
+          </AttentionCard>
+        )}
+
         <AttentionCard
           title={t('dashboard.attention.overdueTasks')}
           count={attention.overdueTasks.count}
@@ -203,6 +315,59 @@ export default function DashboardAttentionPanel({
   )
 }
 
+function AttentionSnoozeMenu({
+  open,
+  onOpenChange,
+  onSnooze,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSnooze: (days: number) => void
+}) {
+  const t = useT()
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => onOpenChange(!open)}
+        className="focus-ring p-1 rounded-md text-fg-muted hover:text-fg hover:bg-fg/5"
+        aria-label={t('dashboard.attention.snoozeMenuAria')}
+        aria-expanded={open}
+        aria-haspopup="menu"
+      >
+        <XMarkIcon className="h-4 w-4" aria-hidden="true" />
+      </button>
+      {open && (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-10 cursor-default"
+            aria-label={t('common.close')}
+            onClick={() => onOpenChange(false)}
+          />
+          <div
+            role="menu"
+            className="absolute end-0 top-full z-20 mt-1 min-w-[10rem] rounded-md border border-border bg-surface shadow-lg py-1 text-sm"
+          >
+            {[7, 30, 90].map((days) => (
+              <button
+                key={days}
+                type="button"
+                role="menuitem"
+                className="focus-ring w-full px-3 py-2 text-start text-fg hover:bg-fg/5"
+                onClick={() => onSnooze(days)}
+              >
+                {t('dashboard.attention.snoozeDays').replace('{days}', String(days))}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function AttentionCard({
   title,
   count,
@@ -211,6 +376,8 @@ function AttentionCard({
   iconClassName = 'text-fg-muted',
   emptyLabel,
   hideMore = false,
+  footer,
+  headerAction,
   children,
 }: {
   title: string
@@ -220,6 +387,8 @@ function AttentionCard({
   iconClassName?: string
   emptyLabel: string
   hideMore?: boolean
+  footer?: string
+  headerAction?: React.ReactNode
   children: React.ReactNode
 }) {
   const t = useT()
@@ -240,19 +409,23 @@ function AttentionCard({
             </span>
           )}
         </div>
-        <Link
-          href={href}
-          className="focus-ring shrink-0 inline-flex items-center gap-0.5 text-xs font-medium text-accent hover:text-accent-hover"
-        >
-          {t('dashboard.viewAll')}
-          <ChevronRightIcon className="h-3.5 w-3.5 rtl:rotate-180" aria-hidden="true" />
-        </Link>
+        <div className="flex items-center gap-1 shrink-0">
+          {headerAction}
+          <Link
+            href={href}
+            className="focus-ring inline-flex items-center gap-0.5 text-xs font-medium text-accent hover:text-accent-hover"
+          >
+            {t('dashboard.viewAll')}
+            <ChevronRightIcon className="h-3.5 w-3.5 rtl:rotate-180" aria-hidden="true" />
+          </Link>
+        </div>
       </div>
       {childCount === 0 ? (
         <p className="text-sm text-fg-muted py-2">{emptyLabel}</p>
       ) : (
         <ul className="divide-y divide-border -mx-1">{children}</ul>
       )}
+      {footer && <p className="mt-3 text-xs text-fg-muted">{footer}</p>}
       {showMore && (
         <p className="mt-3 text-xs text-fg-muted">
           {t('dashboard.attention.moreCount').replace('{count}', String(count - childCount))}
@@ -268,17 +441,19 @@ function AttentionRow({
   trailing,
   badge,
   badgeClassName,
+  href,
 }: {
   primary: string
   secondary?: string
   trailing?: string
   badge?: string
   badgeClassName?: string
+  href?: string
 }) {
-  return (
-    <li className="px-1 py-2.5 flex items-start gap-2 text-sm">
+  const inner = (
+    <>
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-fg truncate">{primary}</p>
+        <p className={`font-medium truncate ${href ? 'text-accent' : 'text-fg'}`}>{primary}</p>
         {secondary && <p className="text-xs text-fg-muted truncate mt-0.5">{secondary}</p>}
       </div>
       {badge && (
@@ -290,6 +465,18 @@ function AttentionRow({
       )}
       {trailing && (
         <span className="shrink-0 text-fg-muted tabular text-xs font-medium">{trailing}</span>
+      )}
+    </>
+  )
+
+  return (
+    <li className="px-1 py-2.5 flex items-start gap-2 text-sm">
+      {href ? (
+        <Link href={href} className="focus-ring flex flex-1 items-start gap-2 rounded min-w-0">
+          {inner}
+        </Link>
+      ) : (
+        inner
       )}
     </li>
   )

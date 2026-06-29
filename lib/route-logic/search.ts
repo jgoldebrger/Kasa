@@ -28,6 +28,7 @@ import { sanitizePaymentNotes } from '@/lib/payments/sanitize'
 import { loadByIdsInChunks } from '@/lib/org-pagination'
 import { Family, FamilyMember, Payment, Task, LifecycleEventPayment } from '@/lib/models'
 import { formatLifecycleEventPayments } from '@/lib/route-logic/events'
+import { listAssignedFamiliesForUser } from '@/lib/member-family-access.server'
 
 // Cap each category independently so a broad substring match cannot scan
 // unbounded rows; PER_GROUP is the per-category ceiling (families, members, payments).
@@ -69,9 +70,22 @@ export const GET = handler({
     const rx = new RegExp(escapeRegex(query!.q), 'i')
     const includePayments = hasMinRole(ctx!.role, 'admin')
 
+    let assignedFamilyIds: Types.ObjectId[] | null = null
+    if (!includePayments) {
+      const assigned = await listAssignedFamiliesForUser(ctx!.organizationId, ctx!.userId)
+      assignedFamilyIds = assigned.familyIds
+      if (assignedFamilyIds.length === 0) {
+        return { data: { items: [] } }
+      }
+    }
+
+    const familyScope =
+      assignedFamilyIds && assignedFamilyIds.length > 0 ? { _id: { $in: assignedFamilyIds } } : {}
+
     const [families, members, payments, tasks, events] = await Promise.all([
       Family.find({
         organizationId: orgId,
+        ...familyScope,
         $or: [{ name: rx }, { hebrewName: rx }, { email: rx }],
       })
         .select('_id name hebrewName email')
@@ -79,6 +93,9 @@ export const GET = handler({
         .lean<any[]>(),
       FamilyMember.find({
         organizationId: orgId,
+        ...(assignedFamilyIds && assignedFamilyIds.length > 0
+          ? { familyId: { $in: assignedFamilyIds } }
+          : {}),
         $or: [
           { firstName: rx },
           { lastName: rx },

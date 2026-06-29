@@ -22,8 +22,12 @@ import { checkRateLimit } from '@/lib/rate-limit'
 import { loadAllByIdCursor } from '@/lib/org-pagination'
 import { collectCompoundCursorPages } from '@/lib/pagination'
 import { fetchFamilySummary } from '@/lib/family-detail-summary'
-import { checkMemberFamilyFinancialAccess } from '@/lib/member-family-access.server'
+import {
+  checkMemberFamilyFinancialAccess,
+  requireMemberFamilyViewAccess,
+} from '@/lib/member-family-access.server'
 import { emailFormatInvalidFlag } from '@/lib/mail/validate-email'
+import { findSimilarFamilies, type ExistingFamilyRecord } from '@/lib/family-duplicate-match'
 
 const SUMMARY_CACHE_HEADERS = {
   'Cache-Control': 'private, max-age=15, stale-while-revalidate=60',
@@ -33,12 +37,7 @@ const getQuery = z.object({
   view: z.enum(['summary', 'full']).optional(),
 })
 
-const familyEmailFlagsPatchBody = z
-  .object({
-    emailDeliverabilityWarning: z.literal(false).optional(),
-    emailFormatInvalid: z.literal(false).optional(),
-  })
-  .refine((v) => Object.keys(v).length > 0, { message: 'At least one field is required' })
+const familyEmailFlagsPatchBody = familySchemas.familyPatchBody
 
 // GET /api/families/[id] — family + members for all org roles; ledger
 // detail (payments, balance, etc.) is admin-only.
@@ -66,9 +65,28 @@ export const GET = handler({
     }
 
     if (query.view === 'summary') {
+      const viewAccess = await requireMemberFamilyViewAccess(
+        ctx!.organizationId,
+        id,
+        ctx!.userId,
+        ctx!.role,
+      )
+      if (!viewAccess.ok) {
+        return { status: viewAccess.status, data: { error: viewAccess.error } }
+      }
       const summary = await fetchFamilySummary(ctx!.organizationId, id, ctx!.role, ctx!.userId)
       if (!summary) return { status: 404, data: { error: 'Family not found' } }
       return { data: summary, headers: SUMMARY_CACHE_HEADERS }
+    }
+
+    const viewAccess = await requireMemberFamilyViewAccess(
+      ctx!.organizationId,
+      id,
+      ctx!.userId,
+      ctx!.role,
+    )
+    if (!viewAccess.ok) {
+      return { status: viewAccess.status, data: { error: viewAccess.error } }
     }
 
     const fam = await Family.findOne({ _id: id, organizationId: ctx!.organizationId })
@@ -260,6 +278,10 @@ export const PUT = handler({
       update.emailFormatInvalid = emailFormatInvalidFlag(body.email)
     }
 
+    if ('tags' in body && body.tags !== undefined) {
+      update.tags = familySchemas.normalizeFamilyTags(body.tags)
+    }
+
     // Validate paymentPlanId belongs to this org and keep legacy currentPlan in sync.
     if ('paymentPlanId' in body) {
       if (body.paymentPlanId) {
@@ -291,6 +313,30 @@ export const PUT = handler({
       }
     }
 
+    let similarFamilies: ReturnType<typeof findSimilarFamilies> | undefined
+    if ('name' in body || 'email' in body) {
+      const current = await Family.findOne({ _id: id, organizationId: ctx!.organizationId })
+        .select('name email')
+        .lean<{ name?: string; email?: string }>()
+      const candidateName = 'name' in body ? body.name : current?.name
+      const candidateEmail = 'email' in body ? body.email : current?.email
+      const existingForMatch: ExistingFamilyRecord[] = (
+        await Family.find({ organizationId: ctx!.organizationId, _id: { $ne: id } })
+          .select('name email')
+          .lean<Array<{ _id: unknown; name?: string; email?: string }>>()
+      ).map((f) => ({
+        familyId: String(f._id),
+        name: f.name || '',
+        email: f.email || undefined,
+      }))
+      const matches = findSimilarFamilies(
+        { name: candidateName, email: candidateEmail },
+        existingForMatch,
+        { excludeFamilyId: id },
+      )
+      if (matches.length > 0) similarFamilies = matches
+    }
+
     const fam = await Family.findOneAndUpdate(
       { _id: id, organizationId: ctx!.organizationId },
       { $set: update },
@@ -308,11 +354,16 @@ export const PUT = handler({
       request,
     })
 
-    return { data: fam }
+    return {
+      data: {
+        ...fam.toObject(),
+        similarFamilies,
+      },
+    }
   },
 })
 
-// PATCH /api/families/[id] — clear email deliverability / format flags (admin-only).
+// PATCH /api/families/[id] — clear email flags or update tags (admin-only).
 export const PATCH = handler({
   auth: 'org',
   minRole: 'admin',
@@ -342,6 +393,9 @@ export const PATCH = handler({
     }
     if (body.emailFormatInvalid === false) {
       update.emailFormatInvalid = false
+    }
+    if (body.tags !== undefined) {
+      update.tags = familySchemas.normalizeFamilyTags(body.tags)
     }
 
     const fam = await Family.findOneAndUpdate(

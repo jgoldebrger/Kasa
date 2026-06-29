@@ -9,45 +9,24 @@
  *   { action: 'setPaymentPlan',  ids: ObjectId[], paymentPlanId: ObjectId | null }
  *   { action: 'setEmailOptOut',  ids: ObjectId[], emailOptOut: boolean }
  *   { action: 'setCommunicationsOptOut', ids: ObjectId[], communicationsOptOut: boolean }
+ *   { action: 'setTags',           ids: ObjectId[], mode: 'add'|'remove'|'replace', tags: string[] }
  *
  * Auth: any org member with `admin+` role (delete is destructive and
  * setting plan/email-opt-out can quietly change billing behavior).
  */
 
-import { z } from 'zod'
 import { Types } from 'mongoose'
 import { handler } from '@/lib/api/handler'
 import { Family, PaymentPlan } from '@/lib/models'
 import { audit } from '@/lib/audit'
-import { objectId } from '@/lib/schemas/common'
 import { softDeleteFamilyCascade } from '@/lib/recycle-bin'
 import { checkRateLimit } from '@/lib/rate-limit'
-
-const idsField = z.array(objectId).min(1, 'Select at least one family').max(500)
-
-const body = z.union([
-  z.object({ action: z.literal('delete'), ids: idsField }),
-  z.object({
-    action: z.literal('setPaymentPlan'),
-    ids: idsField,
-    paymentPlanId: objectId.nullable(),
-  }),
-  z.object({
-    action: z.literal('setEmailOptOut'),
-    ids: idsField,
-    emailOptOut: z.boolean(),
-  }),
-  z.object({
-    action: z.literal('setCommunicationsOptOut'),
-    ids: idsField,
-    communicationsOptOut: z.boolean(),
-  }),
-])
+import { familiesBulkBody, normalizeFamilyTags } from '@/lib/schemas/family'
 
 export const POST = handler({
   auth: 'org',
   minRole: 'admin',
-  body,
+  body: familiesBulkBody,
   name: 'POST /api/families/bulk',
   fn: async ({ ctx, body, session, request }) => {
     const rateVerdict = await checkRateLimit(
@@ -140,7 +119,6 @@ export const POST = handler({
       return { data: { ok: true, modified: result.modifiedCount || 0 } }
     }
 
-    // action === 'setEmailOptOut'
     if (body.action === 'setEmailOptOut') {
       const result = await Family.updateMany(baseFilter, {
         $set: { emailOptOut: body.emailOptOut },
@@ -153,6 +131,34 @@ export const POST = handler({
         metadata: {
           ids: body.ids,
           emailOptOut: body.emailOptOut,
+          count: result.modifiedCount || 0,
+        },
+        request,
+      })
+      return { data: { ok: true, modified: result.modifiedCount || 0 } }
+    }
+
+    if (body.action === 'setTags') {
+      const normalized = normalizeFamilyTags(body.tags)
+      let result: { modifiedCount?: number }
+      if (body.mode === 'replace') {
+        result = await Family.updateMany(baseFilter, { $set: { tags: normalized } })
+      } else if (body.mode === 'remove') {
+        result = await Family.updateMany(baseFilter, { $pullAll: { tags: normalized } })
+      } else {
+        result = await Family.updateMany(baseFilter, {
+          $addToSet: { tags: { $each: normalized } },
+        })
+      }
+      await audit({
+        organizationId: ctx!.organizationId,
+        userId: session!.user.id,
+        action: 'family.bulk_set_tags',
+        resourceType: 'Family',
+        metadata: {
+          ids: body.ids,
+          mode: body.mode,
+          tags: normalized,
           count: result.modifiedCount || 0,
         },
         request,

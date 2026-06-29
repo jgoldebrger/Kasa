@@ -11,6 +11,12 @@ import { formatLifecycleEventPayments } from '@/lib/route-logic/events'
 import { getEmailDashboardSummary } from '@/lib/route-logic/emails/dashboard-summary'
 import { PAYMENT_PUBLIC_SELECT, serializePaymentsPublic } from '@/lib/payments/select'
 import { loadByIdsInChunks } from '@/lib/org-pagination'
+import {
+  DELINQUENT_PREVIEW_LIMIT,
+  loadDelinquencySummary,
+  type DelinquencyAgingBuckets,
+  type DelinquentFamilyRow,
+} from '@/lib/route-logic/collections'
 
 export const OPEN_TASK_STATUSES = ['pending', 'in_progress'] as const
 
@@ -48,11 +54,20 @@ export interface DashboardAttentionSection<T> {
   items: T[]
 }
 
+export type DashboardAttentionDelinquentItem = DelinquentFamilyRow
+
+export interface DashboardAttentionDelinquentSection {
+  count: number
+  items: DashboardAttentionDelinquentItem[]
+  aging: DelinquencyAgingBuckets | null
+}
+
 export interface DashboardAttentionPayload {
   overdueTasks: DashboardAttentionSection<DashboardAttentionTaskItem>
   dueTodayTasks: DashboardAttentionSection<DashboardAttentionTaskItem>
   upcomingEvents: DashboardAttentionSection<DashboardAttentionEventItem>
   recentPayments: DashboardAttentionPaymentItem[]
+  delinquentFamilies: DashboardAttentionDelinquentSection
   /** Populated by GET /api/dashboard-actions; optional for SSR defaults. */
   emailSummary?: {
     failedLast7Days: number
@@ -146,6 +161,7 @@ export async function loadDashboardAttention(
     upcomingRows,
     recentPaymentRows,
     emailSummary,
+    delinquencySummary,
   ] = await Promise.all([
     Task.countDocuments(overdueFilter),
     Task.find(overdueFilter)
@@ -170,6 +186,7 @@ export async function loadDashboardAttention(
       .limit(5)
       .lean<any[]>(),
     getEmailDashboardSummary(organizationId),
+    loadDelinquencySummary(organizationId, { previewLimit: DELINQUENT_PREVIEW_LIMIT }),
   ])
 
   const formattedEvents = await formatLifecycleEventPayments(organizationId, upcomingRows)
@@ -202,6 +219,11 @@ export async function loadDashboardAttention(
     dueTodayTasks: buildAttentionSection(dueTodayCount, dueTodayRows.map(mapTaskAttentionItem), 3),
     upcomingEvents: buildAttentionSection(upcomingCount, formattedEvents, 5),
     recentPayments,
+    delinquentFamilies: {
+      count: delinquencySummary.count,
+      items: delinquencySummary.items,
+      aging: delinquencySummary.aging,
+    },
     emailSummary,
   }
 }

@@ -99,6 +99,13 @@ export const STATIC_SEARCH_PAGES: StaticSearchPage[] = [
     keywords: ['payment'],
     adminOnly: true,
   },
+  {
+    id: 'page-payments-recurring',
+    href: '/payments/recurring',
+    labelKey: 'payments.nav.recurring',
+    keywords: ['recurring', 'subscription', 'auto-pay', 'monthly'],
+    adminOnly: true,
+  },
   { id: 'page-tasks', href: '/tasks', labelKey: 'nav.tasks', keywords: ['task'], adminOnly: true },
   {
     id: 'page-calculations',

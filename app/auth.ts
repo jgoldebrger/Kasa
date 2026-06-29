@@ -1,6 +1,7 @@
 import NextAuth from 'next-auth'
 import type { JWT } from 'next-auth/jwt'
 import Credentials from 'next-auth/providers/credentials'
+import { createOidcProvider } from '@/lib/oidc-auth-provider'
 import bcrypt from 'bcryptjs'
 import connectDB from '@/lib/database'
 import { User, OrgMembership } from '@/lib/models'
@@ -8,7 +9,11 @@ import authConfig from './auth.config'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
 import { verifyTwoFactorCode } from '@/lib/two-factor-verify'
+import { getOidcConfig } from '@/lib/oidc-config'
+import { provisionOidcUser } from '@/lib/oidc-provisioning'
 import type { Role } from '@/types/auth'
+
+const oidcConfig = getOidcConfig()
 
 // Re-check the user's passwordChangedAt + memberships at most once per this
 // many seconds per token. Keeps a sane upper bound on DB load while still
@@ -73,7 +78,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             .lean<{
               _id: any
               email: string
-              hashedPassword: string
+              hashedPassword?: string
               name: string
               twoFactorEnabled?: boolean
               twoFactorSecret?: string
@@ -87,6 +92,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               action: 'auth.login.failed',
               resourceType: 'User',
               metadata: { attemptedEmail: email, reason: 'unknown_user' },
+              request: request as Request,
+            }).catch(() => {})
+            return null
+          }
+
+          if (!user.hashedPassword) {
+            audit({
+              userId: user._id.toString(),
+              action: 'auth.login.failed',
+              resourceType: 'User',
+              resourceId: user._id,
+              metadata: { attemptedEmail: email, reason: 'sso_only' },
               request: request as Request,
             }).catch(() => {})
             return null
@@ -153,9 +170,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
       },
     }),
+    ...(oidcConfig ? [createOidcProvider(oidcConfig)] : []),
   ],
   callbacks: {
     ...authConfig.callbacks,
+    async signIn({ user, account }) {
+      if (account?.provider !== 'oidc') return true
+
+      const email = user.email?.trim()
+      if (!email) return false
+
+      const result = await provisionOidcUser({
+        email,
+        name: user.name,
+        image: user.image,
+      })
+      if (!result.ok) return false
+
+      user.id = result.userId
+      return true
+    },
     // Server-side JWT check: invalidate any token whose `iat` is older than
     // the user's current `passwordChangedAt`. The edge auth.config callback
     // can't hit Mongo, so the gate effectively lives here — every API call

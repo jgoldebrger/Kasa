@@ -91,6 +91,17 @@ const OrganizationSchema = new Schema(
     // When false, the org owner is not emailed when a platform admin enters
     // support mode (still subject to PLATFORM_NOTIFY_OWNER_ON_SUPPORT).
     notifyOwnerOnSupportAccess: { type: Boolean, default: true },
+    // Owner-configured audit log retention window (days). Null uses the
+    // platform default (AUDIT_LOG_RETENTION_DAYS). Capped at the Mongo TTL
+    // ceiling; audit-log reads filter rows older than the effective value.
+    auditLogRetentionDays: { type: Number, default: null, min: 90, max: 400 },
+    // Optional per-org overrides for hourly bulk-operation rate limits.
+    // Null fields inherit ORG_RATE_LIMIT_* env defaults.
+    rateLimits: {
+      importPerHour: { type: Number, default: null },
+      sendBulkPerHour: { type: Number, default: null },
+      exportPerHour: { type: Number, default: null },
+    },
     // Org letterhead: the address/contact/signature block stamped onto
     // outbound documents (currently tax receipts; statements still use
     // the hardcoded "Kasa Family Management" header until a follow-up
@@ -123,6 +134,8 @@ const OrganizationSchema = new Schema(
     subscriptionStatus: { type: String, default: null },
     trialEndsAt: { type: Date, default: null },
     currentPeriodEnd: { type: Date, default: null },
+    // Platform-seeded sales demo org (see lib/demo-org-seed.ts).
+    demoSandbox: { type: Boolean, default: false, index: true, sparse: true },
     letterhead: {
       addressLine1: { type: String, default: '' },
       addressLine2: { type: String, default: '' },

@@ -1,30 +1,42 @@
 import mongoose, { Schema } from 'mongoose'
 import { softDeletePlugin } from './soft-delete-plugin'
 
-const TaskSchema = new Schema({
-  organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
-  title: { type: String, required: true },
-  description: String,
-  dueDate: { type: Date, required: true },
-  email: { type: String, required: true }, // Email to notify on due date
-  status: { 
-    type: String, 
-    enum: ['pending', 'in_progress', 'completed', 'cancelled'], 
-    default: 'pending' 
+const TaskSchema = new Schema(
+  {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: true,
+      index: true,
+    },
+    title: { type: String, required: true },
+    description: String,
+    dueDate: { type: Date, required: true },
+    /** Legacy notification address; kept for backward compat. New tasks derive email from assignee. */
+    email: { type: String },
+    assigneeUserId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+    assigneeMembershipId: { type: Schema.Types.ObjectId, ref: 'OrgMembership' },
+    status: {
+      type: String,
+      enum: ['pending', 'in_progress', 'completed', 'cancelled'],
+      default: 'pending',
+    },
+    priority: {
+      type: String,
+      enum: ['low', 'medium', 'high', 'urgent'],
+      default: 'medium',
+    },
+    relatedFamilyId: { type: Schema.Types.ObjectId, ref: 'Family' },
+    relatedMemberId: { type: Schema.Types.ObjectId, ref: 'FamilyMember' },
+    relatedPaymentId: { type: Schema.Types.ObjectId, ref: 'Payment' },
+    emailSent: { type: Boolean, default: false }, // Track if email was sent
+    completedAt: Date,
+    notes: String,
   },
-  priority: { 
-    type: String, 
-    enum: ['low', 'medium', 'high', 'urgent'], 
-    default: 'medium' 
-  },
-  relatedFamilyId: { type: Schema.Types.ObjectId, ref: 'Family' },
-  relatedMemberId: { type: Schema.Types.ObjectId, ref: 'FamilyMember' },
-  relatedPaymentId: { type: Schema.Types.ObjectId, ref: 'Payment' },
-  emailSent: { type: Boolean, default: false }, // Track if email was sent
-  completedAt: Date,
-  notes: String,
-}, { timestamps: true })
+  { timestamps: true },
+)
 TaskSchema.index({ organizationId: 1, dueDate: 1 })
+TaskSchema.index({ organizationId: 1, assigneeUserId: 1, dueDate: 1 })
 // Due-date email cron filters by `organizationId + dueDate + emailSent
 // + status`; the existing index handles the first two but
 // `emailSent`/`status` were post-filtered in memory. Add a compound

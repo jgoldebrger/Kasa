@@ -28,11 +28,15 @@ import connectDB from '@/lib/database'
 import {
   requireSession,
   requireOrg,
+  requireOrgAccess,
   hasMinRole,
   type AuthedSession,
   type OrgContext,
   type Role,
+  type OrgPermission,
 } from '@/lib/auth-helpers'
+import { requireOrgApiKey, type OrgApiKeyContext } from '@/lib/org-api-key-auth'
+import { parseBearerOrgApiKey } from '@/lib/org-api-key-token'
 import { enforcePlatformAccountAccess, isSubscriptionExemptApi } from '@/lib/billing/account-access'
 import { assertPlatformAdminTwoFactor, isPlatformAdminEmail } from '@/lib/platform-admin'
 import { assertRecentPlatformAdminTotp } from '@/lib/platform-admin-totp'
@@ -43,17 +47,26 @@ import { verifyApiCsrf } from '@/lib/csrf'
 import { blockReadOnlySupportMutation } from '@/lib/support-mode-readonly-guard'
 import { blockScopedSupportAccess } from '@/lib/support-mode-scope'
 
-export type AuthMode = 'public' | 'session' | 'org' | 'admin' | 'cron' | 'org-or-cron'
+export type AuthMode =
+  | 'public'
+  | 'session'
+  | 'org'
+  | 'org-or-api-key'
+  | 'admin'
+  | 'cron'
+  | 'org-or-cron'
 
 export interface HandlerCtx<TBody, TQuery> {
   request: NextRequest
   params: Record<string, string | string[]>
   body: TBody
   query: TQuery
-  /** Present when auth = 'session' | 'org' | 'admin' | 'org-or-cron'. */
+  /** Present when auth = 'session' | 'org' | 'admin' | 'org-or-cron' | 'org-or-api-key' (session path). */
   session?: AuthedSession
-  /** Present when auth = 'org' | 'admin' | 'org-or-cron'. */
+  /** Present when auth = 'org' | 'admin' | 'org-or-cron' | 'org-or-api-key' (session path). */
   ctx?: OrgContext
+  /** Present when auth = 'org-or-api-key' (Bearer API key path). */
+  apiKey?: OrgApiKeyContext
 }
 
 export type HandlerReturn =
@@ -65,8 +78,10 @@ export type HandlerReturn =
 
 export interface HandlerOptions<TBody, TQuery> {
   auth: AuthMode
-  /** For 'org' / 'admin' / 'org-or-cron': min role required. */
+  /** For 'org' / 'admin' / 'org-or-cron' / 'org-or-api-key': min role required (session only). */
   minRole?: Role
+  /** Fine-grained permission for preset roles and API key scopes. */
+  permission?: OrgPermission
   body?: ZodSchema<TBody>
   query?: ZodSchema<TQuery>
   /**
@@ -123,6 +138,7 @@ export function handler<TBody = unknown, TQuery = unknown>(opts: HandlerOptions<
       // --- auth ------------------------------------------------------------
       let session: AuthedSession | undefined
       let ctx: OrgContext | undefined
+      let apiKey: OrgApiKeyContext | undefined
 
       switch (opts.auth) {
         case 'public':
@@ -146,10 +162,36 @@ export function handler<TBody = unknown, TQuery = unknown>(opts: HandlerOptions<
           if (isCronRequest(request)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
           }
-          const r = await requireOrg(request, { minRole: opts.minRole })
+          const r = opts.permission
+            ? await requireOrgAccess(request, {
+                minRole: opts.minRole,
+                permission: opts.permission,
+              })
+            : await requireOrg(request, { minRole: opts.minRole })
           if (r instanceof NextResponse) return r
           ctx = r
           session = r.session
+          break
+        }
+        case 'org-or-api-key': {
+          if (isCronRequest(request)) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+          }
+          if (parseBearerOrgApiKey(request.headers.get('authorization'))) {
+            const r = await requireOrgApiKey(request, { permission: opts.permission })
+            if (r instanceof NextResponse) return r
+            apiKey = r
+          } else {
+            const r = opts.permission
+              ? await requireOrgAccess(request, {
+                  minRole: opts.minRole,
+                  permission: opts.permission,
+                })
+              : await requireOrg(request, { minRole: opts.minRole })
+            if (r instanceof NextResponse) return r
+            ctx = r
+            session = r.session
+          }
           break
         }
         case 'org-or-cron': {
@@ -197,7 +239,9 @@ export function handler<TBody = unknown, TQuery = unknown>(opts: HandlerOptions<
       if (!opts.noDb) await connectDB()
 
       const isOrgUserSession =
-        opts.auth === 'org' || (opts.auth === 'org-or-cron' && ctx && !ctx.isCron)
+        opts.auth === 'org' ||
+        opts.auth === 'org-or-api-key' ||
+        (opts.auth === 'org-or-cron' && ctx && !ctx.isCron)
       if (isOrgUserSession && ctx) {
         const scopeBlock = blockScopedSupportAccess(request, ctx)
         if (scopeBlock) return scopeBlock
@@ -208,10 +252,12 @@ export function handler<TBody = unknown, TQuery = unknown>(opts: HandlerOptions<
 
       // Block org API calls when billing is enforced and the workspace has no
       // active platform subscription (owners subscribe via /pricing or Settings).
-      if (opts.auth === 'org' && ctx) {
+      if ((opts.auth === 'org' || opts.auth === 'org-or-api-key') && (ctx || apiKey)) {
         const apiPath = new URL(request.url).pathname
-        if (!isSubscriptionExemptApi(apiPath) && !ctx.isPlatformImpersonation) {
-          const gate = await enforcePlatformAccountAccess(ctx.organizationId)
+        const organizationId = ctx?.organizationId ?? apiKey!.organizationId
+        const isImpersonation = ctx?.isPlatformImpersonation
+        if (!isSubscriptionExemptApi(apiPath) && !isImpersonation) {
+          const gate = await enforcePlatformAccountAccess(organizationId)
           if (!gate.ok) {
             return NextResponse.json({ error: gate.error }, { status: gate.status })
           }
@@ -250,6 +296,7 @@ export function handler<TBody = unknown, TQuery = unknown>(opts: HandlerOptions<
         query,
         session,
         ctx,
+        apiKey,
       })
 
       return toResponse(result)

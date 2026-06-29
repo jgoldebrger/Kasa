@@ -26,6 +26,7 @@ import {
   ChartBarIcon,
   ChartBarSquareIcon,
   CalendarIcon,
+  CalendarDaysIcon,
   CogIcon,
   PresentationChartBarIcon,
   CurrencyDollarIcon,
@@ -33,6 +34,7 @@ import {
   EnvelopeOpenIcon,
   ArrowRightOnRectangleIcon,
   UserCircleIcon,
+  BanknotesIcon,
   ShieldCheckIcon,
   QuestionMarkCircleIcon,
 } from '@heroicons/react/24/outline'
@@ -73,7 +75,9 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
     { href: '/', label: t('nav.dashboard'), icon: ChartBarIcon },
     { href: '/families', label: t('nav.families'), icon: UserGroupIcon },
     { href: '/payments', label: t('nav.payments'), icon: CurrencyDollarIcon, adminOnly: true },
+    { href: '/collections', label: t('nav.collections'), icon: BanknotesIcon, adminOnly: true },
     { href: '/tasks', label: t('nav.tasks'), icon: ClipboardDocumentListIcon, adminOnly: true },
+    { href: '/calendar', label: t('nav.calendar'), icon: CalendarDaysIcon, adminOnly: true },
     { href: '/calculations', label: t('nav.calculations'), icon: CalculatorIcon, adminOnly: true },
     { href: '/events', label: t('nav.events'), icon: CalendarIcon, adminOnly: true },
     {

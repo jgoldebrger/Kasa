@@ -163,13 +163,20 @@ describe('auth schemas', () => {
   })
 
   describe('updateProfileBody', () => {
-    it('accepts an empty partial update', () => {
+    it('rejects an empty update', () => {
       const result = updateProfileBody.safeParse({})
-      expect(result.success).toBe(true)
+      expect(result.success).toBe(false)
     })
 
     it('accepts a name update', () => {
       const result = updateProfileBody.safeParse({ name: 'New Name' })
+      expect(result.success).toBe(true)
+    })
+
+    it('accepts notification preference updates', () => {
+      const result = updateProfileBody.safeParse({
+        notificationPreferences: { tasks: false },
+      })
       expect(result.success).toBe(true)
     })
 

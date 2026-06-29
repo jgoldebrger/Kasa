@@ -35,9 +35,20 @@ export const changePasswordBody = z.object({
   newPassword: password,
 })
 
-export const updateProfileBody = z.object({
-  name: trimmedName.max(120).optional(),
+export const notificationPreferencesBody = z.object({
+  tasks: z.boolean().optional(),
+  payments: z.boolean().optional(),
+  statements: z.boolean().optional(),
 })
+
+export const updateProfileBody = z
+  .object({
+    name: trimmedName.max(120).optional(),
+    notificationPreferences: notificationPreferencesBody.optional(),
+  })
+  .refine((v) => v.name !== undefined || v.notificationPreferences !== undefined, {
+    message: 'Nothing to update.',
+  })
 
 export const inviteUserBody = z.object({
   email,

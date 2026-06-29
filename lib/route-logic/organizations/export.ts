@@ -3,7 +3,7 @@
  */
 
 import { NextResponse } from 'next/server'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { checkOrgBulkRateLimit, orgBulkRateLimit429 } from '@/lib/org-bulk-rate-limit'
 import { handler } from '@/lib/api/handler'
 import { audit } from '@/lib/audit'
 import { buildOrgExportBundle } from '@/lib/org-export'
@@ -16,20 +16,23 @@ export const GET = handler({
   minRole: 'admin',
   name: 'GET /api/organizations/export',
   fn: async ({ ctx, request }) => {
-    const rateVerdict = await checkRateLimit(
+    const org = await Organization.findById(ctx!.organizationId)
+      .select('slug name rateLimits')
+      .lean<{
+        slug?: string
+        name?: string
+        rateLimits?: { exportPerHour?: number | null }
+      }>()
+    const rateVerdict = await checkOrgBulkRateLimit(
       request,
-      'org-export',
-      { limit: 5, windowMs: 60 * 60_000 },
       ctx!.organizationId,
+      'export',
+      org?.rateLimits,
     )
     if (!rateVerdict.allowed) {
-      return { status: 429, data: { error: 'Too many export requests. Try again later.' } }
+      return orgBulkRateLimit429(rateVerdict, 'Too many export requests. Try again later.')
     }
 
-    const org = await Organization.findById(ctx!.organizationId).select('slug name').lean<{
-      slug?: string
-      name?: string
-    }>()
     if (!org) {
       return { status: 404, data: { error: 'Organization not found' } }
     }

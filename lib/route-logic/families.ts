@@ -14,13 +14,18 @@ import { FAMILY_BALANCES_IDS_CAP, objectId, UNBOUNDED_LIST_CAP, positiveInt } fr
 import { family as familySchemas } from '@/lib/schemas'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { enforceFamilyCapGate } from '@/lib/billing/feature-gate'
+import { findSimilarFamilies, type ExistingFamilyRecord } from '@/lib/family-duplicate-match'
+import { listAssignedFamiliesForUser } from '@/lib/member-family-access.server'
 
 // GET - Get all families (optionally paginated via ?limit=&cursor=)
 // Rate limit exempt: org-scoped read — see lib/rate-limit.ts (ORG_SCOPED_READ_EXEMPT_SCOPES).
+// Also accepts org API keys with `families:read` scope (Bearer auth).
 export const GET = handler({
-  auth: 'org',
+  auth: 'org-or-api-key',
+  permission: 'families:read',
   name: 'GET /api/families',
-  fn: async ({ ctx, request }) => {
+  fn: async ({ ctx, apiKey, request }) => {
+    const organizationId = ctx?.organizationId ?? apiKey!.organizationId
     const { searchParams } = new URL(request.url)
 
     if (searchParams.get('view') === 'names') {
@@ -40,7 +45,7 @@ export const GET = handler({
       }
       const families = await Family.find({
         _id: { $in: validIds.map((id) => new Types.ObjectId(id)) },
-        organizationId: ctx!.organizationId,
+        organizationId,
       })
         .select('_id name')
         .lean<Array<{ _id: unknown; name?: string }>>()
@@ -67,7 +72,17 @@ export const GET = handler({
     }
     const effectiveLimit = clientLimit > 0 ? clientLimit : UNBOUNDED_LIST_CAP
 
-    const baseFilter: Record<string, unknown> = { organizationId: ctx!.organizationId }
+    const baseFilter: Record<string, unknown> = { organizationId }
+
+    const isAdmin = apiKey ? true : hasMinRole(ctx!.role, 'admin')
+    if (!isAdmin && ctx) {
+      const { familyIds } = await listAssignedFamiliesForUser(organizationId, ctx.userId)
+      if (familyIds.length === 0) {
+        return { data: clientLimit > 0 ? { items: [], nextCursor: null } : [] }
+      }
+      baseFilter._id = { $in: familyIds }
+    }
+
     if (cursorParam) {
       // Compound cursor on (name asc, _id asc). The previous version
       // only encoded `_id` which silently skipped rows whenever two
@@ -133,7 +148,7 @@ export const GET = handler({
       {
         $match: {
           familyId: { $in: familyIds },
-          organizationId: new Types.ObjectId(String(ctx!.organizationId)),
+          organizationId: new Types.ObjectId(String(organizationId)),
           deletedAt: null,
           convertedToFamily: { $ne: true },
         },
@@ -145,11 +160,7 @@ export const GET = handler({
       countByFamily.set(String(row._id), row.count)
     }
 
-    const isAdmin = hasMinRole(ctx!.role, 'admin')
-
-    // 3) Stringify ObjectIds and attach memberCount in-memory. No more
-    //    per-family writes / paymentPlanId backfill on the read path —
-    //    that's a migration concern, not a request-time concern.
+    // 3) Stringify ObjectIds and attach memberCount in-memory.
     const out = families.map((familyObj) => {
       const row: Record<string, unknown> = {
         ...familyObj,
@@ -265,6 +276,17 @@ export const POST = handler({
       }
     }
 
+    const existingForMatch: ExistingFamilyRecord[] = (
+      await Family.find({ organizationId: ctx!.organizationId })
+        .select('name email')
+        .lean<Array<{ _id: unknown; name?: string; email?: string }>>()
+    ).map((f) => ({
+      familyId: String(f._id),
+      name: f.name || '',
+      email: f.email || undefined,
+    }))
+    const similarFamilies = findSimilarFamilies({ name, email }, existingForMatch)
+
     const family = await Family.create({
       organizationId: ctx!.organizationId,
       name,
@@ -311,6 +333,12 @@ export const POST = handler({
       request,
     })
 
-    return { status: 201, data: family }
+    return {
+      status: 201,
+      data: {
+        ...family.toObject(),
+        similarFamilies: similarFamilies.length > 0 ? similarFamilies : undefined,
+      },
+    }
   },
 })

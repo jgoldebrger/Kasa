@@ -31,14 +31,14 @@ interface Member {
   userId: string | null
   name: string
   email: string
-  role: 'owner' | 'admin' | 'member'
+  role: 'owner' | 'admin' | 'member' | 'treasurer' | 'communications'
   joinedAt: string
 }
 
 interface PendingInvite {
   id: string
   email: string
-  role: 'owner' | 'admin' | 'member'
+  role: 'owner' | 'admin' | 'member' | 'treasurer' | 'communications'
   invitedAt: string
   expiresAt: string
 }
@@ -48,12 +48,16 @@ const ROLE_BADGE: Record<string, string> = {
     'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/30',
   admin: 'bg-accent/10 text-accent border-accent/20',
   member: 'bg-fg/5 text-fg border-border',
+  treasurer:
+    'bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:border-amber-500/30',
+  communications:
+    'bg-sky-100 text-sky-900 border-sky-200 dark:bg-sky-500/10 dark:text-sky-200 dark:border-sky-500/30',
 }
 
 interface MembersPanelProps {
   /** Called with the current user's role once it's known, so the parent can
    *  decide whether to show owner-only UI elsewhere. */
-  onRoleResolved?: (role: 'owner' | 'admin' | 'member') => void
+  onRoleResolved?: (role: 'owner' | 'admin' | 'member' | 'treasurer' | 'communications') => void
 }
 
 /**
@@ -68,12 +72,16 @@ export default function MembersPanel({ onRoleResolved }: MembersPanelProps = {})
   const [members, setMembers] = useState<Member[]>([])
   const [invites, setInvites] = useState<PendingInvite[]>([])
   const [currentUserId, setCurrentUserId] = useState<string>('')
-  const [currentUserRole, setCurrentUserRole] = useState<'owner' | 'admin' | 'member'>('member')
+  const [currentUserRole, setCurrentUserRole] = useState<
+    'owner' | 'admin' | 'member' | 'treasurer' | 'communications'
+  >('member')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
   const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState<'admin' | 'member' | 'owner'>('member')
+  const [inviteRole, setInviteRole] = useState<
+    'admin' | 'member' | 'owner' | 'treasurer' | 'communications'
+  >('member')
   const [inviteBusy, setInviteBusy] = useState(false)
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
@@ -97,7 +105,12 @@ export default function MembersPanel({ onRoleResolved }: MembersPanelProps = {})
       setMembers(data.members || [])
       setInvites(data.invites || [])
       setCurrentUserId(data.currentUserId || '')
-      const role = (data.currentUserRole || 'member') as 'owner' | 'admin' | 'member'
+      const role = (data.currentUserRole || 'member') as
+        | 'owner'
+        | 'admin'
+        | 'member'
+        | 'treasurer'
+        | 'communications'
       setCurrentUserRole(role)
       onRoleResolved?.(role)
     } catch {
@@ -285,6 +298,8 @@ export default function MembersPanel({ onRoleResolved }: MembersPanelProps = {})
                 onChange={(e) => setInviteRole(e.target.value as any)}
               >
                 <option value="member">Member</option>
+                <option value="treasurer">Treasurer</option>
+                <option value="communications">Communications</option>
                 <option value="admin">Admin</option>
                 {currentUserRole === 'owner' && <option value="owner">Owner</option>}
               </Select>
@@ -357,7 +372,7 @@ function MembersTable({
   loading: boolean
   error: boolean
   currentUserId: string
-  currentUserRole: 'owner' | 'admin' | 'member'
+  currentUserRole: 'owner' | 'admin' | 'member' | 'treasurer' | 'communications'
   canManage: boolean
   onChangeRole: (m: Member, role: string) => void
   onRemove: (m: Member) => void
@@ -420,6 +435,8 @@ function MembersTable({
           { value: 'owner', label: 'Owner' },
           { value: 'admin', label: 'Admin' },
           { value: 'member', label: 'Member' },
+          { value: 'treasurer', label: 'Treasurer' },
+          { value: 'communications', label: 'Communications' },
         ],
         getValue: (m) => m.role,
       },
@@ -438,6 +455,8 @@ function MembersTable({
                 className={`focus-ring rounded border px-2 py-1 text-xs ${ROLE_BADGE[m.role]}`}
               >
                 <option value="member">Member</option>
+                <option value="treasurer">Treasurer</option>
+                <option value="communications">Communications</option>
                 <option value="admin">Admin</option>
                 {currentUserRole === 'owner' && <option value="owner">Owner</option>}
               </select>
@@ -577,6 +596,8 @@ function InvitesTable({
           { value: 'owner', label: 'Owner' },
           { value: 'admin', label: 'Admin' },
           { value: 'member', label: 'Member' },
+          { value: 'treasurer', label: 'Treasurer' },
+          { value: 'communications', label: 'Communications' },
         ],
       },
     },

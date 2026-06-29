@@ -44,6 +44,8 @@ export interface MemberMakePaymentModalProps {
   onClose: () => void
   familyId: string
   cardPaymentsEnabled: boolean
+  /** Pre-fill amount (e.g. current balance for "Pay balance"). */
+  initialAmount?: number
   onSuccess?: () => void
 }
 
@@ -63,6 +65,7 @@ export default function MemberMakePaymentModal({
   onClose,
   familyId,
   cardPaymentsEnabled,
+  initialAmount,
   onSuccess,
 }: MemberMakePaymentModalProps) {
   const t = useT()
@@ -74,13 +77,16 @@ export default function MemberMakePaymentModal({
 
   useEffect(() => {
     if (open) {
+      const amount =
+        initialAmount != null && initialAmount > 0 ? Math.round(initialAmount * 100) / 100 : 0
       setForm({
         ...buildForm(),
+        amount,
         paymentMethod: cardPaymentsEnabled ? 'credit_card' : 'cash',
       })
       cardsFetchedRef.current = false
     }
-  }, [open, cardPaymentsEnabled])
+  }, [open, cardPaymentsEnabled, initialAmount])
 
   const fetchSavedCards = useCallback(async () => {
     if (!familyId) return

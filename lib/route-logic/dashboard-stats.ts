@@ -3,6 +3,7 @@ import { handler } from '@/lib/api/handler'
 import { Family, FamilyMember, YearlyCalculation, Organization } from '@/lib/models'
 import { calculateYearlyBalance, calculateYearlyExpenses } from '@/lib/calculations'
 import { getYearInTimeZone } from '@/lib/date-utils'
+import { countAssignedFamilyStats } from '@/lib/member-family-access.server'
 
 /**
  * Lightweight dashboard summary. Replaces the previous pattern of fetching
@@ -40,17 +41,28 @@ export const GET = handler({
       year = parsed
     }
 
-    // Run independent reads in parallel.
-    const [totalFamilies, totalMembers, calcDoc] = await Promise.all([
-      Family.countDocuments({ organizationId: ctx!.organizationId }),
-      FamilyMember.countDocuments({
-        organizationId: ctx!.organizationId,
-        convertedToFamily: { $ne: true },
-      }),
-      YearlyCalculation.findOne({ year, organizationId: ctx!.organizationId }).lean<any>(),
-    ])
-
     const isAdmin = hasMinRole(ctx!.role, 'admin')
+
+    let totalFamilies: number
+    let totalMembers: number
+    if (isAdmin) {
+      ;[totalFamilies, totalMembers] = await Promise.all([
+        Family.countDocuments({ organizationId: ctx!.organizationId }),
+        FamilyMember.countDocuments({
+          organizationId: ctx!.organizationId,
+          convertedToFamily: { $ne: true },
+        }),
+      ])
+    } else {
+      const assigned = await countAssignedFamilyStats(ctx!.organizationId, ctx!.userId)
+      totalFamilies = assigned.totalFamilies
+      totalMembers = assigned.totalMembers
+    }
+
+    const calcDoc = await YearlyCalculation.findOne({
+      year,
+      organizationId: ctx!.organizationId,
+    }).lean<any>()
 
     let calculatedIncome = 0
     let calculatedExpenses = 0

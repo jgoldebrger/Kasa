@@ -16,7 +16,7 @@ import { report as reportSchemas } from '@/lib/schemas'
 
 export const POST = handler({
   auth: 'org',
-  minRole: 'admin',
+  permission: 'reports:read',
   body: reportSchemas.reportRunBody,
   name: 'POST /api/reports/run',
   fn: async ({ ctx, body, request }) => {

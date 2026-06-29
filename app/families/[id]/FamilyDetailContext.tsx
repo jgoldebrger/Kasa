@@ -293,8 +293,10 @@ export function FamilyDetailProvider({
     if (roleLoading || !params.id || !data?.family) return
     if (isAdmin) {
       if (activeTab === 'statements') void statements.fetchStatements()
-      else if (activeTab === 'sub-families') void deferred.fetchSubFamilies()
-      else if (activeTab === 'tasks') void deferred.fetchFamilyTasks()
+      else if (activeTab === 'sub-families') {
+        void deferred.fetchSubFamilies()
+        void deferred.fetchFamilyTree()
+      } else if (activeTab === 'tasks') void deferred.fetchFamilyTasks()
       else if (['info', 'members'].includes(activeTab)) void deferred.ensurePaymentPlans()
       else if (LEDGER_TABS.has(activeTab) && !ledger.loadedLedgerTabsRef.current.has(activeTab)) {
         ledger.loadedLedgerTabsRef.current.add(activeTab)
@@ -690,6 +692,8 @@ export function FamilyDetailProvider({
       setShowTaskModal: deferred.setShowTaskModal,
       subFamilies: deferred.subFamilies,
       loadingSubFamilies: deferred.loadingSubFamilies,
+      familyTree: deferred.familyTree,
+      loadingFamilyTree: deferred.loadingFamilyTree,
       showInfoModal,
       setShowInfoModal,
       editingField,
@@ -730,6 +734,7 @@ export function FamilyDetailProvider({
       fetchFamilyTasks: deferred.fetchFamilyTasks,
       fetchFamilyDetails: refreshFamily,
       fetchSubFamilies: deferred.fetchSubFamilies,
+      fetchFamilyTree: deferred.fetchFamilyTree,
       fetchLedgerForTab: ledger.fetchLedgerForTab,
       loadMoreLedgerForTab: ledger.loadMoreLedgerForTab,
       ledgerHasMore: ledger.ledgerHasMore,

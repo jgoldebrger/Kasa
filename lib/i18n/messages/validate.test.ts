@@ -7,6 +7,9 @@ describe('i18n messages', () => {
     expect(Object.keys(enUS).length).toBeGreaterThan(50)
   })
 
+  // he-IL is kept in sync with en-US keys (untranslated keys fall back to en-US
+  // copy). When adding strings to en-US.json, run the backfill in CI or mirror
+  // manually — otherwise this parity check fails.
   it('he-IL includes all en-US keys', () => {
     for (const key of Object.keys(enUS)) {
       expect(heIL).toHaveProperty(key)

@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
-import { CalendarIcon, ChartBarIcon } from '@heroicons/react/24/outline'
+import { CalendarIcon, ChartBarIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline'
 import { useToast } from '@/app/components/Toast'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import type { PlReportData } from '@/lib/reports/pl-data'
+import { buildYoYMetrics } from '@/lib/reports/yoy'
 import {
   Badge,
   Button,
@@ -37,6 +38,8 @@ export default function ReportsView({
   const { format: formatMoney } = useCurrency()
   const [loading, setLoading] = useState(false)
   const [reportData, setReportData] = useState<PlReportData | null>(initialReportData)
+  const [priorYearData, setPriorYearData] = useState<PlReportData | null>(null)
+  const [boardPackLoading, setBoardPackLoading] = useState(false)
   const [reportType, setReportType] = useState<'year' | 'range'>('year')
   const [year, setYear] = useState(initialYear)
   const [startDate, setStartDate] = useState('')
@@ -48,6 +51,7 @@ export default function ReportsView({
     useCallback(() => {
       invalidate()
       setReportData(null)
+      setPriorYearData(null)
       deferredGenerateRef.current = false
     }, [invalidate]),
   )
@@ -57,8 +61,10 @@ export default function ReportsView({
     setLoading(true)
     try {
       let url = '/api/reports/pl?'
+      let priorUrl: string | null = null
       if (reportType === 'year') {
         url += `year=${year}`
+        priorUrl = `/api/reports/pl?year=${year - 1}`
       } else {
         if (!startDate || !endDate) {
           toast.error(t('reports.error.dateRange'))
@@ -69,6 +75,7 @@ export default function ReportsView({
       }
 
       const res = await fetch(url)
+      const priorRes = priorUrl ? await fetch(priorUrl) : null
       if (isStale(gen)) return
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -78,6 +85,12 @@ export default function ReportsView({
       const data = await res.json().catch(() => ({}))
       if (isStale(gen)) return
       setReportData(data)
+      if (priorRes?.ok) {
+        const prior = await priorRes.json().catch(() => null)
+        if (!isStale(gen)) setPriorYearData(prior)
+      } else if (!isStale(gen)) {
+        setPriorYearData(null)
+      }
     } catch {
       if (isStale(gen)) return
       toast.error(t('reports.error.generate'))
@@ -85,6 +98,53 @@ export default function ReportsView({
       if (!isStale(gen)) setLoading(false)
     }
   }, [begin, isStale, reportType, year, startDate, endDate, toast, t])
+
+  const downloadBoardPack = useCallback(async () => {
+    setBoardPackLoading(true)
+    try {
+      const packYear = reportType === 'year' ? year : new Date().getFullYear()
+      const res = await fetch(`/api/reports/board-pack?year=${packYear}`)
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.error || t('reports.boardPack.error'))
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Board_Pack_${packYear}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error(t('reports.boardPack.error'))
+    } finally {
+      setBoardPackLoading(false)
+    }
+  }, [reportType, year, toast, t])
+
+  const yoyMetrics = useMemo(() => {
+    if (reportType !== 'year' || !reportData || !priorYearData) return null
+    return buildYoYMetrics(
+      {
+        income: reportData.summary.totalIncome,
+        expenses: reportData.summary.totalExpenses,
+        balance: reportData.summary.netProfit,
+      },
+      {
+        income: priorYearData.summary.totalIncome,
+        expenses: priorYearData.summary.totalExpenses,
+        balance: priorYearData.summary.netProfit,
+      },
+      {
+        income: t('reports.summary.totalIncome'),
+        expenses: t('reports.summary.totalExpenses'),
+        balance: t('reports.summary.netProfit'),
+      },
+    )
+  }, [reportType, reportData, priorYearData, t])
 
   useEffect(() => {
     if (initialReportData || deferredGenerateRef.current) return
@@ -208,9 +268,22 @@ export default function ReportsView({
           title={t('reports.title')}
           subtitle={t('reports.subtitle')}
           actions={
-            <ButtonLink href="/reports/builder" variant="secondary" size="sm">
-              {t('reports.openBuilder')}
-            </ButtonLink>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={downloadBoardPack}
+                loading={boardPackLoading}
+                leftIcon={<DocumentArrowDownIcon className="h-4 w-4" />}
+              >
+                {boardPackLoading
+                  ? t('reports.boardPack.downloading')
+                  : t('reports.boardPack.download')}
+              </Button>
+              <ButtonLink href="/reports/builder" variant="secondary" size="sm">
+                {t('reports.openBuilder')}
+              </ButtonLink>
+            </div>
           }
         />
 
@@ -322,6 +395,54 @@ export default function ReportsView({
                 tone="accent"
               />
             </div>
+
+            {yoyMetrics && (
+              <div className="mb-6 overflow-x-auto">
+                <h3 className="text-sm font-semibold text-fg mb-3">{t('reports.yoy.title')}</h3>
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-fg-muted">
+                      <th className="py-2 pr-4 font-medium">{t('reports.yoy.metric')}</th>
+                      <th className="py-2 px-4 font-medium text-right">
+                        {t('reports.yoy.priorYear').replace('{year}', String(year - 1))}
+                      </th>
+                      <th className="py-2 px-4 font-medium text-right">
+                        {t('reports.yoy.currentYear').replace('{year}', String(year))}
+                      </th>
+                      <th className="py-2 pl-4 font-medium text-right">
+                        {t('reports.yoy.change')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {yoyMetrics.map((row) => (
+                      <tr key={row.label} className="border-b border-border">
+                        <td className="py-2 pr-4 text-fg">{row.label}</td>
+                        <td className="py-2 px-4 text-right tabular text-fg-muted">
+                          {formatMoney(row.prior)}
+                        </td>
+                        <td className="py-2 px-4 text-right tabular text-fg">
+                          {formatMoney(row.current)}
+                        </td>
+                        <td
+                          className={`py-2 pl-4 text-right tabular font-medium ${
+                            row.delta >= 0 ? 'text-success' : 'text-danger'
+                          }`}
+                        >
+                          {formatMoney(row.delta)}
+                          {row.deltaPct != null && (
+                            <span className="text-xs text-fg-muted ml-1">
+                              ({row.deltaPct >= 0 ? '+' : ''}
+                              {row.deltaPct.toFixed(1)}%)
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             <DataView
               tableId="reports-pl"

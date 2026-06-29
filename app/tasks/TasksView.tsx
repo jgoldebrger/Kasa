@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { useToast, useConfirm } from '@/app/components/Toast'
 import { invalidate as invalidateCache } from '@/lib/client-cache'
+import { mutateWithOfflineQueue } from '@/lib/client/offline-write-queue'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { useSupportModeReadOnly } from '@/lib/client/support-mode'
@@ -47,7 +48,9 @@ interface Task {
   title: string
   description?: string
   dueDate: string
-  email: string
+  email?: string
+  assigneeUserId?: { _id: string; name?: string; email?: string } | string
+  assigneeMembershipId?: string
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'urgent'
   relatedFamilyId?: { _id: string; name: string }
@@ -96,11 +99,19 @@ const STATUS_KEYS: Record<Task['status'], MessageKey> = {
 const TASK_STATUSES: Task['status'][] = ['pending', 'in_progress', 'completed', 'cancelled']
 const TASK_PRIORITIES: Task['priority'][] = ['low', 'medium', 'high', 'urgent']
 
-function taskFilterQuery(filter: 'all' | 'pending' | 'today' | 'overdue'): string {
+function taskFilterQuery(filter: 'all' | 'pending' | 'today' | 'overdue' | 'assignedToMe'): string {
   if (filter === 'today') return 'dueDate=today'
   if (filter === 'overdue') return 'dueDate=overdue'
   if (filter === 'pending') return 'status=pending'
+  if (filter === 'assignedToMe') return 'assignedToMe=true'
   return ''
+}
+
+function taskAssigneeLabel(task: Task): string {
+  if (task.assigneeUserId && typeof task.assigneeUserId === 'object') {
+    return task.assigneeUserId.name || task.assigneeUserId.email || ''
+  }
+  return task.email || ''
 }
 
 function taskFamilyName(task: Task): string {
@@ -133,7 +144,9 @@ export default function TasksView({ initialTasks, initialNextCursor = null }: Ta
   const [loadingTasks, setLoadingTasks] = useState(!tasksHydrated)
   const [loadingMore, setLoadingMore] = useState(false)
   const [tasksError, setTasksError] = useState(false)
-  const [taskFilter, setTaskFilter] = useState<'all' | 'pending' | 'today' | 'overdue'>('all')
+  const [taskFilter, setTaskFilter] = useState<
+    'all' | 'pending' | 'today' | 'overdue' | 'assignedToMe'
+  >('all')
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [sort, setSort] = useState<{ id: string; dir: SortDir } | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -233,7 +246,11 @@ export default function TasksView({ initialTasks, initialNextCursor = null }: Ta
   const sortedTasks = useMemo(
     () =>
       sortTaskRows(
-        tasks.map((task) => ({ ...task, familyName: taskFamilyName(task) })),
+        tasks.map((task) => ({
+          ...task,
+          familyName: taskFamilyName(task),
+          assigneeName: taskAssigneeLabel(task),
+        })),
         sort,
       ),
     [tasks, sort],
@@ -292,14 +309,23 @@ export default function TasksView({ initialTasks, initialNextCursor = null }: Ta
       cur.map((task) => (task._id === taskId ? { ...task, status: 'completed' as const } : task)),
     )
     try {
-      const res = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'completed' }),
-      })
-      if (!res.ok) throw new Error()
-      invalidateCache(/^\/api\/tasks/)
-      toast.success(t('tasks.success.completed'))
+      const result = await mutateWithOfflineQueue(
+        `/api/tasks/${taskId}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'completed' }),
+        },
+        { type: 'task-status-update', taskId, status: 'completed' },
+      )
+      if (result.ok) {
+        invalidateCache(/^\/api\/tasks/)
+        toast.success(t('tasks.success.completed'))
+      } else if (result.queued) {
+        toast.info(t('offline.queue.saved'))
+      } else {
+        throw new Error()
+      }
     } catch {
       setTasks(prev)
       toast.error(t('tasks.error.complete'))
@@ -521,13 +547,13 @@ export default function TasksView({ initialTasks, initialNextCursor = null }: Ta
         exportValue: (task) => taskFamilyName(task),
       },
       {
-        id: 'email',
-        header: t('tasks.column.email'),
-        headerText: t('tasks.column.email'),
+        id: 'assignee',
+        header: t('tasks.column.assignee'),
+        headerText: t('tasks.column.assignee'),
         sortable: true,
         hideBelow: 'lg',
-        cell: (task) => <span className="text-fg-muted">{task.email}</span>,
-        exportValue: (task) => task.email,
+        cell: (task) => <span className="text-fg-muted">{taskAssigneeLabel(task) || '—'}</span>,
+        exportValue: (task) => taskAssigneeLabel(task),
       },
       {
         id: 'actions',
@@ -614,6 +640,7 @@ export default function TasksView({ initialTasks, initialNextCursor = null }: Ta
           <Tabs
             items={[
               { id: 'all', label: t('tasks.filters.all') },
+              { id: 'assignedToMe', label: t('tasks.filters.assignedToMe') },
               { id: 'pending', label: t('tasks.filters.pending') },
               { id: 'today', label: t('tasks.filters.today') },
               { id: 'overdue', label: t('tasks.filters.overdue') },
@@ -777,8 +804,8 @@ function TaskMobileCard({
           </div>
         )}
         <div className="col-span-2">
-          <dt className="text-fg-muted">{t('tasks.column.email')}</dt>
-          <dd>{task.email}</dd>
+          <dt className="text-fg-muted">{t('tasks.column.assignee')}</dt>
+          <dd>{taskAssigneeLabel(task) || '—'}</dd>
         </div>
       </dl>
     </Card>

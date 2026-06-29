@@ -15,6 +15,8 @@ export interface RouteFixtureIds {
   membershipId: string
   memberMembershipId: string
   memberUserId: string
+  memberUserEmail: string
+  unassignedFamilyId: string
   savedPaymentMethodId: string
 }
 
@@ -25,6 +27,7 @@ export interface ApiTestContext {
   orgId: string
   betaOrgId: string
   signupCode: string
+  memberEmail: string
   fixtures: RouteFixtureIds
 }
 
@@ -178,6 +181,7 @@ export async function seedApiRouteFixtures(): Promise<ApiTestContext> {
     hashedPassword,
     name: 'API Route Member',
   })
+  const memberEmail = memberUser.email
   const memberMembership = await OrgMembership.create({
     userId: memberUser._id,
     organizationId: org._id,
@@ -200,6 +204,13 @@ export async function seedApiRouteFixtures(): Promise<ApiTestContext> {
     organizationId: betaOrg._id,
     name: 'API Route Disposable Family',
     weddingDate,
+  })
+
+  const unassignedFamily = await Family.create({
+    organizationId: org._id,
+    name: 'API Route Unassigned Family',
+    weddingDate,
+    email: 'unassigned@example.com',
   })
 
   const plan = await PaymentPlan.create({
@@ -240,6 +251,7 @@ export async function seedApiRouteFixtures(): Promise<ApiTestContext> {
     lastName: 'Member',
     gender: 'male',
     birthDate: new Date('2010-03-01'),
+    email: memberEmail,
   })
 
   const year = now.getFullYear()
@@ -374,6 +386,7 @@ export async function seedApiRouteFixtures(): Promise<ApiTestContext> {
     orgId: org._id.toString(),
     betaOrgId: betaOrg._id.toString(),
     signupCode,
+    memberEmail,
     fixtures: {
       familyId: family._id.toString(),
       memberId: member._id.toString(),
@@ -388,6 +401,8 @@ export async function seedApiRouteFixtures(): Promise<ApiTestContext> {
       membershipId: ownerMembership._id.toString(),
       memberMembershipId: memberMembership._id.toString(),
       memberUserId: memberUser._id.toString(),
+      memberUserEmail: memberEmail,
+      unassignedFamilyId: unassignedFamily._id.toString(),
       savedPaymentMethodId: savedPaymentMethod._id.toString(),
     },
   }

@@ -7,6 +7,7 @@ import { useT } from '@/lib/client/i18n'
 import EmailFamilyModal from '@/app/families/_components/EmailFamilyModal'
 import FamilyEmailAdminActions from '@/app/families/_components/FamilyEmailAdminActions'
 import FamilyEmailIndicators from '@/app/families/_components/FamilyEmailIndicators'
+import FamilyTagsEditor from '@/app/families/_components/FamilyTagsEditor'
 import { useFamilyDetail } from './FamilyDetailContext'
 
 export default function FamilyHeader() {
@@ -45,6 +46,18 @@ export default function FamilyHeader() {
                 />
               )}
             </div>
+          )}
+          {isAdmin && (
+            <FamilyTagsEditor
+              familyId={String(family._id)}
+              tags={family.tags ?? []}
+              className="mt-3"
+              onUpdated={(tags) =>
+                setData((prev: typeof data) =>
+                  prev ? { ...prev, family: { ...prev.family, tags } } : prev,
+                )
+              }
+            />
           )}
         </div>
         {isAdmin && (

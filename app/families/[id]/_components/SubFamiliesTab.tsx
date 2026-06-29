@@ -4,12 +4,14 @@
 import type { FamilyDetailContextValue } from '../FamilyDetailContext'
 import { DataView, EmptyState } from '@/app/components/ui'
 import { useFamilyDetail } from '../FamilyDetailContext'
+import SubFamilyTreeView from './SubFamilyTreeView'
 
 function SubFamiliesTabContent(props: FamilyDetailContextValue) {
-  const { subFamilies, loadingSubFamilies } = props
+  const { subFamilies, loadingSubFamilies, familyTree, loadingFamilyTree } = props
 
   return (
     <div>
+      <SubFamilyTreeView tree={familyTree} loading={loadingFamilyTree} />
       <div className="flex justify-between mb-4">
         <h3 className="text-lg font-semibold">Sub-Families</h3>
         <p className="text-sm text-fg-muted">Families created from members of this family</p>

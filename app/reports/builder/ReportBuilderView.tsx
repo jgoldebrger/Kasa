@@ -6,6 +6,7 @@ import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { Button, Input, PageHeader, Select, SkeletonRows } from '@/app/components/ui'
 import { useCurrency } from '@/lib/client/useCurrency'
+import { useT } from '@/lib/client/i18n'
 
 interface ColumnDef {
   id: string
@@ -35,6 +36,16 @@ interface SavedReport {
   name: string
   source: string
   config: any
+}
+
+interface ReportSchedule {
+  _id: string
+  savedReportId: string
+  reportName: string
+  frequency: 'weekly' | 'monthly'
+  enabled: boolean
+  nextRunAt: string
+  lastRunAt: string | null
 }
 
 interface ReportResult {
@@ -72,10 +83,15 @@ export default function ReportBuilderView({
 } = {}) {
   const toast = useToast()
   const confirm = useConfirm()
+  const t = useT()
   const { format } = useCurrency()
   const sourcesHydrated = initialSources !== undefined
   const [sources, setSources] = useState<SourceDef[]>(initialSources ?? [])
   const [saved, setSaved] = useState<SavedReport[]>([])
+  const [schedules, setSchedules] = useState<ReportSchedule[]>([])
+  const [activeSavedId, setActiveSavedId] = useState<string | null>(null)
+  const [scheduleFrequency, setScheduleFrequency] = useState<'weekly' | 'monthly'>('weekly')
+  const [scheduling, setScheduling] = useState(false)
   const [config, setConfig] = useState<ReportConfig>(emptyConfig('payments'))
   const [result, setResult] = useState<ReportResult | null>(null)
   const [running, setRunning] = useState(false)
@@ -100,6 +116,20 @@ export default function ReportBuilderView({
       setSaved([])
     }
   }, [begin, isStale])
+
+  const loadSchedules = useCallback(async () => {
+    try {
+      const res = await fetch('/api/reports/schedules')
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setSchedules(data?.schedules || [])
+      } else {
+        setSchedules([])
+      }
+    } catch {
+      setSchedules([])
+    }
+  }, [])
 
   const loadMeta = useCallback(async () => {
     const gen = begin()
@@ -129,21 +159,26 @@ export default function ReportBuilderView({
         : (cb: () => void) => window.setTimeout(cb, 0)
     const id = schedule(() => {
       void loadSavedReports()
+      void loadSchedules()
     })
     const cancel =
       typeof cancelIdleCallback === 'function'
         ? (id: number) => cancelIdleCallback(id)
         : (id: number) => window.clearTimeout(id)
     return () => cancel(id as unknown as number)
-  }, [sourcesHydrated, loadMeta, loadSavedReports])
+  }, [sourcesHydrated, loadMeta, loadSavedReports, loadSchedules])
 
-  useOrgChanged(useCallback(() => {
-    invalidate()
-    setResult(null)
-    setConfig(emptyConfig('payments'))
-    if (!sourcesHydrated) void loadMeta()
-    void loadSavedReports()
-  }, [loadMeta, loadSavedReports, invalidate, sourcesHydrated]))
+  useOrgChanged(
+    useCallback(() => {
+      invalidate()
+      setResult(null)
+      setConfig(emptyConfig('payments'))
+      setActiveSavedId(null)
+      if (!sourcesHydrated) void loadMeta()
+      void loadSavedReports()
+      void loadSchedules()
+    }, [loadMeta, loadSavedReports, loadSchedules, invalidate, sourcesHydrated]),
+  )
 
   const currentSource = useMemo(
     () => sources.find((s) => s.id === config.source) || null,
@@ -177,6 +212,7 @@ export default function ReportBuilderView({
   }, [config, toast, begin, isStale])
 
   const loadSaved = (report: SavedReport) => {
+    setActiveSavedId(report._id)
     setConfig({
       source: report.config?.source || (report.source as any) || 'payments',
       rowDim: report.config?.rowDim || '',
@@ -186,6 +222,43 @@ export default function ReportBuilderView({
       fromDate: report.config?.fromDate || '',
       toDate: report.config?.toDate || '',
     })
+  }
+
+  const createSchedule = async (savedReportId: string) => {
+    setScheduling(true)
+    try {
+      const res = await fetch('/api/reports/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ savedReportId, frequency: scheduleFrequency }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data.error || t('reports.schedule.error'))
+        return
+      }
+      toast.success(t('reports.schedule.saved'))
+      await loadSchedules()
+    } catch {
+      toast.error(t('reports.schedule.error'))
+    } finally {
+      setScheduling(false)
+    }
+  }
+
+  const removeSchedule = async (scheduleId: string) => {
+    try {
+      const res = await fetch(`/api/reports/schedules/${scheduleId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.error || t('reports.schedule.error'))
+        return
+      }
+      toast.success(t('reports.schedule.removed'))
+      await loadSchedules()
+    } catch {
+      toast.error(t('reports.schedule.error'))
+    }
   }
 
   const saveReport = async () => {
@@ -212,6 +285,7 @@ export default function ReportBuilderView({
       toast.success(`Saved "${name}".`)
       setShowSaveForm(false)
       setSavingName('')
+      if (data?._id) setActiveSavedId(String(data._id))
       // Refresh the saved list.
       const listRes = await fetch('/api/reports/saved')
       if (listRes.ok) {
@@ -318,6 +392,62 @@ export default function ReportBuilderView({
                   ))}
                 </ul>
               )}
+              <div className="border-t border-border pt-3 space-y-2">
+                <h3 className="text-sm font-semibold text-fg">{t('reports.schedule.listTitle')}</h3>
+                {schedules.length === 0 ? (
+                  <p className="text-xs text-fg-muted">{t('reports.schedule.empty')}</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {schedules.map((s) => (
+                      <li key={s._id} className="text-xs rounded border border-border p-2">
+                        <p className="font-medium text-fg truncate">{s.reportName}</p>
+                        <p className="text-fg-muted capitalize">
+                          {s.frequency === 'weekly'
+                            ? t('reports.schedule.weekly')
+                            : t('reports.schedule.monthly')}
+                          {!s.enabled ? ` · ${t('reports.schedule.disabled')}` : ''}
+                        </p>
+                        <p className="text-fg-muted">
+                          {t('reports.schedule.nextRun').replace(
+                            '{date}',
+                            new Date(s.nextRunAt).toLocaleString(),
+                          )}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => removeSchedule(s._id)}
+                          className="mt-1 text-accent hover:underline"
+                        >
+                          {t('reports.schedule.remove')}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {activeSavedId ? (
+                  <div className="space-y-2 pt-2 border-t border-border">
+                    <p className="text-xs text-fg-muted">{t('reports.schedule.title')}</p>
+                    <Select
+                      label={t('reports.schedule.frequency')}
+                      value={scheduleFrequency}
+                      onChange={(e) => setScheduleFrequency(e.target.value as 'weekly' | 'monthly')}
+                    >
+                      <option value="weekly">{t('reports.schedule.weekly')}</option>
+                      <option value="monthly">{t('reports.schedule.monthly')}</option>
+                    </Select>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      loading={scheduling}
+                      onClick={() => createSchedule(activeSavedId)}
+                    >
+                      {t('reports.schedule.create')}
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-fg-muted pt-2">{t('reports.schedule.noSaved')}</p>
+                )}
+              </div>
             </div>
           </aside>
 
@@ -328,9 +458,7 @@ export default function ReportBuilderView({
                 <Select
                   label="Data source"
                   value={config.source}
-                  onChange={(e) =>
-                    setConfig(emptyConfig(e.target.value as SourceDef['id']))
-                  }
+                  onChange={(e) => setConfig(emptyConfig(e.target.value as SourceDef['id']))}
                 >
                   {sources.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -359,11 +487,7 @@ export default function ReportBuilderView({
                   value={config.measure}
                   onChange={(e) => setConfig((c) => ({ ...c, measure: e.target.value }))}
                   disabled={config.aggregate === 'count' || !currentSource?.measures.length}
-                  hint={
-                    config.aggregate === 'count'
-                      ? 'Not used when counting rows.'
-                      : undefined
-                  }
+                  hint={config.aggregate === 'count' ? 'Not used when counting rows.' : undefined}
                 >
                   <option value="">— Select —</option>
                   {currentSource?.measures.map((m) => (
@@ -461,7 +585,8 @@ export default function ReportBuilderView({
               ) : (
                 <div className="overflow-x-auto">
                   <p className="text-xs text-fg-muted mb-2">
-                    {result.rowCount.toLocaleString()} source row{result.rowCount === 1 ? '' : 's'} aggregated.
+                    {result.rowCount.toLocaleString()} source row{result.rowCount === 1 ? '' : 's'}{' '}
+                    aggregated.
                   </p>
                   <table className="min-w-full text-sm">
                     <thead className="bg-app-subtle">

@@ -6,7 +6,10 @@
  */
 
 /** Paths invoked on every tick when `CRON_TICK_MODE=frequent` (Pro). */
-export const EVERY_TICK_JOBS = ['/api/jobs/send-scheduled-emails'] as const
+export const EVERY_TICK_JOBS = [
+  '/api/jobs/send-scheduled-emails',
+  '/api/jobs/send-scheduled-reports',
+] as const
 
 /**
  * Daily jobs keyed by UTC hour — used only in `frequent` mode at minute :00.
@@ -33,6 +36,7 @@ export const ALL_DAILY_TICK_JOBS: readonly string[] = [
   '/api/jobs/wedding-converter',
   '/api/jobs/run-email-drips',
   '/api/jobs/send-scheduled-emails',
+  '/api/jobs/send-scheduled-reports',
   '/api/jobs/ops-digest',
 ]
 

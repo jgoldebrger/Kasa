@@ -47,6 +47,10 @@ export const POST = handler({
       (filter, limit) =>
         Task.find(filter)
           .populate({
+            path: 'assigneeUserId',
+            select: 'name email',
+          })
+          .populate({
             path: 'relatedFamilyId',
             select: 'name organizationId',
             match: { organizationId: ctx!.organizationId },
@@ -114,7 +118,14 @@ export const POST = handler({
         )
         if (!claim) continue
 
-        const to = String(task.email || '').trim()
+        const to = String(
+          (task.assigneeUserId &&
+            typeof task.assigneeUserId === 'object' &&
+            'email' in task.assigneeUserId &&
+            (task.assigneeUserId as { email?: string }).email) ||
+            task.email ||
+            '',
+        ).trim()
         if (!to || !EMAIL_RE.test(to)) {
           await Task.findOneAndUpdate(
             { _id: task._id, organizationId: ctx!.organizationId },

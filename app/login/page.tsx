@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState, useMemo } from 'react'
+import { Suspense, useState, useMemo, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import Link from 'next/link'
@@ -43,8 +43,34 @@ function LoginForm() {
   }>(null)
   const [totpCode, setTotpCode] = useState('')
   const [twoFactorBusy, setTwoFactorBusy] = useState(false)
+  const [oidcStatus, setOidcStatus] = useState<{
+    enabled: boolean
+    providerName: string
+  } | null>(null)
+  const [ssoBusy, setSsoBusy] = useState(false)
 
   const formSchema = useMemo(() => schema(t), [t])
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/auth/oidc-status')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.enabled) {
+          setOidcStatus({ enabled: true, providerName: data.providerName || 'SSO' })
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (searchParams.get('error') === 'AccessDenied') {
+      toast.error(t('auth.ssoProvisioningFailed'))
+    }
+  }, [searchParams, toast, t])
 
   const completeSignIn = async (email: string, password: string, totpCode: string) => {
     const res = await signIn('credentials', {
@@ -101,6 +127,16 @@ function LoginForm() {
       await completeSignIn(values.email, values.password, '')
     },
   })
+
+  const startSso = async () => {
+    if (!oidcStatus?.enabled) return
+    setSsoBusy(true)
+    try {
+      await signIn('oidc', { callbackUrl })
+    } finally {
+      setSsoBusy(false)
+    }
+  }
 
   const submitTwoFactor = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -167,6 +203,30 @@ function LoginForm() {
           </Card>
         ) : (
           <Card>
+            {oidcStatus?.enabled && (
+              <div className="space-y-5 mb-5">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={ssoBusy}
+                  block
+                  size="lg"
+                  onClick={() => void startSso()}
+                >
+                  {t('auth.signInWithSso').replace('{provider}', oidcStatus.providerName)}
+                </Button>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                    <div className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-surface px-2 text-fg-muted">
+                      {t('auth.orContinueWithEmail')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
             <form onSubmit={form.handleSubmit} className="space-y-5" noValidate>
               <Input
                 label={t('auth.email')}

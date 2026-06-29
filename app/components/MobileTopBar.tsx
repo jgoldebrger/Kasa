@@ -20,6 +20,7 @@ const PATH_TITLE_KEYS: { match: RegExp; key: MessageKey }[] = [
   { match: /^\/families/, key: 'nav.families' },
   { match: /^\/payments/, key: 'nav.payments' },
   { match: /^\/tasks/, key: 'nav.tasks' },
+  { match: /^\/calendar/, key: 'nav.calendar' },
   { match: /^\/calculations/, key: 'nav.calculations' },
   { match: /^\/events/, key: 'nav.events' },
   { match: /^\/projections/, key: 'nav.projections' },

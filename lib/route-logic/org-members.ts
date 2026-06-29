@@ -92,6 +92,13 @@ export const PATCH = handler({
     if (body.role === 'owner' && ctx!.role !== 'owner') {
       return { status: 403, data: { error: 'Only owners can promote to owner' } }
     }
+    if (
+      (body.role === 'treasurer' || body.role === 'communications') &&
+      ctx!.role !== 'owner' &&
+      ctx!.role !== 'admin'
+    ) {
+      return { status: 403, data: { error: 'Only admins can assign specialist roles' } }
+    }
 
     const membership = await OrgMembership.findOne({
       _id: body.membershipId,

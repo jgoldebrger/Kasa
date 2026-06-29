@@ -56,6 +56,15 @@ export async function fetchFamilySummary(
   )
 
   if (!isAdmin) {
+    let memberFinancialAccess = false
+    if (userId) {
+      const user = await User.findById(userId).select('email').lean<{ email?: string }>()
+      if (user?.email && userEmailMatchesFamily(user.email, fam, members)) {
+        memberFinancialAccess = true
+      }
+    }
+    if (!memberFinancialAccess) return null
+
     const sanitizedMembers = members.map((m) => {
       const row = { ...m }
       delete (row as any).paymentPlanId
@@ -69,15 +78,8 @@ export async function fetchFamilySummary(
     delete (family as any).currentPlan
     delete (family as any).paymentPlanId
 
-    let memberFinancialAccess = false
     let balance = { ...EMPTY_BALANCE }
-    if (userId) {
-      const user = await User.findById(userId).select('email').lean<{ email?: string }>()
-      if (user?.email && userEmailMatchesFamily(user.email, fam, members)) {
-        memberFinancialAccess = true
-        balance = await calculateFamilyBalance(fam._id.toString(), organizationId)
-      }
-    }
+    balance = await calculateFamilyBalance(fam._id.toString(), organizationId)
 
     return {
       family,
@@ -87,7 +89,7 @@ export async function fetchFamilySummary(
       lifecycleEvents: [],
       cycleCharges: [],
       balance,
-      memberFinancialAccess,
+      memberFinancialAccess: true,
     }
   }
 

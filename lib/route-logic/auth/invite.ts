@@ -21,18 +21,21 @@ export const POST = handler({
   body: authSchemas.inviteUserBody,
   name: 'POST /api/auth/invite',
   fn: async ({ ctx, body, request }) => {
+    if (!ctx || 'isApiKey' in ctx) {
+      return { status: 401, data: { error: 'Unauthorized' } }
+    }
     const rateVerdict = await checkRateLimit(
       request,
       'invite-create',
       { limit: 20, windowMs: 60 * 60_000 },
-      ctx!.organizationId,
+      ctx.organizationId,
     )
     if (!rateVerdict.allowed) {
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
     const { email, role } = body
-    if (role === 'owner' && ctx!.role !== 'owner') {
+    if (role === 'owner' && ctx.role !== 'owner') {
       return { status: 403, data: { error: 'Only owners can invite other owners' } }
     }
 
@@ -40,7 +43,7 @@ export const POST = handler({
     if (existingUser) {
       const existingMembership = await OrgMembership.findOne({
         userId: existingUser._id,
-        organizationId: ctx!.organizationId,
+        organizationId: ctx.organizationId,
       })
       if (existingMembership) {
         return { status: 409, data: { error: 'User is already a member of this organization' } }
@@ -48,7 +51,7 @@ export const POST = handler({
     }
 
     await Invite.deleteMany({
-      organizationId: ctx!.organizationId,
+      organizationId: ctx.organizationId,
       email,
       acceptedAt: null,
     })
@@ -57,17 +60,17 @@ export const POST = handler({
     const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000)
 
     const invite = await Invite.create({
-      organizationId: ctx!.organizationId,
+      organizationId: ctx.organizationId,
       email,
       role,
       token: hashInviteToken(token),
-      invitedById: ctx!.userId,
+      invitedById: ctx.userId,
       expiresAt,
     })
 
     await audit({
-      organizationId: ctx!.organizationId,
-      userId: ctx!.userId,
+      organizationId: ctx.organizationId,
+      userId: ctx.userId,
       action: 'invite.create',
       resourceType: 'Invite',
       resourceId: invite._id,
@@ -77,8 +80,8 @@ export const POST = handler({
     const inviteUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/invite/${token}`
 
     const [org, inviter] = await Promise.all([
-      Organization.findById(ctx!.organizationId).lean<{ name?: string }>(),
-      User.findById(ctx!.userId).lean<{ name?: string; email?: string }>(),
+      Organization.findById(ctx.organizationId).lean<{ name?: string }>(),
+      User.findById(ctx.userId).lean<{ name?: string; email?: string }>(),
     ])
     const orgName = org?.name || 'an organization on Kasa'
     const inviterLabel = inviter?.name || inviter?.email || 'A team member'
@@ -284,11 +287,14 @@ export const DELETE = handler({
   minRole: 'admin',
   name: 'DELETE /api/auth/invite',
   fn: async ({ ctx, request }) => {
+    if (!ctx || 'isApiKey' in ctx) {
+      return { status: 401, data: { error: 'Unauthorized' } }
+    }
     const rateVerdict = await checkRateLimit(
       request,
       'invite-cancel',
       { limit: 30, windowMs: 60 * 60_000 },
-      ctx!.organizationId,
+      ctx.organizationId,
     )
     if (!rateVerdict.allowed) {
       return { status: 429, data: { error: 'Too many requests' } }
@@ -301,16 +307,16 @@ export const DELETE = handler({
 
     const inviteDoc = await Invite.findOne({
       _id: id,
-      organizationId: ctx!.organizationId,
+      organizationId: ctx.organizationId,
     }).select('email role')
     if (!inviteDoc) {
       return { status: 404, data: { error: 'Invite not found' } }
     }
-    await Invite.deleteOne({ _id: id, organizationId: ctx!.organizationId })
+    await Invite.deleteOne({ _id: id, organizationId: ctx.organizationId })
 
     await audit({
-      organizationId: ctx!.organizationId,
-      userId: ctx!.userId,
+      organizationId: ctx.organizationId,
+      userId: ctx.userId,
       action: 'invite.cancel',
       resourceType: 'Invite',
       resourceId: id,

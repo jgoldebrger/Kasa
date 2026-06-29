@@ -6,9 +6,10 @@
 
 import { NextResponse } from 'next/server'
 import { Types } from 'mongoose'
-import { AuditLog, OrgMembership } from '@/lib/models'
+import { AuditLog, OrgMembership, Organization } from '@/lib/models'
 import { validateDateRange } from '@/lib/validate-date-range'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { auditLogRetentionCutoff } from '@/lib/audit-log-retention'
 import { handler } from '@/lib/api/handler'
 
 export const dynamic = 'force-dynamic'
@@ -75,6 +76,12 @@ export const GET = handler({
     const query: Record<string, any> = {
       organizationId: new Types.ObjectId(String(ctx!.organizationId)),
     }
+
+    const org = await Organization.findById(ctx!.organizationId)
+      .select('auditLogRetentionDays')
+      .lean<{ auditLogRetentionDays?: number | null }>()
+    const retentionCutoff = auditLogRetentionCutoff(org)
+    query.createdAt = { $gte: retentionCutoff }
     if (action) {
       if (action.length > 120 || !/^[a-z0-9_.-]+$/i.test(action)) {
         return { status: 400, data: { error: 'Invalid action filter' } }
@@ -108,14 +115,14 @@ export const GET = handler({
           data: { error: 'Both fromDate and toDate are required for a date range' },
         }
       }
-      const createdAt: Record<string, Date> = {}
+      const createdAt: Record<string, Date> = { $gte: retentionCutoff }
       const from = new Date(fromDateRaw)
       const to = new Date(toDateRaw)
       const rangeErr = validateDateRange(from, to)
       if (rangeErr) {
         return { status: 400, data: { error: rangeErr } }
       }
-      createdAt.$gte = from
+      createdAt.$gte = from > retentionCutoff ? from : retentionCutoff
       if (/^\d{4}-\d{2}-\d{2}$/.test(toDateRaw)) {
         to.setUTCHours(23, 59, 59, 999)
       }

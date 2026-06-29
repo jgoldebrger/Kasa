@@ -11,6 +11,7 @@ import { useCurrency } from '@/lib/client/useCurrency'
 import { isFiniteDate } from '@/lib/date-utils'
 import { PageHeader, SkeletonRows, Card, Input, Modal, Button } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
+import type { Role } from '@/types/auth'
 import SettingsNav, { type SettingsTabId } from '@/app/components/settings/SettingsNav'
 import PanelSkeleton from './panels/PanelSkeleton'
 import type { BillingSnapshot } from '@/app/components/settings/BillingPanel'
@@ -166,9 +167,7 @@ export default function SettingsView({
   // Track the current user's role in the active org so we can gate the
   // Members + Trash tabs. Resolved from the MembersPanel fetch and cached
   // here so the gate updates the instant the panel loads.
-  const [currentRole, setCurrentRole] = useState<'owner' | 'admin' | 'member' | null>(
-    initialCurrentRole ?? null,
-  )
+  const [currentRole, setCurrentRole] = useState<Role | null>(initialCurrentRole ?? null)
   const canSeePrivilegedTabs = currentRole === 'owner' || currentRole === 'admin'
   const canPurge = currentRole === 'owner'
   const isOwner = currentRole === 'owner'
@@ -1767,6 +1766,7 @@ export default function SettingsView({
                   setToDate={setAuditToDate}
                   onLoadMore={() => fetchAuditPage(auditNextCursor)}
                   onExportCsv={exportAuditCsv}
+                  isOwner={isOwner}
                 />
               </>
             )}

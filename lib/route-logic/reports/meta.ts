@@ -12,7 +12,7 @@ import { checkRateLimit } from '@/lib/rate-limit'
 
 export const GET = handler({
   auth: 'org',
-  minRole: 'admin',
+  permission: 'reports:read',
   noDb: true,
   name: 'GET /api/reports/meta',
   fn: async ({ ctx, request }) => {
@@ -27,8 +27,8 @@ export const GET = handler({
     }
 
     return {
-    data: { sources: REPORT_SOURCES },
-    headers: { 'Cache-Control': 'private, max-age=300' },
+      data: { sources: REPORT_SOURCES },
+      headers: { 'Cache-Control': 'private, max-age=300' },
     }
   },
 })

@@ -44,6 +44,8 @@ const FamilySchema = new Schema(
     emailDeliverabilityWarning: { type: Boolean, default: false },
     // True when `email` is non-empty but fails basic format validation.
     emailFormatInvalid: { type: Boolean, default: false },
+    // Org-defined labels for segmentation (communications, exports, filters).
+    tags: { type: [String], default: [] },
   },
   { timestamps: true },
 )
@@ -51,6 +53,7 @@ FamilySchema.index({ organizationId: 1, createdAt: -1 })
 // Covers GET /api/families which `sort({ name: 1 })`. Without this Mongo
 // has to do an in-memory sort of every family in the org on every list call.
 FamilySchema.index({ organizationId: 1, name: 1 })
+FamilySchema.index({ organizationId: 1, parentFamilyId: 1 })
 FamilySchema.plugin(softDeletePlugin)
 
 export const Family = mongoose.models.Family || mongoose.model('Family', FamilySchema)

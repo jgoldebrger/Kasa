@@ -73,6 +73,7 @@ export default function AdminHubPage() {
   const [twoFactorRequired, setTwoFactorRequired] = useState(false)
   const [impersonation, setImpersonation] = useState<SupportModeDetail | null>(null)
   const [exiting, setExiting] = useState(false)
+  const [demoSeeding, setDemoSeeding] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -127,6 +128,27 @@ export default function AdminHubPage() {
       toast.error(t('admin.supportMode.exitFailed'))
     } finally {
       setExiting(false)
+    }
+  }
+
+  async function handleSeedDemo() {
+    setDemoSeeding(true)
+    try {
+      const res = await fetch('/api/admin/organizations/seed-demo', { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data.error || t('admin.demoSandbox.error'))
+        return
+      }
+      toast.success(
+        t('admin.demoSandbox.success')
+          .replace('{families}', String(data.familyCount ?? 0))
+          .replace('{payments}', String(data.paymentCount ?? 0)),
+      )
+    } catch {
+      toast.error(t('admin.demoSandbox.error'))
+    } finally {
+      setDemoSeeding(false)
     }
   }
 
@@ -206,6 +228,26 @@ export default function AdminHubPage() {
               </Card>
             ))}
           </div>
+
+          <section>
+            <h2 className="text-lg font-semibold text-fg mb-3">{t('admin.demoSandbox.title')}</h2>
+            <Card className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <p className="text-sm text-fg-muted flex-1">{t('admin.demoSandbox.description')}</p>
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  type="button"
+                  size="sm"
+                  loading={demoSeeding}
+                  onClick={() => void handleSeedDemo()}
+                >
+                  {demoSeeding ? t('admin.demoSandbox.seeding') : t('admin.demoSandbox.seed')}
+                </Button>
+                <ButtonLink href="/admin/organizations" size="sm" variant="secondary">
+                  Organizations
+                </ButtonLink>
+              </div>
+            </Card>
+          </section>
 
           <section>
             <h2 className="text-lg font-semibold text-fg mb-3">System status</h2>

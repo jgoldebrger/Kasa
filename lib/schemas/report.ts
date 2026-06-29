@@ -30,6 +30,21 @@ export const savedReportUpdateBody = z.object({
 
 export const reportRunBody = savedReportConfig
 
+const scheduleFrequency = z.enum(['weekly', 'monthly'])
+
+export const scheduledReportCreateBody = z.object({
+  savedReportId: objectId,
+  frequency: scheduleFrequency,
+  recipientEmail: z.string().email().max(320).optional(),
+  enabled: z.boolean().optional(),
+})
+
+export const scheduledReportUpdateBody = z.object({
+  frequency: scheduleFrequency.optional(),
+  recipientEmail: z.union([z.string().email().max(320), z.literal('')]).optional(),
+  enabled: z.boolean().optional(),
+})
+
 export const statementDateRangeBody = z
   .object({
     fromDate: isoDate,
