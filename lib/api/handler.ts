@@ -39,6 +39,7 @@ import { isCronRequest, requireOrgOrCron } from '@/lib/auth-cron'
 import { verifyCronJob } from '@/lib/auth-cron-job'
 import { logError } from '@/lib/log'
 import { verifyApiCsrf } from '@/lib/csrf'
+import { blockReadOnlySupportMutation } from '@/lib/support-mode-readonly-guard'
 
 export type AuthMode = 'public' | 'session' | 'org' | 'admin' | 'cron' | 'org-or-cron'
 
@@ -184,6 +185,11 @@ export function handler<TBody = unknown, TQuery = unknown>(opts: HandlerOptions<
 
       // --- db --------------------------------------------------------------
       if (!opts.noDb) await connectDB()
+
+      if (opts.auth === 'org' && ctx) {
+        const readOnlyBlock = blockReadOnlySupportMutation(request, ctx)
+        if (readOnlyBlock) return readOnlyBlock
+      }
 
       // Block org API calls when billing is enforced and the workspace has no
       // active platform subscription (owners subscribe via /pricing or Settings).

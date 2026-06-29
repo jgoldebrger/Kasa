@@ -166,6 +166,7 @@ export default function EmailPanel({
   const t = useT()
   const { readOnly: supportReadOnly } = useSupportModeReadOnly()
   const [tickStatus, setTickStatus] = useState<TickStatusRow | null | undefined>(undefined)
+  const [smtpTesting, setSmtpTesting] = useState(false)
   const [deliverability, setDeliverability] = useState<
     DeliverabilityStatusResponse | null | undefined
   >(undefined)
@@ -213,6 +214,22 @@ export default function EmailPanel({
     emailConfig?.lastTestStatus,
     loadDeliverability,
   ])
+
+  const smtpNeedsTest =
+    deliverability &&
+    (deliverability.smtpVerifiedRecently.status === 'fail' ||
+      deliverability.smtpVerifiedRecently.status === 'warn')
+
+  const runChecklistSmtpTest = async () => {
+    if (!emailConfig?.email) return
+    setSmtpTesting(true)
+    try {
+      await onTest()
+      await loadDeliverability()
+    } finally {
+      setSmtpTesting(false)
+    }
+  }
 
   const tickSummary = (() => {
     if (tickStatus === undefined) return t('settings.cron.lastTick.loading')
@@ -306,6 +323,20 @@ export default function EmailPanel({
             })
           )}
         </ul>
+        {smtpNeedsTest && emailConfig?.email && (
+          <div className="mt-3">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              loading={smtpTesting || saving}
+              disabled={supportReadOnly}
+              onClick={() => void runChecklistSmtpTest()}
+            >
+              {t('settings.email.checklist.testNow')}
+            </Button>
+          </div>
+        )}
       </Card>
 
       <Alert variant="info" className="mb-4" title={t('settings.email.helpLinks.title')}>

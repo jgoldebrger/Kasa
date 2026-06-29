@@ -5,14 +5,18 @@ import { ensureAlphaOrg, exitSupportModeIfActive, supportModeBanner } from './he
 const SUPPORT_REASON = 'E2E support access test'
 
 /** Complete the support-mode enter modal (reason required, min 3 chars). */
-async function confirmSupportModeEnter(page: Page, reason: string): Promise<void> {
+async function confirmSupportModeEnter(
+  page: Page,
+  reason: string,
+  opts?: { readOnly?: boolean },
+): Promise<void> {
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible({ timeout: 15_000 })
   await expect(dialog.getByRole('heading', { name: /enter support mode/i })).toBeVisible()
 
   const readOnlyCheckbox = dialog.getByRole('checkbox', { name: /read-only/i })
-  if (await readOnlyCheckbox.isVisible().catch(() => false)) {
-    await expect(readOnlyCheckbox).toBeVisible()
+  if (opts?.readOnly) {
+    await readOnlyCheckbox.check()
   }
 
   await dialog.locator('textarea').fill(reason)
@@ -73,6 +77,26 @@ test.describe('platform admin support mode', () => {
 
     await banner.getByRole('button', { name: /exit support mode/i }).click()
     await expect(banner).toBeHidden({ timeout: 30_000 })
-    await expect(page.getByText(/exited support mode/i)).toBeVisible()
+    const summaryModal = page.getByRole('dialog').filter({ hasText: /support session summary/i })
+    const summaryVisible = await summaryModal.isVisible().catch(() => false)
+    if (summaryVisible) {
+      await page.getByRole('button', { name: /^close$/i }).click()
+    } else {
+      await expect(page.getByText(/exited support mode/i)).toBeVisible()
+    }
+  })
+
+  test('read-only support mode hides compose send on communications', async ({ page }) => {
+    await page.goto('/admin/organizations', { timeout: 180_000 })
+    const targetOrg = E2E_ORGS.alpha
+    const orgRow = page.getByRole('row').filter({ hasText: targetOrg.name })
+    await expect(orgRow).toBeVisible({ timeout: 30_000 })
+    await orgRow.getByRole('button', { name: 'Open as admin' }).click()
+    await confirmSupportModeEnter(page, SUPPORT_REASON, { readOnly: true })
+
+    await page.goto('/communications')
+    await expect(supportModeBanner(page)).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText(/view only/i)).toBeVisible()
+    await expect(page.getByRole('button', { name: /send to \d+ families/i })).not.toBeVisible()
   })
 })

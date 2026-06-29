@@ -37,6 +37,7 @@ import {
   taxReceiptYearOptions,
 } from './email-utils'
 import { tomorrowMorningLocal, useEmailQuota } from './useEmailQuota'
+import { useDeliverabilityStatus } from './useDeliverabilityStatus'
 import type { EmailAttachment, EmailDraft, EmailTemplate, FamilyOption } from './types'
 
 const MAX_ATTACHMENTS = 3
@@ -82,6 +83,7 @@ export default function ComposeTab({
   const [attachingTaxReceipt, setAttachingTaxReceipt] = useState(false)
   const [recipientSegment, setRecipientSegment] = useState<RecipientSegment>('all')
   const { quota, refresh: refreshQuota } = useEmailQuota()
+  const { hasFailures: deliverabilityBlocked } = useDeliverabilityStatus()
 
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [drafts, setDrafts] = useState<EmailDraft[]>([])
@@ -423,6 +425,16 @@ export default function ComposeTab({
     if (selectedIds.size === 0) {
       toast.error(t('communications.error.noRecipients'))
       return
+    }
+
+    if (deliverabilityBlocked) {
+      const proceed = await confirm({
+        title: t('communications.deliverabilityChecklist.blockTitle'),
+        message: t('communications.deliverabilityChecklist.blockMessage'),
+        confirmLabel: t('communications.deliverabilityChecklist.sendAnyway'),
+        cancelLabel: t('communications.deliverability.cancel'),
+      })
+      if (!proceed) return
     }
 
     if (deliverabilityWarnings.length > 0) {
