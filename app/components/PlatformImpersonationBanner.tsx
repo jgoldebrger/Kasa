@@ -46,6 +46,29 @@ export default function PlatformImpersonationBanner() {
     setState(detail)
   }, [isPlatformAdmin])
 
+  const showExitToast = useCallback(
+    (actions: { action: string; at: string }[], expired = false) => {
+      const count = actions.length
+      if (expired) {
+        const expiredMsg = t('admin.supportMode.sessionExpired')
+        if (count > 0) {
+          toast.info(
+            `${expiredMsg} ${t('admin.supportMode.sessionSummary').replace('{count}', String(count))}`,
+          )
+        } else {
+          toast.info(expiredMsg)
+        }
+        return
+      }
+      if (count > 0) {
+        toast.success(t('admin.supportMode.sessionSummary').replace('{count}', String(count)))
+        return
+      }
+      toast.success(t('admin.supportMode.exitSuccess'))
+    },
+    [t, toast],
+  )
+
   useEffect(() => {
     void refresh()
   }, [refresh, pathname])
@@ -76,7 +99,7 @@ export default function PlatformImpersonationBanner() {
             void refresh()
             return
           }
-          toast.info(t('admin.supportMode.sessionExpired'))
+          showExitToast(result.actions, true)
         })()
         return
       }
@@ -88,7 +111,7 @@ export default function PlatformImpersonationBanner() {
     updateTimer()
     const id = window.setInterval(updateTimer, 60_000)
     return () => window.clearInterval(id)
-  }, [state?.active, state?.expiresAt, refresh, router, t, toast, updateSession])
+  }, [state?.active, state?.expiresAt, refresh, router, showExitToast, t, updateSession])
 
   if (!isPlatformAdmin) return null
 
@@ -100,7 +123,7 @@ export default function PlatformImpersonationBanner() {
         toast.error(result.error || t('admin.supportMode.exitFailed'))
         return
       }
-      toast.success(t('admin.supportMode.exitSuccess'))
+      showExitToast(result.actions)
     } finally {
       setExiting(false)
     }
@@ -117,6 +140,11 @@ export default function PlatformImpersonationBanner() {
       className="sticky top-0 z-30 bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-sm text-fg flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2 min-w-0">
+        {state.readOnly && (
+          <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+            {t('admin.supportMode.viewOnlyNotice')}
+          </p>
+        )}
         <p className="min-w-0">
           <strong className="font-semibold">{t('admin.supportMode.bannerTitle')}:</strong>{' '}
           {t('admin.supportMode.bannerViewing')

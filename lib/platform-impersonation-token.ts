@@ -5,6 +5,7 @@ const MAX_AGE_SEC = 8 * 60 * 60
 interface ImpersonationPayload {
   u: string
   o: string
+  iat: number
   exp: number
   ro?: boolean
 }
@@ -13,6 +14,8 @@ export type ImpersonationDetails = {
   orgId: string
   readOnly: boolean
   expiresAt: number
+  /** Unix seconds when the support session started. */
+  startedAt: number
 }
 
 function signingSecret(): string | null {
@@ -46,10 +49,12 @@ export function createImpersonationToken(
 ): string | null {
   const secret = signingSecret()
   if (!secret) return null
+  const now = Math.floor(Date.now() / 1000)
   const payload: ImpersonationPayload = {
     u: userId,
     o: orgId,
-    exp: Math.floor(Date.now() / 1000) + MAX_AGE_SEC,
+    iat: now,
+    exp: now + MAX_AGE_SEC,
   }
   if (readOnly) payload.ro = true
   const body = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')
@@ -65,10 +70,13 @@ export function readImpersonationDetails(
   if (!payload) return null
   if (payload.u !== userId) return null
   if (!payload.o || payload.exp < Math.floor(Date.now() / 1000)) return null
+  const startedAt =
+    typeof payload.iat === 'number' && payload.iat > 0 ? payload.iat : payload.exp - MAX_AGE_SEC
   return {
     orgId: payload.o,
     readOnly: payload.ro === true,
     expiresAt: payload.exp,
+    startedAt,
   }
 }
 

@@ -63,7 +63,7 @@ export const POST = handler({
     const filter = {
       organizationId: new Types.ObjectId(ctx!.organizationId),
       campaignId: new Types.ObjectId(campaignId!),
-      status: 'failed' as const,
+      status: { $in: ['failed', 'bounced'] as const },
     }
 
     const failedRows = await EmailMessage.find(filter)

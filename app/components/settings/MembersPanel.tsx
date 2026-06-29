@@ -13,6 +13,8 @@ import {
 } from '@heroicons/react/24/outline'
 import { useToast, useConfirm } from '@/app/components/Toast'
 import { useCopyToClipboard } from '@/lib/client/useCopyToClipboard'
+import ReadOnlySupportGuard from '@/app/components/ReadOnlySupportGuard'
+import { useSupportModeReadOnly } from '@/lib/client/support-mode'
 import {
   Button,
   DataView,
@@ -62,6 +64,7 @@ export default function MembersPanel({ onRoleResolved }: MembersPanelProps = {})
   const toast = useToast()
   const confirm = useConfirm()
   const { copy, copied } = useCopyToClipboard()
+  const { readOnly: supportReadOnly } = useSupportModeReadOnly()
   const [members, setMembers] = useState<Member[]>([])
   const [invites, setInvites] = useState<PendingInvite[]>([])
   const [currentUserId, setCurrentUserId] = useState<string>('')
@@ -251,6 +254,7 @@ export default function MembersPanel({ onRoleResolved }: MembersPanelProps = {})
 
   return (
     <div className="space-y-6">
+      <ReadOnlySupportGuard />
       {canManage && (
         <div className="surface-card p-4 sm:p-6">
           <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-fg">
@@ -285,7 +289,7 @@ export default function MembersPanel({ onRoleResolved }: MembersPanelProps = {})
                 {currentUserRole === 'owner' && <option value="owner">Owner</option>}
               </Select>
             </div>
-            <Button type="submit" loading={inviteBusy}>
+            <Button type="submit" loading={inviteBusy} disabled={supportReadOnly}>
               Send invite
             </Button>
           </form>

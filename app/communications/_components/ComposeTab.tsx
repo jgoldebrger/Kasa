@@ -13,6 +13,8 @@ import {
 import { useToast, useConfirm } from '@/app/components/Toast'
 import { Alert, Button, Card, Input, Select } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
+import { useSupportModeReadOnly } from '@/lib/client/support-mode'
+import ReadOnlySupportGuard from '@/app/components/ReadOnlySupportGuard'
 import type { MessageKey } from '@/lib/i18n/load-locale'
 import EmailComposeEditor from './EmailComposeEditor'
 import SubjectFieldWithMergeFields from './SubjectFieldWithMergeFields'
@@ -62,6 +64,7 @@ export default function ComposeTab({
   const t = useT()
   const toast = useToast()
   const confirm = useConfirm()
+  const { readOnly: supportReadOnly } = useSupportModeReadOnly()
 
   const [subject, setSubject] = useState('')
   const [subjectB, setSubjectB] = useState('')
@@ -72,12 +75,13 @@ export default function ComposeTab({
   const taxYearOptions = useMemo(() => taxReceiptYearOptions(), [])
   const [scheduledAt, setScheduledAt] = useState('')
   const [sending, setSending] = useState(false)
+  const [testSending, setTestSending] = useState(false)
   const [savingDraft, setSavingDraft] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [attachingStatement, setAttachingStatement] = useState(false)
   const [attachingTaxReceipt, setAttachingTaxReceipt] = useState(false)
   const [recipientSegment, setRecipientSegment] = useState<RecipientSegment>('all')
-  const { quota } = useEmailQuota()
+  const { quota, refresh: refreshQuota } = useEmailQuota()
 
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [drafts, setDrafts] = useState<EmailDraft[]>([])
@@ -240,6 +244,7 @@ export default function ComposeTab({
   )
 
   useEffect(() => {
+    if (supportReadOnly) return
     if (skipAutoSaveRef.current) {
       skipAutoSaveRef.current = false
       return
@@ -252,7 +257,7 @@ export default function ComposeTab({
     return () => {
       if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
     }
-  }, [subject, body, selectedIds, saveDraft])
+  }, [subject, body, selectedIds, saveDraft, supportReadOnly])
 
   const handleFiles = async (files: FileList | null) => {
     if (!files?.length) return
@@ -378,6 +383,36 @@ export default function ComposeTab({
     }
     if (subjectB.trim()) payload.subjectB = subjectB.trim()
     return payload
+  }
+
+  const sendTestToSelf = async () => {
+    if (!subject.trim() || composeBodyIsEmpty(body)) {
+      toast.error(t('communications.error.missingFields'))
+      return
+    }
+    setTestSending(true)
+    try {
+      const html = bodyToEmailHtml(body)
+      const text = bodyToPlainText(body)
+      const res = await fetch('/api/emails/test-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subject: subject.trim(),
+          html,
+          text,
+          selectedFamilyIds: selectedIds.size > 0 ? Array.from(selectedIds) : undefined,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Test send failed'))
+      toast.success(t('communications.testSend.success'))
+      void refreshQuota()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : t('communications.testSend.error'))
+    } finally {
+      setTestSending(false)
+    }
   }
 
   const send = async () => {
@@ -506,6 +541,8 @@ export default function ComposeTab({
   const remainingQuota = quota?.remaining
   const overQuota =
     remainingQuota != null && selectedIds.size > 0 && selectedIds.size > remainingQuota
+  const quotaNearLimit =
+    quota != null && quota.limit > 0 && quota.sent / quota.limit > 0.8 && !overQuota
   const scheduleSuggested = overQuota && !scheduledAt
 
   const applyTomorrowSchedule = () => {
@@ -514,6 +551,7 @@ export default function ComposeTab({
 
   return (
     <>
+      <ReadOnlySupportGuard className="mb-4" />
       <Card className="p-4 sm:p-6 space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Select
@@ -720,9 +758,15 @@ export default function ComposeTab({
         <div className="flex flex-wrap items-center gap-2">
           {quota != null && (
             <p
-              className={`text-xs tabular mr-auto ${overQuota ? 'text-danger font-medium' : 'text-fg-muted'}`}
+              className={`text-xs tabular mr-auto ${
+                overQuota
+                  ? 'text-danger font-medium'
+                  : quotaNearLimit
+                    ? 'text-warning font-medium'
+                    : 'text-fg-muted'
+              }`}
             >
-              {t('communications.quota.daily')
+              {t('communications.quota.today')
                 .replace('{sent}', String(quota.sent))
                 .replace('{limit}', String(quota.limit))}
               {overQuota &&
@@ -741,6 +785,7 @@ export default function ComposeTab({
             type="button"
             variant="secondary"
             loading={savingDraft}
+            disabled={supportReadOnly}
             leftIcon={<BookmarkIcon className="h-4 w-4" />}
             onClick={() => void saveDraft(false)}
           >
@@ -749,26 +794,39 @@ export default function ComposeTab({
           <Button
             type="button"
             variant="secondary"
+            disabled={supportReadOnly}
             leftIcon={<BookmarkIcon className="h-4 w-4" />}
             onClick={() => void saveAsTemplate()}
           >
             {t('communications.template.save')}
           </Button>
           <Button
-            loading={sending}
-            leftIcon={
-              scheduledAt ? (
-                <ClockIcon className="h-4 w-4" />
-              ) : (
-                <PaperAirplaneIcon className="h-4 w-4" />
-              )
-            }
-            onClick={() => void send()}
+            type="button"
+            variant="secondary"
+            loading={testSending}
+            disabled={supportReadOnly || sending}
+            onClick={() => void sendTestToSelf()}
           >
-            {scheduledAt
-              ? t('communications.schedule.button').replace('{count}', String(selectedIds.size))
-              : t('communications.send').replace('{count}', String(selectedIds.size))}
+            {t('communications.testSend.button')}
           </Button>
+          {!supportReadOnly && (
+            <Button
+              loading={sending}
+              disabled={testSending}
+              leftIcon={
+                scheduledAt ? (
+                  <ClockIcon className="h-4 w-4" />
+                ) : (
+                  <PaperAirplaneIcon className="h-4 w-4" />
+                )
+              }
+              onClick={() => void send()}
+            >
+              {scheduledAt
+                ? t('communications.schedule.button').replace('{count}', String(selectedIds.size))
+                : t('communications.send').replace('{count}', String(selectedIds.size))}
+            </Button>
+          )}
         </div>
       </Card>
 

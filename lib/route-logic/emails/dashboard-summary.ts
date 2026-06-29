@@ -16,7 +16,7 @@ export async function getEmailDashboardSummary(
   const [failedLast7Days, lastSent, pendingScheduled] = await Promise.all([
     EmailMessage.countDocuments({
       organizationId: orgOid,
-      status: 'failed',
+      status: { $in: ['failed', 'bounced'] },
       createdAt: { $gte: since },
     }),
     EmailMessage.findOne({

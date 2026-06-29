@@ -5,6 +5,8 @@ import { PaperAirplaneIcon } from '@heroicons/react/24/outline'
 import { useToast } from '@/app/components/Toast'
 import { Alert, Button, Modal, Textarea } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
+import { useSupportModeReadOnly } from '@/lib/client/support-mode'
+import ReadOnlySupportGuard from '@/app/components/ReadOnlySupportGuard'
 import { insertAtCursor } from '@/lib/client/insert-at-cursor'
 import MergeFieldSelector from '@/app/communications/_components/MergeFieldSelector'
 import SubjectFieldWithMergeFields from '@/app/communications/_components/SubjectFieldWithMergeFields'
@@ -35,6 +37,7 @@ export default function EmailFamiliesModal({
 }: EmailFamiliesModalProps) {
   const t = useT()
   const toast = useToast()
+  const { readOnly: supportReadOnly } = useSupportModeReadOnly()
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
@@ -125,6 +128,7 @@ export default function EmailFamiliesModal({
       maxWidth="max-w-lg"
     >
       <div className="space-y-4">
+        <ReadOnlySupportGuard />
         {skippedNoEmail.length > 0 && (
           <p className="text-sm text-warning">
             {t('families.emailBulk.skippedNoEmail').replace(
@@ -192,14 +196,16 @@ export default function EmailFamiliesModal({
           <Button type="button" variant="ghost" onClick={resetAndClose} disabled={sending}>
             {t('common.cancel')}
           </Button>
-          <Button
-            loading={sending}
-            disabled={emailable.length === 0}
-            onClick={() => void sendBulk()}
-            leftIcon={<PaperAirplaneIcon className="h-4 w-4" />}
-          >
-            {t('families.emailBulk.send').replace('{count}', String(emailable.length))}
-          </Button>
+          {!supportReadOnly && (
+            <Button
+              loading={sending}
+              disabled={emailable.length === 0}
+              onClick={() => void sendBulk()}
+              leftIcon={<PaperAirplaneIcon className="h-4 w-4" />}
+            >
+              {t('families.emailBulk.send').replace('{count}', String(emailable.length))}
+            </Button>
+          )}
         </div>
       </div>
     </Modal>

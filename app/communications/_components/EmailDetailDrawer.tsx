@@ -22,6 +22,7 @@ function statusBadge(status: string): 'default' | 'success' | 'warning' | 'dange
     opened: 'success',
     clicked: 'success',
     failed: 'danger',
+    bounced: 'danger',
     queued: 'warning',
   }
   return map[status] ?? 'default'
@@ -166,7 +167,7 @@ export default function EmailDetailDrawer({
                     {detail.openCount} / {detail.clickCount}
                   </span>
                 </div>
-                {detail.status === 'failed' && detail.error && (
+                {(detail.status === 'failed' || detail.status === 'bounced') && detail.error && (
                   <p className="text-sm text-danger">{detail.error}</p>
                 )}
                 {detail.openTracking &&
@@ -212,7 +213,7 @@ export default function EmailDetailDrawer({
           )}
         </div>
 
-        {detail?.status === 'failed' && (
+        {(detail?.status === 'failed' || detail?.status === 'bounced') && (
           <div className="border-t border-border p-4">
             <Button
               type="button"

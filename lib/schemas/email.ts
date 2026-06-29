@@ -37,13 +37,24 @@ export const sendBulkEmailQuery = z.object({
 export const listEmailsQuery = z.object({
   familyId: objectId.optional(),
   kind: z.enum(['custom', 'statement', 'tax-receipt', 'task-reminder', 'file']).optional(),
-  status: z.enum(['queued', 'sent', 'opened', 'clicked', 'failed']).optional(),
+  status: z.enum(['queued', 'sent', 'opened', 'clicked', 'failed', 'bounced']).optional(),
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   cursor: z.string().optional(),
   format: z.enum(['csv']).optional(),
 })
+
+export const testSendEmailBody = z
+  .object({
+    subject: z.string().min(1).max(998),
+    html: z.string().min(1).max(100_000).optional(),
+    text: z.string().max(100_000).optional(),
+    selectedFamilyIds: z.array(objectId).max(100).optional(),
+  })
+  .refine((data) => Boolean(data.html?.trim() || data.text?.trim()), {
+    message: 'html or text is required',
+  })
 
 export const attachStatementBody = z.object({
   familyId: objectId,

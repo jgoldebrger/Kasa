@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { BoltIcon, PlayIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { BoltIcon, EyeIcon, PlayIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useToast } from '@/app/components/Toast'
 import {
@@ -17,6 +17,7 @@ import {
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
 import CommunicationsNav from './CommunicationsNav'
+import AutomationRecipientsModal from './AutomationRecipientsModal'
 import type { EmailAutomationRuleRow, EmailTemplate } from './types'
 
 function tf(t: ReturnType<typeof useT>, key: string, fallback: string) {
@@ -55,6 +56,7 @@ export default function AutomationsView() {
   const [creating, setCreating] = useState(false)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [runningId, setRunningId] = useState<string | null>(null)
+  const [previewRule, setPreviewRule] = useState<{ id: string; name: string } | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const loadTemplates = useCallback(async () => {
@@ -341,6 +343,19 @@ export default function AutomationsView() {
                         type="button"
                         variant="secondary"
                         size="sm"
+                        leftIcon={<EyeIcon className="h-4 w-4" />}
+                        onClick={() => setPreviewRule({ id: rule._id, name: rule.name })}
+                      >
+                        {tf(
+                          t,
+                          'communications.automations.previewRecipients',
+                          'Preview recipients',
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
                         loading={runningId === rule._id}
                         leftIcon={<PlayIcon className="h-4 w-4" />}
                         onClick={() => void runNow(rule._id)}
@@ -365,6 +380,13 @@ export default function AutomationsView() {
           </div>
         )}
       </div>
+
+      <AutomationRecipientsModal
+        open={previewRule != null}
+        ruleId={previewRule?.id ?? null}
+        ruleName={previewRule?.name ?? ''}
+        onClose={() => setPreviewRule(null)}
+      />
     </div>
   )
 }

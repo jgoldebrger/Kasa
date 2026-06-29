@@ -28,6 +28,7 @@ import { formatLocaleDate } from '@/lib/date-utils'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
+import { useSupportModeReadOnly } from '@/lib/client/support-mode'
 import { PAYMENTS_LIST_PAGE_SIZE, parsePaymentsListResponse } from '@/lib/client/payments-list'
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
@@ -92,6 +93,7 @@ export default function PaymentsView({
 } = {}) {
   const toast = useToast()
   const t = useT()
+  const { readOnly: supportReadOnly } = useSupportModeReadOnly()
   const { format: formatMoney } = useCurrency()
   const serverHydrated = initialPayments !== undefined
   const [allPayments, setAllPayments] = useState<Payment[]>(initialPayments ?? [])
@@ -341,12 +343,14 @@ export default function PaymentsView({
           subtitle={t('payments.subtitle')}
           actions={
             <div className="flex flex-col sm:flex-row sm:items-end gap-3">
-              <Button
-                leftIcon={<PlusIcon className="h-5 w-5" />}
-                onClick={() => setShowRecordModal(true)}
-              >
-                {t('payments.recordPayment')}
-              </Button>
+              {!supportReadOnly && (
+                <Button
+                  leftIcon={<PlusIcon className="h-5 w-5" />}
+                  onClick={() => setShowRecordModal(true)}
+                >
+                  {t('payments.recordPayment')}
+                </Button>
+              )}
               <div className="text-right">
                 <div className="text-xs text-fg-muted">{t('payments.totalAmount')}</div>
                 <div className="text-2xl sm:text-3xl font-bold text-fg tabular">

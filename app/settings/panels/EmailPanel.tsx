@@ -3,10 +3,17 @@
 import type React from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { EnvelopeIcon } from '@heroicons/react/24/outline'
+import {
+  CheckCircleIcon,
+  EnvelopeIcon,
+  ExclamationTriangleIcon,
+  XCircleIcon,
+} from '@heroicons/react/24/outline'
+import ReadOnlySupportGuard from '@/app/components/ReadOnlySupportGuard'
 import { SettingsPanel } from '@/app/components/settings/SettingsPanel'
-import { Alert, Badge, Button, Input } from '@/app/components/ui'
+import { Alert, Badge, Button, Card, Input } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
+import { useSupportModeReadOnly } from '@/lib/client/support-mode'
 
 export interface EmailConfig {
   email: string
@@ -51,6 +58,59 @@ interface TickStatusRow {
 }
 
 const HELP_ARTICLE_SLUGS = ['email-setup', 'email-domain-dns', 'email-can-spam'] as const
+
+type ChecklistStatus = 'pass' | 'warn' | 'fail'
+
+interface DeliverabilityCheck {
+  status: ChecklistStatus
+  ok: boolean
+}
+
+interface DeliverabilityStatusResponse {
+  smtpConfigured: DeliverabilityCheck
+  smtpVerifiedRecently: DeliverabilityCheck
+  replyToSet: DeliverabilityCheck
+  physicalAddressSet: DeliverabilityCheck
+  quotaHeadroom: DeliverabilityCheck
+  quota: { sentToday: number; limit: number; remaining: number }
+}
+
+type ChecklistItemId =
+  | 'smtpConfigured'
+  | 'smtpVerifiedRecently'
+  | 'replyToSet'
+  | 'physicalAddressSet'
+  | 'quotaHeadroom'
+
+const CHECKLIST_ITEMS: { id: ChecklistItemId; helpSlug: (typeof HELP_ARTICLE_SLUGS)[number] }[] = [
+  { id: 'smtpConfigured', helpSlug: 'email-setup' },
+  { id: 'smtpVerifiedRecently', helpSlug: 'email-setup' },
+  { id: 'replyToSet', helpSlug: 'email-setup' },
+  { id: 'physicalAddressSet', helpSlug: 'email-can-spam' },
+  { id: 'quotaHeadroom', helpSlug: 'email-domain-dns' },
+]
+
+function StatusIcon({ status }: { status: ChecklistStatus }) {
+  if (status === 'pass') {
+    return (
+      <CheckCircleIcon
+        className="h-5 w-5 shrink-0 text-green-600 dark:text-green-400"
+        aria-hidden="true"
+      />
+    )
+  }
+  if (status === 'warn') {
+    return (
+      <ExclamationTriangleIcon
+        className="h-5 w-5 shrink-0 text-amber-500 dark:text-amber-400"
+        aria-hidden="true"
+      />
+    )
+  }
+  return (
+    <XCircleIcon className="h-5 w-5 shrink-0 text-red-600 dark:text-red-400" aria-hidden="true" />
+  )
+}
 
 function formatRelative(iso: string): string {
   const then = new Date(iso).getTime()
@@ -104,7 +164,26 @@ export default function EmailPanel({
   onTest,
 }: EmailPanelProps) {
   const t = useT()
+  const { readOnly: supportReadOnly } = useSupportModeReadOnly()
   const [tickStatus, setTickStatus] = useState<TickStatusRow | null | undefined>(undefined)
+  const [deliverability, setDeliverability] = useState<
+    DeliverabilityStatusResponse | null | undefined
+  >(undefined)
+
+  const loadDeliverability = useCallback(async () => {
+    setDeliverability(undefined)
+    try {
+      const res = await fetch('/api/emails/deliverability-status')
+      if (!res.ok) {
+        setDeliverability(null)
+        return
+      }
+      const body = await res.json().catch(() => null)
+      setDeliverability(body as DeliverabilityStatusResponse)
+    } catch {
+      setDeliverability(null)
+    }
+  }, [])
 
   const loadTickStatus = useCallback(async () => {
     setTickStatus(undefined)
@@ -124,6 +203,16 @@ export default function EmailPanel({
   useEffect(() => {
     void loadTickStatus()
   }, [loadTickStatus])
+
+  useEffect(() => {
+    void loadDeliverability()
+  }, [
+    emailConfig?.email,
+    emailConfig?.replyTo,
+    emailConfig?.lastTestAt,
+    emailConfig?.lastTestStatus,
+    loadDeliverability,
+  ])
 
   const tickSummary = (() => {
     if (tickStatus === undefined) return t('settings.cron.lastTick.loading')
@@ -153,6 +242,8 @@ export default function EmailPanel({
       title={t('settings.email.title')}
       description={t('settings.email.description')}
     >
+      <ReadOnlySupportGuard className="mb-4" />
+
       {message && (
         <Alert
           variant={message.type === 'success' ? 'success' : 'danger'}
@@ -160,6 +251,62 @@ export default function EmailPanel({
           title={message.text}
         />
       )}
+
+      <Card className="mb-4" compact>
+        <h3 className="text-sm font-medium text-fg">{t('settings.email.checklist.title')}</h3>
+        <p className="mt-1 text-xs text-fg-muted">{t('settings.email.checklist.description')}</p>
+        <ul className="mt-3 divide-y divide-border rounded-md border border-border overflow-hidden">
+          {deliverability === undefined ? (
+            <li className="px-3 py-2.5 text-sm text-fg-muted">
+              {t('settings.email.checklist.loading')}
+            </li>
+          ) : deliverability === null ? (
+            <li className="px-3 py-2.5 text-sm text-fg-muted">
+              {t('settings.email.checklist.unavailable')}
+            </li>
+          ) : (
+            CHECKLIST_ITEMS.map(({ id, helpSlug }) => {
+              const check = deliverability[id]
+              const detailKey = `settings.email.checklist.${id}.${check.status}` as const
+              const detail =
+                id === 'quotaHeadroom' && deliverability.quota
+                  ? t(detailKey)
+                      .replace('{remaining}', String(deliverability.quota.remaining))
+                      .replace('{limit}', String(deliverability.quota.limit))
+                  : t(detailKey)
+              return (
+                <li key={id} className="flex items-start gap-2.5 px-3 py-2.5 text-sm">
+                  <StatusIcon status={check.status} />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-fg">
+                      {t(`settings.email.checklist.${id}.label`)}
+                    </p>
+                    <p className="text-xs text-fg-muted">{detail}</p>
+                    <Link
+                      href={`/help/${helpSlug}`}
+                      className="mt-0.5 inline-block text-xs text-accent underline hover:text-accent-hover"
+                    >
+                      {t(`settings.email.helpLinks.${helpSlug}`)}
+                    </Link>
+                  </div>
+                  <Badge
+                    variant={
+                      check.status === 'pass'
+                        ? 'success'
+                        : check.status === 'warn'
+                          ? 'warning'
+                          : 'danger'
+                    }
+                    className="shrink-0 normal-case"
+                  >
+                    {t(`settings.email.checklist.status.${check.status}`)}
+                  </Badge>
+                </li>
+              )
+            })
+          )}
+        </ul>
+      </Card>
 
       <Alert variant="info" className="mb-4" title={t('settings.email.helpLinks.title')}>
         <ul className="space-y-1.5 text-sm">
@@ -313,7 +460,12 @@ export default function EmailPanel({
         />
 
         <div className="flex gap-3 pt-4">
-          <Button type="submit" loading={saving} leftIcon={<EnvelopeIcon className="h-4 w-4" />}>
+          <Button
+            type="submit"
+            loading={saving}
+            disabled={supportReadOnly}
+            leftIcon={<EnvelopeIcon className="h-4 w-4" />}
+          >
             {emailConfig ? t('settings.email.update') : t('settings.email.save')}
           </Button>
 
@@ -322,7 +474,7 @@ export default function EmailPanel({
               type="button"
               variant="secondary"
               onClick={onTest}
-              disabled={saving}
+              disabled={supportReadOnly || saving}
               leftIcon={<EnvelopeIcon className="h-4 w-4" />}
             >
               {t('settings.email.sendTest')}

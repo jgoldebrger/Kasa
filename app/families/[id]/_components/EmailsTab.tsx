@@ -7,6 +7,7 @@ import { formatLocaleDate } from '@/lib/date-utils'
 import { useFamilyDetail } from '../FamilyDetailContext'
 import { Badge, Card, EmptyState, SkeletonRows } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
+import type { MessageKey } from '@/lib/i18n/load-locale'
 
 interface EmailLogRow {
   _id: string
@@ -17,6 +18,20 @@ interface EmailLogRow {
   clickCount: number
   error: string | null
   createdAt: string
+  firstOpenedAt: string | null
+}
+
+const EMAIL_KIND_KEYS: Record<string, MessageKey> = {
+  custom: 'communications.emailKind.custom',
+  statement: 'communications.emailKind.statement',
+  'tax-receipt': 'communications.emailKind.tax-receipt',
+  'task-reminder': 'communications.emailKind.task-reminder',
+  file: 'communications.emailKind.file',
+}
+
+function emailKindLabel(kind: string, t: ReturnType<typeof useT>): string {
+  const key = EMAIL_KIND_KEYS[kind]
+  return key ? t(key) : kind.replace(/-/g, ' ')
 }
 
 export default function EmailsTab() {
@@ -59,8 +74,8 @@ export default function EmailsTab() {
         title={t('family.emails.empty.title')}
         description={t('family.emails.empty.description')}
         cta={{
-          label: t('communications.title'),
-          href: '/communications',
+          label: t('family.emails.composeForFamily'),
+          href: `/communications?familyId=${familyId}`,
         }}
       />
     )
@@ -75,10 +90,22 @@ export default function EmailsTab() {
             className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
           >
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-fg truncate">{row.subject}</p>
+              <Link
+                href={`/communications?emailId=${row._id}`}
+                className="font-medium text-fg truncate block hover:text-accent hover:underline"
+                title={t('family.emails.viewDetail')}
+              >
+                {row.subject}
+              </Link>
               <p className="text-xs text-fg-muted tabular mt-0.5">
                 {row.createdAt ? formatLocaleDate(row.createdAt) : '—'} ·{' '}
-                <span className="capitalize">{row.kind.replace(/-/g, ' ')}</span>
+                {emailKindLabel(row.kind, t)}
+                {row.firstOpenedAt && (
+                  <>
+                    {' '}
+                    · {t('family.emails.firstOpened')}: {formatLocaleDate(row.firstOpenedAt)}
+                  </>
+                )}
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">

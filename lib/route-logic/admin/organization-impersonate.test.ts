@@ -7,6 +7,7 @@ describe('validateImpersonateBody', () => {
       ok: true,
       reason: 'Customer billing issue',
       readOnly: true,
+      redirectTo: '/',
     })
   })
 
@@ -15,6 +16,7 @@ describe('validateImpersonateBody', () => {
       ok: true,
       reason: 'Help desk ticket',
       readOnly: false,
+      redirectTo: '/',
     })
   })
 
@@ -43,6 +45,22 @@ describe('validateImpersonateBody', () => {
     expect(validateImpersonateBody({ reason: 'x'.repeat(501) })).toEqual({
       ok: false,
       error: 'Reason must be at most 500 characters',
+    })
+  })
+
+  it('accepts allowed redirectTo values', () => {
+    expect(validateImpersonateBody({ reason: 'Go to families', redirectTo: '/families' })).toEqual({
+      ok: true,
+      reason: 'Go to families',
+      readOnly: false,
+      redirectTo: '/families',
+    })
+  })
+
+  it('rejects invalid redirectTo', () => {
+    expect(validateImpersonateBody({ reason: 'Bad redirect', redirectTo: '/payments' })).toEqual({
+      ok: false,
+      error: 'Invalid redirectTo',
     })
   })
 })

@@ -35,7 +35,7 @@ export const GET = handler({
       await Promise.all([
         EmailMessage.countDocuments(filter),
         EmailMessage.countDocuments({ ...filter, status: { $in: ['sent', 'opened', 'clicked'] } }),
-        EmailMessage.countDocuments({ ...filter, status: 'failed' }),
+        EmailMessage.countDocuments({ ...filter, status: { $in: ['failed', 'bounced'] } }),
         EmailMessage.countDocuments({
           ...filter,
           $or: [{ status: 'opened' }, { status: 'clicked' }, { openCount: { $gt: 0 } }],

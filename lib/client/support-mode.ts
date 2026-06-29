@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { clearCache } from '@/lib/client-cache'
 
 export const SUPPORT_MODE_CHANGED = 'kasa:support-mode-changed'
@@ -67,18 +67,39 @@ export async function enterSupportMode(opts: {
   opts.router.refresh()
 }
 
+export type SupportSessionAction = {
+  action: string
+  at: string
+}
+
+export type ExitSupportModeResult =
+  | { ok: true; actions: SupportSessionAction[] }
+  | { ok: false; error: string }
+
 /** After successful DELETE or local exit — ends support mode server-side. */
 export async function exitSupportMode(opts: {
   router: { push: (url: string) => void; refresh: () => void }
   updateSession?: () => Promise<unknown>
   redirectTo?: string
-}): Promise<{ ok: boolean; error?: string }> {
+}): Promise<ExitSupportModeResult> {
   try {
     const res = await fetch('/api/admin/impersonate', { method: 'DELETE' })
+    const body = await res.json().catch(() => ({}))
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}))
       return { ok: false, error: body?.error || 'Could not exit support mode' }
     }
+
+    const actions: SupportSessionAction[] = Array.isArray(body.actions)
+      ? body.actions
+          .filter(
+            (row: unknown): row is SupportSessionAction =>
+              !!row &&
+              typeof row === 'object' &&
+              typeof (row as SupportSessionAction).action === 'string' &&
+              typeof (row as SupportSessionAction).at === 'string',
+          )
+          .slice(0, 50)
+      : []
 
     notifySupportModeChanged({ active: false })
     clearOrgCaches()
@@ -90,7 +111,7 @@ export async function exitSupportMode(opts: {
     dispatchOrgChanged()
     opts.router.push(opts.redirectTo ?? '/admin')
     opts.router.refresh()
-    return { ok: true }
+    return { ok: true, actions }
   } catch {
     return { ok: false, error: 'Network error exiting support mode' }
   }
@@ -106,6 +127,42 @@ export function useSupportModeChanged(onChange: (detail: SupportModeDetail) => v
     window.addEventListener(SUPPORT_MODE_CHANGED, handler)
     return () => window.removeEventListener(SUPPORT_MODE_CHANGED, handler)
   }, [onChange])
+}
+
+/** Client hook for read-only platform support impersonation. */
+export function useSupportModeReadOnly(): {
+  active: boolean
+  readOnly: boolean
+  loading: boolean
+} {
+  const [state, setState] = useState<SupportModeDetail>({ active: false })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchSupportModeStatus().then((detail) => {
+      if (!cancelled) {
+        setState(detail)
+        setLoading(false)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useSupportModeChanged(
+    useCallback((detail) => {
+      setState(detail)
+      setLoading(false)
+    }, []),
+  )
+
+  return {
+    active: Boolean(state.active),
+    readOnly: Boolean(state.active && state.readOnly),
+    loading,
+  }
 }
 
 export async function fetchSupportModeStatus(): Promise<SupportModeDetail> {

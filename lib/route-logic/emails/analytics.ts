@@ -5,6 +5,7 @@
  */
 
 import { z } from 'zod'
+import { NextResponse } from 'next/server'
 import { Types } from 'mongoose'
 import { EmailMessage } from '@/lib/models'
 import { checkRateLimit } from '@/lib/rate-limit'
@@ -17,7 +18,49 @@ const analyticsQuery = z.object({
     .enum(['30', '90'])
     .optional()
     .transform((v) => (v === '90' ? 90 : 30)),
+  format: z.enum(['json', 'csv']).optional().default('json'),
 })
+
+function csvField(value: string): string {
+  const s = String(value ?? '')
+  return `"${s.replace(/"/g, '""')}"`
+}
+
+function exportAnalyticsCsv(
+  buckets: Array<{
+    date: string
+    sent: number
+    opened: number
+    clicked: number
+    failed: number
+  }>,
+  topCampaigns: Array<{ subject: string; sent: number }>,
+  days: number,
+): NextResponse {
+  const header = ['date', 'subject/campaign', 'sent', 'opened', 'clicked', 'failed']
+  const lines = [header.join(',')]
+
+  for (const row of buckets) {
+    lines.push(
+      [csvField(row.date), csvField(''), row.sent, row.opened, row.clicked, row.failed].join(','),
+    )
+  }
+
+  for (const row of topCampaigns) {
+    lines.push([csvField(''), csvField(row.subject || ''), row.sent, '', '', ''].join(','))
+  }
+
+  const csv = lines.join('\n')
+  const filename = `email-analytics-${days}d-${new Date().toISOString().slice(0, 10)}.csv`
+  return new NextResponse(csv, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Cache-Control': 'no-store',
+    },
+  })
+}
 
 const SENT_STATUSES = ['sent', 'opened', 'clicked'] as const
 
@@ -146,7 +189,7 @@ export const GET = handler({
       const count = row.count ?? 0
       if (!bucketMap.has(day)) continue
       const bucket = bucketMap.get(day)!
-      if (status === 'failed') bucket.failed += count
+      if (status === 'failed' || status === 'bounced') bucket.failed += count
       else if ((SENT_STATUSES as readonly string[]).includes(status)) bucket.sent += count
     }
 
@@ -187,6 +230,10 @@ export const GET = handler({
       subject: row.subject ?? '',
       sent: row.sent ?? 0,
     }))
+
+    if (query?.format === 'csv') {
+      return exportAnalyticsCsv(buckets, topCampaigns, days)
+    }
 
     return {
       data: {

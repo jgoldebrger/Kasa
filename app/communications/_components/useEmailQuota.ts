@@ -23,7 +23,7 @@ export function useEmailQuota(enabled = true) {
   const refresh = useCallback(async () => {
     if (!enabled) return
     try {
-      const res = await fetch('/api/emails/quota')
+      const res = await fetch('/api/emails/send-quota')
       if (!res.ok) return
       const json = await res.json().catch(() => ({}))
       const payload = (json.data ?? json) as Record<string, unknown>

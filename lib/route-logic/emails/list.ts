@@ -5,12 +5,13 @@ import { encodeCompoundCursor, decodeCompoundCursor } from '@/lib/pagination'
 
 function errorFromRow(row: {
   error?: string | null
-  events?: Array<{ type?: string; meta?: { message?: string } }>
+  events?: Array<{ type?: string; meta?: { message?: string; reason?: string } }>
 }): string | null {
   if (row.error) return row.error
   const events = row.events ?? []
   for (let i = events.length - 1; i >= 0; i--) {
     const ev = events[i]
+    if (ev?.type === 'bounced' && ev.meta?.reason) return String(ev.meta.reason)
     if (ev?.type === 'failed' && ev.meta?.message) return String(ev.meta.message)
   }
   return null

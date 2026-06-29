@@ -35,7 +35,7 @@ const EmailMessageSchema = new Schema(
     provider: { type: String, enum: ['gmail'], default: 'gmail' },
     status: {
       type: String,
-      enum: ['queued', 'sent', 'opened', 'clicked', 'failed'],
+      enum: ['queued', 'sent', 'opened', 'clicked', 'failed', 'bounced'],
       default: 'queued',
       index: true,
     },

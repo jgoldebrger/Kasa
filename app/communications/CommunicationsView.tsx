@@ -47,6 +47,7 @@ export default function CommunicationsView() {
   const toast = useToast()
   const searchParams = useSearchParams()
   const deepLinkFamilyId = searchParams.get('familyId')
+  const deepLinkEmailId = searchParams.get('emailId')
   const [tab, setTab] = useState<Tab>('compose')
   const [families, setFamilies] = useState<FamilyOption[]>([])
   const [hasBalanceData, setHasBalanceData] = useState(false)
@@ -154,6 +155,12 @@ export default function CommunicationsView() {
     void loadFamilies()
     void loadLogs()
   })
+
+  useEffect(() => {
+    if (!deepLinkEmailId) return
+    setTab('log')
+    setDetailEmailId(deepLinkEmailId)
+  }, [deepLinkEmailId])
 
   const handleSent = (result: { sent: number; failed: number; campaignId?: string }) => {
     setTab('log')

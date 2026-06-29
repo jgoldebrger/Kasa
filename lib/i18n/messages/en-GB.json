@@ -236,5 +236,14 @@
   "admin.supportMode.sessionExpired": "Support mode session expired.",
   "admin.supportMode.defaultOrg": "organisation",
   "admin.supportMode.sidebarBadge": "Support",
-  "admin.supportMode.sidebarBadgeReadOnly": "Support (read-only)"
+  "admin.supportMode.sidebarBadgeReadOnly": "Support (read-only)",
+  "admin.supportMode.landingTitle": "Support mode overview",
+  "admin.supportMode.landingSubtitle": "Quick snapshot for {orgName} — use the links below to investigate.",
+  "admin.supportMode.smtpLabel": "Org SMTP",
+  "admin.supportMode.smtpConfigured": "Configured",
+  "admin.supportMode.smtpNotConfigured": "Not configured",
+  "admin.supportMode.platformLabel": "Platform",
+  "admin.supportMode.viewCommunications": "View communications log",
+  "admin.supportMode.viewOrganizations": "All organisations",
+  "admin.supportMode.viewEmailSettings": "Email settings"
 }

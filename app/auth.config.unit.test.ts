@@ -146,4 +146,12 @@ describe('auth.config authorized — cron secret middleware gate', () => {
     })
     expect(result).toBe(true)
   })
+
+  it('allows unauthenticated email bounce webhook requests', () => {
+    const result = authorized({
+      auth: null,
+      request: apiRequest('/api/email/bounce'),
+    })
+    expect(result).toBe(true)
+  })
 })

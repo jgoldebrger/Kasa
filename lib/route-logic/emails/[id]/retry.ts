@@ -33,8 +33,8 @@ export const POST = handler({
     }).lean<any>()
 
     if (!row) return { status: 404, data: { error: 'Email not found' } }
-    if (row.status !== 'failed') {
-      return { status: 400, data: { error: 'Only failed emails can be retried' } }
+    if (row.status !== 'failed' && row.status !== 'bounced') {
+      return { status: 400, data: { error: 'Only failed or bounced emails can be retried' } }
     }
     if (!row.html?.trim() && !row.text?.trim()) {
       return {

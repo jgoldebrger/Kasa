@@ -29,6 +29,7 @@ import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { formatLocaleDate, isFiniteDate } from '@/lib/date-utils'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { useT } from '@/lib/client/i18n'
+import { useSupportModeReadOnly } from '@/lib/client/support-mode'
 import {
   ActionMenu,
   Button,
@@ -141,6 +142,7 @@ export default function FamiliesView({
   const toast = useToast()
   const confirm = useConfirm()
   const t = useT()
+  const { readOnly: supportReadOnly } = useSupportModeReadOnly()
   const router = useRouter()
   const { format: formatMoney } = useCurrency()
   const familiesHydrated = initialFamilies !== undefined
@@ -899,7 +901,7 @@ export default function FamiliesView({
           title={t('nav.families')}
           subtitle={t('families.subtitle')}
           actions={
-            isAdmin ? (
+            isAdmin && !supportReadOnly ? (
               <Button
                 leftIcon={<PlusIcon className="h-5 w-5" />}
                 onClick={() => {
@@ -917,7 +919,7 @@ export default function FamiliesView({
           }
         />
 
-        {isAdmin && selectedIds.size > 0 && (
+        {isAdmin && !supportReadOnly && selectedIds.size > 0 && (
           <div className="sticky top-0 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 shadow-sm">
             <span className="text-sm font-medium text-fg">
               {selectedIds.size} {t('families.selected')}

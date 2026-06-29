@@ -1,6 +1,5 @@
 import { Types } from 'mongoose'
-import { EmailAutomationRule, EmailTemplate, Family, LifecycleEventPayment } from '@/lib/models'
-import { calculateFamilyBalance } from '@/lib/calculations'
+import { EmailAutomationRule, EmailTemplate, Family } from '@/lib/models'
 import {
   sendEmail,
   applyMergeFields,
@@ -9,58 +8,9 @@ import {
   sleep,
 } from '@/lib/mail'
 import { escapeHtml } from '@/lib/html-escape'
+import { listAutomationRecipients } from './resolve-recipients'
 
 const MIN_RUN_INTERVAL_MS = 24 * 60 * 60 * 1000
-
-async function familiesForBalanceRule(organizationId: string): Promise<string[]> {
-  const families = await Family.find({
-    organizationId,
-    email: { $exists: true, $ne: '' },
-    communicationsOptOut: { $ne: true },
-    emailFormatInvalid: { $ne: true },
-  })
-    .select('_id')
-    .lean<{ _id: Types.ObjectId }[]>()
-
-  const matching: string[] = []
-  for (const fam of families) {
-    const familyId = String(fam._id)
-    try {
-      const bal = await calculateFamilyBalance(familyId, organizationId)
-      if (bal.balance > 0) matching.push(familyId)
-    } catch {
-      /* skip */
-    }
-  }
-  return matching
-}
-
-async function familiesForEventRule(organizationId: string): Promise<string[]> {
-  const now = new Date()
-  const horizon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
-  const rows = await LifecycleEventPayment.find({
-    organizationId,
-    eventDate: { $gte: now, $lte: horizon },
-    deletedAt: null,
-  })
-    .select('familyId')
-    .lean<{ familyId?: Types.ObjectId }[]>()
-
-  const familyIds = [...new Set(rows.map((r) => String(r.familyId)).filter(Boolean))]
-  if (familyIds.length === 0) return []
-
-  const eligible = await Family.find({
-    organizationId,
-    _id: { $in: familyIds },
-    email: { $exists: true, $ne: '' },
-    communicationsOptOut: { $ne: true },
-    emailFormatInvalid: { $ne: true },
-  })
-    .select('_id')
-    .lean<{ _id: Types.ObjectId }[]>()
-
-  return eligible.map((f) => String(f._id))
-}
 
 export type ExecuteEmailAutomationRuleResult = {
   sent: number
@@ -95,34 +45,32 @@ export async function executeEmailAutomationRule(
     return { sent: 0, failed: 0, skipped: true, reason: 'Template missing subject or html' }
   }
 
-  const familyIds =
-    rule.ruleType === 'balance_gt_zero'
-      ? await familiesForBalanceRule(organizationId)
-      : await familiesForEventRule(organizationId)
+  const recipients = await listAutomationRecipients(organizationId, rule.ruleType)
 
-  if (familyIds.length === 0) {
+  if (recipients.length === 0) {
     await EmailAutomationRule.updateOne({ _id: rule._id }, { $set: { lastRunAt: new Date() } })
     return { sent: 0, failed: 0, skipped: false }
   }
 
   const families = await Family.find({
     organizationId,
-    _id: { $in: familyIds },
+    _id: { $in: recipients.map((r) => r.id) },
   }).lean<any[]>()
   const byId = new Map(families.map((f) => [String(f._id), f]))
 
-  const pacingMs = delayBetweenSendsMs(familyIds.length)
+  const pacingMs = delayBetweenSendsMs(recipients.length)
   let sent = 0
   let failed = 0
   let sendIndex = 0
 
-  for (const familyId of familyIds) {
+  for (const recipient of recipients) {
     if (sendIndex > 0 && pacingMs > 0) await sleep(pacingMs)
     sendIndex++
 
-    const family = byId.get(familyId)
+    const family = byId.get(recipient.id)
     if (!family?.email || family.communicationsOptOut || family.emailFormatInvalid) continue
 
+    const familyId = recipient.id
     const mergeCtx = await loadMergeFieldContext(familyId, organizationId)
     const html = applyMergeFields(template.html, mergeCtx).replace(
       /\{\{familyName\}\}/g,

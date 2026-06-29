@@ -13,7 +13,10 @@ import {
   readImpersonationOrgId,
   readImpersonationReadOnly,
   readImpersonationExpiresAt,
+  readImpersonationSession,
 } from '@/lib/platform-impersonation'
+import { getSupportSessionActions } from '@/lib/support-session-summary'
+import { notifyPlatformSupportWebhook } from '@/lib/platform-support-webhook'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,9 +55,23 @@ export const DELETE = handler({
   auth: 'admin',
   name: 'DELETE /api/admin/impersonate',
   fn: async ({ session, request }) => {
-    const orgId = await readImpersonationOrgId(session!.user.id)
+    const impersonation = await readImpersonationSession(session!.user.id)
+    const orgId = impersonation?.orgId ?? null
+    const readOnly = impersonation?.readOnly ?? false
+    const org = orgId
+      ? await Organization.findById(orgId).select('name').lean<{ name?: string }>()
+      : null
 
-    const res = NextResponse.json({ ok: true })
+    let actions: { action: string; at: string }[] = []
+    if (impersonation) {
+      actions = await getSupportSessionActions(
+        session!.user.id,
+        impersonation.orgId,
+        impersonation.startedAt,
+      )
+    }
+
+    const res = NextResponse.json({ ok: true, actions })
     clearImpersonationCookies(res, ACTIVE_ORG_COOKIE)
 
     if (orgId) {
@@ -64,7 +81,17 @@ export const DELETE = handler({
         action: 'platform.impersonate.end',
         resourceType: 'Organization',
         resourceId: orgId,
+        metadata: actions.length > 0 ? { actionCount: actions.length } : undefined,
         request,
+      })
+
+      notifyPlatformSupportWebhook({
+        event: 'impersonate.end',
+        orgId,
+        orgName: org?.name || 'Organization',
+        adminEmail: session!.user.email,
+        readOnly,
+        at: new Date().toISOString(),
       })
     }
 

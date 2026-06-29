@@ -15,6 +15,7 @@ import { useToast, useConfirm } from '@/app/components/Toast'
 import { invalidate as invalidateCache } from '@/lib/client-cache'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
+import { useSupportModeReadOnly } from '@/lib/client/support-mode'
 import { formatLocaleDate } from '@/lib/date-utils'
 import {
   TASKS_LIST_PAGE_SIZE,
@@ -125,6 +126,7 @@ export default function TasksView({ initialTasks, initialNextCursor = null }: Ta
   const toast = useToast()
   const t = useT()
   const confirm = useConfirm()
+  const { readOnly: supportReadOnly } = useSupportModeReadOnly()
   const tasksHydrated = initialTasks !== undefined
   const [tasks, setTasks] = useState<Task[]>(initialTasks ?? [])
   const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor)
@@ -597,12 +599,14 @@ export default function TasksView({ initialTasks, initialNextCursor = null }: Ta
           title={t('tasks.title')}
           subtitle={t('tasks.subtitle')}
           actions={
-            <Button
-              leftIcon={<PlusIcon className="h-5 w-5" />}
-              onClick={() => setShowTaskModal(true)}
-            >
-              {t('tasks.addTask')}
-            </Button>
+            !supportReadOnly ? (
+              <Button
+                leftIcon={<PlusIcon className="h-5 w-5" />}
+                onClick={() => setShowTaskModal(true)}
+              >
+                {t('tasks.addTask')}
+              </Button>
+            ) : undefined
           }
         />
 
@@ -620,7 +624,7 @@ export default function TasksView({ initialTasks, initialNextCursor = null }: Ta
           />
         </Card>
 
-        {selectedIds.size > 0 && (
+        {!supportReadOnly && selectedIds.size > 0 && (
           <div className="sticky top-0 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 shadow-sm">
             <span className="text-sm font-medium text-fg">
               {selectedIds.size} {t('tasks.selected')}

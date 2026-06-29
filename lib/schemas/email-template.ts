@@ -13,4 +13,11 @@ export const emailTemplateBody = z.object({
 
 export const emailTemplateUpdateBody = emailTemplateBody
   .partial()
+  .extend({
+    versionNote: z.string().max(500).trim().optional(),
+  })
   .refine((v) => Object.keys(v).length > 0, { message: 'At least one field is required' })
+
+export const emailTemplateRestoreBody = z.object({
+  versionId: objectId,
+})

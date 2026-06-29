@@ -1,6 +1,6 @@
 import { Types } from 'mongoose'
 import type nodemailer from 'nodemailer'
-import { EmailMessage, Organization, Family } from '@/lib/models'
+import { EmailMessage, Organization } from '@/lib/models'
 import { audit } from '@/lib/audit'
 import { logError } from '@/lib/log'
 import { isAllowedOutboundRecipient } from '@/lib/email-recipients'
@@ -13,8 +13,26 @@ import { notifyAdmins } from '@/lib/notify'
 import { wrapEmailHtml, type OrgPhysicalAddress } from './email-wrapper'
 import { buildUnsubscribeUrl, createUnsubscribeToken } from './unsubscribe-token'
 import { checkDailySendQuota } from './daily-send-quota'
+import { clearDeliverabilityWarning, trackDeliverabilityFailure } from './deliverability'
 
 export type EmailKind = 'custom' | 'statement' | 'tax-receipt' | 'task-reminder' | 'file'
+
+/** Kinds whose html/text are stored on EmailMessage so admins can retry failed sends. */
+const RETRY_PERSIST_KINDS = new Set<EmailKind>([
+  'custom',
+  'statement',
+  'tax-receipt',
+  'task-reminder',
+  'file',
+])
+
+function bodyFieldsForPersistence(input: SendEmailInput): { html?: string; text?: string } {
+  if (!RETRY_PERSIST_KINDS.has(input.kind)) return {}
+  return {
+    ...(input.html !== undefined ? { html: input.html } : {}),
+    ...(input.text !== undefined ? { text: input.text } : {}),
+  }
+}
 
 export interface SendEmailAttachment {
   filename: string
@@ -62,43 +80,6 @@ function bodyPreviewFrom(html?: string, text?: string): string | undefined {
     ''
   ).slice(0, 200)
   return raw || undefined
-}
-
-async function clearDeliverabilityWarning(organizationId: string, to: string): Promise<void> {
-  const normalized = to.trim().toLowerCase()
-  if (!normalized) return
-  await Family.updateMany(
-    {
-      organizationId: new Types.ObjectId(organizationId),
-      email: {
-        $regex: new RegExp(`^${normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
-      },
-    },
-    { $set: { emailDeliverabilityWarning: false } },
-  )
-}
-
-async function trackDeliverabilityFailure(organizationId: string, to: string): Promise<void> {
-  const normalized = to.trim().toLowerCase()
-  if (!normalized) return
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-  const failureCount = await EmailMessage.countDocuments({
-    organizationId: new Types.ObjectId(organizationId),
-    to: { $regex: new RegExp(`^${normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-    status: 'failed',
-    createdAt: { $gte: sevenDaysAgo },
-  })
-  if (failureCount >= 3) {
-    await Family.updateMany(
-      {
-        organizationId: new Types.ObjectId(organizationId),
-        email: {
-          $regex: new RegExp(`^${normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
-        },
-      },
-      { $set: { emailDeliverabilityWarning: true } },
-    )
-  }
 }
 
 async function loadOrgBranding(organizationId: string): Promise<{
@@ -175,8 +156,7 @@ async function recordFailedEmail(
     to,
     subject: subject.replace(/[\r\n]+/g, ' ').slice(0, 998),
     bodyPreview: bodyPreviewFrom(input.html, input.text),
-    html: input.html,
-    text: input.text,
+    ...bodyFieldsForPersistence(input),
     kind: input.kind,
     provider: 'gmail',
     status: 'failed',
@@ -254,8 +234,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     to,
     subject,
     bodyPreview: bodyPreviewFrom(input.html, input.text),
-    html: input.html,
-    text: input.text,
+    ...bodyFieldsForPersistence(input),
     kind: input.kind,
     provider: 'gmail',
     status: 'queued',

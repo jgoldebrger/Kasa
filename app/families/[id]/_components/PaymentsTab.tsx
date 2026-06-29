@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 import type { FamilyDetailContextValue } from '../FamilyDetailContext'
 import { PlusIcon } from '@heroicons/react/24/outline'
 import { DataView, EmptyState, Button, type SortDir } from '@/app/components/ui'
+import { useSupportModeReadOnly } from '@/lib/client/support-mode'
 import { paymentColumnsFor, paymentMobileCard } from '../_lib/helpers'
 import { sortPaymentRows } from '@/lib/payments/sort-payments'
 import { useFamilyDetail } from '../FamilyDetailContext'
@@ -24,6 +25,7 @@ function PaymentsTabContent(props: FamilyDetailContextValue) {
   } = props
 
   const [sort, setSort] = useState<{ id: string; dir: SortDir } | null>(null)
+  const { readOnly: supportReadOnly } = useSupportModeReadOnly()
   const familyPayments = useMemo(
     () => data.payments.filter((payment: any) => !payment.memberId),
     [data.payments],
@@ -37,20 +39,22 @@ function PaymentsTabContent(props: FamilyDetailContextValue) {
     <div>
       <div className="flex justify-between mb-4">
         <h3 className="text-lg font-semibold text-fg">Payments</h3>
-        <Button
-          size="sm"
-          leftIcon={<PlusIcon className="h-4 w-4" aria-hidden="true" />}
-          onClick={() => {
-            setPaymentForm({
-              ...paymentForm,
-              paymentFor: 'family',
-              memberId: '',
-            })
-            setShowPaymentModal(true)
-          }}
-        >
-          Add Payment
-        </Button>
+        {!supportReadOnly && (
+          <Button
+            size="sm"
+            leftIcon={<PlusIcon className="h-4 w-4" aria-hidden="true" />}
+            onClick={() => {
+              setPaymentForm({
+                ...paymentForm,
+                paymentFor: 'family',
+                memberId: '',
+              })
+              setShowPaymentModal(true)
+            }}
+          >
+            Add Payment
+          </Button>
+        )}
       </div>
       <DataView
         tableId="family-payments"

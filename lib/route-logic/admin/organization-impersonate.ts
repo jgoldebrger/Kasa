@@ -4,16 +4,19 @@
 
 import { NextResponse } from 'next/server'
 import { ACTIVE_ORG_COOKIE } from '@/lib/auth-helpers'
-import { Organization } from '@/lib/models'
+import { Organization, User } from '@/lib/models'
 import { audit } from '@/lib/audit'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { handler } from '@/lib/api/handler'
 import { setImpersonationCookies } from '@/lib/platform-impersonation'
+import { notifyOrgOwnerOfSupportAccess } from '@/lib/platform-email'
+import { notifyPlatformSupportWebhook } from '@/lib/platform-support-webhook'
+import { isSupportModeRedirect, type SupportModeRedirect } from '@/lib/support-mode-redirect'
 
 export const dynamic = 'force-dynamic'
 
 export type ImpersonateBodyResult =
-  | { ok: true; reason: string; readOnly: boolean }
+  | { ok: true; reason: string; readOnly: boolean; redirectTo: SupportModeRedirect }
   | { ok: false; error: string }
 
 /** Validates POST body for organization impersonation (exported for unit tests). */
@@ -34,7 +37,14 @@ export function validateImpersonateBody(body: unknown): ImpersonateBodyResult {
     return { ok: false, error: 'Reason must be at most 500 characters' }
   }
   const readOnly = record.readOnly === true
-  return { ok: true, reason, readOnly }
+  let redirectTo: SupportModeRedirect = '/'
+  if (record.redirectTo !== undefined && record.redirectTo !== null && record.redirectTo !== '') {
+    if (!isSupportModeRedirect(record.redirectTo)) {
+      return { ok: false, error: 'Invalid redirectTo' }
+    }
+    redirectTo = record.redirectTo
+  }
+  return { ok: true, reason, readOnly, redirectTo }
 }
 
 export const POST = handler({
@@ -55,12 +65,13 @@ export const POST = handler({
     if (!validated.ok) {
       return { status: 400, data: { error: validated.error } }
     }
-    const { reason, readOnly } = validated
+    const { reason, readOnly, redirectTo } = validated
 
     const orgId = String(params.id)
-    const org = await Organization.findById(orgId).select('name slug').lean<{
+    const org = await Organization.findById(orgId).select('name slug ownerId').lean<{
       name?: string
       slug?: string
+      ownerId?: { toString(): string }
     }>()
     if (!org) {
       return { status: 404, data: { error: 'Organization not found' } }
@@ -72,7 +83,7 @@ export const POST = handler({
       organizationName: org.name,
       organizationSlug: org.slug ?? null,
       readOnly,
-      redirectTo: '/',
+      redirectTo,
     })
 
     const ok = setImpersonationCookies(res, session!.user.id, orgId, ACTIVE_ORG_COOKIE, readOnly)
@@ -80,14 +91,50 @@ export const POST = handler({
       return { status: 500, data: { error: 'Could not start support session' } }
     }
 
+    const at = new Date()
+    const adminEmail = session!.user.email
+    const adminName = session!.user.name || adminEmail
+
     await audit({
       organizationId: orgId,
       userId: session!.user.id,
       action: 'platform.impersonate.start',
       resourceType: 'Organization',
       resourceId: orgId,
-      metadata: { orgName: org.name, orgSlug: org.slug, reason, readOnly },
+      metadata: { orgName: org.name, orgSlug: org.slug, reason, readOnly, redirectTo },
       request,
+    })
+
+    try {
+      if (org.ownerId) {
+        const owner = await User.findById(org.ownerId).select('email').lean<{ email?: string }>()
+        if (owner?.email) {
+          await notifyOrgOwnerOfSupportAccess({
+            ownerEmail: owner.email,
+            orgName: org.name || 'Organization',
+            adminName,
+            adminEmail,
+            reason,
+            readOnly,
+            at,
+          })
+        }
+      }
+    } catch (err: unknown) {
+      console.error(
+        '[support-mode] owner notification error:',
+        err instanceof Error ? err.message : err,
+      )
+    }
+
+    notifyPlatformSupportWebhook({
+      event: 'impersonate.start',
+      orgId,
+      orgName: org.name || 'Organization',
+      adminEmail,
+      reason,
+      readOnly,
+      at: at.toISOString(),
     })
 
     return res

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ChartBarIcon } from '@heroicons/react/24/outline'
+import { ChartBarIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useToast } from '@/app/components/Toast'
 import { Button, Card, EmptyState, PageHeader, Select, SkeletonRows } from '@/app/components/ui'
@@ -17,6 +17,7 @@ export default function AnalyticsView() {
   const [period, setPeriod] = useState<string>('30')
   const [data, setData] = useState<EmailAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
 
   const loadAnalytics = useCallback(async () => {
     setLoading(true)
@@ -61,6 +62,25 @@ export default function AnalyticsView() {
   const topCampaigns = data?.topCampaigns ?? []
 
   const formatRate = (rate?: number) => (rate != null ? `${Math.round(rate * 100)}%` : '—')
+
+  const exportCsv = async () => {
+    setExporting(true)
+    try {
+      const res = await fetch(`/api/emails/analytics?days=${period}&format=csv`)
+      if (!res.ok) throw new Error('Export failed')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `email-analytics-${period}d.csv`
+      anchor.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error(t('communications.analytics.exportError'))
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <div className="min-h-screen p-4 sm:p-6 md:p-8">
@@ -214,7 +234,16 @@ export default function AnalyticsView() {
               </Card>
             )}
 
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                loading={exporting}
+                leftIcon={<ArrowDownTrayIcon className="h-4 w-4" />}
+                onClick={() => void exportCsv()}
+              >
+                {t('communications.analytics.exportCsv')}
+              </Button>
               <Button type="button" variant="secondary" onClick={() => void loadAnalytics()}>
                 {t('communications.analytics.refresh')}
               </Button>

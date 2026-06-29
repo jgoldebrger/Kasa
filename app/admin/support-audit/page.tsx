@@ -9,8 +9,11 @@ import {
   Badge,
   Button,
   ButtonLink,
+  Card,
   EmptyState,
+  Input,
   PageHeader,
+  Select,
   SkeletonRows,
 } from '@/app/components/ui'
 
@@ -28,6 +31,13 @@ type AuditEntry = {
   readOnly?: boolean
 }
 
+type AppliedFilters = {
+  action: string
+  orgQ: string
+  fromDate: string
+  toDate: string
+}
+
 function actionBadge(action: string) {
   if (action === 'platform.impersonate.start') {
     return <Badge variant="warning">Start</Badge>
@@ -38,6 +48,16 @@ function actionBadge(action: string) {
   return <Badge variant="default">{action}</Badge>
 }
 
+function buildFilterParams(filters: AppliedFilters, cursor?: string | null) {
+  const qs = new URLSearchParams()
+  if (filters.action) qs.set('action', filters.action)
+  if (filters.orgQ) qs.set('q', filters.orgQ)
+  if (filters.fromDate) qs.set('fromDate', filters.fromDate)
+  if (filters.toDate) qs.set('toDate', filters.toDate)
+  if (cursor) qs.set('cursor', cursor)
+  return qs
+}
+
 export default function SupportAuditAdminPage() {
   const toast = useToast()
   const [rows, setRows] = useState<AuditEntry[]>([])
@@ -46,13 +66,24 @@ export default function SupportAuditAdminPage() {
   const [forbidden, setForbidden] = useState(false)
   const [twoFactorRequired, setTwoFactorRequired] = useState(false)
 
+  const [actionInput, setActionInput] = useState('')
+  const [orgQuery, setOrgQuery] = useState('')
+  const [fromDateInput, setFromDateInput] = useState('')
+  const [toDateInput, setToDateInput] = useState('')
+  const [filters, setFilters] = useState<AppliedFilters>({
+    action: '',
+    orgQ: '',
+    fromDate: '',
+    toDate: '',
+  })
+
   const load = useCallback(
-    async (opts?: { cursor?: string | null; append?: boolean }) => {
+    async (opts?: { cursor?: string | null; append?: boolean; filters?: AppliedFilters }) => {
       setLoading(true)
       setTwoFactorRequired(false)
       try {
-        const qs = new URLSearchParams()
-        if (opts?.cursor) qs.set('cursor', opts.cursor)
+        const active = opts?.filters ?? filters
+        const qs = buildFilterParams(active, opts?.cursor)
         const res = await fetch(`/api/admin/impersonation-audit?${qs.toString()}`)
         if (res.status === 403) {
           const data = await res.json().catch(() => ({}))
@@ -99,12 +130,30 @@ export default function SupportAuditAdminPage() {
         setLoading(false)
       }
     },
-    [toast],
+    [filters, toast],
   )
 
   useEffect(() => {
     void load()
   }, [load])
+
+  function applyFilters(e: React.FormEvent) {
+    e.preventDefault()
+    const next: AppliedFilters = {
+      action: actionInput,
+      orgQ: orgQuery.trim(),
+      fromDate: fromDateInput,
+      toDate: toDateInput,
+    }
+    setFilters(next)
+    void load({ filters: next })
+  }
+
+  function exportCsv() {
+    const qs = buildFilterParams(filters)
+    qs.set('format', 'csv')
+    window.location.href = `/api/admin/impersonation-audit?${qs.toString()}`
+  }
 
   if (forbidden) {
     return (
@@ -142,75 +191,123 @@ export default function SupportAuditAdminPage() {
             Go to account settings →
           </Link>
         </Alert>
-      ) : loading && rows.length === 0 ? (
-        <SkeletonRows count={6} />
-      ) : rows.length === 0 ? (
-        <EmptyState
-          title="No impersonation entries"
-          description="Support mode sessions will appear here once admins enter a tenant workspace."
-        />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-app-subtle border-b border-border">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Time</th>
-                <th className="px-4 py-3 font-semibold">Admin</th>
-                <th className="px-4 py-3 font-semibold">Organization</th>
-                <th className="px-4 py-3 font-semibold">Action</th>
-                <th className="px-4 py-3 font-semibold">Reason</th>
-                <th className="px-4 py-3 font-semibold">Read-only</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {rows.map((row) => (
-                <tr key={row.id} className="bg-surface">
-                  <td className="px-4 py-3 text-fg-muted whitespace-nowrap">
-                    {row.createdAt ? new Date(row.createdAt).toLocaleString() : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-fg-muted">
-                    <div>{row.userName || row.userId}</div>
-                    {row.userEmail && <div className="text-xs">{row.userEmail}</div>}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-fg">{row.organizationName || '—'}</div>
-                    {row.organizationSlug && (
-                      <div className="text-xs text-fg-muted font-mono">{row.organizationSlug}</div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">{actionBadge(row.action)}</td>
-                  <td className="px-4 py-3 text-fg-muted max-w-xs">
-                    {row.reason || (row.action === 'platform.impersonate.start' ? '—' : '')}
-                  </td>
-                  <td className="px-4 py-3">
-                    {row.action === 'platform.impersonate.start' ? (
-                      row.readOnly ? (
-                        <Badge variant="warning">Yes</Badge>
-                      ) : (
-                        <Badge variant="muted">No</Badge>
-                      )
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+        <>
+          <Card className="p-4">
+            <form
+              className="flex flex-col gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-5 sm:items-end"
+              onSubmit={applyFilters}
+            >
+              <Select
+                label="Action"
+                value={actionInput}
+                onChange={(e) => setActionInput(e.target.value)}
+              >
+                <option value="">All actions</option>
+                <option value="start">Start</option>
+                <option value="end">End</option>
+              </Select>
+              <Input
+                label="Organization"
+                type="search"
+                placeholder="Name or slug…"
+                value={orgQuery}
+                onChange={(e) => setOrgQuery(e.target.value)}
+              />
+              <Input
+                label="From"
+                type="date"
+                value={fromDateInput}
+                onChange={(e) => setFromDateInput(e.target.value)}
+              />
+              <Input
+                label="To"
+                type="date"
+                value={toDateInput}
+                onChange={(e) => setToDateInput(e.target.value)}
+              />
+              <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-1">
+                <Button type="submit">Search</Button>
+                <Button type="button" variant="secondary" onClick={exportCsv}>
+                  Export CSV
+                </Button>
+              </div>
+            </form>
+          </Card>
 
-      {nextCursor && (
-        <div className="flex justify-center">
-          <Button
-            type="button"
-            variant="secondary"
-            loading={loading}
-            onClick={() => load({ cursor: nextCursor, append: true })}
-          >
-            Load more
-          </Button>
-        </div>
+          {loading && rows.length === 0 ? (
+            <SkeletonRows count={6} />
+          ) : rows.length === 0 ? (
+            <EmptyState
+              title="No impersonation entries"
+              description="Adjust the filters above or clear them to see support session history."
+            />
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-app-subtle border-b border-border">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Time</th>
+                    <th className="px-4 py-3 font-semibold">Admin</th>
+                    <th className="px-4 py-3 font-semibold">Organization</th>
+                    <th className="px-4 py-3 font-semibold">Action</th>
+                    <th className="px-4 py-3 font-semibold">Reason</th>
+                    <th className="px-4 py-3 font-semibold">Read-only</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {rows.map((row) => (
+                    <tr key={row.id} className="bg-surface">
+                      <td className="px-4 py-3 text-fg-muted whitespace-nowrap">
+                        {row.createdAt ? new Date(row.createdAt).toLocaleString() : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-fg-muted">
+                        <div>{row.userName || row.userId}</div>
+                        {row.userEmail && <div className="text-xs">{row.userEmail}</div>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-fg">{row.organizationName || '—'}</div>
+                        {row.organizationSlug && (
+                          <div className="text-xs text-fg-muted font-mono">
+                            {row.organizationSlug}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">{actionBadge(row.action)}</td>
+                      <td className="px-4 py-3 text-fg-muted max-w-xs">
+                        {row.reason || (row.action === 'platform.impersonate.start' ? '—' : '')}
+                      </td>
+                      <td className="px-4 py-3">
+                        {row.action === 'platform.impersonate.start' ? (
+                          row.readOnly ? (
+                            <Badge variant="warning">Yes</Badge>
+                          ) : (
+                            <Badge variant="muted">No</Badge>
+                          )
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {nextCursor && (
+            <div className="flex justify-center">
+              <Button
+                type="button"
+                variant="secondary"
+                loading={loading}
+                onClick={() => load({ cursor: nextCursor, append: true })}
+              >
+                Load more
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

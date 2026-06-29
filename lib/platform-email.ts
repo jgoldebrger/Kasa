@@ -182,6 +182,78 @@ export interface InviteRequestRejectionEmail {
 /**
  * Notify a visitor that their signup request was rejected.
  */
+export interface SupportAccessOwnerNotification {
+  ownerEmail: string
+  orgName: string
+  adminName: string
+  adminEmail: string
+  reason: string
+  readOnly: boolean
+  at: Date
+}
+
+/** True unless PLATFORM_NOTIFY_OWNER_ON_SUPPORT is explicitly false/0. */
+export function isNotifyOwnerOnSupportEnabled(): boolean {
+  const raw = process.env.PLATFORM_NOTIFY_OWNER_ON_SUPPORT?.trim()
+  if (!raw) return true
+  return raw !== 'false' && raw !== '0'
+}
+
+/**
+ * Notify the org owner when a platform admin enters support mode.
+ * No-ops when disabled via env or platform SMTP is missing.
+ */
+export async function notifyOrgOwnerOfSupportAccess(
+  input: SupportAccessOwnerNotification,
+): Promise<void> {
+  if (!isNotifyOwnerOnSupportEnabled()) return
+
+  if (!isPlatformEmailConfigured()) {
+    console.warn('[support-mode] Platform SMTP not configured; owner notification not sent.')
+    return
+  }
+
+  const atStr = input.at.toISOString()
+  const readOnlyText = input.readOnly ? 'Yes (view only)' : 'No (full admin access)'
+  const safeOrgName = escapeHtml(input.orgName)
+  const safeAdminName = escapeHtml(input.adminName)
+  const safeAdminEmail = escapeHtml(input.adminEmail)
+  const safeReason = escapeHtml(input.reason)
+
+  const subject = `Kasa support access to ${input.orgName.replace(/[\r\n]+/g, ' ').slice(0, 200)}`
+
+  const result = await sendPlatformEmail({
+    to: input.ownerEmail,
+    subject,
+    text:
+      `A Kasa platform administrator has entered support mode for your organization.\n\n` +
+      `Organization: ${input.orgName}\n` +
+      `Administrator: ${input.adminName} <${input.adminEmail}>\n` +
+      `Reason: ${input.reason}\n` +
+      `Read-only: ${readOnlyText}\n` +
+      `Time (UTC): ${atStr}\n\n` +
+      `Support sessions are audit-logged. If you did not expect this access, contact Kasa support.`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; line-height: 1.6; color: #222;">
+        <h2 style="margin: 0 0 12px;">Kasa support access</h2>
+        <p>A Kasa platform administrator has entered support mode for <strong>${safeOrgName}</strong>.</p>
+        <p><strong>Administrator:</strong> ${safeAdminName} &lt;${safeAdminEmail}&gt;</p>
+        <p><strong>Reason:</strong> ${safeReason}</p>
+        <p><strong>Read-only:</strong> ${escapeHtml(readOnlyText)}</p>
+        <p><strong>Time (UTC):</strong> ${escapeHtml(atStr)}</p>
+        <p style="color:#555;font-size:13px;margin-top:24px;">Support sessions are audit-logged. If you did not expect this access, contact Kasa support.</p>
+      </div>
+    `,
+  })
+
+  if (!result.sent) {
+    console.error(
+      `[support-mode] owner notification to ${input.ownerEmail} failed:`,
+      result.reason || result.error,
+    )
+  }
+}
+
 export async function sendInviteRequestRejectionEmail(
   input: InviteRequestRejectionEmail,
 ): Promise<SendResult> {

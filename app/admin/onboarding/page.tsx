@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useToast } from '@/app/components/Toast'
 import SupportModeEnterModal from '@/app/components/SupportModeEnterModal'
+import SupportModeOpenButton from '@/app/components/SupportModeOpenButton'
 import { enterSupportMode } from '@/lib/client/support-mode'
+import type { SupportModeRedirect } from '@/lib/support-mode-redirect'
 import { PLATFORM_ADMIN_2FA_REQUIRED_CODE } from '@/lib/platform-admin-constants'
 import {
   Alert,
@@ -69,6 +71,7 @@ export default function OnboardingAdminPage() {
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [enteringId, setEnteringId] = useState<string | null>(null)
   const [modalOrg, setModalOrg] = useState<OrgRow | null>(null)
+  const [modalRedirectTo, setModalRedirectTo] = useState<SupportModeRedirect>('/')
   const [markingId, setMarkingId] = useState<string | null>(null)
   const [forbidden, setForbidden] = useState(false)
   const [twoFactorRequired, setTwoFactorRequired] = useState(false)
@@ -128,7 +131,7 @@ export default function OnboardingAdminPage() {
       const res = await fetch(`/api/admin/organizations/${org.id}/impersonate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason, readOnly }),
+        body: JSON.stringify({ reason, readOnly, redirectTo: modalRedirectTo }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -256,14 +259,13 @@ export default function OnboardingAdminPage() {
               )}
 
               <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
+                <SupportModeOpenButton
                   loading={enteringId === org.id}
-                  onClick={() => setModalOrg(org)}
-                >
-                  Open as admin
-                </Button>
+                  onSelect={(redirectTo) => {
+                    setModalRedirectTo(redirectTo)
+                    setModalOrg(org)
+                  }}
+                />
                 <Button
                   type="button"
                   size="sm"

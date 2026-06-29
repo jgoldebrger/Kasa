@@ -32,6 +32,9 @@ const PUBLIC_API_PREFIXES = [
   // mail clients without a session cookie.
   '/api/email/track',
   '/api/email/unsubscribe',
+  // Bounce notifications from the mail provider; handler verifies
+  // `X-Webhook-Secret` against `EMAIL_BOUNCE_WEBHOOK_SECRET`.
+  '/api/email/bounce',
 ]
 
 /** API routes that may bypass session auth when `CRON_SECRET` matches. Handlers re-verify. */

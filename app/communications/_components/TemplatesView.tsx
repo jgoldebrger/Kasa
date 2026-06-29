@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { TrashIcon } from '@heroicons/react/24/outline'
+import { ClockIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useToast } from '@/app/components/Toast'
 import {
@@ -10,6 +10,7 @@ import {
   Card,
   EmptyState,
   Input,
+  Modal,
   PageHeader,
   Select,
   SkeletonRows,
@@ -39,6 +40,20 @@ function tf(t: ReturnType<typeof useT>, key: string, fallback: string) {
 }
 
 type EditableTemplate = EmailTemplate & { html: string; dirty?: boolean; saving?: boolean }
+
+type TemplateVersion = {
+  _id: string
+  version: number
+  subject: string
+  html: string
+  text: string | null
+  createdAt: string
+}
+
+function formatVersionDate(value: string) {
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? value : d.toLocaleString()
+}
 
 function normalizeTemplate(row: Record<string, unknown>): EditableTemplate {
   const stored = String(row.html ?? row.body ?? '')
@@ -71,6 +86,12 @@ export default function TemplatesView() {
   const [loading, setLoading] = useState(true)
   const [categoryFilter, setCategoryFilter] = useState('')
   const [newCategory, setNewCategory] = useState<EmailTemplateCategory>('general')
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyTemplateId, setHistoryTemplateId] = useState<string | null>(null)
+  const [historyTemplateName, setHistoryTemplateName] = useState('')
+  const [historyVersions, setHistoryVersions] = useState<TemplateVersion[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null)
 
   const loadTemplates = useCallback(async () => {
     setLoading(true)
@@ -147,6 +168,88 @@ export default function TemplatesView() {
       setTemplates((prev) => prev.filter((x) => x._id !== id))
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : t('communications.template.error'))
+    }
+  }
+
+  const openHistory = async (id: string, name: string) => {
+    setHistoryTemplateId(id)
+    setHistoryTemplateName(name)
+    setHistoryOpen(true)
+    setHistoryLoading(true)
+    setHistoryVersions([])
+    try {
+      const res = await fetch(`/api/email-templates/${id}/versions`)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Failed to load versions'))
+      setHistoryVersions((data.versions ?? []) as TemplateVersion[])
+    } catch {
+      toast.error(
+        tf(t, 'communications.template.historyLoadError', 'Could not load version history.'),
+      )
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  const closeHistory = () => {
+    setHistoryOpen(false)
+    setHistoryTemplateId(null)
+    setHistoryTemplateName('')
+    setHistoryVersions([])
+    setRestoringVersionId(null)
+  }
+
+  const restoreVersion = async (version: TemplateVersion) => {
+    if (!historyTemplateId) return
+    const ok = window.confirm(
+      tf(
+        t,
+        'communications.template.restoreConfirm',
+        'Restore version {version}? Current content will be replaced.',
+      ).replace('{version}', String(version.version)),
+    )
+    if (!ok) return
+
+    setRestoringVersionId(version._id)
+    try {
+      const res = await fetch(`/api/email-templates/${historyTemplateId}/restore`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ versionId: version._id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(apiErrorMessage(data, 'Failed to restore'))
+
+      const html = emailHtmlToEditorHtml(String(data.html ?? ''))
+      setTemplates((prev) =>
+        prev.map((tpl) =>
+          tpl._id === historyTemplateId
+            ? {
+                ...tpl,
+                subject: String(data.subject ?? ''),
+                html,
+                body: html,
+                dirty: false,
+              }
+            : tpl,
+        ),
+      )
+      toast.success(
+        tf(
+          t,
+          'communications.template.restored',
+          'Template restored from version {version}.',
+        ).replace('{version}', String(version.version)),
+      )
+      closeHistory()
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : tf(t, 'communications.template.restoreError', 'Could not restore template version.'),
+      )
+    } finally {
+      setRestoringVersionId(null)
     }
   }
 
@@ -285,7 +388,15 @@ export default function TemplatesView() {
                   value={tpl.html}
                   onChange={(html) => updateLocal(tpl._id, { html, body: html })}
                 />
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => void openHistory(tpl._id, tpl.name)}
+                  >
+                    <ClockIcon className="h-4 w-4 mr-1.5" aria-hidden />
+                    {tf(t, 'communications.template.history', 'History')}
+                  </Button>
                   <Button
                     type="button"
                     variant="secondary"
@@ -301,6 +412,60 @@ export default function TemplatesView() {
           </div>
         )}
       </div>
+
+      <Modal
+        open={historyOpen}
+        onClose={closeHistory}
+        title={tf(t, 'communications.template.historyTitle', 'Version history')}
+        description={historyTemplateName}
+        maxWidth="max-w-xl"
+        footer={
+          <Button type="button" variant="secondary" onClick={closeHistory}>
+            {t('common.close', 'Close')}
+          </Button>
+        }
+      >
+        {historyLoading ? (
+          <SkeletonRows count={3} />
+        ) : historyVersions.length === 0 ? (
+          <p className="text-sm text-fg-muted">
+            {tf(
+              t,
+              'communications.template.historyEmpty',
+              'No saved versions yet. Versions are created when you save changes.',
+            )}
+          </p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {historyVersions.map((version) => (
+              <li key={version._id} className="py-3 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-fg">
+                    {tf(t, 'communications.template.historyVersion', 'Version {version}').replace(
+                      '{version}',
+                      String(version.version),
+                    )}
+                  </p>
+                  <p className="text-xs text-fg-muted mt-0.5">
+                    {formatVersionDate(version.createdAt)}
+                  </p>
+                  <p className="text-sm text-fg-muted mt-1 truncate">{version.subject}</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  loading={restoringVersionId === version._id}
+                  disabled={restoringVersionId !== null && restoringVersionId !== version._id}
+                  onClick={() => void restoreVersion(version)}
+                >
+                  {tf(t, 'communications.template.restore', 'Restore')}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Modal>
     </div>
   )
 }

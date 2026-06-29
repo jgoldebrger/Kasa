@@ -37,6 +37,18 @@ export async function readImpersonationExpiresAt(userId: string): Promise<number
   return details?.expiresAt ?? null
 }
 
+export async function readImpersonationStartedAt(userId: string): Promise<number | null> {
+  const details = await readImpersonationSessionDetails(userId)
+  return details?.startedAt ?? null
+}
+
+/** Full impersonation session from the httpOnly cookie (null if inactive/invalid). */
+export async function readImpersonationSession(
+  userId: string,
+): Promise<ImpersonationDetails | null> {
+  return readImpersonationSessionDetails(userId)
+}
+
 /** True when a platform admin is viewing an org via support impersonation. */
 export async function isPlatformImpersonating(
   userId: string,

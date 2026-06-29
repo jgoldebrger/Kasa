@@ -2,10 +2,13 @@ import { Types } from 'mongoose'
 import { EmailTemplate } from '@/lib/models'
 import { audit } from '@/lib/audit'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { snapshotEmailTemplateVersion } from '@/lib/email-template-versions'
 import { emailTemplate as emailTemplateSchemas } from '@/lib/schemas'
 import { handler } from '@/lib/api/handler'
 
 export const dynamic = 'force-dynamic'
+
+const CONTENT_FIELDS = ['subject', 'html', 'text'] as const
 
 export const PATCH = handler({
   auth: 'org',
@@ -29,9 +32,27 @@ export const PATCH = handler({
       return { status: 400, data: { error: 'Invalid template id' } }
     }
 
+    const existing = await EmailTemplate.findOne({
+      _id: id,
+      organizationId: ctx!.organizationId,
+    }).lean<any>()
+
+    if (!existing) return { status: 404, data: { error: 'Template not found' } }
+
+    const touchesContent = CONTENT_FIELDS.some((field) => field in body)
+    const updatePayload: Record<string, unknown> = {
+      ...body,
+      updatedByUserId: ctx!.userId,
+    }
+
+    if (touchesContent) {
+      const versionId = await snapshotEmailTemplateVersion(existing, ctx!.userId)
+      updatePayload.previousVersionId = versionId
+    }
+
     const updated = await EmailTemplate.findOneAndUpdate(
       { _id: id, organizationId: ctx!.organizationId },
-      { $set: body },
+      { $set: updatePayload },
       { new: true, runValidators: true },
     ).lean<any>()
 

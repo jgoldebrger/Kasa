@@ -18,6 +18,9 @@ const EmailTemplateSchema = new Schema(
     html: { type: String, required: true, maxlength: 100_000 },
     text: { type: String, maxlength: 100_000 },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    previousVersionId: { type: Schema.Types.ObjectId, ref: 'EmailTemplateVersion' },
+    versionNote: { type: String, maxlength: 500, trim: true },
+    updatedByUserId: { type: Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true },
 )

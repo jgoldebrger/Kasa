@@ -30,6 +30,7 @@ import { Skeleton } from './components/ui/Skeleton'
 import OnboardingChecklist from './components/OnboardingChecklist'
 import DashboardAttentionPanel from './components/DashboardAttentionPanel'
 import EmailDashboardCard from './components/EmailDashboardCard'
+import SupportModeLandingCard from './components/SupportModeLandingCard'
 import type { DashboardAttentionPayload } from '@/lib/route-logic/dashboard-actions'
 import MemberWelcomeChecklist from './components/MemberWelcomeChecklist'
 import { openCreateTask, openRecordEvent, openRecordPayment } from '@/lib/client/command-events'
@@ -142,6 +143,8 @@ export default function DashboardView({
     <div className="min-h-screen bg-app p-4 sm:p-6 md:p-8">
       <div className="max-w-7xl mx-auto">
         <PageHeader title={t('dashboard.title')} subtitle={t('dashboard.subtitle')} />
+
+        <SupportModeLandingCard familiesCount={stats.totalFamilies} />
 
         {showFinancials && <OnboardingChecklist initialProgress={initialSetupProgress} />}
         {!showFinancials && <MemberWelcomeChecklist />}
