@@ -1,28 +1,39 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { Button } from '@/app/components/ui'
+import { Badge, Button } from '@/app/components/ui'
 import { useToast } from '@/app/components/Toast'
+import { useT } from '@/lib/client/i18n'
 import {
-  SUPPORT_MODE_CHANGED,
-  notifySupportModeChanged,
+  exitSupportMode,
+  fetchSupportModeStatus,
+  useSupportModeChanged,
   type SupportModeDetail,
 } from '@/lib/client/support-mode'
 
-interface ImpersonationState {
-  active: boolean
-  organizationName?: string | null
+function formatTimeRemaining(expiresAt: number): string {
+  const nowSec = Math.floor(Date.now() / 1000)
+  const remainingSec = Math.max(0, expiresAt - nowSec)
+  if (remainingSec <= 0) return '0m'
+  const hours = Math.floor(remainingSec / 3600)
+  const minutes = Math.floor((remainingSec % 3600) / 60)
+  if (hours > 0) return `${hours}h ${minutes}m`
+  return `${minutes}m`
 }
 
 export default function PlatformImpersonationBanner() {
   const router = useRouter()
   const pathname = usePathname()
   const toast = useToast()
-  const { data: session } = useSession()
-  const [state, setState] = useState<ImpersonationState | null>(null)
+  const t = useT()
+  const { data: session, update: updateSession } = useSession()
+  const [state, setState] = useState<SupportModeDetail | null>(null)
   const [exiting, setExiting] = useState(false)
+  const [timeLabel, setTimeLabel] = useState('')
+  const expiryHandledRef = useRef(false)
 
   const isPlatformAdmin = Boolean(session?.user?.isPlatformAdmin)
 
@@ -31,58 +42,65 @@ export default function PlatformImpersonationBanner() {
       setState({ active: false })
       return
     }
-    try {
-      const res = await fetch('/api/admin/impersonate')
-      if (res.status === 403 || res.status === 401) {
-        setState({ active: false })
-        return
-      }
-      if (!res.ok) return
-      const data = await res.json()
-      setState({
-        active: Boolean(data.active),
-        organizationName: data.organizationName,
-      })
-    } catch {
-      // Non-platform users — hide banner.
-      setState({ active: false })
-    }
+    const detail = await fetchSupportModeStatus()
+    setState(detail)
   }, [isPlatformAdmin])
 
   useEffect(() => {
     void refresh()
   }, [refresh, pathname])
 
+  useSupportModeChanged(
+    useCallback((detail) => {
+      setState(detail)
+    }, []),
+  )
+
   useEffect(() => {
-    const onSupportModeChanged = (event: Event) => {
-      const detail = (event as CustomEvent<SupportModeDetail>).detail
-      if (!detail || typeof detail.active !== 'boolean') return
-      setState({
-        active: detail.active,
-        organizationName: detail.organizationName,
-      })
+    if (!state?.active || !state.expiresAt) {
+      setTimeLabel('')
+      expiryHandledRef.current = false
+      return
     }
-    window.addEventListener(SUPPORT_MODE_CHANGED, onSupportModeChanged)
-    return () => window.removeEventListener(SUPPORT_MODE_CHANGED, onSupportModeChanged)
-  }, [])
+
+    const updateTimer = () => {
+      const nowSec = Math.floor(Date.now() / 1000)
+      if (state.expiresAt! <= nowSec) {
+        setTimeLabel(t('admin.supportMode.timerExpired'))
+        if (expiryHandledRef.current) return
+        expiryHandledRef.current = true
+        void (async () => {
+          const result = await exitSupportMode({ router, updateSession })
+          if (!result.ok) {
+            expiryHandledRef.current = false
+            void refresh()
+            return
+          }
+          toast.info(t('admin.supportMode.sessionExpired'))
+        })()
+        return
+      }
+      setTimeLabel(
+        t('admin.supportMode.timer').replace('{time}', formatTimeRemaining(state.expiresAt!)),
+      )
+    }
+
+    updateTimer()
+    const id = window.setInterval(updateTimer, 60_000)
+    return () => window.clearInterval(id)
+  }, [state?.active, state?.expiresAt, refresh, router, t, toast, updateSession])
 
   if (!isPlatformAdmin) return null
 
-  async function exitSupportMode() {
+  async function handleExit() {
     setExiting(true)
     try {
-      const res = await fetch('/api/admin/impersonate', { method: 'DELETE' })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        toast.error(data.error || 'Could not exit support mode.')
+      const result = await exitSupportMode({ router, updateSession })
+      if (!result.ok) {
+        toast.error(result.error || t('admin.supportMode.exitFailed'))
         return
       }
-      toast.success('Exited support mode.')
-      notifySupportModeChanged({ active: false })
-      router.push('/admin')
-      router.refresh()
-    } catch {
-      toast.error('Network error — please try again.')
+      toast.success(t('admin.supportMode.exitSuccess'))
     } finally {
       setExiting(false)
     }
@@ -90,24 +108,43 @@ export default function PlatformImpersonationBanner() {
 
   if (!state?.active) return null
 
+  const orgName = state.organizationName || t('admin.supportMode.defaultOrg')
+  const orgSlug = state.organizationSlug
+
   return (
     <div
       role="status"
-      className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-sm text-fg flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+      className="sticky top-0 z-30 bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-sm text-fg flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
     >
-      <p>
-        <strong className="font-semibold">Support mode:</strong> viewing{' '}
-        <span className="font-medium">{state.organizationName || 'organization'}</span> as admin.
-        Actions are logged.
-      </p>
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2 min-w-0">
+        <p className="min-w-0">
+          <strong className="font-semibold">{t('admin.supportMode.bannerTitle')}:</strong>{' '}
+          {t('admin.supportMode.bannerViewing')
+            .replace('{orgName}', orgName)
+            .replace('{orgSlug}', orgSlug || '—')}
+          {state.readOnly && (
+            <Badge variant="warning" className="ms-2 align-middle">
+              {t('admin.supportMode.readOnlyBadge')}
+            </Badge>
+          )}
+        </p>
+        {timeLabel && <p className="text-xs text-fg-muted">{timeLabel}</p>}
+        <Link
+          href="/admin"
+          className="text-xs font-medium text-accent hover:text-accent-hover sm:ms-2"
+        >
+          {t('admin.supportMode.adminHub')}
+        </Link>
+      </div>
       <Button
         type="button"
         size="sm"
         variant="secondary"
         loading={exiting}
-        onClick={exitSupportMode}
+        onClick={handleExit}
+        className="shrink-0"
       >
-        Exit support mode
+        {t('admin.supportMode.exit')}
       </Button>
     </div>
   )

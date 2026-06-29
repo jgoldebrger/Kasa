@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import { useCallback, useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import OrgSwitcher from './OrgSwitcher'
@@ -11,7 +12,13 @@ import { useT } from '@/lib/client/i18n'
 import { clearCache } from '@/lib/client-cache'
 import { useOrgBranding } from '@/lib/client/useOrgBranding'
 import { useOrgRole } from '@/lib/client/useOrgRole'
+import {
+  fetchSupportModeStatus,
+  useSupportModeChanged,
+  type SupportModeDetail,
+} from '@/lib/client/support-mode'
 import LegalFooterLinks from './legal/LegalFooterLinks'
+import { Badge } from '@/app/components/ui'
 import {
   UserGroupIcon,
   CalculatorIcon,
@@ -46,6 +53,21 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
   const { branding } = useOrgBranding()
   const { isAdmin } = useOrgRole()
   const t = useT()
+  const [supportMode, setSupportMode] = useState<SupportModeDetail>({ active: false })
+
+  useSupportModeChanged(
+    useCallback((detail) => {
+      setSupportMode(detail)
+    }, []),
+  )
+
+  useEffect(() => {
+    if (!user?.isPlatformAdmin) {
+      setSupportMode({ active: false })
+      return
+    }
+    void fetchSupportModeStatus().then(setSupportMode)
+  }, [user?.isPlatformAdmin])
 
   const navItems = [
     { href: '/', label: t('nav.dashboard'), icon: ChartBarIcon },
@@ -105,8 +127,28 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
       </div>
 
       {user && (
-        <div className="px-3 pt-3">
+        <div
+          className={`px-3 pt-3 ${
+            supportMode.active
+              ? supportMode.readOnly
+                ? 'border-s-2 border-amber-400/60'
+                : 'border-s-2 border-amber-500'
+              : ''
+          }`}
+        >
           <OrgSwitcher />
+          {supportMode.active && user.isPlatformAdmin && (
+            <div className="mt-2 px-1">
+              <Badge
+                variant={supportMode.readOnly ? 'muted' : 'warning'}
+                className="text-[10px] uppercase tracking-wide"
+              >
+                {supportMode.readOnly
+                  ? t('admin.supportMode.sidebarBadgeReadOnly')
+                  : t('admin.supportMode.sidebarBadge')}
+              </Badge>
+            </div>
+          )}
         </div>
       )}
 
@@ -197,6 +239,19 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
             >
               <ShieldCheckIcon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
               <span className="truncate">Onboarding</span>
+            </Link>
+            <Link
+              href="/admin/support-audit"
+              onClick={onClose}
+              className={`focus-ring relative flex items-center gap-2.5 px-3 py-2 min-h-[var(--touch-target)] md:min-h-0 md:h-9 rounded-md text-sm font-medium transition-colors ${
+                pathname?.startsWith('/admin/support-audit')
+                  ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                  : 'text-fg-muted hover:bg-fg/5 hover:text-fg'
+              }`}
+              title={t('nav.platformAdmin')}
+            >
+              <ShieldCheckIcon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+              <span className="truncate">Support audit</span>
             </Link>
             <Link
               href="/admin/jobs"

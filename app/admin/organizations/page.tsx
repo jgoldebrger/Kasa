@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { useToast } from '@/app/components/Toast'
-import { notifySupportModeChanged } from '@/lib/client/support-mode'
+import SupportModeEnterModal from '@/app/components/SupportModeEnterModal'
+import { enterSupportMode } from '@/lib/client/support-mode'
 import { PLATFORM_ADMIN_2FA_REQUIRED_CODE } from '@/lib/platform-admin-constants'
 import {
   Alert,
@@ -53,12 +55,14 @@ function setupBadge(setupCompletedAt: string | null) {
 export default function OrganizationsAdminPage() {
   const router = useRouter()
   const toast = useToast()
+  const { update: updateSession } = useSession()
   const [rows, setRows] = useState<OrgRow[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [search, setSearch] = useState('')
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [enteringId, setEnteringId] = useState<string | null>(null)
+  const [modalOrg, setModalOrg] = useState<OrgRow | null>(null)
   const [forbidden, setForbidden] = useState(false)
   const [twoFactorRequired, setTwoFactorRequired] = useState(false)
 
@@ -103,11 +107,21 @@ export default function OrganizationsAdminPage() {
     void load()
   }, [load])
 
-  async function enterAsAdmin(org: OrgRow) {
+  async function confirmEnterSupportMode({
+    reason,
+    readOnly,
+  }: {
+    reason: string
+    readOnly: boolean
+  }) {
+    if (!modalOrg) return
+    const org = modalOrg
     setEnteringId(org.id)
     try {
       const res = await fetch(`/api/admin/organizations/${org.id}/impersonate`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason, readOnly }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -115,12 +129,17 @@ export default function OrganizationsAdminPage() {
         return
       }
       toast.success(`Now viewing ${org.name} as admin.`)
-      notifySupportModeChanged({
-        active: true,
+      setModalOrg(null)
+      await enterSupportMode({
+        organizationId: data.organizationId || org.id,
         organizationName: data.organizationName || org.name,
+        organizationSlug: data.organizationSlug || org.slug,
+        readOnly: Boolean(data.readOnly ?? readOnly),
+        expiresAt: data.expiresAt ?? null,
+        redirectTo: data.redirectTo || '/',
+        router,
+        updateSession,
       })
-      router.push(data.redirectTo || '/')
-      router.refresh()
     } catch {
       toast.error('Network error — please try again.')
     } finally {
@@ -243,7 +262,7 @@ export default function OrganizationsAdminPage() {
                           type="button"
                           size="sm"
                           loading={enteringId === org.id}
-                          onClick={() => enterAsAdmin(org)}
+                          onClick={() => setModalOrg(org)}
                         >
                           Open as admin
                         </Button>
@@ -273,6 +292,16 @@ export default function OrganizationsAdminPage() {
             customer&apos;s data ownership. All entries are audit-logged. Exit from the banner at
             the top of the app.
           </p>
+
+          <SupportModeEnterModal
+            open={modalOrg !== null}
+            organizationName={modalOrg?.name || ''}
+            confirming={enteringId !== null}
+            onClose={() => {
+              if (enteringId === null) setModalOrg(null)
+            }}
+            onConfirm={confirmEnterSupportMode}
+          />
         </>
       )}
     </div>

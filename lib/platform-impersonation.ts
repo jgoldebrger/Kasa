@@ -4,19 +4,37 @@ import { isPlatformAdminEmail } from '@/lib/platform-admin'
 import {
   createImpersonationToken,
   IMPERSONATION_MAX_AGE_SEC,
-  verifyImpersonationToken,
+  readImpersonationDetails,
+  type ImpersonationDetails,
 } from '@/lib/platform-impersonation-token'
 
 export const PLATFORM_IMPERSONATION_COOKIE = 'kasa_platform_impersonate'
 
-export async function readImpersonationOrgId(userId: string): Promise<string | null> {
+async function readImpersonationSessionDetails(
+  userId: string,
+): Promise<ImpersonationDetails | null> {
   try {
     const token = (await cookies()).get(PLATFORM_IMPERSONATION_COOKIE)?.value
     if (!token) return null
-    return verifyImpersonationToken(token, userId)
+    return readImpersonationDetails(token, userId)
   } catch {
     return null
   }
+}
+
+export async function readImpersonationOrgId(userId: string): Promise<string | null> {
+  const details = await readImpersonationSessionDetails(userId)
+  return details?.orgId ?? null
+}
+
+export async function readImpersonationReadOnly(userId: string): Promise<boolean> {
+  const details = await readImpersonationSessionDetails(userId)
+  return details?.readOnly ?? false
+}
+
+export async function readImpersonationExpiresAt(userId: string): Promise<number | null> {
+  const details = await readImpersonationSessionDetails(userId)
+  return details?.expiresAt ?? null
 }
 
 /** True when a platform admin is viewing an org via support impersonation. */
@@ -35,8 +53,9 @@ export function setImpersonationCookies(
   userId: string,
   orgId: string,
   activeOrgCookieName: string,
+  readOnly?: boolean,
 ): boolean {
-  const token = createImpersonationToken(userId, orgId)
+  const token = createImpersonationToken(userId, orgId, readOnly)
   if (!token) return false
 
   const secure = process.env.NODE_ENV === 'production'

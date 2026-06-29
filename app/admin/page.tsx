@@ -3,9 +3,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { useToast } from '@/app/components/Toast'
-import { notifySupportModeChanged } from '@/lib/client/support-mode'
 import { PLATFORM_ADMIN_2FA_REQUIRED_CODE } from '@/lib/platform-admin-constants'
+import {
+  exitSupportMode,
+  useSupportModeChanged,
+  type SupportModeDetail,
+} from '@/lib/client/support-mode'
 import {
   Alert,
   Badge,
@@ -15,11 +20,6 @@ import {
   PageHeader,
   SkeletonRows,
 } from '@/app/components/ui'
-
-interface ImpersonationState {
-  active: boolean
-  organizationName?: string | null
-}
 
 const ADMIN_LINKS = [
   {
@@ -36,6 +36,11 @@ const ADMIN_LINKS = [
     href: '/admin/onboarding',
     title: 'Onboarding',
     description: 'Tenants stuck in setup — progress flags and quick actions.',
+  },
+  {
+    href: '/admin/support-audit',
+    title: 'Support audit',
+    description: 'Impersonation start/end log with reasons and read-only flags.',
   },
   {
     href: '/admin/jobs',
@@ -55,10 +60,11 @@ const RUNBOOK_PATHS = [
 export default function AdminHubPage() {
   const router = useRouter()
   const toast = useToast()
+  const { update: updateSession } = useSession()
   const [loading, setLoading] = useState(true)
   const [forbidden, setForbidden] = useState(false)
   const [twoFactorRequired, setTwoFactorRequired] = useState(false)
-  const [impersonation, setImpersonation] = useState<ImpersonationState | null>(null)
+  const [impersonation, setImpersonation] = useState<SupportModeDetail | null>(null)
   const [exiting, setExiting] = useState(false)
 
   const load = useCallback(async () => {
@@ -80,7 +86,11 @@ export default function AdminHubPage() {
       const data = await res.json()
       setImpersonation({
         active: Boolean(data.active),
-        organizationName: data.organizationName,
+        organizationId: data.organizationId ?? null,
+        organizationName: data.organizationName ?? null,
+        organizationSlug: data.organizationSlug ?? null,
+        readOnly: Boolean(data.readOnly),
+        expiresAt: data.expiresAt ?? null,
       })
     } catch {
       toast.error('Could not load admin status.')
@@ -93,19 +103,22 @@ export default function AdminHubPage() {
     void load()
   }, [load])
 
-  async function exitSupportMode() {
+  useSupportModeChanged(
+    useCallback((detail) => {
+      setImpersonation(detail)
+    }, []),
+  )
+
+  async function handleExitSupportMode() {
     setExiting(true)
     try {
-      const res = await fetch('/api/admin/impersonate', { method: 'DELETE' })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        toast.error(data.error || 'Could not exit support mode.')
+      const result = await exitSupportMode({ router, updateSession })
+      if (!result.ok) {
+        toast.error(result.error || 'Could not exit support mode.')
         return
       }
       toast.success('Exited support mode.')
-      notifySupportModeChanged({ active: false })
-      await load()
-      router.refresh()
+      setImpersonation({ active: false })
     } catch {
       toast.error('Network error — please try again.')
     } finally {
@@ -152,14 +165,26 @@ export default function AdminHubPage() {
             <Alert variant="warning" title="Support mode active">
               <p className="mb-3">
                 You are viewing{' '}
-                <strong>{impersonation.organizationName || 'an organization'}</strong> as admin.
+                <strong>{impersonation.organizationName || 'an organization'}</strong>
+                {impersonation.organizationSlug && (
+                  <span className="text-fg-muted font-mono text-sm">
+                    {' '}
+                    ({impersonation.organizationSlug})
+                  </span>
+                )}
+                {impersonation.readOnly && (
+                  <Badge variant="warning" className="ms-2 align-middle">
+                    Read-only
+                  </Badge>
+                )}{' '}
+                as admin.
               </p>
               <Button
                 type="button"
                 size="sm"
                 variant="secondary"
                 loading={exiting}
-                onClick={exitSupportMode}
+                onClick={handleExitSupportMode}
               >
                 Exit support mode
               </Button>

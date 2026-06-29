@@ -8,7 +8,12 @@ import { ACTIVE_ORG_COOKIE } from '@/lib/auth-helpers'
 import { Organization } from '@/lib/models'
 import { audit } from '@/lib/audit'
 import { handler } from '@/lib/api/handler'
-import { clearImpersonationCookies, readImpersonationOrgId } from '@/lib/platform-impersonation'
+import {
+  clearImpersonationCookies,
+  readImpersonationOrgId,
+  readImpersonationReadOnly,
+  readImpersonationExpiresAt,
+} from '@/lib/platform-impersonation'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,10 +26,14 @@ export const GET = handler({
       return { data: { active: false } }
     }
 
-    const org = await Organization.findById(orgId).select('name slug').lean<{
-      name?: string
-      slug?: string
-    }>()
+    const [org, readOnly, expiresAt] = await Promise.all([
+      Organization.findById(orgId).select('name slug').lean<{
+        name?: string
+        slug?: string
+      }>(),
+      readImpersonationReadOnly(session!.user.id),
+      readImpersonationExpiresAt(session!.user.id),
+    ])
 
     return {
       data: {
@@ -32,6 +41,8 @@ export const GET = handler({
         organizationId: orgId,
         organizationName: org?.name || null,
         organizationSlug: org?.slug || null,
+        readOnly,
+        expiresAt,
       },
     }
   },

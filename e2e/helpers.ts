@@ -198,6 +198,21 @@ export function inMain(page: Page) {
   return page.locator('main')
 }
 
+/** Sticky support-mode banner (platform admin impersonation). */
+export function supportModeBanner(page: Page) {
+  return page.getByRole('status').filter({ hasText: /support mode/i })
+}
+
+/** End an active support-mode session via API (test cleanup). */
+export async function exitSupportModeIfActive(page: Page): Promise<void> {
+  const res = await page.request.get('/api/admin/impersonate')
+  if (!res.ok()) return
+  const data = (await res.json()) as { active?: boolean }
+  if (data.active) {
+    await page.request.delete('/api/admin/impersonate')
+  }
+}
+
 export async function openGlobalSearch(page: Page, query: string): Promise<void> {
   await page.keyboard.press('Control+k')
   const input = page.getByPlaceholder(/search/i)

@@ -12,6 +12,31 @@ import { setImpersonationCookies } from '@/lib/platform-impersonation'
 
 export const dynamic = 'force-dynamic'
 
+export type ImpersonateBodyResult =
+  | { ok: true; reason: string; readOnly: boolean }
+  | { ok: false; error: string }
+
+/** Validates POST body for organization impersonation (exported for unit tests). */
+export function validateImpersonateBody(body: unknown): ImpersonateBodyResult {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return { ok: false, error: 'Request body required' }
+  }
+  const record = body as Record<string, unknown>
+  const reasonRaw = record.reason
+  if (typeof reasonRaw !== 'string') {
+    return { ok: false, error: 'Reason is required' }
+  }
+  const reason = reasonRaw.trim()
+  if (reason.length < 3) {
+    return { ok: false, error: 'Reason must be at least 3 characters' }
+  }
+  if (reason.length > 500) {
+    return { ok: false, error: 'Reason must be at most 500 characters' }
+  }
+  const readOnly = record.readOnly === true
+  return { ok: true, reason, readOnly }
+}
+
 export const POST = handler({
   auth: 'admin',
   idParams: ['id'],
@@ -24,6 +49,13 @@ export const POST = handler({
     if (!rateVerdict.allowed) {
       return { status: 429, data: { error: 'Too many requests' } }
     }
+
+    const body = await request.json().catch(() => null)
+    const validated = validateImpersonateBody(body)
+    if (!validated.ok) {
+      return { status: 400, data: { error: validated.error } }
+    }
+    const { reason, readOnly } = validated
 
     const orgId = String(params.id)
     const org = await Organization.findById(orgId).select('name slug').lean<{
@@ -38,10 +70,12 @@ export const POST = handler({
       ok: true,
       organizationId: orgId,
       organizationName: org.name,
+      organizationSlug: org.slug ?? null,
+      readOnly,
       redirectTo: '/',
     })
 
-    const ok = setImpersonationCookies(res, session!.user.id, orgId, ACTIVE_ORG_COOKIE)
+    const ok = setImpersonationCookies(res, session!.user.id, orgId, ACTIVE_ORG_COOKIE, readOnly)
     if (!ok) {
       return { status: 500, data: { error: 'Could not start support session' } }
     }
@@ -52,7 +86,7 @@ export const POST = handler({
       action: 'platform.impersonate.start',
       resourceType: 'Organization',
       resourceId: orgId,
-      metadata: { orgName: org.name, orgSlug: org.slug },
+      metadata: { orgName: org.name, orgSlug: org.slug, reason, readOnly },
       request,
     })
 

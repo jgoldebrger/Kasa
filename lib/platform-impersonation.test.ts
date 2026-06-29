@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import {
   createImpersonationToken,
   verifyImpersonationToken,
+  readImpersonationDetails,
 } from '@/lib/platform-impersonation-token'
 
 describe('platform impersonation tokens', () => {
@@ -20,6 +21,20 @@ describe('platform impersonation tokens', () => {
     const token = createImpersonationToken('user-1', 'org-1')
     expect(token).toBeTruthy()
     expect(verifyImpersonationToken(token!, 'user-1')).toBe('org-1')
+  })
+
+  it('round-trips readOnly flag when set', () => {
+    const token = createImpersonationToken('user-1', 'org-1', true)
+    expect(token).toBeTruthy()
+    const details = readImpersonationDetails(token!, 'user-1')
+    expect(details).toMatchObject({ orgId: 'org-1', readOnly: true })
+    expect(typeof details?.expiresAt).toBe('number')
+  })
+
+  it('defaults readOnly to false when omitted', () => {
+    const token = createImpersonationToken('user-1', 'org-1')
+    const details = readImpersonationDetails(token!, 'user-1')
+    expect(details?.readOnly).toBe(false)
   })
 
   it('rejects token for a different user', () => {

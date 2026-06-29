@@ -11,7 +11,7 @@ import {
   enforcePlatformAccountAccess,
   platformAccessRedirectPath,
 } from '@/lib/billing/account-access'
-import { isPlatformImpersonating } from '@/lib/platform-impersonation'
+import { isPlatformImpersonating, readImpersonationReadOnly } from '@/lib/platform-impersonation'
 
 /**
  * Per-request memoized `auth()`. Use this from layout.tsx + every server
@@ -30,6 +30,7 @@ export interface ServerOrgContext {
   organizationId: string
   role: Role
   isPlatformImpersonation?: boolean
+  isPlatformImpersonationReadOnly?: boolean
 }
 
 /**
@@ -84,13 +85,15 @@ export const getServerOrgContext = cache(async (): Promise<ServerOrgContext | nu
       .lean<{ role: Role }>()
     if (!m) {
       if (await isPlatformImpersonating(userId, session.user?.email, orgId)) {
+        const readOnly = await readImpersonationReadOnly(userId)
         return {
           userId,
           email: session.user?.email || '',
           name: session.user?.name || '',
           organizationId: orgId,
-          role: 'admin',
+          role: readOnly ? 'member' : 'admin',
           isPlatformImpersonation: true,
+          isPlatformImpersonationReadOnly: readOnly || undefined,
         }
       }
       return null
@@ -99,6 +102,7 @@ export const getServerOrgContext = cache(async (): Promise<ServerOrgContext | nu
   }
 
   const impersonating = await isPlatformImpersonating(userId, session.user?.email, orgId)
+  const readOnly = impersonating ? await readImpersonationReadOnly(userId) : false
 
   return {
     userId,
@@ -107,6 +111,7 @@ export const getServerOrgContext = cache(async (): Promise<ServerOrgContext | nu
     organizationId: orgId,
     role,
     isPlatformImpersonation: impersonating || undefined,
+    isPlatformImpersonationReadOnly: readOnly || undefined,
   }
 })
 

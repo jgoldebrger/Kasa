@@ -1,12 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import MobileTopBar from './MobileTopBar'
 import PlatformImpersonationBanner from './PlatformImpersonationBanner'
 import KeyboardShortcuts from './KeyboardShortcuts'
 import GlobalQuickActionModals from './GlobalQuickActionModals'
+import {
+  fetchSupportModeStatus,
+  useSupportModeChanged,
+  type SupportModeDetail,
+} from '@/lib/client/support-mode'
 
 const FULLSCREEN_PATHS = [
   '/welcome',
@@ -27,6 +32,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isFullscreen = FULLSCREEN_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 
   const [menuOpen, setMenuOpen] = useState(false)
+  const [supportMode, setSupportMode] = useState<SupportModeDetail>({ active: false })
+
+  useSupportModeChanged(
+    useCallback((detail) => {
+      setSupportMode(detail)
+    }, []),
+  )
+
+  useEffect(() => {
+    void fetchSupportModeStatus().then(setSupportMode)
+  }, [pathname])
 
   // Auto-close the mobile drawer when the route changes (the Sidebar
   // also calls onClose on link click; this is a belt-and-braces in case
@@ -89,12 +105,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Main content offset uses logical `ms-64` (margin-inline-start)
-          so RTL flips the offset to the right side automatically. */}
-      <main id="main-content" className="min-h-screen md:ms-64">
+      {/* Main column: banner sits outside scrollable content so sticky works on mobile. */}
+      <div className="min-h-screen md:ms-64 flex flex-col">
         <PlatformImpersonationBanner />
-        {children}
-      </main>
+        <main
+          id="main-content"
+          className="flex-1 min-h-0"
+          data-support-mode={supportMode.active ? 'true' : undefined}
+          data-support-mode-readonly={supportMode.readOnly ? 'true' : undefined}
+        >
+          {children}
+        </main>
+      </div>
       <KeyboardShortcuts />
       <GlobalQuickActionModals />
     </>
