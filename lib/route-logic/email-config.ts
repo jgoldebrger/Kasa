@@ -1,4 +1,4 @@
-import { EmailConfig } from '@/lib/models'
+import { EmailConfig, Organization } from '@/lib/models'
 import { encrypt, safeDecrypt } from '@/lib/encryption'
 import { audit } from '@/lib/audit'
 import { sanitizeFromName } from '@/lib/email-from-name'
@@ -47,9 +47,16 @@ export const GET = handler({
       organizationId: ctx!.organizationId,
     })
 
+    const org = await Organization.findById(ctx!.organizationId)
+      .select('emailStrictDeliverability')
+      .lean<{ emailStrictDeliverability?: boolean }>()
+
     if (!config) {
       return {
-        data: { configured: false },
+        data: {
+          configured: false,
+          emailStrictDeliverability: !!org?.emailStrictDeliverability,
+        },
         headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=300' },
       }
     }
@@ -64,6 +71,7 @@ export const GET = handler({
         lastTestAt: config.lastTestAt ?? null,
         lastTestStatus: config.lastTestStatus ?? null,
         lastTestError: config.lastTestError ?? null,
+        emailStrictDeliverability: !!org?.emailStrictDeliverability,
       },
       headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=300' },
     }
@@ -86,7 +94,7 @@ const saveEmailConfig = handler({
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    const { email, fromName, replyTo } = body
+    const { email, fromName, replyTo, emailStrictDeliverability } = body
     const normalizedPassword = body.password ? normalizeGmailAppPassword(body.password) : undefined
     const cleanedReplyTo = replyTo === '' ? null : replyTo?.trim() || undefined
 
@@ -168,12 +176,20 @@ const saveEmailConfig = handler({
         request,
       })
 
+      if (emailStrictDeliverability !== undefined) {
+        await Organization.findByIdAndUpdate(ctx!.organizationId, {
+          $set: { emailStrictDeliverability: !!emailStrictDeliverability },
+        })
+      }
+
       return {
         data: {
           email: updatedConfig!.email,
           fromName: updatedConfig!.fromName,
           isActive: updatedConfig!.isActive,
           replyTo: updatedConfig!.replyTo ?? null,
+          emailStrictDeliverability:
+            emailStrictDeliverability !== undefined ? !!emailStrictDeliverability : undefined,
         },
       }
     }
@@ -208,6 +224,12 @@ const saveEmailConfig = handler({
       request,
     })
 
+    if (emailStrictDeliverability !== undefined) {
+      await Organization.findByIdAndUpdate(ctx!.organizationId, {
+        $set: { emailStrictDeliverability: !!emailStrictDeliverability },
+      })
+    }
+
     return {
       status: 201,
       data: {
@@ -215,6 +237,8 @@ const saveEmailConfig = handler({
         fromName: config.fromName,
         isActive: config.isActive,
         replyTo: config.replyTo ?? null,
+        emailStrictDeliverability:
+          emailStrictDeliverability !== undefined ? !!emailStrictDeliverability : undefined,
       },
     }
   },
@@ -225,3 +249,44 @@ export const POST = saveEmailConfig
 
 // PUT mirrors POST for clients that prefer idempotent update semantics.
 export const PUT = saveEmailConfig
+
+const patchEmailSettings = handler({
+  auth: 'org',
+  minRole: 'admin',
+  body: emailConfigSchemas.emailSettingsPatchBody,
+  name: 'PATCH /api/email-config',
+  fn: async ({ ctx, body, request }) => {
+    const rateVerdict = await checkRateLimit(
+      request,
+      'email-config-patch',
+      { limit: 30, windowMs: 60_000 },
+      ctx!.organizationId,
+    )
+    if (!rateVerdict.allowed) {
+      return { status: 429, data: { error: 'Too many requests' } }
+    }
+
+    const updated = await Organization.findByIdAndUpdate(
+      ctx!.organizationId,
+      { $set: { emailStrictDeliverability: !!body.emailStrictDeliverability } },
+      { new: true },
+    )
+      .select('emailStrictDeliverability')
+      .lean<{ emailStrictDeliverability?: boolean }>()
+    if (!updated) return { status: 404, data: { error: 'Organization not found' } }
+
+    await audit({
+      organizationId: ctx!.organizationId,
+      userId: ctx!.userId,
+      action: 'org.settings.update',
+      resourceType: 'Organization',
+      resourceId: ctx!.organizationId,
+      metadata: { fields: ['emailStrictDeliverability'] },
+      request,
+    })
+
+    return { data: { emailStrictDeliverability: !!updated.emailStrictDeliverability } }
+  },
+})
+
+export const PATCH = patchEmailSettings

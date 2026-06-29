@@ -35,11 +35,13 @@ import {
 } from '@/lib/auth-helpers'
 import { enforcePlatformAccountAccess, isSubscriptionExemptApi } from '@/lib/billing/account-access'
 import { assertPlatformAdminTwoFactor, isPlatformAdminEmail } from '@/lib/platform-admin'
+import { assertRecentPlatformAdminTotp } from '@/lib/platform-admin-totp'
 import { isCronRequest, requireOrgOrCron } from '@/lib/auth-cron'
 import { verifyCronJob } from '@/lib/auth-cron-job'
 import { logError } from '@/lib/log'
 import { verifyApiCsrf } from '@/lib/csrf'
 import { blockReadOnlySupportMutation } from '@/lib/support-mode-readonly-guard'
+import { blockScopedSupportAccess } from '@/lib/support-mode-scope'
 
 export type AuthMode = 'public' | 'session' | 'org' | 'admin' | 'cron' | 'org-or-cron'
 
@@ -86,6 +88,10 @@ export interface HandlerOptions<TBody, TQuery> {
    * Set true to opt in on sensitive routes.
    */
   platformAdminTwoFactor?: boolean
+  /**
+   * For `auth: 'admin'`: require a recent step-up TOTP verification cookie (~5 min).
+   */
+  platformAdminRecentTotp?: boolean
   fn: (input: HandlerCtx<TBody, TQuery>) => Promise<HandlerReturn>
 }
 
@@ -166,6 +172,10 @@ export function handler<TBody = unknown, TQuery = unknown>(opts: HandlerOptions<
             const tfaBlock = await assertPlatformAdminTwoFactor(r.user.id)
             if (tfaBlock) return tfaBlock
           }
+          if (opts.platformAdminRecentTotp === true) {
+            const totpBlock = assertRecentPlatformAdminTotp(request, r.user.id)
+            if (totpBlock) return totpBlock
+          }
           session = r
           break
         }
@@ -186,7 +196,12 @@ export function handler<TBody = unknown, TQuery = unknown>(opts: HandlerOptions<
       // --- db --------------------------------------------------------------
       if (!opts.noDb) await connectDB()
 
-      if (opts.auth === 'org' && ctx) {
+      const isOrgUserSession =
+        opts.auth === 'org' || (opts.auth === 'org-or-cron' && ctx && !ctx.isCron)
+      if (isOrgUserSession && ctx) {
+        const scopeBlock = blockScopedSupportAccess(request, ctx)
+        if (scopeBlock) return scopeBlock
+
         const readOnlyBlock = blockReadOnlySupportMutation(request, ctx)
         if (readOnlyBlock) return readOnlyBlock
       }

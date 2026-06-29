@@ -9,14 +9,23 @@ import { audit } from '@/lib/audit'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { handler } from '@/lib/api/handler'
 import { setImpersonationCookies } from '@/lib/platform-impersonation'
+import { assertPlatformAdminTwoFactor } from '@/lib/platform-admin'
+import { assertRecentPlatformAdminTotp } from '@/lib/platform-admin-totp'
 import { notifyOrgOwnerOfSupportAccess } from '@/lib/platform-email'
 import { notifyPlatformSupportWebhook } from '@/lib/platform-support-webhook'
 import { isSupportModeRedirect, type SupportModeRedirect } from '@/lib/support-mode-redirect'
+import { validateSupportModeScope, type SupportModeScope } from '@/lib/support-mode-scope'
 
 export const dynamic = 'force-dynamic'
 
 export type ImpersonateBodyResult =
-  | { ok: true; reason: string; readOnly: boolean; redirectTo: SupportModeRedirect }
+  | {
+      ok: true
+      reason: string
+      readOnly: boolean
+      scope: SupportModeScope
+      redirectTo: SupportModeRedirect
+    }
   | { ok: false; error: string }
 
 /** Validates POST body for organization impersonation (exported for unit tests). */
@@ -37,6 +46,10 @@ export function validateImpersonateBody(body: unknown): ImpersonateBodyResult {
     return { ok: false, error: 'Reason must be at most 500 characters' }
   }
   const readOnly = record.readOnly === true
+  const scopeResult = validateSupportModeScope(record.scope)
+  if (!scopeResult.ok) {
+    return { ok: false, error: scopeResult.error }
+  }
   let redirectTo: SupportModeRedirect = '/'
   if (record.redirectTo !== undefined && record.redirectTo !== null && record.redirectTo !== '') {
     if (!isSupportModeRedirect(record.redirectTo)) {
@@ -44,7 +57,7 @@ export function validateImpersonateBody(body: unknown): ImpersonateBodyResult {
     }
     redirectTo = record.redirectTo
   }
-  return { ok: true, reason, readOnly, redirectTo }
+  return { ok: true, reason, readOnly, scope: scopeResult.scope, redirectTo }
 }
 
 export const POST = handler({
@@ -65,14 +78,24 @@ export const POST = handler({
     if (!validated.ok) {
       return { status: 400, data: { error: validated.error } }
     }
-    const { reason, readOnly, redirectTo } = validated
+    const { reason, readOnly, scope, redirectTo } = validated
+
+    if (!readOnly) {
+      const tfaBlock = await assertPlatformAdminTwoFactor(session!.user.id)
+      if (tfaBlock) return tfaBlock
+      const totpBlock = assertRecentPlatformAdminTotp(request, session!.user.id)
+      if (totpBlock) return totpBlock
+    }
 
     const orgId = String(params.id)
-    const org = await Organization.findById(orgId).select('name slug ownerId').lean<{
-      name?: string
-      slug?: string
-      ownerId?: { toString(): string }
-    }>()
+    const org = await Organization.findById(orgId)
+      .select('name slug ownerId notifyOwnerOnSupportAccess')
+      .lean<{
+        name?: string
+        slug?: string
+        ownerId?: { toString(): string }
+        notifyOwnerOnSupportAccess?: boolean
+      }>()
     if (!org) {
       return { status: 404, data: { error: 'Organization not found' } }
     }
@@ -83,10 +106,18 @@ export const POST = handler({
       organizationName: org.name,
       organizationSlug: org.slug ?? null,
       readOnly,
+      scope,
       redirectTo,
     })
 
-    const ok = setImpersonationCookies(res, session!.user.id, orgId, ACTIVE_ORG_COOKIE, readOnly)
+    const ok = setImpersonationCookies(
+      res,
+      session!.user.id,
+      orgId,
+      ACTIVE_ORG_COOKIE,
+      readOnly,
+      scope,
+    )
     if (!ok) {
       return { status: 500, data: { error: 'Could not start support session' } }
     }
@@ -101,12 +132,12 @@ export const POST = handler({
       action: 'platform.impersonate.start',
       resourceType: 'Organization',
       resourceId: orgId,
-      metadata: { orgName: org.name, orgSlug: org.slug, reason, readOnly, redirectTo },
+      metadata: { orgName: org.name, orgSlug: org.slug, reason, readOnly, scope, redirectTo },
       request,
     })
 
     try {
-      if (org.ownerId) {
+      if (org.ownerId && org.notifyOwnerOnSupportAccess !== false) {
         const owner = await User.findById(org.ownerId).select('email').lean<{ email?: string }>()
         if (owner?.email) {
           await notifyOrgOwnerOfSupportAccess({
@@ -116,6 +147,7 @@ export const POST = handler({
             adminEmail,
             reason,
             readOnly,
+            scope,
             at,
           })
         }
@@ -134,6 +166,7 @@ export const POST = handler({
       adminEmail,
       reason,
       readOnly,
+      scope,
       at: at.toISOString(),
     })
 

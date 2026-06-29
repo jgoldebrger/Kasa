@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { BoltIcon, EyeIcon, PlayIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useToast } from '@/app/components/Toast'
@@ -44,6 +45,29 @@ function formatLastRun(value?: string | null) {
   if (!value) return '—'
   const d = new Date(value)
   return Number.isNaN(d.getTime()) ? value : d.toLocaleString()
+}
+
+function formatLastRunStats(t: ReturnType<typeof useT>, rule: EmailAutomationRuleRow) {
+  if (!rule.lastRunAt) {
+    return tf(t, 'communications.automations.lastRunNever', 'Last run: never')
+  }
+
+  const date = formatLastRun(rule.lastRunAt)
+  const sent = rule.lastRunSentCount ?? 0
+  const skipped = rule.lastRunSkippedCount ?? 0
+  const failed = rule.lastRunFailedCount ?? 0
+
+  let counts = tf(t, 'communications.automations.lastRunCounts', '{sent} sent, {skipped} skipped')
+    .replace('{sent}', String(sent))
+    .replace('{skipped}', String(skipped))
+
+  if (failed > 0) {
+    counts += `, ${tf(t, 'communications.automations.lastRunFailed', '{count} failed').replace('{count}', String(failed))}`
+  }
+
+  return tf(t, 'communications.automations.lastRunStats', 'Last run: {date} — {counts}')
+    .replace('{date}', date)
+    .replace('{counts}', counts)
 }
 
 export default function AutomationsView() {
@@ -323,10 +347,24 @@ export default function AutomationsView() {
                       <p className="text-sm text-fg-muted">
                         {ruleTypeLabel(rule.ruleType)} · {templateName}
                       </p>
-                      <p className="text-xs text-fg-muted">
-                        {tf(t, 'communications.automations.lastRun', 'Last run')}:{' '}
-                        {formatLastRun(rule.lastRunAt)}
-                      </p>
+                      <p className="text-xs text-fg-muted">{formatLastRunStats(t, rule)}</p>
+                      {rule.lastRunError ? (
+                        <p className="text-xs text-danger">
+                          {tf(
+                            t,
+                            'communications.automations.lastRunError',
+                            'Last run error: {error}',
+                          ).replace('{error}', rule.lastRunError)}
+                        </p>
+                      ) : null}
+                      {rule.lastRunAt && (rule.lastRunSentCount ?? 0) > 0 ? (
+                        <Link
+                          href="/communications"
+                          className="text-xs text-accent hover:underline"
+                        >
+                          {tf(t, 'communications.automations.viewSentLog', 'View sent log')}
+                        </Link>
+                      ) : null}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <label className="inline-flex items-center gap-2 text-sm text-fg">

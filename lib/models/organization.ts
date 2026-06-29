@@ -85,6 +85,12 @@ const OrganizationSchema = new Schema(
     // `monthlyStatementCalendar` is 'hebrew'. End-of-month clamp lives in
     // `monthlyStatementHebrewDayMatcher` (lib/jobs.ts).
     monthlyStatementHebrewDay: { type: Number, default: 1, min: 1, max: 30 },
+    // When true, bulk email sends are blocked while the deliverability
+    // checklist has failing items — Compose cannot override with "Send anyway".
+    emailStrictDeliverability: { type: Boolean, default: false },
+    // When false, the org owner is not emailed when a platform admin enters
+    // support mode (still subject to PLATFORM_NOTIFY_OWNER_ON_SUPPORT).
+    notifyOwnerOnSupportAccess: { type: Boolean, default: true },
     // Org letterhead: the address/contact/signature block stamped onto
     // outbound documents (currently tax receipts; statements still use
     // the hardcoded "Kasa Family Management" header until a follow-up

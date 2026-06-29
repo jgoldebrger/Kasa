@@ -1,1 +1,1 @@
-export { GET, POST, PUT } from '@/lib/route-logic/email-config'
+export { GET, POST, PUT, PATCH } from '@/lib/route-logic/email-config'

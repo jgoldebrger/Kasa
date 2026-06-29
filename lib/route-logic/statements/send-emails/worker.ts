@@ -19,6 +19,7 @@ import { verifyApiCsrf } from '@/lib/csrf'
 import { Types } from 'mongoose'
 import connectDB from '@/lib/database'
 import { requireOrg } from '@/lib/auth-helpers'
+import { blockReadOnlySupportMutation } from '@/lib/support-mode-readonly-guard'
 import { isCronRequest } from '@/lib/auth-cron'
 import { EmailJob, EmailConfig } from '@/lib/models'
 import { safeDecrypt, decryptFailureMessage } from '@/lib/encryption'
@@ -60,6 +61,8 @@ export async function POST(request: NextRequest) {
     if (!cron) {
       const ctx = await requireOrg(request, { minRole: 'admin' })
       if (ctx instanceof NextResponse) return ctx
+      const readOnlyBlock = blockReadOnlySupportMutation(request, ctx)
+      if (readOnlyBlock) return readOnlyBlock
       organizationId = ctx.organizationId
     }
 
@@ -302,12 +305,15 @@ export async function POST(request: NextRequest) {
         // multi-hour job started near session expiry will lose
         // auth on the next tick. Log it loudly so the operator can
         // set CRON_SECRET before this bites in production.
-        logError(new Error('CRON_SECRET is not set; long EmailJob runs risk losing auth on continuation'), {
-          module: 'statements.worker',
-          jobId: job._id.toString(),
-          phase: 'continuation-auth',
-          level: 'warn',
-        })
+        logError(
+          new Error('CRON_SECRET is not set; long EmailJob runs risk losing auth on continuation'),
+          {
+            module: 'statements.worker',
+            jobId: job._id.toString(),
+            phase: 'continuation-auth',
+            level: 'warn',
+          },
+        )
       }
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), 5000)

@@ -1,6 +1,9 @@
 import crypto from 'crypto'
+import type { SupportModeScope } from '@/lib/support-mode-scope'
 
 const MAX_AGE_SEC = 8 * 60 * 60
+
+type ScopedPayloadValue = 'communications' | 'billing'
 
 interface ImpersonationPayload {
   u: string
@@ -8,11 +11,14 @@ interface ImpersonationPayload {
   iat: number
   exp: number
   ro?: boolean
+  /** Omitted for full org access (backward compatible). */
+  sc?: ScopedPayloadValue
 }
 
 export type ImpersonationDetails = {
   orgId: string
   readOnly: boolean
+  scope: SupportModeScope
   expiresAt: number
   /** Unix seconds when the support session started. */
   startedAt: number
@@ -46,6 +52,7 @@ export function createImpersonationToken(
   userId: string,
   orgId: string,
   readOnly?: boolean,
+  scope: SupportModeScope = 'full',
 ): string | null {
   const secret = signingSecret()
   if (!secret) return null
@@ -57,6 +64,7 @@ export function createImpersonationToken(
     exp: now + MAX_AGE_SEC,
   }
   if (readOnly) payload.ro = true
+  if (scope === 'communications' || scope === 'billing') payload.sc = scope
   const body = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')
   const sig = crypto.createHmac('sha256', secret).update(body).digest('base64url')
   return `${body}.${sig}`
@@ -72,9 +80,13 @@ export function readImpersonationDetails(
   if (!payload.o || payload.exp < Math.floor(Date.now() / 1000)) return null
   const startedAt =
     typeof payload.iat === 'number' && payload.iat > 0 ? payload.iat : payload.exp - MAX_AGE_SEC
+  const scope: SupportModeScope =
+    payload.sc === 'communications' || payload.sc === 'billing' ? payload.sc : 'full'
+
   return {
     orgId: payload.o,
     readOnly: payload.ro === true,
+    scope,
     expiresAt: payload.exp,
     startedAt,
   }

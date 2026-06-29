@@ -6,8 +6,14 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useToast } from '@/app/components/Toast'
 import SupportModeEnterModal from '@/app/components/SupportModeEnterModal'
+import PlatformAdminTotpModal from '@/app/components/PlatformAdminTotpModal'
 import SupportModeOpenButton from '@/app/components/SupportModeOpenButton'
 import { enterSupportMode } from '@/lib/client/support-mode'
+import { usePlatformAdminTotpGate } from '@/lib/client/usePlatformAdminTotpGate'
+import {
+  isPlatformAdminTotpReverifyError,
+  needsPlatformAdminTotpForWrite,
+} from '@/lib/client/platform-admin-totp'
 import type { SupportModeRedirect } from '@/lib/support-mode-redirect'
 import { PLATFORM_ADMIN_2FA_REQUIRED_CODE } from '@/lib/platform-admin-constants'
 import {
@@ -75,6 +81,9 @@ export default function OnboardingAdminPage() {
   const [markingId, setMarkingId] = useState<string | null>(null)
   const [forbidden, setForbidden] = useState(false)
   const [twoFactorRequired, setTwoFactorRequired] = useState(false)
+  const totpGate = usePlatformAdminTotpGate()
+  const [pendingMarkOrg, setPendingMarkOrg] = useState<OrgRow | null>(null)
+  const [markTotpOpen, setMarkTotpOpen] = useState(false)
 
   const load = useCallback(
     async (opts?: { cursor?: string | null; append?: boolean }) => {
@@ -117,27 +126,43 @@ export default function OnboardingAdminPage() {
     void load()
   }, [load])
 
+  async function postImpersonate(
+    orgId: string,
+    payload: {
+      reason: string
+      readOnly: boolean
+      scope: import('@/lib/support-mode-scope').SupportModeScope
+    },
+  ) {
+    return fetch(`/api/admin/organizations/${orgId}/impersonate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, redirectTo: modalRedirectTo }),
+    })
+  }
+
   async function confirmEnterSupportMode({
     reason,
     readOnly,
+    scope,
   }: {
     reason: string
     readOnly: boolean
+    scope: import('@/lib/support-mode-scope').SupportModeScope
   }) {
     if (!modalOrg) return
     const org = modalOrg
     setEnteringId(org.id)
     try {
-      const res = await fetch(`/api/admin/organizations/${org.id}/impersonate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason, readOnly, redirectTo: modalRedirectTo }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        toast.error(data.error || 'Could not enter support mode.')
+      const result = await totpGate.runWithTotpGate(
+        { orgId: org.id, reason, readOnly, scope, redirectTo: modalRedirectTo },
+        (entry) => postImpersonate(entry.orgId, entry),
+      )
+      if (!result.ok) {
+        if (result.error) toast.error(result.error)
         return
       }
+      const data = result.data
       toast.success(`Now viewing ${org.name} as admin.`)
       setModalOrg(null)
       await enterSupportMode({
@@ -145,6 +170,7 @@ export default function OnboardingAdminPage() {
         organizationName: data.organizationName || org.name,
         organizationSlug: data.organizationSlug || org.slug,
         readOnly: Boolean(data.readOnly ?? readOnly),
+        scope: data.scope === 'communications' || data.scope === 'billing' ? data.scope : scope,
         expiresAt: data.expiresAt ?? null,
         redirectTo: data.redirectTo || '/',
         router,
@@ -157,13 +183,80 @@ export default function OnboardingAdminPage() {
     }
   }
 
+  async function handleTotpVerified() {
+    if (!modalOrg) return
+    const org = modalOrg
+    setEnteringId(org.id)
+    try {
+      const result = await totpGate.retryAfterTotpVerified((entry) =>
+        postImpersonate(entry.orgId, entry),
+      )
+      if (!result.ok) {
+        toast.error(result.error || 'Could not enter support mode.')
+        return
+      }
+      const data = result.data
+      toast.success(`Now viewing ${org.name} as admin.`)
+      setModalOrg(null)
+      await enterSupportMode({
+        organizationId: data.organizationId || org.id,
+        organizationName: data.organizationName || org.name,
+        organizationSlug: data.organizationSlug || org.slug,
+        readOnly: Boolean(data.readOnly),
+        scope: data.scope === 'communications' || data.scope === 'billing' ? data.scope : 'full',
+        expiresAt: data.expiresAt ?? null,
+        redirectTo: data.redirectTo || '/',
+        router,
+        updateSession,
+      })
+    } catch {
+      toast.error('Network error — please try again.')
+    } finally {
+      setEnteringId(null)
+    }
+  }
+
+  async function postMarkSetupComplete(orgId: string) {
+    return fetch(`/api/admin/organizations/${orgId}/mark-setup-complete`, { method: 'POST' })
+  }
+
   async function markSetupComplete(org: OrgRow) {
     setMarkingId(org.id)
     try {
-      const res = await fetch(`/api/admin/organizations/${org.id}/mark-setup-complete`, {
-        method: 'POST',
-      })
+      if (await needsPlatformAdminTotpForWrite()) {
+        setPendingMarkOrg(org)
+        setMarkTotpOpen(true)
+        return
+      }
+      const res = await postMarkSetupComplete(org.id)
       const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        if (isPlatformAdminTotpReverifyError(data)) {
+          setPendingMarkOrg(org)
+          setMarkTotpOpen(true)
+          return
+        }
+        toast.error(data.error || 'Could not mark setup complete.')
+        return
+      }
+      toast.success(`Marked ${org.name} setup complete.`)
+      void load()
+    } catch {
+      toast.error('Network error — please try again.')
+    } finally {
+      setMarkingId(null)
+    }
+  }
+
+  async function handleMarkTotpVerified() {
+    if (!pendingMarkOrg) return
+    const org = pendingMarkOrg
+    setMarkingId(org.id)
+    setMarkTotpOpen(false)
+    try {
+      const res = await postMarkSetupComplete(org.id)
+      const data = await res.json().catch(() => ({}))
+      setPendingMarkOrg(null)
       if (!res.ok) {
         toast.error(data.error || 'Could not mark setup complete.')
         return
@@ -302,6 +395,25 @@ export default function OnboardingAdminPage() {
           if (enteringId === null) setModalOrg(null)
         }}
         onConfirm={confirmEnterSupportMode}
+      />
+
+      <PlatformAdminTotpModal
+        open={totpGate.totpOpen}
+        onClose={() => {
+          if (enteringId === null) totpGate.clearPending()
+        }}
+        onVerified={handleTotpVerified}
+      />
+
+      <PlatformAdminTotpModal
+        open={markTotpOpen}
+        onClose={() => {
+          if (markingId === null) {
+            setMarkTotpOpen(false)
+            setPendingMarkOrg(null)
+          }
+        }}
+        onVerified={handleMarkTotpVerified}
       />
     </div>
   )

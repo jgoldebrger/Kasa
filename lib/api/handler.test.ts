@@ -21,6 +21,13 @@ vi.mock('@/lib/platform-admin', () => ({
   isPlatformAdminEmail: vi.fn(),
   assertPlatformAdminTwoFactor: vi.fn(),
 }))
+vi.mock('@/lib/billing/account-access', () => ({
+  enforcePlatformAccountAccess: vi.fn().mockResolvedValue({ ok: true }),
+  isSubscriptionExemptApi: vi.fn().mockReturnValue(false),
+}))
+vi.mock('@/lib/platform-admin-totp', () => ({
+  assertRecentPlatformAdminTotp: vi.fn(),
+}))
 
 function sameOriginRequest(
   url: string,
@@ -39,8 +46,12 @@ function sameOriginRequest(
 }
 
 describe('handler', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
+    const { verifyApiCsrf } = await import('@/lib/csrf')
+    const { isCronRequest } = await import('@/lib/auth-cron')
+    vi.mocked(verifyApiCsrf).mockReturnValue(null)
+    vi.mocked(isCronRequest).mockReturnValue(false)
   })
 
   it('runs public handlers without auth', async () => {
@@ -313,12 +324,16 @@ describe('handler', () => {
     const { requireSession } = await import('@/lib/auth-helpers')
     const { isPlatformAdminEmail, assertPlatformAdminTwoFactor } =
       await import('@/lib/platform-admin')
+    const { assertRecentPlatformAdminTotp } = await import('@/lib/platform-admin-totp')
     vi.mocked(requireSession).mockResolvedValue({
       user: { id: 'u1', email: 'admin@example.com' },
     } as any)
     vi.mocked(isPlatformAdminEmail).mockReturnValue(true)
     vi.mocked(assertPlatformAdminTwoFactor).mockResolvedValue(
       NextResponse.json({ error: '2FA required' }, { status: 403 }),
+    )
+    vi.mocked(assertRecentPlatformAdminTotp).mockReturnValue(
+      NextResponse.json({ error: 'TOTP reverify required' }, { status: 403 }),
     )
 
     const { handler } = await import('./handler')
@@ -330,7 +345,41 @@ describe('handler', () => {
 
     const res = await route(sameOriginRequest('http://localhost/api/admin/organizations'))
     expect(assertPlatformAdminTwoFactor).not.toHaveBeenCalled()
+    expect(assertRecentPlatformAdminTotp).not.toHaveBeenCalled()
     await expect(res.json()).resolves.toEqual({ ok: true })
+  })
+
+  it('returns 403 for platform admin routes when platformAdminRecentTotp is true and cookie is missing', async () => {
+    const { requireSession } = await import('@/lib/auth-helpers')
+    const { isPlatformAdminEmail } = await import('@/lib/platform-admin')
+    const { assertRecentPlatformAdminTotp } = await import('@/lib/platform-admin-totp')
+    vi.mocked(requireSession).mockResolvedValue({
+      user: { id: 'u1', email: 'admin@example.com' },
+    } as any)
+    vi.mocked(isPlatformAdminEmail).mockReturnValue(true)
+    vi.mocked(assertRecentPlatformAdminTotp).mockReturnValue(
+      NextResponse.json(
+        {
+          error: 'Enter your authenticator code',
+          code: 'PLATFORM_ADMIN_TOTP_REVERIFY_REQUIRED',
+        },
+        { status: 403 },
+      ),
+    )
+
+    const { handler } = await import('./handler')
+    const route = handler({
+      auth: 'admin',
+      platformAdminRecentTotp: true,
+      noDb: true,
+      fn: async () => ({ data: { ok: true } }),
+    })
+
+    const res = await route(sameOriginRequest('http://localhost/api/admin/sensitive'))
+    expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toMatchObject({
+      code: 'PLATFORM_ADMIN_TOTP_REVERIFY_REQUIRED',
+    })
   })
 
   it('passes org-or-cron context when cron+org auth succeeds', async () => {
@@ -471,6 +520,66 @@ describe('handler', () => {
 
     const res = await route(
       sameOriginRequest('http://localhost/api/families', { method: 'POST', body: '{}' }),
+    )
+    expect(res.status).toBe(403)
+  })
+
+  it('blocks read-only support mutations on org routes', async () => {
+    const { requireOrg } = await import('@/lib/auth-helpers')
+    const { verifyApiCsrf } = await import('@/lib/csrf')
+    const { isCronRequest } = await import('@/lib/auth-cron')
+    vi.mocked(verifyApiCsrf).mockReturnValue(null)
+    vi.mocked(isCronRequest).mockReturnValue(false)
+    vi.mocked(requireOrg).mockResolvedValue({
+      ...mockOrgContext({
+        organizationId: '507f1f77bcf86cd799439011',
+        userId: 'u1',
+        role: 'member',
+      }),
+      isPlatformImpersonation: true,
+      isPlatformImpersonationReadOnly: true,
+    })
+
+    const { handler } = await import('./handler')
+    const route = handler({
+      auth: 'org',
+      noDb: true,
+      fn: async () => ({ data: { ok: true } }),
+    })
+
+    const res = await route(
+      sameOriginRequest('http://localhost/api/families', { method: 'POST', body: '{}' }),
+    )
+    expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toMatchObject({ error: expect.stringMatching(/read-only/i) })
+  })
+
+  it('blocks read-only support mutations on org-or-cron session routes', async () => {
+    const { requireOrgOrCron } = await import('@/lib/auth-cron')
+    const { verifyApiCsrf } = await import('@/lib/csrf')
+    vi.mocked(verifyApiCsrf).mockReturnValue(null)
+    vi.mocked(requireOrgOrCron).mockResolvedValue({
+      ...mockOrgContext({
+        organizationId: '507f1f77bcf86cd799439011',
+        userId: 'u1',
+        role: 'member',
+      }),
+      isPlatformImpersonation: true,
+      isPlatformImpersonationReadOnly: true,
+    })
+
+    const { handler } = await import('./handler')
+    const route = handler({
+      auth: 'org-or-cron',
+      noDb: true,
+      fn: async () => ({ data: { ok: true } }),
+    })
+
+    const res = await route(
+      sameOriginRequest('http://localhost/api/statements/auto-generate', {
+        method: 'POST',
+        body: '{}',
+      }),
     )
     expect(res.status).toBe(403)
   })

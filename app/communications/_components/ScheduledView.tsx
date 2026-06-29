@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ClockIcon } from '@heroicons/react/24/outline'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useToast } from '@/app/components/Toast'
@@ -17,11 +17,8 @@ import {
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
 import CommunicationsNav from './CommunicationsNav'
-import type { ScheduledEmailRow } from './types'
-
-function tf(t: ReturnType<typeof useT>, key: string, fallback: string) {
-  return t(key as MessageKey, fallback)
-}
+import ScheduledEmailDetailDrawer from './ScheduledEmailDetailDrawer'
+import type { FamilyOption, ScheduledEmailRow } from './types'
 
 function formatScheduledFor(value: string) {
   const d = new Date(value)
@@ -36,12 +33,38 @@ function statusVariant(status: string): 'default' | 'success' | 'warning' | 'dan
   return 'default'
 }
 
+function statusLabel(status: string, t: ReturnType<typeof useT>): string {
+  const key = `communications.scheduled.status.${status}` as MessageKey
+  const fallbacks: Record<string, string> = {
+    pending: 'Pending',
+    sent: 'Sent',
+    cancelled: 'Cancelled',
+    failed: 'Failed',
+  }
+  return t(key, fallbacks[status] ?? status)
+}
+
 export default function ScheduledView() {
   const t = useT()
   const toast = useToast()
   const [rows, setRows] = useState<ScheduledEmailRow[]>([])
+  const [families, setFamilies] = useState<FamilyOption[]>([])
   const [loading, setLoading] = useState(true)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [detailId, setDetailId] = useState<string | null>(null)
+
+  const familyById = useMemo(() => new Map(families.map((f) => [f._id, f])), [families])
+
+  const loadFamilies = useCallback(async () => {
+    try {
+      const res = await fetch('/api/families?limit=500')
+      if (!res.ok) return
+      const data = await res.json()
+      setFamilies((data.items ?? []) as FamilyOption[])
+    } catch {
+      // Non-fatal — detail view falls back to ids
+    }
+  }, [])
 
   const loadScheduled = useCallback(async () => {
     setLoading(true)
@@ -52,7 +75,7 @@ export default function ScheduledView() {
       const list = (data.scheduledEmails ?? data.items ?? []) as ScheduledEmailRow[]
       setRows(list)
     } catch {
-      toast.error(tf(t, 'communications.scheduled.loadError', 'Failed to load scheduled sends'))
+      toast.error(t('communications.scheduled.loadError'))
     } finally {
       setLoading(false)
     }
@@ -60,42 +83,45 @@ export default function ScheduledView() {
 
   useEffect(() => {
     void loadScheduled()
-  }, [loadScheduled])
+    void loadFamilies()
+  }, [loadScheduled, loadFamilies])
 
   useOrgChanged(() => {
     void loadScheduled()
+    void loadFamilies()
   })
 
   const cancelScheduled = async (id: string) => {
-    const ok = window.confirm(
-      tf(t, 'communications.scheduled.cancelConfirm', 'Cancel this scheduled send?'),
-    )
+    const ok = window.confirm(t('communications.scheduled.cancelConfirm'))
     if (!ok) return
     setCancellingId(id)
     try {
       const res = await fetch(`/api/scheduled-emails/${id}`, { method: 'DELETE' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Cancel failed')
-      toast.success(tf(t, 'communications.scheduled.cancelled', 'Scheduled send cancelled'))
+      toast.success(t('communications.scheduled.cancelled'))
       setRows((prev) => prev.map((row) => (row._id === id ? { ...row, status: 'cancelled' } : row)))
+      if (detailId === id) setDetailId(null)
     } catch (err: unknown) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : tf(t, 'communications.scheduled.cancelError', 'Cancel failed'),
-      )
+      toast.error(err instanceof Error ? err.message : t('communications.scheduled.cancelError'))
     } finally {
       setCancellingId(null)
     }
   }
 
+  const recipientSummary = (row: ScheduledEmailRow) => {
+    const count = row.familyIds?.length ?? 0
+    return t('communications.scheduled.recipients').replace('{count}', String(count))
+  }
+
   const pending = rows.filter((r) => r.status === 'pending')
+  const detailRow = detailId ? (rows.find((r) => r._id === detailId) ?? null) : null
 
   const columns: DataColumn<ScheduledEmailRow>[] = [
     {
       id: 'scheduledFor',
-      header: tf(t, 'communications.scheduled.column.when', 'Scheduled for'),
-      headerText: tf(t, 'communications.scheduled.column.when', 'Scheduled for'),
+      header: t('communications.scheduled.column.when'),
+      headerText: t('communications.scheduled.column.when'),
       cell: (row) => (
         <span className="tabular text-fg">{formatScheduledFor(row.scheduledFor)}</span>
       ),
@@ -110,10 +136,9 @@ export default function ScheduledView() {
     },
     {
       id: 'recipients',
-      header: tf(t, 'communications.scheduled.column.recipients', 'Recipients'),
-      headerText: tf(t, 'communications.scheduled.column.recipients', 'Recipients'),
-      align: 'right',
-      cell: (row) => <span className="tabular text-fg-muted">{row.familyIds?.length ?? 0}</span>,
+      header: t('communications.scheduled.column.recipients'),
+      headerText: t('communications.scheduled.column.recipients'),
+      cell: (row) => <span className="text-fg-muted">{recipientSummary(row)}</span>,
       exportValue: (row) => row.familyIds?.length ?? 0,
     },
     {
@@ -122,7 +147,7 @@ export default function ScheduledView() {
       headerText: t('communications.column.status'),
       cell: (row) => (
         <Badge size="sm" variant={statusVariant(row.status)}>
-          {row.status}
+          {statusLabel(row.status, t)}
         </Badge>
       ),
       exportValue: (row) => row.status,
@@ -144,7 +169,7 @@ export default function ScheduledView() {
               void cancelScheduled(row._id)
             }}
           >
-            {tf(t, 'communications.scheduled.cancel', 'Cancel')}
+            {t('communications.scheduled.cancel')}
           </Button>
         ) : null,
       exportValue: () => '',
@@ -155,12 +180,8 @@ export default function ScheduledView() {
     <div className="min-h-screen p-4 sm:p-6 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         <PageHeader
-          title={tf(t, 'communications.scheduled.title', 'Scheduled sends')}
-          subtitle={tf(
-            t,
-            'communications.scheduled.subtitle',
-            'Pending bulk emails waiting to go out.',
-          )}
+          title={t('communications.scheduled.title')}
+          subtitle={t('communications.scheduled.subtitle')}
         />
 
         <CommunicationsNav />
@@ -177,12 +198,13 @@ export default function ScheduledView() {
             rowKey={(r) => r._id}
             pageSize={15}
             exportFileName="scheduled-emails"
+            onRowClick={(row) => setDetailId(row._id)}
             toolbar={
               pending.length > 0
                 ? {
                     left: (
                       <p className="text-sm text-fg-muted">
-                        {tf(t, 'communications.scheduled.pendingCount', '{count} pending').replace(
+                        {t('communications.scheduled.pendingCount').replace(
                           '{count}',
                           String(pending.length),
                         )}
@@ -192,19 +214,20 @@ export default function ScheduledView() {
                 : undefined
             }
             mobileCard={(row) => (
-              <Card compact className="space-y-2">
+              <Card
+                compact
+                className="space-y-2 cursor-pointer hover:bg-app-subtle"
+                onClick={() => setDetailId(row._id)}
+              >
                 <p className="font-medium text-fg truncate">{row.subject}</p>
                 <p className="text-sm text-fg-muted tabular">
                   {formatScheduledFor(row.scheduledFor)}
                 </p>
                 <div className="flex items-center justify-between gap-2">
                   <Badge size="sm" variant={statusVariant(row.status)}>
-                    {row.status}
+                    {statusLabel(row.status, t)}
                   </Badge>
-                  <span className="text-xs text-fg-muted tabular">
-                    {row.familyIds?.length ?? 0}{' '}
-                    {tf(t, 'communications.scheduled.recipients', 'recipients')}
-                  </span>
+                  <span className="text-xs text-fg-muted">{recipientSummary(row)}</span>
                 </div>
                 {row.status === 'pending' && (
                   <Button
@@ -212,9 +235,12 @@ export default function ScheduledView() {
                     variant="secondary"
                     size="sm"
                     loading={cancellingId === row._id}
-                    onClick={() => void cancelScheduled(row._id)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void cancelScheduled(row._id)
+                    }}
                   >
-                    {tf(t, 'communications.scheduled.cancel', 'Cancel')}
+                    {t('communications.scheduled.cancel')}
                   </Button>
                 )}
               </Card>
@@ -222,14 +248,10 @@ export default function ScheduledView() {
             empty={
               <EmptyState
                 icon={<ClockIcon className="h-10 w-10" />}
-                title={tf(t, 'communications.scheduled.empty', 'No scheduled sends')}
-                description={tf(
-                  t,
-                  'communications.scheduled.emptyHint',
-                  'Schedule a bulk email from the compose screen.',
-                )}
+                title={t('communications.scheduled.empty')}
+                description={t('communications.scheduled.emptyHint')}
                 cta={{
-                  label: tf(t, 'communications.templates.goCompose', 'Go to compose'),
+                  label: t('communications.templates.goCompose'),
                   href: '/communications',
                 }}
               />
@@ -237,6 +259,14 @@ export default function ScheduledView() {
           />
         )}
       </div>
+
+      <ScheduledEmailDetailDrawer
+        row={detailRow}
+        familyById={familyById}
+        cancelling={cancellingId === detailId}
+        onClose={() => setDetailId(null)}
+        onCancel={(id) => void cancelScheduled(id)}
+      />
     </div>
   )
 }

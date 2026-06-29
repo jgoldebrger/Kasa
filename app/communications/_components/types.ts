@@ -127,6 +127,10 @@ export interface EmailAutomationRuleRow {
   templateName?: string
   ruleType: 'balance_gt_zero' | 'event_within_30_days'
   lastRunAt?: string | null
+  lastRunSentCount?: number | null
+  lastRunSkippedCount?: number | null
+  lastRunFailedCount?: number | null
+  lastRunError?: string | null
   createdAt?: string
   updatedAt?: string
 }
@@ -170,6 +174,8 @@ export interface EmailAnalytics {
 export interface ScheduledEmailRow {
   _id: string
   subject: string
+  html?: string
+  text?: string | null
   familyIds: string[]
   scheduledFor: string
   status: string

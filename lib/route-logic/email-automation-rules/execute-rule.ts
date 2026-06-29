@@ -12,6 +12,24 @@ import { listAutomationRecipients } from './resolve-recipients'
 
 const MIN_RUN_INTERVAL_MS = 24 * 60 * 60 * 1000
 
+async function persistLastRunStats(
+  ruleId: Types.ObjectId,
+  stats: { sent: number; skipped: number; failed: number; error?: string | null },
+) {
+  await EmailAutomationRule.updateOne(
+    { _id: ruleId },
+    {
+      $set: {
+        lastRunAt: new Date(),
+        lastRunSentCount: stats.sent,
+        lastRunSkippedCount: stats.skipped,
+        lastRunFailedCount: stats.failed,
+        lastRunError: stats.error ?? null,
+      },
+    },
+  )
+}
+
 export type ExecuteEmailAutomationRuleResult = {
   sent: number
   failed: number
@@ -48,7 +66,7 @@ export async function executeEmailAutomationRule(
   const recipients = await listAutomationRecipients(organizationId, rule.ruleType)
 
   if (recipients.length === 0) {
-    await EmailAutomationRule.updateOne({ _id: rule._id }, { $set: { lastRunAt: new Date() } })
+    await persistLastRunStats(rule._id, { sent: 0, skipped: 0, failed: 0 })
     return { sent: 0, failed: 0, skipped: false }
   }
 
@@ -61,6 +79,7 @@ export async function executeEmailAutomationRule(
   const pacingMs = delayBetweenSendsMs(recipients.length)
   let sent = 0
   let failed = 0
+  let skipped = 0
   let sendIndex = 0
 
   for (const recipient of recipients) {
@@ -68,7 +87,10 @@ export async function executeEmailAutomationRule(
     sendIndex++
 
     const family = byId.get(recipient.id)
-    if (!family?.email || family.communicationsOptOut || family.emailFormatInvalid) continue
+    if (!family?.email || family.communicationsOptOut || family.emailFormatInvalid) {
+      skipped++
+      continue
+    }
 
     const familyId = recipient.id
     const mergeCtx = await loadMergeFieldContext(familyId, organizationId)
@@ -97,6 +119,6 @@ export async function executeEmailAutomationRule(
     else failed++
   }
 
-  await EmailAutomationRule.updateOne({ _id: rule._id }, { $set: { lastRunAt: new Date() } })
+  await persistLastRunStats(rule._id, { sent, skipped, failed })
   return { sent, failed, skipped: false }
 }

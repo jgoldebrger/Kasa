@@ -16,6 +16,7 @@ export interface DeliverabilityStatus {
   physicalAddressSet: DeliverabilityCheck
   quotaHeadroom: DeliverabilityCheck
   quota: { sentToday: number; limit: number; remaining: number }
+  emailStrictDeliverability?: boolean
 }
 
 const CHECK_IDS = [
@@ -55,5 +56,11 @@ export function useDeliverabilityStatus() {
     void refresh()
   }, [refresh])
 
-  return { status, loading, hasFailures: hasDeliverabilityFailures(status), refresh }
+  return {
+    status,
+    loading,
+    hasFailures: hasDeliverabilityFailures(status),
+    strictMode: !!status?.emailStrictDeliverability,
+    refresh,
+  }
 }

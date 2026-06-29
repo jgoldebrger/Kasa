@@ -2,7 +2,7 @@
  * GET /api/admin/impersonation-audit — platform-wide support session audit log.
  *
  * Query: cursor, limit, action (start|end), organizationId, userId, q (org name/slug),
- * fromDate, toDate, format (csv).
+ * fromDate, toDate, format (csv), sessionId (start audit entry id — returns session actions).
  */
 
 import { NextResponse } from 'next/server'
@@ -11,6 +11,8 @@ import { AuditLog, Organization, User } from '@/lib/models'
 import { validateDateRange } from '@/lib/validate-date-range'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { handler } from '@/lib/api/handler'
+import { getSupportSessionByStartId } from '@/lib/support-session-summary'
+import { parseSupportModeScope, type SupportModeScope } from '@/lib/support-mode-scope'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,6 +57,21 @@ function actionLabel(action: string): string {
   if (action === 'platform.impersonate.start') return 'start'
   if (action === 'platform.impersonate.end') return 'end'
   return action
+}
+
+function scopeLabel(action: string, metadata: Record<string, unknown> | null): string {
+  if (action !== 'platform.impersonate.start') {
+    const scope = metadata?.scope
+    if (typeof scope === 'string') return scope
+    return ''
+  }
+  const scope = parseSupportModeScope(metadata?.scope)
+  return scope
+}
+
+function readScopeFromMetadata(metadata: Record<string, unknown> | null): SupportModeScope | null {
+  if (!metadata || metadata.scope === undefined) return null
+  return parseSupportModeScope(metadata.scope)
 }
 
 function readOnlyLabel(action: string, metadata: Record<string, unknown> | null): string {
@@ -131,6 +148,8 @@ function mapAuditRow(
         : null,
     reason: typeof metadata?.reason === 'string' ? metadata.reason : null,
     readOnly: metadata?.readOnly === true ? true : metadata?.readOnly === false ? false : null,
+    scope: readScopeFromMetadata(metadata),
+    sessionId: String(r.action || '') === 'platform.impersonate.start' ? String(r._id) : null,
     metadata,
   }
 }
@@ -247,7 +266,7 @@ export const GET = handler({
         .lean<Record<string, unknown>[]>()
 
       const entries = await hydrateRows(exportRows)
-      const header = ['time', 'admin email', 'org name', 'action', 'reason', 'readOnly']
+      const header = ['time', 'admin email', 'org name', 'action', 'reason', 'readOnly', 'scope']
       const lines = [header.join(',')]
       for (const entry of entries) {
         const metadata =
@@ -262,6 +281,7 @@ export const GET = handler({
             csvField(actionLabel(entry.action)),
             csvField(entry.reason || ''),
             csvField(readOnlyLabel(entry.action, metadata)),
+            csvField(scopeLabel(entry.action, metadata)),
           ].join(','),
         )
       }

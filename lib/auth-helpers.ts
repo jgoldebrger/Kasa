@@ -4,7 +4,12 @@ import { Types } from 'mongoose'
 import { auth } from '@/app/auth'
 import connectDB from '@/lib/database'
 import { OrgMembership, Organization, User } from '@/lib/models'
-import { isPlatformImpersonating, readImpersonationReadOnly } from '@/lib/platform-impersonation'
+import {
+  isPlatformImpersonating,
+  readImpersonationReadOnly,
+  readImpersonationScope,
+} from '@/lib/platform-impersonation'
+import type { SupportModeScope } from '@/lib/support-mode-scope'
 import type { Role, SessionMembership } from '@/types/auth'
 
 export type { Role, SessionMembership } from '@/types/auth'
@@ -36,6 +41,8 @@ export interface OrgContext {
   isPlatformImpersonation?: boolean
   /** Read-only support impersonation — member role, no mutations. */
   isPlatformImpersonationReadOnly?: boolean
+  /** Scoped support impersonation area (default full when impersonating). */
+  supportModeScope?: SupportModeScope
 }
 
 /** Role check for handler/route logic. Cron context never satisfies admin/owner gates. */
@@ -169,7 +176,10 @@ export async function requireOrg(
     }).lean<{ role: Role }>()
     if (!membership) {
       if (await isPlatformImpersonating(session.user.id, session.user.email, orgId)) {
-        const readOnly = await readImpersonationReadOnly(session.user.id)
+        const [readOnly, scope] = await Promise.all([
+          readImpersonationReadOnly(session.user.id),
+          readImpersonationScope(session.user.id),
+        ])
         return {
           session,
           userId: session.user.id,
@@ -177,6 +187,7 @@ export async function requireOrg(
           role: readOnly ? 'member' : 'admin',
           isPlatformImpersonation: true,
           isPlatformImpersonationReadOnly: readOnly || undefined,
+          supportModeScope: scope,
         }
       }
       return forbidden('You are not a member of this organization')

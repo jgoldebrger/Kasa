@@ -12,6 +12,7 @@ export interface SupportWebhookPayload {
   adminEmail: string
   reason?: string
   readOnly?: boolean
+  scope?: string
   at: string
 }
 

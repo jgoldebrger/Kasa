@@ -17,6 +17,7 @@ import { verifyApiCsrf } from '@/lib/csrf'
 import { Types } from 'mongoose'
 import connectDB from '@/lib/database'
 import { requireOrg } from '@/lib/auth-helpers'
+import { blockReadOnlySupportMutation } from '@/lib/support-mode-readonly-guard'
 import { isCronRequest } from '@/lib/auth-cron'
 import { EmailJob, EmailConfig } from '@/lib/models'
 import { safeDecrypt, decryptFailureMessage } from '@/lib/encryption'
@@ -54,6 +55,8 @@ export async function POST(request: NextRequest) {
     if (!cron) {
       const ctx = await requireOrg(request, { minRole: 'admin' })
       if (ctx instanceof NextResponse) return ctx
+      const readOnlyBlock = blockReadOnlySupportMutation(request, ctx)
+      if (readOnlyBlock) return readOnlyBlock
       organizationId = ctx.organizationId
     }
 
@@ -263,12 +266,17 @@ export async function POST(request: NextRequest) {
       const url = selfUrl(request, '/api/tax-receipts/email/worker')
       const secret = process.env.CRON_SECRET || ''
       if (!secret) {
-        logError(new Error('CRON_SECRET is not set; long tax-receipt EmailJob runs risk losing auth on continuation'), {
-          module: 'tax-receipts.worker',
-          jobId: job._id.toString(),
-          phase: 'continuation-auth',
-          level: 'warn',
-        })
+        logError(
+          new Error(
+            'CRON_SECRET is not set; long tax-receipt EmailJob runs risk losing auth on continuation',
+          ),
+          {
+            module: 'tax-receipts.worker',
+            jobId: job._id.toString(),
+            phase: 'continuation-auth',
+            level: 'warn',
+          },
+        )
       }
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), 5000)

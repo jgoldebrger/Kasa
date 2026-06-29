@@ -6,8 +6,10 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useToast } from '@/app/components/Toast'
 import SupportModeEnterModal from '@/app/components/SupportModeEnterModal'
+import PlatformAdminTotpModal from '@/app/components/PlatformAdminTotpModal'
 import SupportModeOpenButton from '@/app/components/SupportModeOpenButton'
 import { enterSupportMode } from '@/lib/client/support-mode'
+import { usePlatformAdminTotpGate } from '@/lib/client/usePlatformAdminTotpGate'
 import type { SupportModeRedirect } from '@/lib/support-mode-redirect'
 import { PLATFORM_ADMIN_2FA_REQUIRED_CODE } from '@/lib/platform-admin-constants'
 import {
@@ -68,6 +70,7 @@ export default function OrganizationsAdminPage() {
   const [modalRedirectTo, setModalRedirectTo] = useState<SupportModeRedirect>('/')
   const [forbidden, setForbidden] = useState(false)
   const [twoFactorRequired, setTwoFactorRequired] = useState(false)
+  const totpGate = usePlatformAdminTotpGate()
 
   const load = useCallback(
     async (opts?: { cursor?: string | null; append?: boolean; q?: string }) => {
@@ -110,27 +113,43 @@ export default function OrganizationsAdminPage() {
     void load()
   }, [load])
 
+  async function postImpersonate(
+    orgId: string,
+    payload: {
+      reason: string
+      readOnly: boolean
+      scope: import('@/lib/support-mode-scope').SupportModeScope
+    },
+  ) {
+    return fetch(`/api/admin/organizations/${orgId}/impersonate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, redirectTo: modalRedirectTo }),
+    })
+  }
+
   async function confirmEnterSupportMode({
     reason,
     readOnly,
+    scope,
   }: {
     reason: string
     readOnly: boolean
+    scope: import('@/lib/support-mode-scope').SupportModeScope
   }) {
     if (!modalOrg) return
     const org = modalOrg
     setEnteringId(org.id)
     try {
-      const res = await fetch(`/api/admin/organizations/${org.id}/impersonate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason, readOnly, redirectTo: modalRedirectTo }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        toast.error(data.error || 'Could not enter support mode.')
+      const result = await totpGate.runWithTotpGate(
+        { orgId: org.id, reason, readOnly, scope, redirectTo: modalRedirectTo },
+        (entry) => postImpersonate(entry.orgId, entry),
+      )
+      if (!result.ok) {
+        if (result.error) toast.error(result.error)
         return
       }
+      const data = result.data
       toast.success(`Now viewing ${org.name} as admin.`)
       setModalOrg(null)
       await enterSupportMode({
@@ -138,6 +157,40 @@ export default function OrganizationsAdminPage() {
         organizationName: data.organizationName || org.name,
         organizationSlug: data.organizationSlug || org.slug,
         readOnly: Boolean(data.readOnly ?? readOnly),
+        scope: data.scope === 'communications' || data.scope === 'billing' ? data.scope : scope,
+        expiresAt: data.expiresAt ?? null,
+        redirectTo: data.redirectTo || '/',
+        router,
+        updateSession,
+      })
+    } catch {
+      toast.error('Network error — please try again.')
+    } finally {
+      setEnteringId(null)
+    }
+  }
+
+  async function handleTotpVerified() {
+    if (!modalOrg) return
+    const org = modalOrg
+    setEnteringId(org.id)
+    try {
+      const result = await totpGate.retryAfterTotpVerified((entry) =>
+        postImpersonate(entry.orgId, entry),
+      )
+      if (!result.ok) {
+        toast.error(result.error || 'Could not enter support mode.')
+        return
+      }
+      const data = result.data
+      toast.success(`Now viewing ${org.name} as admin.`)
+      setModalOrg(null)
+      await enterSupportMode({
+        organizationId: data.organizationId || org.id,
+        organizationName: data.organizationName || org.name,
+        organizationSlug: data.organizationSlug || org.slug,
+        readOnly: Boolean(data.readOnly),
+        scope: data.scope === 'communications' || data.scope === 'billing' ? data.scope : 'full',
         expiresAt: data.expiresAt ?? null,
         redirectTo: data.redirectTo || '/',
         router,
@@ -303,6 +356,14 @@ export default function OrganizationsAdminPage() {
               if (enteringId === null) setModalOrg(null)
             }}
             onConfirm={confirmEnterSupportMode}
+          />
+
+          <PlatformAdminTotpModal
+            open={totpGate.totpOpen}
+            onClose={() => {
+              if (enteringId === null) totpGate.clearPending()
+            }}
+            onVerified={handleTotpVerified}
           />
         </>
       )}

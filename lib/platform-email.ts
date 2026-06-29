@@ -189,6 +189,7 @@ export interface SupportAccessOwnerNotification {
   adminEmail: string
   reason: string
   readOnly: boolean
+  scope?: string
   at: Date
 }
 
@@ -215,6 +216,10 @@ export async function notifyOrgOwnerOfSupportAccess(
 
   const atStr = input.at.toISOString()
   const readOnlyText = input.readOnly ? 'Yes (view only)' : 'No (full admin access)'
+  const scopeText =
+    input.scope && input.scope !== 'full'
+      ? input.scope.charAt(0).toUpperCase() + input.scope.slice(1)
+      : 'Full organization'
   const safeOrgName = escapeHtml(input.orgName)
   const safeAdminName = escapeHtml(input.adminName)
   const safeAdminEmail = escapeHtml(input.adminEmail)
@@ -231,6 +236,7 @@ export async function notifyOrgOwnerOfSupportAccess(
       `Administrator: ${input.adminName} <${input.adminEmail}>\n` +
       `Reason: ${input.reason}\n` +
       `Read-only: ${readOnlyText}\n` +
+      `Scope: ${scopeText}\n` +
       `Time (UTC): ${atStr}\n\n` +
       `Support sessions are audit-logged. If you did not expect this access, contact Kasa support.`,
     html: `
@@ -240,6 +246,7 @@ export async function notifyOrgOwnerOfSupportAccess(
         <p><strong>Administrator:</strong> ${safeAdminName} &lt;${safeAdminEmail}&gt;</p>
         <p><strong>Reason:</strong> ${safeReason}</p>
         <p><strong>Read-only:</strong> ${escapeHtml(readOnlyText)}</p>
+        <p><strong>Scope:</strong> ${escapeHtml(scopeText)}</p>
         <p><strong>Time (UTC):</strong> ${escapeHtml(atStr)}</p>
         <p style="color:#555;font-size:13px;margin-top:24px;">Support sessions are audit-logged. If you did not expect this access, contact Kasa support.</p>
       </div>

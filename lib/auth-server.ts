@@ -11,7 +11,12 @@ import {
   enforcePlatformAccountAccess,
   platformAccessRedirectPath,
 } from '@/lib/billing/account-access'
-import { isPlatformImpersonating, readImpersonationReadOnly } from '@/lib/platform-impersonation'
+import {
+  isPlatformImpersonating,
+  readImpersonationReadOnly,
+  readImpersonationScope,
+} from '@/lib/platform-impersonation'
+import type { SupportModeScope } from '@/lib/support-mode-scope'
 
 /**
  * Per-request memoized `auth()`. Use this from layout.tsx + every server
@@ -31,6 +36,7 @@ export interface ServerOrgContext {
   role: Role
   isPlatformImpersonation?: boolean
   isPlatformImpersonationReadOnly?: boolean
+  supportModeScope?: SupportModeScope
 }
 
 /**
@@ -85,7 +91,10 @@ export const getServerOrgContext = cache(async (): Promise<ServerOrgContext | nu
       .lean<{ role: Role }>()
     if (!m) {
       if (await isPlatformImpersonating(userId, session.user?.email, orgId)) {
-        const readOnly = await readImpersonationReadOnly(userId)
+        const [readOnly, scope] = await Promise.all([
+          readImpersonationReadOnly(userId),
+          readImpersonationScope(userId),
+        ])
         return {
           userId,
           email: session.user?.email || '',
@@ -94,6 +103,7 @@ export const getServerOrgContext = cache(async (): Promise<ServerOrgContext | nu
           role: readOnly ? 'member' : 'admin',
           isPlatformImpersonation: true,
           isPlatformImpersonationReadOnly: readOnly || undefined,
+          supportModeScope: scope,
         }
       }
       return null
@@ -102,7 +112,9 @@ export const getServerOrgContext = cache(async (): Promise<ServerOrgContext | nu
   }
 
   const impersonating = await isPlatformImpersonating(userId, session.user?.email, orgId)
-  const readOnly = impersonating ? await readImpersonationReadOnly(userId) : false
+  const [readOnly, scope] = impersonating
+    ? await Promise.all([readImpersonationReadOnly(userId), readImpersonationScope(userId)])
+    : [false, 'full' as SupportModeScope]
 
   return {
     userId,
@@ -112,6 +124,7 @@ export const getServerOrgContext = cache(async (): Promise<ServerOrgContext | nu
     role,
     isPlatformImpersonation: impersonating || undefined,
     isPlatformImpersonationReadOnly: readOnly || undefined,
+    supportModeScope: impersonating ? scope : undefined,
   }
 })
 

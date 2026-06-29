@@ -83,7 +83,8 @@ export default function ComposeTab({
   const [attachingTaxReceipt, setAttachingTaxReceipt] = useState(false)
   const [recipientSegment, setRecipientSegment] = useState<RecipientSegment>('all')
   const { quota, refresh: refreshQuota } = useEmailQuota()
-  const { hasFailures: deliverabilityBlocked } = useDeliverabilityStatus()
+  const { hasFailures: deliverabilityBlocked, strictMode: strictDeliverability } =
+    useDeliverabilityStatus()
 
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [drafts, setDrafts] = useState<EmailDraft[]>([])
@@ -428,6 +429,10 @@ export default function ComposeTab({
     }
 
     if (deliverabilityBlocked) {
+      if (strictDeliverability) {
+        toast.error(t('communications.deliverabilityChecklist.strictBlock'))
+        return
+      }
       const proceed = await confirm({
         title: t('communications.deliverabilityChecklist.blockTitle'),
         message: t('communications.deliverabilityChecklist.blockMessage'),

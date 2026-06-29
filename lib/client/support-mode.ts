@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { clearCache } from '@/lib/client-cache'
+import type { SupportModeScope } from '@/lib/support-mode-scope'
 
 export const SUPPORT_MODE_CHANGED = 'kasa:support-mode-changed'
+export const SUPPORT_MODE_EXIT_SUMMARY = 'kasa:support-mode-exit-summary'
 const ORG_CHANGED = 'kasa:org-changed'
 
 export type SupportModeDetail = {
@@ -12,13 +14,30 @@ export type SupportModeDetail = {
   organizationSlug?: string | null
   organizationId?: string | null
   readOnly?: boolean
+  scope?: SupportModeScope
   expiresAt?: number | null // unix seconds
+}
+
+export type SupportSessionAction = {
+  action: string
+  at: string
+}
+
+export type SupportModeExitSummaryDetail = {
+  actions: SupportSessionAction[]
+  expired?: boolean
 }
 
 /** Tell client UI (banner, admin hub) that support mode started or ended. */
 export function notifySupportModeChanged(detail: SupportModeDetail): void {
   if (typeof window === 'undefined') return
   window.dispatchEvent(new CustomEvent(SUPPORT_MODE_CHANGED, { detail }))
+}
+
+/** After successful exit — show session summary modal or exit toast. */
+export function notifySupportModeExitSummary(detail: SupportModeExitSummaryDetail): void {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(SUPPORT_MODE_EXIT_SUMMARY, { detail }))
 }
 
 function clearOrgCaches(): void {
@@ -43,6 +62,7 @@ export async function enterSupportMode(opts: {
   organizationName: string
   organizationSlug?: string | null
   readOnly?: boolean
+  scope?: SupportModeScope
   expiresAt?: number | null
   redirectTo?: string
   router: { push: (url: string) => void; refresh: () => void }
@@ -54,6 +74,7 @@ export async function enterSupportMode(opts: {
     organizationName: opts.organizationName,
     organizationSlug: opts.organizationSlug ?? null,
     readOnly: opts.readOnly,
+    scope: opts.scope,
     expiresAt: opts.expiresAt ?? null,
   })
   clearOrgCaches()
@@ -67,11 +88,6 @@ export async function enterSupportMode(opts: {
   opts.router.refresh()
 }
 
-export type SupportSessionAction = {
-  action: string
-  at: string
-}
-
 export type ExitSupportModeResult =
   | { ok: true; actions: SupportSessionAction[] }
   | { ok: false; error: string }
@@ -81,6 +97,8 @@ export async function exitSupportMode(opts: {
   router: { push: (url: string) => void; refresh: () => void }
   updateSession?: () => Promise<unknown>
   redirectTo?: string
+  /** Session ended because the timer expired (affects exit toast copy). */
+  expired?: boolean
 }): Promise<ExitSupportModeResult> {
   try {
     const res = await fetch('/api/admin/impersonate', { method: 'DELETE' })
@@ -111,6 +129,7 @@ export async function exitSupportMode(opts: {
     dispatchOrgChanged()
     opts.router.push(opts.redirectTo ?? '/admin')
     opts.router.refresh()
+    notifySupportModeExitSummary({ actions, expired: opts.expired })
     return { ok: true, actions }
   } catch {
     return { ok: false, error: 'Network error exiting support mode' }
@@ -178,6 +197,7 @@ export async function fetchSupportModeStatus(): Promise<SupportModeDetail> {
       organizationName: data.organizationName ?? null,
       organizationSlug: data.organizationSlug ?? null,
       readOnly: Boolean(data.readOnly),
+      scope: data.scope === 'communications' || data.scope === 'billing' ? data.scope : 'full',
       expiresAt: data.expiresAt ?? null,
     }
   } catch {

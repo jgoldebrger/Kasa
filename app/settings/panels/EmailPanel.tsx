@@ -73,6 +73,7 @@ interface DeliverabilityStatusResponse {
   physicalAddressSet: DeliverabilityCheck
   quotaHeadroom: DeliverabilityCheck
   quota: { sentToday: number; limit: number; remaining: number }
+  emailStrictDeliverability?: boolean
 }
 
 type ChecklistItemId =
@@ -170,6 +171,8 @@ export default function EmailPanel({
   const [deliverability, setDeliverability] = useState<
     DeliverabilityStatusResponse | null | undefined
   >(undefined)
+  const [emailStrictDeliverability, setEmailStrictDeliverability] = useState(false)
+  const [strictSaving, setStrictSaving] = useState(false)
 
   const loadDeliverability = useCallback(async () => {
     setDeliverability(undefined)
@@ -181,6 +184,11 @@ export default function EmailPanel({
       }
       const body = await res.json().catch(() => null)
       setDeliverability(body as DeliverabilityStatusResponse)
+      if (body && typeof body === 'object' && 'emailStrictDeliverability' in body) {
+        setEmailStrictDeliverability(
+          !!(body as DeliverabilityStatusResponse).emailStrictDeliverability,
+        )
+      }
     } catch {
       setDeliverability(null)
     }
@@ -228,6 +236,25 @@ export default function EmailPanel({
       await loadDeliverability()
     } finally {
       setSmtpTesting(false)
+    }
+  }
+
+  const handleStrictDeliverabilityChange = async (checked: boolean) => {
+    setEmailStrictDeliverability(checked)
+    setStrictSaving(true)
+    try {
+      const res = await fetch('/api/email-config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emailStrictDeliverability: checked }),
+      })
+      if (!res.ok) {
+        setEmailStrictDeliverability(!checked)
+      }
+    } catch {
+      setEmailStrictDeliverability(!checked)
+    } finally {
+      setStrictSaving(false)
     }
   }
 
@@ -337,6 +364,25 @@ export default function EmailPanel({
             </Button>
           </div>
         )}
+      </Card>
+
+      <Card className="mb-4" compact>
+        <h3 className="text-sm font-medium text-fg">
+          {t('settings.email.strictDeliverability.title')}
+        </h3>
+        <p className="mt-1 text-xs text-fg-muted">
+          {t('settings.email.strictDeliverability.description')}
+        </p>
+        <label className="mt-3 flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={emailStrictDeliverability}
+            disabled={supportReadOnly || strictSaving}
+            onChange={(e) => void handleStrictDeliverabilityChange(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-accent"
+          />
+          <span className="text-sm text-fg">{t('settings.email.strictDeliverability.label')}</span>
+        </label>
       </Card>
 
       <Alert variant="info" className="mb-4" title={t('settings.email.helpLinks.title')}>

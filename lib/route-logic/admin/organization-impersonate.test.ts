@@ -7,15 +7,17 @@ describe('validateImpersonateBody', () => {
       ok: true,
       reason: 'Customer billing issue',
       readOnly: true,
+      scope: 'full',
       redirectTo: '/',
     })
   })
 
-  it('defaults readOnly to false', () => {
+  it('defaults readOnly to false and scope to full', () => {
     expect(validateImpersonateBody({ reason: 'Help desk ticket' })).toEqual({
       ok: true,
       reason: 'Help desk ticket',
       readOnly: false,
+      scope: 'full',
       redirectTo: '/',
     })
   })
@@ -53,7 +55,21 @@ describe('validateImpersonateBody', () => {
       ok: true,
       reason: 'Go to families',
       readOnly: false,
+      scope: 'full',
       redirectTo: '/families',
+    })
+  })
+
+  it('accepts communications scope', () => {
+    expect(
+      validateImpersonateBody({ reason: 'Email issue', scope: 'communications' }),
+    ).toMatchObject({ ok: true, scope: 'communications' })
+  })
+
+  it('rejects invalid scope', () => {
+    expect(validateImpersonateBody({ reason: 'Bad scope', scope: 'payments' })).toEqual({
+      ok: false,
+      error: 'Invalid scope',
     })
   })
 

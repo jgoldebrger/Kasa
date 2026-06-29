@@ -38,10 +38,12 @@ vi.mock('next/navigation', () => ({
   redirect: (url: string) => redirectMock(url),
 }))
 
-async function seedUserWithOrg(options?: {
-  role?: Role
-  setLastActive?: boolean
-}) {
+vi.mock('@/lib/billing/account-access', () => ({
+  enforcePlatformAccountAccess: vi.fn().mockResolvedValue({ ok: true }),
+  platformAccessRedirectPath: vi.fn(() => '/pricing'),
+}))
+
+async function seedUserWithOrg(options?: { role?: Role; setLastActive?: boolean }) {
   const { User, Organization, OrgMembership } = await import('./models')
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const user = await User.create({
@@ -265,9 +267,9 @@ describe('auth-server', () => {
 
       const { requireServerOrgContext } = await import('./auth-server')
 
-      await expect(
-        requireServerOrgContext({ minRole: 'admin' }),
-      ).rejects.toMatchObject({ url: '/' })
+      await expect(requireServerOrgContext({ minRole: 'admin' })).rejects.toMatchObject({
+        url: '/',
+      })
       expect(redirectMock).toHaveBeenCalledWith('/')
     })
 

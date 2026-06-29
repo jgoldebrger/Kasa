@@ -9,6 +9,7 @@ import { verifyApiCsrf } from '@/lib/csrf'
 import { Types } from 'mongoose'
 import connectDB from '@/lib/database'
 import { requireOrg } from '@/lib/auth-helpers'
+import { blockReadOnlySupportMutation } from '@/lib/support-mode-readonly-guard'
 import { isCronRequest } from '@/lib/auth-cron'
 import { EmailJob, EmailConfig, Family } from '@/lib/models'
 import { safeDecrypt, decryptFailureMessage } from '@/lib/encryption'
@@ -79,6 +80,8 @@ export async function POST(request: NextRequest) {
     if (!cron) {
       const ctx = await requireOrg(request, { minRole: 'admin' })
       if (ctx instanceof NextResponse) return ctx
+      const readOnlyBlock = blockReadOnlySupportMutation(request, ctx)
+      if (readOnlyBlock) return readOnlyBlock
       organizationId = ctx.organizationId
     }
 

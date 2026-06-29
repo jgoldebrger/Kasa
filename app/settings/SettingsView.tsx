@@ -100,6 +100,9 @@ const DynamicLabelsPanel = dynamic(() => import('./panels/LabelsPanel'), {
 const DynamicActivityPanel = dynamic(() => import('./panels/ActivityPanel'), {
   loading: () => <PanelSkeleton />,
 })
+const DynamicSecurityPanel = dynamic(() => import('./panels/SecurityPanel'), {
+  loading: () => <PanelSkeleton />,
+})
 const DynamicLetterheadPanel = dynamic(() => import('@/app/components/settings/LetterheadPanel'), {
   loading: () => <PanelSkeleton />,
 })
@@ -1745,24 +1748,27 @@ export default function SettingsView({
 
             {/* Activity (audit log) Tab — admin / owner only. */}
             {activeTab === 'activity' && canSeePrivilegedTabs && (
-              <DynamicActivityPanel
-                items={auditItems}
-                nextCursor={auditNextCursor}
-                loading={auditLoading}
-                usersMap={auditUsersMap}
-                actionFilter={auditActionFilter}
-                setActionFilter={setAuditActionFilter}
-                userFilter={auditUserFilter}
-                setUserFilter={setAuditUserFilter}
-                resourceTypeFilter={auditResourceTypeFilter}
-                setResourceTypeFilter={setAuditResourceTypeFilter}
-                fromDate={auditFromDate}
-                setFromDate={setAuditFromDate}
-                toDate={auditToDate}
-                setToDate={setAuditToDate}
-                onLoadMore={() => fetchAuditPage(auditNextCursor)}
-                onExportCsv={exportAuditCsv}
-              />
+              <>
+                <DynamicSecurityPanel isOwner={isOwner} />
+                <DynamicActivityPanel
+                  items={auditItems}
+                  nextCursor={auditNextCursor}
+                  loading={auditLoading}
+                  usersMap={auditUsersMap}
+                  actionFilter={auditActionFilter}
+                  setActionFilter={setAuditActionFilter}
+                  userFilter={auditUserFilter}
+                  setUserFilter={setAuditUserFilter}
+                  resourceTypeFilter={auditResourceTypeFilter}
+                  setResourceTypeFilter={setAuditResourceTypeFilter}
+                  fromDate={auditFromDate}
+                  setFromDate={setAuditFromDate}
+                  toDate={auditToDate}
+                  setToDate={setAuditToDate}
+                  onLoadMore={() => fetchAuditPage(auditNextCursor)}
+                  onExportCsv={exportAuditCsv}
+                />
+              </>
             )}
 
             {/* Cycle Configuration Tab */}

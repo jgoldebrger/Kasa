@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useToast } from '@/app/components/Toast'
+import { useT } from '@/lib/client/i18n'
 import { PLATFORM_ADMIN_2FA_REQUIRED_CODE } from '@/lib/platform-admin-constants'
 import {
   exitSupportMode,
@@ -38,6 +39,11 @@ const ADMIN_LINKS = [
     description: 'Tenants stuck in setup — progress flags and quick actions.',
   },
   {
+    href: '/admin/ops',
+    title: 'Platform ops',
+    description: 'SMTP failures, bounce rates, and stuck onboarding — read-only health view.',
+  },
+  {
     href: '/admin/support-audit',
     title: 'Support audit',
     description: 'Impersonation start/end log with reasons and read-only flags.',
@@ -60,6 +66,7 @@ const RUNBOOK_PATHS = [
 export default function AdminHubPage() {
   const router = useRouter()
   const toast = useToast()
+  const t = useT()
   const { update: updateSession } = useSession()
   const [loading, setLoading] = useState(true)
   const [forbidden, setForbidden] = useState(false)
@@ -114,13 +121,10 @@ export default function AdminHubPage() {
     try {
       const result = await exitSupportMode({ router, updateSession })
       if (!result.ok) {
-        toast.error(result.error || 'Could not exit support mode.')
-        return
+        toast.error(result.error || t('admin.supportMode.exitFailed'))
       }
-      toast.success('Exited support mode.')
-      setImpersonation({ active: false })
     } catch {
-      toast.error('Network error — please try again.')
+      toast.error(t('admin.supportMode.exitFailed'))
     } finally {
       setExiting(false)
     }
@@ -186,7 +190,7 @@ export default function AdminHubPage() {
                 loading={exiting}
                 onClick={handleExitSupportMode}
               >
-                Exit support mode
+                {t('admin.supportMode.exit')}
               </Button>
             </Alert>
           )}

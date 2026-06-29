@@ -12,6 +12,8 @@ export const dynamic = 'force-dynamic'
 
 export const POST = handler({
   auth: 'admin',
+  platformAdminTwoFactor: true,
+  platformAdminRecentTotp: true,
   idParams: ['id'],
   name: 'POST /api/admin/organizations/:id/mark-setup-complete',
   fn: async ({ session, params, request }) => {

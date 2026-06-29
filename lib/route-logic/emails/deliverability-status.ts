@@ -21,6 +21,19 @@ export interface DeliverabilityStatus {
   quota: { sentToday: number; limit: number; remaining: number }
   lastTestAt: string | null
   lastTestStatus: 'success' | 'failed' | null
+  emailStrictDeliverability: boolean
+}
+
+const CHECK_IDS = [
+  'smtpConfigured',
+  'smtpVerifiedRecently',
+  'replyToSet',
+  'physicalAddressSet',
+  'quotaHeadroom',
+] as const
+
+export function hasDeliverabilityFailures(status: DeliverabilityStatus): boolean {
+  return CHECK_IDS.some((id) => status[id].status === 'fail')
 }
 
 const SMTP_VERIFY_RECENT_MS = 14 * 24 * 60 * 60 * 1000
@@ -79,8 +92,8 @@ export async function getDeliverabilityStatus(
       lastTestStatus?: 'success' | 'failed'
     }>(),
     Organization.findById(organizationId)
-      .select('letterhead')
-      .lean<{ letterhead?: OrgPhysicalAddress }>(),
+      .select('letterhead emailStrictDeliverability')
+      .lean<{ letterhead?: OrgPhysicalAddress; emailStrictDeliverability?: boolean }>(),
     getEmailQuota(organizationId),
   ])
 
@@ -110,6 +123,7 @@ export async function getDeliverabilityStatus(
     quota,
     lastTestAt: config?.lastTestAt?.toISOString() ?? null,
     lastTestStatus: config?.lastTestStatus ?? null,
+    emailStrictDeliverability: !!org?.emailStrictDeliverability,
   }
 }
 

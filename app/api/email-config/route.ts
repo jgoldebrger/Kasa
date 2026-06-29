@@ -1,1 +1,1 @@
-export { GET, POST, PUT } from '@/lib/api-handlers/email-config/handler'
+export { GET, POST, PUT, PATCH } from '@/lib/api-handlers/email-config/handler'

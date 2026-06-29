@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import MobileTopBar from './MobileTopBar'
 import PlatformImpersonationBanner from './PlatformImpersonationBanner'
+import SupportSessionSummaryHost from './SupportSessionSummaryHost'
 import KeyboardShortcuts from './KeyboardShortcuts'
 import GlobalQuickActionModals from './GlobalQuickActionModals'
 import {
@@ -108,6 +109,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Main column: banner sits outside scrollable content so sticky works on mobile. */}
       <div className="min-h-screen md:ms-64 flex flex-col">
         <PlatformImpersonationBanner />
+        <SupportSessionSummaryHost />
         <main
           id="main-content"
           className="flex-1 min-h-0"

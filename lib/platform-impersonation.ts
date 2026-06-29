@@ -7,6 +7,7 @@ import {
   readImpersonationDetails,
   type ImpersonationDetails,
 } from '@/lib/platform-impersonation-token'
+import type { SupportModeScope } from '@/lib/support-mode-scope'
 
 export const PLATFORM_IMPERSONATION_COOKIE = 'kasa_platform_impersonate'
 
@@ -30,6 +31,11 @@ export async function readImpersonationOrgId(userId: string): Promise<string | n
 export async function readImpersonationReadOnly(userId: string): Promise<boolean> {
   const details = await readImpersonationSessionDetails(userId)
   return details?.readOnly ?? false
+}
+
+export async function readImpersonationScope(userId: string): Promise<SupportModeScope> {
+  const details = await readImpersonationSessionDetails(userId)
+  return details?.scope ?? 'full'
 }
 
 export async function readImpersonationExpiresAt(userId: string): Promise<number | null> {
@@ -66,8 +72,9 @@ export function setImpersonationCookies(
   orgId: string,
   activeOrgCookieName: string,
   readOnly?: boolean,
+  scope: SupportModeScope = 'full',
 ): boolean {
-  const token = createImpersonationToken(userId, orgId, readOnly)
+  const token = createImpersonationToken(userId, orgId, readOnly, scope)
   if (!token) return false
 
   const secure = process.env.NODE_ENV === 'production'

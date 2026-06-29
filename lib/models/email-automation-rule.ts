@@ -17,6 +17,10 @@ const EmailAutomationRuleSchema = new Schema(
       required: true,
     },
     lastRunAt: { type: Date, default: null },
+    lastRunSentCount: { type: Number, default: null },
+    lastRunSkippedCount: { type: Number, default: null },
+    lastRunFailedCount: { type: Number, default: null },
+    lastRunError: { type: String, default: null, maxlength: 500 },
   },
   { timestamps: true },
 )

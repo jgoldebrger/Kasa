@@ -17,6 +17,7 @@ import { handler } from '@/lib/api/handler'
 import { audit } from '@/lib/audit'
 import { findActiveEmailJob, sweepStaleEmailJobs, kickoffEmailWorker } from '@/lib/email-jobs'
 import { loadByIdsInChunks } from '@/lib/org-pagination'
+import { getDeliverabilityStatus, hasDeliverabilityFailures } from './deliverability-status'
 
 const ASYNC_FAMILY_THRESHOLD = 100
 
@@ -244,6 +245,17 @@ export const POST = handler({
     )
     if (!rateVerdict.allowed) {
       return { status: 429, data: { error: 'Too many requests' } }
+    }
+
+    const deliverability = await getDeliverabilityStatus(ctx!.organizationId)
+    if (deliverability.emailStrictDeliverability && hasDeliverabilityFailures(deliverability)) {
+      return {
+        status: 400,
+        data: {
+          error:
+            'Email send blocked: deliverability checklist has failing items. Fix them in Settings → Email.',
+        },
+      }
     }
 
     const campaignId = new Types.ObjectId()

@@ -35,6 +35,17 @@ async function ensureOrgSetupComplete(page: Page, orgName: string): Promise<void
   await page.request.post(`/api/admin/organizations/${org.id}/mark-setup-complete`)
 }
 
+/** Dismiss support session summary modal if shown, else assert exit toast. */
+async function dismissSupportSessionSummaryOrToast(page: Page): Promise<void> {
+  const summaryModal = page.getByRole('dialog').filter({ hasText: /support session summary/i })
+  const summaryVisible = await summaryModal.isVisible().catch(() => false)
+  if (summaryVisible) {
+    await page.getByRole('button', { name: /^close$/i }).click()
+  } else {
+    await expect(page.getByText(/exited support mode/i)).toBeVisible()
+  }
+}
+
 test.describe('platform admin support mode', () => {
   test.beforeEach(async ({ page }) => {
     await ensureAlphaOrg(page)
@@ -77,13 +88,29 @@ test.describe('platform admin support mode', () => {
 
     await banner.getByRole('button', { name: /exit support mode/i }).click()
     await expect(banner).toBeHidden({ timeout: 30_000 })
-    const summaryModal = page.getByRole('dialog').filter({ hasText: /support session summary/i })
-    const summaryVisible = await summaryModal.isVisible().catch(() => false)
-    if (summaryVisible) {
-      await page.getByRole('button', { name: /^close$/i }).click()
-    } else {
-      await expect(page.getByText(/exited support mode/i)).toBeVisible()
-    }
+    await dismissSupportSessionSummaryOrToast(page)
+  })
+
+  test('exit from admin hub shows session summary or success toast', async ({ page }) => {
+    await page.goto('/admin/organizations', { timeout: 180_000 })
+    const targetOrg = E2E_ORGS.alpha
+    const orgRow = page.getByRole('row').filter({ hasText: targetOrg.name })
+    await expect(orgRow).toBeVisible({ timeout: 30_000 })
+    await orgRow.getByRole('button', { name: 'Open as admin' }).click()
+    await confirmSupportModeEnter(page, SUPPORT_REASON)
+
+    await page.goto('/admin')
+    await expect(supportModeBanner(page)).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('alert').filter({ hasText: /support mode active/i })).toBeVisible()
+
+    await page
+      .getByRole('alert')
+      .filter({ hasText: /support mode active/i })
+      .getByRole('button', { name: /exit support mode/i })
+      .click()
+
+    await expect(supportModeBanner(page)).toBeHidden({ timeout: 30_000 })
+    await dismissSupportSessionSummaryOrToast(page)
   })
 
   test('read-only support mode hides compose send on communications', async ({ page }) => {

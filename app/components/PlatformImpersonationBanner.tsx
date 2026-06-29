@@ -7,14 +7,14 @@ import { useSession } from 'next-auth/react'
 import { Badge, Button } from '@/app/components/ui'
 import { useToast } from '@/app/components/Toast'
 import { useT } from '@/lib/client/i18n'
+import type { MessageKey } from '@/lib/i18n/load-locale'
 import {
   exitSupportMode,
   fetchSupportModeStatus,
   useSupportModeChanged,
-  type SupportSessionAction,
   type SupportModeDetail,
 } from '@/lib/client/support-mode'
-import SupportSessionSummaryModal from './SupportSessionSummaryModal'
+import type { SupportModeScope } from '@/lib/support-mode-scope'
 
 function formatTimeRemaining(expiresAt: number): string {
   const nowSec = Math.floor(Date.now() / 1000)
@@ -26,6 +26,12 @@ function formatTimeRemaining(expiresAt: number): string {
   return `${minutes}m`
 }
 
+const SCOPE_BADGE_KEYS: Record<SupportModeScope, MessageKey | null> = {
+  full: null,
+  communications: 'admin.supportMode.scopeBadgeCommunications',
+  billing: 'admin.supportMode.scopeBadgeBilling',
+}
+
 export default function PlatformImpersonationBanner() {
   const router = useRouter()
   const pathname = usePathname()
@@ -35,8 +41,6 @@ export default function PlatformImpersonationBanner() {
   const [state, setState] = useState<SupportModeDetail | null>(null)
   const [exiting, setExiting] = useState(false)
   const [timeLabel, setTimeLabel] = useState('')
-  const [summaryActions, setSummaryActions] = useState<SupportSessionAction[]>([])
-  const [summaryOpen, setSummaryOpen] = useState(false)
   const expiryHandledRef = useRef(false)
 
   const isPlatformAdmin = Boolean(session?.user?.isPlatformAdmin)
@@ -49,25 +53,6 @@ export default function PlatformImpersonationBanner() {
     const detail = await fetchSupportModeStatus()
     setState(detail)
   }, [isPlatformAdmin])
-
-  const showExitSummary = useCallback(
-    (actions: SupportSessionAction[], expired = false) => {
-      if (actions.length > 0) {
-        setSummaryActions(actions)
-        setSummaryOpen(true)
-        if (expired) {
-          toast.info(t('admin.supportMode.sessionExpired'))
-        }
-        return
-      }
-      if (expired) {
-        toast.info(t('admin.supportMode.sessionExpired'))
-        return
-      }
-      toast.success(t('admin.supportMode.exitSuccess'))
-    },
-    [t, toast],
-  )
 
   useEffect(() => {
     void refresh()
@@ -93,13 +78,11 @@ export default function PlatformImpersonationBanner() {
         if (expiryHandledRef.current) return
         expiryHandledRef.current = true
         void (async () => {
-          const result = await exitSupportMode({ router, updateSession })
+          const result = await exitSupportMode({ router, updateSession, expired: true })
           if (!result.ok) {
             expiryHandledRef.current = false
             void refresh()
-            return
           }
-          showExitSummary(result.actions, true)
         })()
         return
       }
@@ -111,7 +94,7 @@ export default function PlatformImpersonationBanner() {
     updateTimer()
     const id = window.setInterval(updateTimer, 60_000)
     return () => window.clearInterval(id)
-  }, [state?.active, state?.expiresAt, refresh, router, showExitSummary, t, updateSession])
+  }, [state?.active, state?.expiresAt, refresh, router, t, updateSession])
 
   if (!isPlatformAdmin) return null
 
@@ -121,9 +104,7 @@ export default function PlatformImpersonationBanner() {
       const result = await exitSupportMode({ router, updateSession })
       if (!result.ok) {
         toast.error(result.error || t('admin.supportMode.exitFailed'))
-        return
       }
-      showExitSummary(result.actions)
     } finally {
       setExiting(false)
     }
@@ -133,54 +114,53 @@ export default function PlatformImpersonationBanner() {
 
   const orgName = state.organizationName || t('admin.supportMode.defaultOrg')
   const orgSlug = state.organizationSlug
+  const scopeBadgeKey = state.scope && state.scope !== 'full' ? SCOPE_BADGE_KEYS[state.scope] : null
 
   return (
-    <>
-      <SupportSessionSummaryModal
-        open={summaryOpen}
-        actions={summaryActions}
-        onClose={() => setSummaryOpen(false)}
-      />
-      <div
-        role="status"
-        className="sticky top-0 z-30 bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-sm text-fg flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
-      >
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2 min-w-0">
-          {state.readOnly && (
-            <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
-              {t('admin.supportMode.viewOnlyNotice')}
-            </p>
-          )}
-          <p className="min-w-0">
-            <strong className="font-semibold">{t('admin.supportMode.bannerTitle')}:</strong>{' '}
-            {t('admin.supportMode.bannerViewing')
-              .replace('{orgName}', orgName)
-              .replace('{orgSlug}', orgSlug || '—')}
-            {state.readOnly && (
-              <Badge variant="warning" className="ms-2 align-middle">
-                {t('admin.supportMode.readOnlyBadge')}
-              </Badge>
-            )}
+    <div
+      role="status"
+      className="sticky top-0 z-30 bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-sm text-fg flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2 min-w-0">
+        {state.readOnly && (
+          <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+            {t('admin.supportMode.viewOnlyNotice')}
           </p>
-          {timeLabel && <p className="text-xs text-fg-muted">{timeLabel}</p>}
-          <Link
-            href="/admin"
-            className="text-xs font-medium text-accent hover:text-accent-hover sm:ms-2"
-          >
-            {t('admin.supportMode.adminHub')}
-          </Link>
-        </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          loading={exiting}
-          onClick={handleExit}
-          className="shrink-0"
+        )}
+        <p className="min-w-0">
+          <strong className="font-semibold">{t('admin.supportMode.bannerTitle')}:</strong>{' '}
+          {t('admin.supportMode.bannerViewing')
+            .replace('{orgName}', orgName)
+            .replace('{orgSlug}', orgSlug || '—')}
+          {state.readOnly && (
+            <Badge variant="warning" className="ms-2 align-middle">
+              {t('admin.supportMode.readOnlyBadge')}
+            </Badge>
+          )}
+          {scopeBadgeKey && (
+            <Badge variant="default" className="ms-2 align-middle">
+              {t(scopeBadgeKey)}
+            </Badge>
+          )}
+        </p>
+        {timeLabel && <p className="text-xs text-fg-muted">{timeLabel}</p>}
+        <Link
+          href="/admin"
+          className="text-xs font-medium text-accent hover:text-accent-hover sm:ms-2"
         >
-          {t('admin.supportMode.exit')}
-        </Button>
+          {t('admin.supportMode.adminHub')}
+        </Link>
       </div>
-    </>
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        loading={exiting}
+        onClick={handleExit}
+        className="shrink-0"
+      >
+        {t('admin.supportMode.exit')}
+      </Button>
+    </div>
   )
 }

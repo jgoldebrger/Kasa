@@ -7,8 +7,7 @@ import { User, OrgMembership } from '@/lib/models'
 import authConfig from './auth.config'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
-import { decryptTwoFactorSecret } from '@/lib/encryption'
-import { verifyTotpStep } from '@/lib/totp'
+import { verifyTwoFactorCode } from '@/lib/two-factor-verify'
 import type { Role } from '@/types/auth'
 
 // Re-check the user's passwordChangedAt + memberships at most once per this
@@ -120,7 +119,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               return null
             }
 
-            const twoFactorOk = await verifyTwoFactor(user, totpCode)
+            const twoFactorOk = await verifyTwoFactorCode(user, totpCode)
             if (!twoFactorOk) {
               audit({
                 userId: user._id.toString(),
@@ -233,77 +232,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
 })
-
-/**
- * Verify the supplied second factor against the user record. Accepts
- * either a 6-digit TOTP from an authenticator app OR a one-use backup
- * code (`XXXX-XXXX`). A consumed backup code is removed from the array
- * so it can never be replayed.
- */
-async function verifyTwoFactor(
-  user: {
-    _id: any
-    twoFactorSecret?: string
-    twoFactorBackupCodes?: string[]
-    twoFactorLastUsedStep?: number
-  },
-  code: string,
-): Promise<boolean> {
-  if (!code) return false
-
-  // 6-digit TOTP path with replay protection.
-  const digitsOnly = code.replace(/\D/g, '')
-  if (digitsOnly.length === 6 && user.twoFactorSecret) {
-    try {
-      const secret = decryptTwoFactorSecret(user.twoFactorSecret)
-      const step = verifyTotpStep(secret, digitsOnly)
-      if (step !== null) {
-        // Atomic replay guard: only accept the code if its HOTP step is
-        // strictly newer than the last successful one. Without this an
-        // intercepted code could be replayed within the ±30s skew window.
-        const updated = await User.updateOne(
-          {
-            _id: user._id,
-            $or: [
-              { twoFactorLastUsedStep: { $exists: false } },
-              { twoFactorLastUsedStep: null },
-              { twoFactorLastUsedStep: { $lt: step } },
-            ],
-          },
-          { $set: { twoFactorLastUsedStep: step } },
-        )
-        if (updated.modifiedCount === 1) return true
-        // Otherwise: another login already consumed this step. Treat as
-        // replay → reject.
-        return false
-      }
-    } catch {
-      // Fall through to backup-code path.
-    }
-  }
-
-  // Backup-code path. Atomic consume-on-match: if two concurrent login
-  // requests race here with the same backup code, only the request whose
-  // `$pull` actually removes the hash wins. The other gets
-  // `modifiedCount: 0` and is rejected even though `bcrypt.compare`
-  // returned true — preventing single-use codes from authenticating
-  // twice under concurrency.
-  const normalized = code.toUpperCase().replace(/[^A-Z0-9-]/g, '')
-  if (normalized.length >= 9 && user.twoFactorBackupCodes?.length) {
-    for (const hash of user.twoFactorBackupCodes) {
-      if (await bcrypt.compare(normalized, hash)) {
-        const res = await User.updateOne(
-          { _id: user._id, twoFactorBackupCodes: hash },
-          { $pull: { twoFactorBackupCodes: hash } },
-        )
-        if (res.modifiedCount === 1) return true
-        // Lost the race — another login already consumed this code.
-        return false
-      }
-    }
-  }
-  return false
-}
 
 /**
  * Pull membership rows for this user and stash a compact form on the token.

@@ -12,6 +12,7 @@ import {
   clearImpersonationCookies,
   readImpersonationOrgId,
   readImpersonationReadOnly,
+  readImpersonationScope,
   readImpersonationExpiresAt,
   readImpersonationSession,
 } from '@/lib/platform-impersonation'
@@ -29,12 +30,13 @@ export const GET = handler({
       return { data: { active: false } }
     }
 
-    const [org, readOnly, expiresAt] = await Promise.all([
+    const [org, readOnly, scope, expiresAt] = await Promise.all([
       Organization.findById(orgId).select('name slug').lean<{
         name?: string
         slug?: string
       }>(),
       readImpersonationReadOnly(session!.user.id),
+      readImpersonationScope(session!.user.id),
       readImpersonationExpiresAt(session!.user.id),
     ])
 
@@ -45,6 +47,7 @@ export const GET = handler({
         organizationName: org?.name || null,
         organizationSlug: org?.slug || null,
         readOnly,
+        scope,
         expiresAt,
       },
     }
@@ -58,6 +61,7 @@ export const DELETE = handler({
     const impersonation = await readImpersonationSession(session!.user.id)
     const orgId = impersonation?.orgId ?? null
     const readOnly = impersonation?.readOnly ?? false
+    const scope = impersonation?.scope ?? 'full'
     const org = orgId
       ? await Organization.findById(orgId).select('name').lean<{ name?: string }>()
       : null
@@ -81,7 +85,10 @@ export const DELETE = handler({
         action: 'platform.impersonate.end',
         resourceType: 'Organization',
         resourceId: orgId,
-        metadata: actions.length > 0 ? { actionCount: actions.length } : undefined,
+        metadata: {
+          ...(actions.length > 0 ? { actionCount: actions.length } : {}),
+          scope,
+        },
         request,
       })
 
@@ -91,6 +98,7 @@ export const DELETE = handler({
         orgName: org?.name || 'Organization',
         adminEmail: session!.user.email,
         readOnly,
+        scope,
         at: new Date().toISOString(),
       })
     }

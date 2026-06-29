@@ -8,6 +8,10 @@ import {
 } from '@/lib/platform-admin-constants'
 
 export { PLATFORM_ADMIN_2FA_REQUIRED_CODE, PLATFORM_ADMIN_2FA_REQUIRED_MESSAGE }
+export {
+  PLATFORM_ADMIN_TOTP_REVERIFY_CODE,
+  PLATFORM_ADMIN_TOTP_REVERIFY_MESSAGE,
+} from '@/lib/platform-admin-constants'
 /**
  * "SaaS owner" / platform-admin gate.
  *
