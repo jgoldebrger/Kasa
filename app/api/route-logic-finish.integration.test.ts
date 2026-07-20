@@ -193,7 +193,7 @@ describe.sequential('route-logic finish coverage', () => {
           memberships: [{ o: ctx.orgId, r: 'member' }],
         },
       } as never
-      mockAuth.mockResolvedValueOnce(memberSession)
+      mockAuth.mockResolvedValue(memberSession)
       const memberList = await GET(orgJsonReq('/api/families', 'GET'))
       expect(memberList.status).toBe(200)
       const rows = await memberList.json()
@@ -202,7 +202,6 @@ describe.sequential('route-logic finish coverage', () => {
       expect(rows[0]._id).toBe(ctx.fixtures.familyId)
       expect(rows[0].openBalance).toBeUndefined()
 
-      mockAuth.mockResolvedValueOnce(memberSession)
       const unassigned = await GET(
         orgJsonReq(`/api/families/${ctx.fixtures.unassignedFamilyId}`, 'GET'),
         { params: { id: ctx.fixtures.unassignedFamilyId } },
