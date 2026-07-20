@@ -70,9 +70,7 @@ export function useFamilyLedger({
         const page = await fetchFamilyLedgerPage(config.url(familyId))
         if (isFamilyFetchStale(gen)) return
         setLedgerNextCursor((prev) => ({ ...prev, [config.field]: page.nextCursor }))
-        setData((prev) =>
-          prev ? { ...prev, [config.field]: page.items } : prev,
-        )
+        setData((prev) => (prev ? { ...prev, [config.field]: page.items } : prev))
       } catch (error) {
         if (isFamilyFetchStale(gen)) return
         console.error(`Error fetching ${tab} ledger:`, error)
@@ -98,9 +96,7 @@ export function useFamilyLedger({
         const page = await fetchFamilyLedgerPage(config.url(familyId), { cursor })
         setLedgerNextCursor((prev) => ({ ...prev, [config.field]: page.nextCursor }))
         setData((prev) =>
-          prev
-            ? { ...prev, [config.field]: [...(prev[config.field] || []), ...page.items] }
-            : prev,
+          prev ? { ...prev, [config.field]: [...(prev[config.field] || []), ...page.items] } : prev,
         )
       } catch (error) {
         console.error(`Error loading more ${tab} ledger:`, error)

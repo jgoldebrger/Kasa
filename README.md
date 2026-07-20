@@ -30,7 +30,7 @@ role-based access.
 
 ### 1. Prerequisites
 
-- Node.js **18+**
+- Node.js **20+** (see `engines` in `package.json`: `>=20 <23`)
 - A MongoDB cluster (local or Atlas)
 - (Optional) Stripe account for card payments
 - (Optional) SMTP credentials for the platform-level sender
@@ -345,16 +345,27 @@ node scripts/fix-indexes.js
 ## Cron jobs (automation)
 
 Production cron entry points are HTTP routes under `/api/jobs/*`, secured
-with `CRON_SECRET` (see `.env.example`). `vercel.json` ships with five
-schedules — **Vercel Pro** is required (Hobby allows at most two cron jobs).
+with `CRON_SECRET` (see `.env.example`).
 
-| API route                               | Purpose                                   | Schedule (UTC) |
-| --------------------------------------- | ----------------------------------------- | -------------- |
-| `/api/jobs/cycle-rollover`              | Annual cycle rollover per org             | `0 1 * * *`    |
-| `/api/jobs/generate-monthly-statements` | Generate previous-month statements        | `0 2 * * *`    |
-| `/api/jobs/process-recurring-payments`  | Charge due `RecurringPayment` rows        | `0 2 * * *`    |
-| `/api/jobs/send-monthly-statements`     | Email statements as PDF                   | `0 3 * * *`    |
-| `/api/jobs/wedding-converter`           | Child → family conversion on wedding date | `0 4 * * *`    |
+**Vercel Hobby (default in `vercel.json`):** a **single** daily cron hits
+`/api/jobs/tick` at `0 8 * * *` (UTC). The tick runs the full daily job
+batch (cycle rollover, statements, recurring payments, wedding converter,
+etc.) — see `docs/runbooks/deploy-rollback.md` and
+`lib/route-logic/jobs/cron-schedule.ts`.
+
+**Vercel Pro:** set `CRON_TICK_MODE=frequent` and change the schedule to
+`*/15 * * * *` for finer-grained processing.
+
+Individual job routes remain available for manual / CLI invocation:
+
+| API route                               | Purpose                                   |
+| --------------------------------------- | ----------------------------------------- |
+| `/api/jobs/tick`                        | Orchestrated daily batch (Vercel cron)    |
+| `/api/jobs/cycle-rollover`              | Annual cycle rollover per org             |
+| `/api/jobs/generate-monthly-statements` | Generate previous-month statements        |
+| `/api/jobs/process-recurring-payments`  | Charge due `RecurringPayment` rows        |
+| `/api/jobs/send-monthly-statements`     | Email statements as PDF                   |
+| `/api/jobs/wedding-converter`           | Child → family conversion on wedding date |
 
 Legacy CLI scripts (`scripts/generate-monthly-statements.js`, etc.) and
 matching `npm run …` aliases remain for local or non-Vercel hosts. Ops
@@ -362,7 +373,7 @@ runbooks live in `docs/runbooks/`.
 
 ### Vercel Cron (`vercel.json`)
 
-The committed `vercel.json` already lists all five `/api/jobs/*` paths.
+The committed `vercel.json` schedules `/api/jobs/tick` once per day.
 Set `CRON_SECRET` in Vercel env vars before enabling production crons.
 
 ---
@@ -389,13 +400,24 @@ live keys (`pk_live_…` / `sk_live_…`) for production.
    section in **Project Settings → Environment Variables**.
 3. Redeploy with `vercel --prod`.
 
-### Anywhere with Node 18+
+### Anywhere with Node 20+
 
 ```bash
 npm install
 npm run build
 npm start    # serves on port 3000
 ```
+
+### Docker (optional / self-host)
+
+```bash
+docker build -t kasa:local .
+docker run --rm -p 3000:3000 --env-file .env.local kasa:local
+# Probes: GET /api/health/livez  ·  GET /api/health/readyz
+```
+
+Primary production deploy remains **Vercel**. The Dockerfile uses Next.js
+`output: 'standalone'` for portable Node hosts.
 
 ### Pre-deploy checklist
 
@@ -422,13 +444,14 @@ npm start    # serves on port 3000
 
 ### Operations docs
 
-| Doc                                                                | Purpose                                                                          |
-| ------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| [docs/STRIPE_MONEY_FLOW.md](docs/STRIPE_MONEY_FLOW.md)             | Platform Stripe account, PCI (SAQ A), org expectations vs Connect, live webhooks |
-| [docs/sso-evaluation.md](docs/sso-evaluation.md)                   | Enterprise SSO (SAML/OIDC) assessment — not yet implemented                      |
-| [docs/NEXTAUTH_UPGRADE_POLICY.md](docs/NEXTAUTH_UPGRADE_POLICY.md) | Beta pin, monitoring, when to upgrade `next-auth`                                |
-| [docs/NEXTAUTH_V5_MIGRATION.md](docs/NEXTAUTH_V5_MIGRATION.md)     | v5 architecture, env vars, full migration notes                                  |
-| [docs/runbooks/](docs/runbooks/)                                   | Deploy/rollback, DB restore, cron failure, Stripe webhook replay                 |
+| Doc                                                                  | Purpose                                                                          |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| [docs/STRIPE_MONEY_FLOW.md](docs/STRIPE_MONEY_FLOW.md)               | Platform Stripe account, PCI (SAQ A), org expectations vs Connect, live webhooks |
+| [docs/sso-evaluation.md](docs/sso-evaluation.md)                     | Enterprise SSO (SAML/OIDC) assessment — not yet implemented                      |
+| [docs/NEXTAUTH_UPGRADE_POLICY.md](docs/NEXTAUTH_UPGRADE_POLICY.md)   | Beta pin, monitoring, when to upgrade `next-auth`                                |
+| [docs/NEXTAUTH_V5_MIGRATION.md](docs/NEXTAUTH_V5_MIGRATION.md)       | v5 architecture, env vars, full migration notes                                  |
+| [docs/runbooks/](docs/runbooks/)                                     | Deploy/rollback, DB restore, cron failure, Stripe webhook replay                 |
+| [docs/github-branch-protection.md](docs/github-branch-protection.md) | Required CI checks on `main`                                                     |
 
 ### Post-deploy smoke test
 

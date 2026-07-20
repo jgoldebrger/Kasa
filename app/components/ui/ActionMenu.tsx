@@ -42,7 +42,9 @@ export default function ActionMenu({
 }: ActionMenuProps) {
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
-  const [pos, setPos] = useState<{ top: number; left: number; placement: 'top' | 'bottom' } | null>(null)
+  const [pos, setPos] = useState<{ top: number; left: number; placement: 'top' | 'bottom' } | null>(
+    null,
+  )
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
 
@@ -66,11 +68,12 @@ export default function ActionMenu({
       left = rect.left
     }
     // Clamp horizontally to the viewport.
-    left = Math.max(VIEWPORT_PADDING, Math.min(left, window.innerWidth - MENU_WIDTH - VIEWPORT_PADDING))
+    left = Math.max(
+      VIEWPORT_PADDING,
+      Math.min(left, window.innerWidth - MENU_WIDTH - VIEWPORT_PADDING),
+    )
 
-    const top = flipUp
-      ? rect.top - menuHeight - VERTICAL_GAP
-      : rect.bottom + VERTICAL_GAP
+    const top = flipUp ? rect.top - menuHeight - VERTICAL_GAP : rect.bottom + VERTICAL_GAP
 
     setPos({ top, left, placement: flipUp ? 'top' : 'bottom' })
   }
@@ -130,48 +133,49 @@ export default function ActionMenu({
         <EllipsisVerticalIcon className="h-5 w-5" aria-hidden="true" />
       </button>
 
-      {open && mounted && pos && createPortal(
-        <div
-          ref={menuRef}
-          role="menu"
-          style={{ position: 'fixed', top: pos.top, left: pos.left, width: MENU_WIDTH }}
-          className="z-[1000] overflow-hidden rounded-md border border-border bg-surface shadow-popover"
-        >
-          {items.map((item, idx) => (
-            <button
-              key={`${item.label}-${idx}`}
-              type="button"
-              role="menuitem"
-              disabled={item.disabled}
-              onClick={(e) => {
-                e.stopPropagation()
-                setOpen(false)
-                item.onClick()
-              }}
-              className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors disabled:opacity-50 ${
-                item.destructive
-                  ? 'text-red-700 hover:bg-red-50'
-                  : 'text-fg hover:bg-fg/5'
-              } ${idx > 0 ? 'border-t border-border' : ''}`}
-            >
-              {item.icon && (
-                <span
-                  className={
-                    item.destructive
-                      ? 'inline-flex h-4 w-4 items-center justify-center text-red-700'
-                      : 'inline-flex h-4 w-4 items-center justify-center text-fg-subtle'
-                  }
-                  aria-hidden="true"
-                >
-                  {item.icon}
-                </span>
-              )}
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </div>,
-        document.body,
-      )}
+      {open &&
+        mounted &&
+        pos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            style={{ position: 'fixed', top: pos.top, left: pos.left, width: MENU_WIDTH }}
+            className="z-[1000] overflow-hidden rounded-md border border-border bg-surface shadow-popover"
+          >
+            {items.map((item, idx) => (
+              <button
+                key={`${item.label}-${idx}`}
+                type="button"
+                role="menuitem"
+                disabled={item.disabled}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setOpen(false)
+                  item.onClick()
+                }}
+                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors disabled:opacity-50 ${
+                  item.destructive ? 'text-danger hover:bg-danger/10' : 'text-fg hover:bg-fg/5'
+                } ${idx > 0 ? 'border-t border-border' : ''}`}
+              >
+                {item.icon && (
+                  <span
+                    className={
+                      item.destructive
+                        ? 'inline-flex h-4 w-4 items-center justify-center text-danger'
+                        : 'inline-flex h-4 w-4 items-center justify-center text-fg-subtle'
+                    }
+                    aria-hidden="true"
+                  >
+                    {item.icon}
+                  </span>
+                )}
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

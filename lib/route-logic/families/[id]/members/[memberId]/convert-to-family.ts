@@ -61,7 +61,7 @@ export const POST = handler({
     }
 
     // Create new family name
-    const newFamilyName = spouseName 
+    const newFamilyName = spouseName
       ? `${member.firstName} ${member.lastName} & ${spouseName}`
       : `${member.firstName} ${member.lastName} Family`
 
@@ -97,17 +97,22 @@ export const POST = handler({
     }
 
     // Determine spouse information - use new fields if available, otherwise fall back to spouseName
-    const spouseFirstName = member.spouseFirstName || (spouseName ? spouseName.trim().split(' ')[0] : '')
-    const spouseLastName = spouseName && !member.spouseFirstName 
-      ? (spouseName.trim().split(' ').length > 1 ? spouseName.trim().split(' ').slice(1).join(' ') : member.lastName)
-      : member.lastName
+    const spouseFirstName =
+      member.spouseFirstName || (spouseName ? spouseName.trim().split(' ')[0] : '')
+    const spouseLastName =
+      spouseName && !member.spouseFirstName
+        ? spouseName.trim().split(' ').length > 1
+          ? spouseName.trim().split(' ').slice(1).join(' ')
+          : member.lastName
+        : member.lastName
 
     // Determine father's Hebrew name based on member gender
     // If male: use current family's husbandHebrewName
     // If female: use current family's wifeHebrewName
-    const fatherHebrewName = member.gender === 'male' 
-      ? originalFamily.husbandHebrewName || null
-      : originalFamily.wifeHebrewName || null
+    const fatherHebrewName =
+      member.gender === 'male'
+        ? originalFamily.husbandHebrewName || null
+        : originalFamily.wifeHebrewName || null
 
     // Create new family - use address if provided, otherwise use original family address
     const newFamily = await Family.create({
@@ -122,25 +127,27 @@ export const POST = handler({
       state: member.state || originalFamily.state,
       zip: member.zip || originalFamily.zip,
       // Set husband/wife information based on member gender
-      ...(member.gender === 'male' ? {
-        husbandFirstName: member.firstName,
-        husbandHebrewName: member.hebrewFirstName || null,
-        husbandFatherHebrewName: fatherHebrewName,
-        husbandCellPhone: null,
-        wifeFirstName: spouseFirstName || null,
-        wifeHebrewName: member.spouseHebrewName || null,
-        wifeFatherHebrewName: member.spouseFatherHebrewName || null,
-        wifeCellPhone: member.spouseCellPhone || null
-      } : {
-        husbandFirstName: spouseFirstName || null,
-        husbandHebrewName: member.spouseHebrewName || null,
-        husbandFatherHebrewName: member.spouseFatherHebrewName || null,
-        husbandCellPhone: member.spouseCellPhone || null,
-        wifeFirstName: member.firstName,
-        wifeHebrewName: member.hebrewFirstName || null,
-        wifeFatherHebrewName: fatherHebrewName,
-        wifeCellPhone: null
-      }),
+      ...(member.gender === 'male'
+        ? {
+            husbandFirstName: member.firstName,
+            husbandHebrewName: member.hebrewFirstName || null,
+            husbandFatherHebrewName: fatherHebrewName,
+            husbandCellPhone: null,
+            wifeFirstName: spouseFirstName || null,
+            wifeHebrewName: member.spouseHebrewName || null,
+            wifeFatherHebrewName: member.spouseFatherHebrewName || null,
+            wifeCellPhone: member.spouseCellPhone || null,
+          }
+        : {
+            husbandFirstName: spouseFirstName || null,
+            husbandHebrewName: member.spouseHebrewName || null,
+            husbandFatherHebrewName: member.spouseFatherHebrewName || null,
+            husbandCellPhone: member.spouseCellPhone || null,
+            wifeFirstName: member.firstName,
+            wifeHebrewName: member.hebrewFirstName || null,
+            wifeFatherHebrewName: fatherHebrewName,
+            wifeCellPhone: null,
+          }),
       currentPlan: paymentPlanNumber ?? undefined,
       paymentPlanId: paymentPlanId || undefined,
       currentPayment: 0,
@@ -157,8 +164,9 @@ export const POST = handler({
         lastName: spouseLastName,
         hebrewFirstName: member.spouseHebrewName || null,
         birthDate: new Date(weddingDate), // Approximate, can be updated later
-        gender: member.gender === 'male' ? 'female' : 'male'
-      , organizationId: ctx!.organizationId})
+        gender: member.gender === 'male' ? 'female' : 'male',
+        organizationId: ctx!.organizationId,
+      })
     }
 
     // Move the member to the new family
@@ -190,4 +198,3 @@ export const POST = handler({
     }
   },
 })
-

@@ -35,7 +35,7 @@ function recordBadgeClass(type: ApiSearchRecord['type']): string {
     case 'member':
       return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
     case 'payment':
-      return 'bg-purple-500/10 text-purple-700 dark:text-purple-300'
+      return 'bg-accent/10 text-accent'
     case 'task':
       return 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
     case 'event':

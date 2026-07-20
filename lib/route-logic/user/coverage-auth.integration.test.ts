@@ -52,8 +52,8 @@ async function withRateLimitBlocked<T>(fn: () => Promise<T>): Promise<T> {
   const rateLimit = await import('@/lib/rate-limit')
   const spy = vi.spyOn(rateLimit, 'checkRateLimit').mockResolvedValue({
     allowed: false,
-        remaining: 0,
-        resetAt: 0,
+    remaining: 0,
+    resetAt: 0,
   })
   try {
     return await fn()
@@ -97,7 +97,11 @@ describe.sequential('user auth route-logic coverage', () => {
     it('returns 404 when user record missing', async () => {
       const ghostId = '507f1f77bcf86cd799439099'
       mockAuth.mockResolvedValueOnce({
-        user: { id: ghostId, email: 'ghost@example.com', memberships: [{ o: ctx.orgId, r: 'owner' }] },
+        user: {
+          id: ghostId,
+          email: 'ghost@example.com',
+          memberships: [{ o: ctx.orgId, r: 'owner' }],
+        },
       } as never)
 
       const { GET } = await import('@/lib/route-logic/user')

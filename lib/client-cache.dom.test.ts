@@ -44,10 +44,7 @@ describe('client-cache (dom)', () => {
   it('dedupes concurrent in-flight requests', async () => {
     const { cachedFetch } = await loadCache()
     const fetchMock = global.fetch as ReturnType<typeof vi.fn>
-    const [a, b] = await Promise.all([
-      cachedFetch('/api/x'),
-      cachedFetch('/api/x'),
-    ])
+    const [a, b] = await Promise.all([cachedFetch('/api/x'), cachedFetch('/api/x')])
     expect(a).toEqual(b)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
@@ -173,7 +170,10 @@ describe('client-cache (dom)', () => {
     const pending = new Promise<{ ok: boolean; json: () => Promise<unknown> }>((resolve) => {
       resolveFetch = resolve
     })
-    vi.stubGlobal('fetch', vi.fn(() => pending))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => pending),
+    )
     const { cachedFetch, invalidate } = await loadCache()
     const inFlight = cachedFetch('/api/tasks/queued')
     invalidate(/^\/api\/tasks/)

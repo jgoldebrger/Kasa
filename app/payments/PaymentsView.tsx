@@ -107,16 +107,19 @@ export default function PaymentsView({
   const [sort, setSort] = useState<{ id: string; dir: SortDir } | null>(null)
   const [showRecordModal, setShowRecordModal] = useState(false)
   const [showBatchChargeModal, setShowBatchChargeModal] = useState(false)
+  const [highlightId, setHighlightId] = useState<string | null>(null)
   const hasFetchedRef = useRef(serverHydrated)
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { begin, invalidate, isStale } = useRequestGeneration()
 
   const fetchPayments = useCallback(
-    async (opts?: { cursor?: string | null; append?: boolean }) => {
+    async (opts?: { cursor?: string | null; append?: boolean; silent?: boolean }) => {
       const gen = begin()
       const append = opts?.append ?? false
+      const silent = opts?.silent ?? false
       try {
         if (append) setLoadingMore(true)
-        else {
+        else if (!silent) {
           setLoading(true)
           setError(false)
         }
@@ -135,9 +138,11 @@ export default function PaymentsView({
       } catch {
         if (isStale(gen)) return
         if (!append) {
-          setAllPayments([])
-          setNextCursor(null)
-          setError(true)
+          if (!silent) {
+            setAllPayments([])
+            setNextCursor(null)
+            setError(true)
+          }
           toast.error(t('payments.error.load'))
         } else {
           toast.error(t('payments.error.loadMore'))
@@ -157,6 +162,36 @@ export default function PaymentsView({
     hasFetchedRef.current = true
     void fetchPayments()
   }, [fetchPayments])
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current)
+    }
+  }, [])
+
+  const handlePaymentCreated = useCallback(
+    (created: {
+      _id: string
+      familyId: Payment['familyId']
+      amount: number
+      paymentDate: string
+      year: number
+      type: Payment['type']
+      paymentMethod: Payment['paymentMethod']
+      notes?: string
+      createdAt: string
+    }) => {
+      setAllPayments((prev) => {
+        if (prev.some((p) => p._id === created._id)) return prev
+        return [created as Payment, ...prev]
+      })
+      setHighlightId(created._id)
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current)
+      highlightTimerRef.current = setTimeout(() => setHighlightId(null), 2400)
+      void fetchPayments({ silent: true })
+    },
+    [fetchPayments],
+  )
 
   useOrgChanged(
     useCallback(() => {
@@ -253,7 +288,11 @@ export default function PaymentsView({
         sortable: true,
         align: 'right',
         cell: (p) => (
-          <span className="font-semibold text-success tabular">
+          <span
+            className={`inline-block rounded px-1.5 py-0.5 font-semibold text-success tabular transition-colors ${
+              highlightId === p._id ? 'bg-success/15 ring-1 ring-success/30' : ''
+            }`}
+          >
             {formatMoney(netPaymentAmount(p))}
           </span>
         ),
@@ -335,7 +374,7 @@ export default function PaymentsView({
         exportValue: (p) => p.notes || '',
       },
     ],
-    [t, formatMoney, formatPaymentMethod],
+    [t, formatMoney, formatPaymentMethod, highlightId],
   )
 
   return (
@@ -345,27 +384,27 @@ export default function PaymentsView({
           title={t('payments.title')}
           subtitle={t('payments.subtitle')}
           actions={
-            <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
               {!supportReadOnly && (
-                <>
-                  <Button
-                    variant="secondary"
-                    leftIcon={<CreditCardIcon className="h-5 w-5" aria-hidden="true" />}
-                    onClick={() => setShowBatchChargeModal(true)}
-                  >
-                    {t('payments.batchCharge.action')}
-                  </Button>
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     leftIcon={<PlusIcon className="h-5 w-5" />}
                     onClick={() => setShowRecordModal(true)}
                   >
                     {t('payments.recordPayment')}
                   </Button>
-                </>
+                  <Button
+                    variant="ghost"
+                    leftIcon={<CreditCardIcon className="h-5 w-5" aria-hidden="true" />}
+                    onClick={() => setShowBatchChargeModal(true)}
+                  >
+                    {t('payments.batchCharge.action')}
+                  </Button>
+                </div>
               )}
-              <div className="text-right">
+              <div className="sm:ms-auto sm:border-s sm:border-border sm:ps-4 text-start sm:text-end">
                 <div className="text-xs text-fg-muted">{t('payments.totalAmount')}</div>
-                <div className="text-2xl sm:text-3xl font-bold text-fg tabular">
+                <div className="text-xl font-semibold text-fg tabular sm:text-2xl">
                   {formatMoney(totalAmount)}
                 </div>
               </div>
@@ -437,7 +476,11 @@ export default function PaymentsView({
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-lg font-semibold text-success tabular">
+                      <div
+                        className={`inline-block rounded px-1.5 py-0.5 text-lg font-semibold text-success tabular transition-colors ${
+                          highlightId === p._id ? 'bg-success/15 ring-1 ring-success/30' : ''
+                        }`}
+                      >
                         {formatMoney(netPaymentAmount(p))}
                       </div>
                       <div className="text-xs text-fg-muted">{t(PAYMENT_TYPE_KEYS[p.type])}</div>
@@ -499,12 +542,12 @@ export default function PaymentsView({
       <RecordPaymentModal
         open={showRecordModal}
         onClose={() => setShowRecordModal(false)}
-        onCreated={() => fetchPayments()}
+        onCreated={handlePaymentCreated}
       />
       <BatchChargeModal
         open={showBatchChargeModal}
         onClose={() => setShowBatchChargeModal(false)}
-        onComplete={() => fetchPayments()}
+        onComplete={() => fetchPayments({ silent: true })}
       />
     </div>
   )

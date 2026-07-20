@@ -22,7 +22,9 @@ export function sanitizeUploadFilename(name: string): string {
   return base.replace(/^\.+/, '') || 'upload'
 }
 
-export function validateImportFile(file: File): { ok: true } | { ok: false; error: string; status: number } {
+export function validateImportFile(
+  file: File,
+): { ok: true } | { ok: false; error: string; status: number } {
   const name = (file.name || '').toLowerCase()
   const type = (file.type || '').toLowerCase().trim()
 

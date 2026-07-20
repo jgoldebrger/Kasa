@@ -385,9 +385,7 @@ describe.sequential('webhook.ts branch coverage', () => {
         amount_refunded: 10000,
         currency: 'usd',
       }
-      client.charges.retrieve
-        .mockResolvedValueOnce(lostCharge)
-        .mockResolvedValueOnce(lostCharge)
+      client.charges.retrieve.mockResolvedValueOnce(lostCharge).mockResolvedValueOnce(lostCharge)
 
       const { POST } = await import('@/lib/route-logic/stripe/webhook')
       expect(
@@ -425,9 +423,7 @@ describe.sequential('webhook.ts branch coverage', () => {
         payment_intent: { id: piId },
         amount_refunded: 0,
       }
-      client.charges.retrieve
-        .mockResolvedValueOnce(wonCharge)
-        .mockResolvedValueOnce(wonCharge)
+      client.charges.retrieve.mockResolvedValueOnce(wonCharge).mockResolvedValueOnce(wonCharge)
 
       const { POST } = await import('@/lib/route-logic/stripe/webhook')
       expect(

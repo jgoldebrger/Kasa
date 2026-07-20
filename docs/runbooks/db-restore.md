@@ -23,7 +23,6 @@
    Expect `status: "ok"`. A `503` confirms the app cannot reach MongoDB.
 
 2. **Atlas checks**
-
    - Cluster status (paused? scaling?)
    - **Network Access** — Vercel egress IPs still allowed
    - **Database Access** — user/password not rotated without updating `MONGODB_URI`

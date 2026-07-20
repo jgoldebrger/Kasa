@@ -85,9 +85,7 @@ describe('useDataFilters', () => {
   })
 
   it('filters by global search and column filters', () => {
-    const { result } = renderHook(() =>
-      useDataFilters(baseColumns, rows, { globalSearch: true }),
-    )
+    const { result } = renderHook(() => useDataFilters(baseColumns, rows, { globalSearch: true }))
 
     act(() => {
       result.current.setSearch('ali')
@@ -283,9 +281,7 @@ describe('useDataFilters', () => {
   })
 
   it('shows dateRange to-only chip and clears search via chip', () => {
-    const { result } = renderHook(() =>
-      useDataFilters(baseColumns, rows, { globalSearch: true }),
-    )
+    const { result } = renderHook(() => useDataFilters(baseColumns, rows, { globalSearch: true }))
 
     act(() => {
       result.current.setSearch('bob')

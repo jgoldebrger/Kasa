@@ -17,6 +17,9 @@ on:
       - 'middleware.ts'
       - 'lib/**'
       - 'e2e/**'
+  schedule:
+    # Weekly DAST — Monday 07:00 UTC (baseline ZAP after Playwright)
+    - cron: '0 7 * * 1'
   workflow_dispatch:
     inputs:
       target_env:
@@ -37,8 +40,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
+      # schedule → safe (non-destructive); push/PR → destructive; dispatch → input
       SECURITY_ENV: ${{ github.event.inputs.target_env || 'local' }}
-      SECURITY_ALLOW_DESTRUCTIVE: ${{ github.event.inputs.allow_destructive || 'true' }}
+      SECURITY_ALLOW_DESTRUCTIVE: ${{ github.event.inputs.allow_destructive || (github.event_name == 'schedule' && 'false') || 'true' }}
       SECURITY_OWNER_EMAIL: e2e@kasa.test
       SECURITY_OWNER_PASSWORD: E2eTestPass123!
       SECURITY_MEMBER_EMAIL: e2e-member@kasa.test
@@ -91,7 +95,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: security-playwright
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     env:
       SECURITY_ENV: local
       SECURITY_ZAP_ENABLED: 'true'
@@ -116,7 +120,7 @@ jobs:
         run: npx tsx scripts/security-zap.ts baseline
 
       - name: OWASP ZAP full scan
-        if: github.event.inputs.run_zap_full == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_zap_full == 'true'
         run: npx tsx scripts/security-zap.ts full
 
       - name: Upload ZAP reports

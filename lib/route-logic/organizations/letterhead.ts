@@ -102,9 +102,7 @@ export const GET = handler({
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    const org = await Organization.findById(ctx!.organizationId)
-      .select('letterhead')
-      .lean<any>()
+    const org = await Organization.findById(ctx!.organizationId).select('letterhead').lean<any>()
     if (!org) return { status: 404, data: { error: 'Organization not found' } }
     return { data: normalizeLetterhead(org.letterhead) }
   },

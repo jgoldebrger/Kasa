@@ -202,7 +202,7 @@ export default function ApiKeysPanel({ isOwner }: ApiKeysPanelProps) {
                 onClick={() => void handleRevoke(k)}
                 aria-label={t('settings.apiKeys.revoke')}
               >
-                <TrashIcon className="h-4 w-4 text-red-600" aria-hidden="true" />
+                <TrashIcon className="h-4 w-4 text-danger" aria-hidden="true" />
               </Button>
             </li>
           ))}

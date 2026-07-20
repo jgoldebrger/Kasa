@@ -39,9 +39,9 @@ export default function CookieNotice() {
           Cookies &amp; privacy
         </h2>
         <p id="cookie-notice-desc" className="text-sm text-fg-muted leading-relaxed mb-3">
-          Kasa uses a small number of strictly necessary cookies to keep you signed in,
-          remember your workspace, and apply your language preference. We do not use
-          advertising or third-party tracking cookies.
+          Kasa uses a small number of strictly necessary cookies to keep you signed in, remember
+          your workspace, and apply your language preference. We do not use advertising or
+          third-party tracking cookies.
         </p>
         <ul className="text-xs text-fg-muted space-y-1 mb-4">
           {SESSION_COOKIES.map((cookie) => (

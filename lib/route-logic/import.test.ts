@@ -12,7 +12,9 @@ vi.mock('@/lib/api/handler', () => ({
 describe('import route-logic parsers', () => {
   it('parseCSV handles CRLF row terminators', async () => {
     const { parseCSV } = await import('./import')
-    const { headers, rows } = parseCSV('name,weddingDate\r\nAlpha,2018-01-01\r\nBeta,2019-02-02\r\n')
+    const { headers, rows } = parseCSV(
+      'name,weddingDate\r\nAlpha,2018-01-01\r\nBeta,2019-02-02\r\n',
+    )
     expect(headers).toEqual(['name', 'weddingDate'])
     expect(rows).toHaveLength(2)
     expect(rows[0][0]).toBe('Alpha')

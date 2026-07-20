@@ -533,7 +533,7 @@ function ColumnMappingPanel({
                 <tr key={col.key} className="border-t border-border">
                   <td className="px-3 py-2 text-fg">
                     <span className="font-medium">{col.key}</span>
-                    {col.required && <span className="ml-1 text-red-500">*</span>}
+                    {col.required && <span className="ml-1 text-danger">*</span>}
                     {col.hint && <p className="mt-0.5 text-fg-muted">{col.hint}</p>}
                   </td>
                   <td className="px-3 py-2">
@@ -580,9 +580,9 @@ function DryRunPreview({ result, t }: { result: DryRunResult; t: ReturnType<type
           </p>
           <p className="text-xs text-amber-800 dark:text-amber-200">{t('import.wouldSkip')}</p>
         </div>
-        <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 dark:border-red-700 dark:bg-red-950/30">
-          <p className="text-2xl font-semibold text-red-700 dark:text-red-300">{result.failed}</p>
-          <p className="text-xs text-red-800 dark:text-red-200">{t('import.wouldFail')}</p>
+        <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2">
+          <p className="text-2xl font-semibold text-danger">{result.failed}</p>
+          <p className="text-xs text-danger">{t('import.wouldFail')}</p>
         </div>
       </div>
 
@@ -669,7 +669,7 @@ function ActionBadge({
   const styles = {
     import: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200',
     skip: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200',
-    error: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200',
+    error: 'bg-danger/10 text-danger',
   }
   const labels = {
     import: t('import.action.import'),
@@ -691,21 +691,19 @@ function ResultBlock({ result, t }: { result: ImportResult; t: ReturnType<typeof
       className={`rounded-lg border p-4 ${
         result.success
           ? 'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/30'
-          : 'border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-950/30'
+          : 'border-danger/40 bg-danger/10'
       }`}
     >
       <div className="flex items-start gap-3">
         {result.success ? (
           <CheckCircleIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-green-600 dark:text-green-400" />
         ) : (
-          <XCircleIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600 dark:text-red-400" />
+          <XCircleIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-danger" />
         )}
         <div className="flex-1 space-y-1.5 text-sm">
           <p
             className={`font-medium ${
-              result.success
-                ? 'text-green-800 dark:text-green-200'
-                : 'text-red-800 dark:text-red-200'
+              result.success ? 'text-green-800 dark:text-green-200' : 'text-danger'
             }`}
           >
             {result.success ? t('import.result.complete') : t('import.result.failed')}
@@ -740,10 +738,8 @@ function ResultBlock({ result, t }: { result: ImportResult; t: ReturnType<typeof
           )}
           {result.errors.length > 0 && (
             <div>
-              <p className="mt-1 font-medium text-red-700 dark:text-red-300">
-                {t('import.result.errors')}
-              </p>
-              <ul className="ml-4 list-disc text-xs text-red-700 dark:text-red-300">
+              <p className="mt-1 font-medium text-danger">{t('import.result.errors')}</p>
+              <ul className="ml-4 list-disc text-xs text-danger">
                 {result.errors.slice(0, 10).map((e, i) => (
                   <li key={i}>{e}</li>
                 ))}

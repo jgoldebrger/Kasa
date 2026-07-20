@@ -44,8 +44,7 @@ interface PendingInvite {
 }
 
 const ROLE_BADGE: Record<string, string> = {
-  owner:
-    'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/30',
+  owner: 'bg-accent/10 text-accent border-accent/20',
   admin: 'bg-accent/10 text-accent border-accent/20',
   member: 'bg-fg/5 text-fg border-border',
   treasurer:
@@ -495,7 +494,7 @@ function MembersTable({
             onClick={() => onRemove(m)}
             aria-label={`Remove ${m.name}`}
             title="Remove member"
-            className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-full text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+            className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-full text-danger hover:bg-danger/10"
           >
             <TrashIcon className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -538,7 +537,7 @@ function MembersTable({
                   <button
                     onClick={() => onRemove(m)}
                     aria-label={`Remove ${m.name}`}
-                    className="focus-ring inline-flex items-center gap-1 text-xs text-red-700 hover:text-red-800 dark:text-red-400"
+                    className="focus-ring inline-flex items-center gap-1 text-xs text-danger hover:text-danger/80"
                   >
                     <TrashIcon className="h-4 w-4" aria-hidden="true" /> Remove
                   </button>
@@ -626,7 +625,7 @@ function InvitesTable({
               onClick={() => onCancel(i)}
               aria-label={`Cancel invite for ${i.email}`}
               title="Cancel invite"
-              className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-full text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+              className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-full text-danger hover:bg-danger/10"
             >
               <TrashIcon className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -663,7 +662,7 @@ function InvitesTable({
               <div className="mt-3 flex justify-end gap-2">
                 <button
                   onClick={() => onCancel(i)}
-                  className="focus-ring inline-flex items-center gap-1 text-xs text-red-700 hover:text-red-800 dark:text-red-400"
+                  className="focus-ring inline-flex items-center gap-1 text-xs text-danger hover:text-danger/80"
                 >
                   <TrashIcon className="h-4 w-4" aria-hidden="true" /> Cancel
                 </button>

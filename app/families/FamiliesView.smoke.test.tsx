@@ -59,10 +59,7 @@ describe('FamiliesView smoke', () => {
 
   it('renders without crashing', () => {
     const { container } = render(
-      <FamiliesView
-        initialFamilies={[stubFamily]}
-        initialPaymentPlans={[stubPlan]}
-      />,
+      <FamiliesView initialFamilies={[stubFamily]} initialPaymentPlans={[stubPlan]} />,
     )
     expect(container).toBeDefined()
   })
@@ -121,13 +118,7 @@ describe('FamiliesView smoke', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(
-      <FamiliesView
-        initialFamilies={[]}
-        initialPaymentPlans={[stubPlan]}
-        isAdmin
-      />,
-    )
+    render(<FamiliesView initialFamilies={[]} initialPaymentPlans={[stubPlan]} isAdmin />)
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Add Family' })[0])
     const dialog = screen.getByRole('dialog', { name: 'Add Family' })

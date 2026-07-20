@@ -119,10 +119,15 @@ describe('checkRateLimit (unit, mocked Mongo)', () => {
     vi.stubEnv('TRUST_PROXY_HEADERS', 'false')
     delete process.env.VERCEL
     const check = await importCheckRateLimit()
-    await check(new Request('http://localhost/test'), 'login', {
-      limit: 5,
-      windowMs: 60_000,
-    }, 'User@Example.COM')
+    await check(
+      new Request('http://localhost/test'),
+      'login',
+      {
+        limit: 5,
+        windowMs: 60_000,
+      },
+      'User@Example.COM',
+    )
     expect(rlMocks.findOneAndUpdate.mock.calls[0][0]._id).toBe('login:id:user@example.com')
   })
 
@@ -137,13 +142,16 @@ describe('checkRateLimit (unit, mocked Mongo)', () => {
   it('appends extraKey to the bucket when both IP and extraKey are present', async () => {
     vi.stubEnv('TRUST_PROXY_HEADERS', 'true')
     const check = await importCheckRateLimit()
-    await check(reqWithHeaders({ 'x-forwarded-for': '1.2.3.4' }), 'login', {
-      limit: 5,
-      windowMs: 60_000,
-    }, 'alice@test.com')
-    expect(rlMocks.findOneAndUpdate.mock.calls[0][0]._id).toBe(
-      'login:1.2.3.4:alice@test.com',
+    await check(
+      reqWithHeaders({ 'x-forwarded-for': '1.2.3.4' }),
+      'login',
+      {
+        limit: 5,
+        windowMs: 60_000,
+      },
+      'alice@test.com',
     )
+    expect(rlMocks.findOneAndUpdate.mock.calls[0][0]._id).toBe('login:1.2.3.4:alice@test.com')
   })
 
   it('denies when count exceeds limit', async () => {
@@ -216,10 +224,14 @@ describe('checkRateLimit (unit, mocked Mongo)', () => {
     expect(importV.allowed).toBe(false)
 
     rlMocks.connectDB.mockRejectedValue(new Error('mongo down'))
-    const emailV = await check(reqWithHeaders({ 'x-forwarded-for': '1.1.1.1' }), 'send-file-email', {
-      limit: 20,
-      windowMs: 60_000,
-    })
+    const emailV = await check(
+      reqWithHeaders({ 'x-forwarded-for': '1.1.1.1' }),
+      'send-file-email',
+      {
+        limit: 20,
+        windowMs: 60_000,
+      },
+    )
     expect(emailV.allowed).toBe(false)
   })
 

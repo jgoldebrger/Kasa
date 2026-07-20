@@ -48,10 +48,7 @@ export async function loadByIdsInChunks<T>(
 }
 
 async function* idSortedBatches<T extends { _id: Types.ObjectId | string }>(
-  load: (
-    filter: Record<string, unknown>,
-    limit: number,
-  ) => Promise<T[]>,
+  load: (filter: Record<string, unknown>, limit: number) => Promise<T[]>,
   baseFilter: Record<string, unknown>,
   opts: BatchOptions = {},
 ): AsyncGenerator<T[]> {
@@ -93,11 +90,7 @@ export async function* familyBatches(
 /** Families with a non-empty email that have not opted out of bulk mail. */
 export const EMailableFamilyFilter: Record<string, unknown> = {
   emailOptOut: { $ne: true },
-  $and: [
-    { email: { $exists: true } },
-    { email: { $ne: null } },
-    { email: { $ne: '' } },
-  ],
+  $and: [{ email: { $exists: true } }, { email: { $ne: null } }, { email: { $ne: '' } }],
 }
 
 /** Yield family-member docs matching `extraFilter` in stable _id order. */

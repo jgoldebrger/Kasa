@@ -7,7 +7,9 @@ let buildTransactionList: typeof import('./period').buildTransactionList
 let statementSnapshotFromPeriod: typeof import('./period').statementSnapshotFromPeriod
 let loadStatementPeriod: typeof import('./period').loadStatementPeriod
 
-function emptyPeriod(overrides: Partial<StatementPeriodAggregates> = {}): StatementPeriodAggregates {
+function emptyPeriod(
+  overrides: Partial<StatementPeriodAggregates> = {},
+): StatementPeriodAggregates {
   return {
     payments: [],
     priorPeriodRefunds: [],
@@ -137,9 +139,7 @@ describe('buildTransactionList', () => {
     expect(txs.find((t) => t.type === 'withdrawal')?.description).toBe('Withdrawal')
     expect(txs.find((t) => t.type === 'event')?.description).toContain('bar_mitzvah')
     expect(txs.find((t) => t.type === 'event')?.description).toContain('Mazel tov')
-    expect(txs.find((t) => t.type === 'cycle-charge')?.description).toBe(
-      'Annual dues — cycle 2024',
-    )
+    expect(txs.find((t) => t.type === 'cycle-charge')?.description).toBe('Annual dues — cycle 2024')
   })
 
   it('sorts when both transaction dates are invalid', () => {

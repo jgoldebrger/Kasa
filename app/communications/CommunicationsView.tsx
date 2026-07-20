@@ -15,6 +15,7 @@ import {
   PageHeader,
   SkeletonRows,
   Button,
+  Tabs,
   type DataColumn,
 } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
@@ -310,30 +311,15 @@ export default function CommunicationsView() {
 
         {jobStatus && <BulkJobProgressBanner status={jobStatus} polling={jobPolling} />}
 
-        <div className="flex gap-2 border-b border-border">
-          <button
-            type="button"
-            onClick={() => setTab('compose')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-              tab === 'compose'
-                ? 'border-accent text-accent'
-                : 'border-transparent text-fg-muted hover:text-fg'
-            }`}
-          >
-            {t('communications.tab.compose')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('log')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-              tab === 'log'
-                ? 'border-accent text-accent'
-                : 'border-transparent text-fg-muted hover:text-fg'
-            }`}
-          >
-            {t('communications.tab.log')}
-          </button>
-        </div>
+        <Tabs
+          label={t('communications.title')}
+          activeId={tab}
+          onChange={(id) => setTab(id as Tab)}
+          items={[
+            { id: 'compose', label: t('communications.tab.compose') },
+            { id: 'log', label: t('communications.tab.log') },
+          ]}
+        />
 
         {tab === 'compose' ? (
           <ComposeTab

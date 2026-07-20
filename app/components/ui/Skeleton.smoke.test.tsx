@@ -9,7 +9,9 @@ import { Skeleton as Component } from './Skeleton'
 
 describe('Skeleton smoke', () => {
   it('renders without crashing', () => {
-    const { container } = render(React.createElement(Component, null) as unknown as React.ReactElement)
+    const { container } = render(
+      React.createElement(Component, null) as unknown as React.ReactElement,
+    )
     expect(container).toBeDefined()
   })
 })

@@ -63,8 +63,7 @@ export const RECYCLABLE_MODELS: Record<RecyclableKind, ModelMeta> = {
     model: FamilyMember,
     label: 'Member',
     pluralLabel: 'Members',
-    describe: (d) =>
-      `${d?.firstName || ''} ${d?.lastName || ''}`.trim() || 'Unnamed member',
+    describe: (d) => `${d?.firstName || ''} ${d?.lastName || ''}`.trim() || 'Unnamed member',
   },
   payment: {
     model: Payment,
@@ -305,11 +304,9 @@ export async function restoreFromBin(
 
   const clearFields = { $set: { deletedAt: null, deletedBy: null, deletedKind: null } }
 
-  await meta.model.updateOne(
-    { _id: id, organizationId: ctx.organizationId },
-    clearFields,
-    { includeDeleted: true },
-  )
+  await meta.model.updateOne({ _id: id, organizationId: ctx.organizationId }, clearFields, {
+    includeDeleted: true,
+  })
 
   let cascadeRestored = 0
   if (kind === 'family' && doc.deletedAt) {
@@ -472,7 +469,8 @@ export async function getTrashItem(
   const doc = await meta.model
     .findOne({ _id: id, organizationId: orgId, deletedAt: { $ne: null } }, null, {
       includeDeleted: true,
-    }).lean()
+    })
+    .lean()
   if (!doc) return null
   return toTrashItem(kind, doc)
 }

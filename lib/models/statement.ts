@@ -1,26 +1,34 @@
 import mongoose, { Schema } from 'mongoose'
 import { softDeletePlugin } from './soft-delete-plugin'
 
-const StatementSchema = new Schema({
-  organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
-  familyId: { type: Schema.Types.ObjectId, ref: 'Family', required: true },
-  memberId: { type: Schema.Types.ObjectId, ref: 'FamilyMember' }, // Optional: for member-specific statements
-  statementNumber: { type: String, required: true },
-  date: { type: Date, required: true },
-  fromDate: { type: Date, required: true },
-  toDate: { type: Date, required: true },
-  openingBalance: { type: Number, required: true },
-  income: { type: Number, required: true },
-  withdrawals: { type: Number, required: true },
-  expenses: { type: Number, required: true },
-  // Sum of CycleCharges falling in the statement period. Defaults to 0
-  // for back-compat with pre-rollover statements. Subtracted from the
-  // closing balance just like withdrawals, so opening balances of
-  // subsequent statements (re-computed via `calculateFamilyBalance`)
-  // stay consistent with what the statement reported.
-  cycleCharges: { type: Number, default: 0 },
-  closingBalance: { type: Number, required: true },
-}, { timestamps: true })
+const StatementSchema = new Schema(
+  {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: true,
+      index: true,
+    },
+    familyId: { type: Schema.Types.ObjectId, ref: 'Family', required: true },
+    memberId: { type: Schema.Types.ObjectId, ref: 'FamilyMember' }, // Optional: for member-specific statements
+    statementNumber: { type: String, required: true },
+    date: { type: Date, required: true },
+    fromDate: { type: Date, required: true },
+    toDate: { type: Date, required: true },
+    openingBalance: { type: Number, required: true },
+    income: { type: Number, required: true },
+    withdrawals: { type: Number, required: true },
+    expenses: { type: Number, required: true },
+    // Sum of CycleCharges falling in the statement period. Defaults to 0
+    // for back-compat with pre-rollover statements. Subtracted from the
+    // closing balance just like withdrawals, so opening balances of
+    // subsequent statements (re-computed via `calculateFamilyBalance`)
+    // stay consistent with what the statement reported.
+    cycleCharges: { type: Number, default: 0 },
+    closingBalance: { type: Number, required: true },
+  },
+  { timestamps: true },
+)
 StatementSchema.index({ organizationId: 1, date: -1 })
 // Per-family statement listing — `family.detail` page and per-member
 // statement endpoint both filter by familyId and sort by `date desc`.

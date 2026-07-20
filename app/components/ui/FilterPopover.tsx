@@ -12,11 +12,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline'
-import type {
-  ColumnFilterConfig,
-  FilterOption,
-  FilterValue,
-} from '@/lib/client/useDataFilters'
+import type { ColumnFilterConfig, FilterOption, FilterValue } from '@/lib/client/useDataFilters'
 
 export interface FilterPopoverColumn {
   id: string
@@ -240,9 +236,7 @@ function FilterField({
           value={v == null ? '' : v}
           onChange={(e) =>
             onChange(
-              e.target.value === ''
-                ? null
-                : { type: 'number', value: Number(e.target.value) },
+              e.target.value === '' ? null : { type: 'number', value: Number(e.target.value) },
             )
           }
           className={inputCls}
@@ -303,9 +297,7 @@ function FilterField({
     const from = cur?.from ?? ''
     const to = cur?.to ?? ''
     const update = (f: string, x: string) =>
-      onChange(
-        !f && !x ? null : { type: 'dateRange', from: f || null, to: x || null },
-      )
+      onChange(!f && !x ? null : { type: 'dateRange', from: f || null, to: x || null })
     return (
       <div className="space-y-1">
         {label}

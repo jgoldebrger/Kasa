@@ -30,11 +30,11 @@ Subscribed events (configure in Stripe Dashboard):
 
 ### 2. Verify server configuration
 
-| Env var | Purpose |
-| ------- | ------- |
-| `STRIPE_SECRET_KEY` | Server API access (`sk_live_…` in prod) |
-| `STRIPE_WEBHOOK_SECRET` | Must match the endpoint's **Signing secret** (`whsec_…`) |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Client-side only |
+| Env var                              | Purpose                                                  |
+| ------------------------------------ | -------------------------------------------------------- |
+| `STRIPE_SECRET_KEY`                  | Server API access (`sk_live_…` in prod)                  |
+| `STRIPE_WEBHOOK_SECRET`              | Must match the endpoint's **Signing secret** (`whsec_…`) |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Client-side only                                         |
 
 A `503` with `"Stripe webhook not configured"` means one of the secrets is missing in Vercel.
 

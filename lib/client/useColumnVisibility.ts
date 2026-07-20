@@ -267,24 +267,21 @@ export function useColumnVisibility(
   const pendingVis = useRef<Record<string, boolean> | null>(null)
   const pendingOrder = useRef<string[] | null>(null)
 
-  const applyStored = useCallback(
-    (stored: Record<string, boolean> | null | undefined) => {
-      if (!stored) return
-      setVisibility((prev) => {
-        const next: Record<string, boolean> = { ...prev }
-        for (const id of Object.keys(prev)) {
-          if (Object.prototype.hasOwnProperty.call(stored, id)) {
-            next[id] = !!stored[id]
-          }
+  const applyStored = useCallback((stored: Record<string, boolean> | null | undefined) => {
+    if (!stored) return
+    setVisibility((prev) => {
+      const next: Record<string, boolean> = { ...prev }
+      for (const id of Object.keys(prev)) {
+        if (Object.prototype.hasOwnProperty.call(stored, id)) {
+          next[id] = !!stored[id]
         }
-        if (!Object.values(next).some(Boolean) && Object.keys(next).length > 0) {
-          next[Object.keys(next)[0]] = true
-        }
-        return next
-      })
-    },
-    [],
-  )
+      }
+      if (!Object.values(next).some(Boolean) && Object.keys(next).length > 0) {
+        next[Object.keys(next)[0]] = true
+      }
+      return next
+    })
+  }, [])
 
   const applyStoredOrder = useCallback(
     (stored: string[] | null | undefined) => {
@@ -292,10 +289,7 @@ export function useColumnVisibility(
       setOrderState((prev) => {
         const reconciled = reconcileOrder(stored, declaredOrder)
         // Only update if changed (avoid render churn).
-        if (
-          reconciled.length === prev.length &&
-          reconciled.every((id, i) => id === prev[i])
-        ) {
+        if (reconciled.length === prev.length && reconciled.every((id, i) => id === prev[i])) {
           return prev
         }
         return reconciled
@@ -440,10 +434,7 @@ export function useColumnVisibility(
     (next: string[]) => {
       setOrderState((prev) => {
         const reconciled = reconcileOrder(next, declaredOrder)
-        if (
-          reconciled.length === prev.length &&
-          reconciled.every((id, i) => id === prev[i])
-        ) {
+        if (reconciled.length === prev.length && reconciled.every((id, i) => id === prev[i])) {
           return prev
         }
         persistOrder(reconciled)
@@ -456,13 +447,7 @@ export function useColumnVisibility(
   const moveColumn = useCallback(
     (from: number, to: number) => {
       setOrderState((prev) => {
-        if (
-          from < 0 ||
-          from >= prev.length ||
-          to < 0 ||
-          to >= prev.length ||
-          from === to
-        ) {
+        if (from < 0 || from >= prev.length || to < 0 || to >= prev.length || from === to) {
           return prev
         }
         const next = prev.slice()
@@ -476,10 +461,7 @@ export function useColumnVisibility(
   )
 
   const isVisible = useCallback((id: string) => visibility[id] !== false, [visibility])
-  const visibleCount = useMemo(
-    () => Object.values(visibility).filter(Boolean).length,
-    [visibility],
-  )
+  const visibleCount = useMemo(() => Object.values(visibility).filter(Boolean).length, [visibility])
 
   return {
     visibility,
@@ -493,4 +475,3 @@ export function useColumnVisibility(
     moveColumn,
   }
 }
-

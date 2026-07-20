@@ -84,11 +84,16 @@ describe('cron-lock (integration)', () => {
     const { withCronLock } = await import('./cron-lock')
     const { JobLock } = await import('./models')
 
-    const result = await withCronLock('generate-statements', '2026-04', async () => {
-      const held = await JobLock.countDocuments({ jobName: 'generate-statements' })
-      expect(held).toBe(1)
-      return { processed: 3 }
-    }, { ttlMs: 60_000 })
+    const result = await withCronLock(
+      'generate-statements',
+      '2026-04',
+      async () => {
+        const held = await JobLock.countDocuments({ jobName: 'generate-statements' })
+        expect(held).toBe(1)
+        return { processed: 3 }
+      },
+      { ttlMs: 60_000 },
+    )
 
     expect(result).toEqual({ processed: 3 })
     expect(await JobLock.countDocuments({ jobName: 'generate-statements' })).toBe(0)

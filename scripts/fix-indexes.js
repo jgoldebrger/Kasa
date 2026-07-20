@@ -26,9 +26,15 @@ async function main() {
   // affected collection; mongoose will re-create the correct (multi-tenant)
   // ones automatically on next app startup.
   const COLLECTIONS_TO_RESET = [
-    'organizations', 'users', 'orgmemberships', 'invites',
-    'paymentplans', 'lifecycleevents', 'yearlycalculations',
-    'emailconfigs', 'cycleconfigs',
+    'organizations',
+    'users',
+    'orgmemberships',
+    'invites',
+    'paymentplans',
+    'lifecycleevents',
+    'yearlycalculations',
+    'emailconfigs',
+    'cycleconfigs',
   ]
 
   for (const collName of COLLECTIONS_TO_RESET) {
@@ -55,5 +61,8 @@ async function main() {
 }
 
 main()
-  .catch((e) => { console.error(e); process.exitCode = 1 })
+  .catch((e) => {
+    console.error(e)
+    process.exitCode = 1
+  })
   .finally(() => mongoose.disconnect().catch(() => {}))

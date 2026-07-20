@@ -27,7 +27,7 @@ export function PageHeader({ title, subtitle, actions, eyebrow, className = '' }
             {eyebrow}
           </div>
         )}
-        <h1 className="hidden truncate text-xl font-semibold tracking-tight text-fg md:block sm:text-2xl">
+        <h1 className="truncate text-xl font-semibold tracking-tight text-fg sm:text-2xl">
           {title}
         </h1>
         {subtitle && <p className="mt-1 text-sm text-fg-muted">{subtitle}</p>}

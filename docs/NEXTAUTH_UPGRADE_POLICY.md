@@ -23,12 +23,12 @@ This document defines **when and how** KASA upgrades Auth.js / NextAuth. For arc
 
 ### Continuous
 
-| Signal | Action |
-|--------|--------|
-| [next-auth GitHub releases](https://github.com/nextauthjs/next-auth/releases) | Watch for `5.0.0` stable, new betas, security advisories |
-| [GitHub Security Advisories](https://github.com/nextauthjs/next-auth/security/advisories) | Treat **any** advisory affecting our pin as **P0** |
-| `npm audit` in CI / locally | Investigate `next-auth` / `@auth/core` findings; cross-check maintainer guidance |
-| Production auth metrics | Login error rate, 401 spikes on `/api/*`, middleware redirect loops, 2FA failures |
+| Signal                                                                                    | Action                                                                            |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| [next-auth GitHub releases](https://github.com/nextauthjs/next-auth/releases)             | Watch for `5.0.0` stable, new betas, security advisories                          |
+| [GitHub Security Advisories](https://github.com/nextauthjs/next-auth/security/advisories) | Treat **any** advisory affecting our pin as **P0**                                |
+| `npm audit` in CI / locally                                                               | Investigate `next-auth` / `@auth/core` findings; cross-check maintainer guidance  |
+| Production auth metrics                                                                   | Login error rate, 401 spikes on `/api/*`, middleware redirect loops, 2FA failures |
 
 ### Quarterly (lightweight)
 
@@ -108,7 +108,7 @@ Long-term, evaluate **Better Auth** or continued Auth.js support only as a **sep
 
 ## Decision log
 
-| Date | Decision |
-|------|----------|
+| Date       | Decision                                                          |
+| ---------- | ----------------------------------------------------------------- |
 | 2026-06-09 | Stay on `5.0.0-beta.31` until stable `5.0.0` or security advisory |
-| 2026-06-09 | Publish this policy; link from README deploy section |
+| 2026-06-09 | Publish this policy; link from README deploy section              |

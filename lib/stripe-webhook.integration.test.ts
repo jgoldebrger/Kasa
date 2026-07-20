@@ -225,7 +225,8 @@ describe('stripe-webhook POST (integration)', () => {
             object: {
               id: PI,
               metadata: { organizationId: orgId.toString(), familyId: familyId.toString() },
-              last_payment_error: type === 'payment_intent.payment_failed' ? { message: 'card_declined' } : undefined,
+              last_payment_error:
+                type === 'payment_intent.payment_failed' ? { message: 'card_declined' } : undefined,
             },
           },
         }),
@@ -277,7 +278,9 @@ describe('stripe-webhook POST (integration)', () => {
     )
     expect(res.status).toBe(200)
     const { Payment } = await import('./models')
-    expect((await Payment.findOne({ stripePaymentIntentId: PI }))?.disputeStatus).toBe('under_review')
+    expect((await Payment.findOne({ stripePaymentIntentId: PI }))?.disputeStatus).toBe(
+      'under_review',
+    )
   })
 
   it('returns 500 when the handler throws', async () => {
@@ -340,10 +343,7 @@ describe('stripe-webhook POST (integration)', () => {
   it('updates soft-deleted payments on charge.refunded', async () => {
     await seedPayment()
     const { Payment } = await import('./models')
-    await Payment.updateOne(
-      { stripePaymentIntentId: PI },
-      { $set: { deletedAt: new Date() } },
-    )
+    await Payment.updateOne({ stripePaymentIntentId: PI }, { $set: { deletedAt: new Date() } })
 
     const { POST } = await import('./route-logic/stripe/webhook')
     const res = await POST(
@@ -361,11 +361,7 @@ describe('stripe-webhook POST (integration)', () => {
       }),
     )
     expect(res.status).toBe(200)
-    const row = await Payment.findOne(
-      { stripePaymentIntentId: PI },
-      null,
-      { includeDeleted: true },
-    )
+    const row = await Payment.findOne({ stripePaymentIntentId: PI }, null, { includeDeleted: true })
     expect(Number(row?.refundedAmount || 0)).toBeGreaterThan(0)
     await Payment.updateOne({ stripePaymentIntentId: PI }, { $unset: { deletedAt: 1 } })
   })
@@ -373,7 +369,10 @@ describe('stripe-webhook POST (integration)', () => {
   it('handles dispute funds withdrawn and reinstated', async () => {
     await seedPayment({ disputeStatus: 'needs_response', disputedAt: new Date() })
     const { POST } = await import('./route-logic/stripe/webhook')
-    for (const type of ['charge.dispute.funds_withdrawn', 'charge.dispute.funds_reinstated'] as const) {
+    for (const type of [
+      'charge.dispute.funds_withdrawn',
+      'charge.dispute.funds_reinstated',
+    ] as const) {
       const res = await POST(
         webhookRequest({
           id: `evt_${type}_${Date.now()}`,

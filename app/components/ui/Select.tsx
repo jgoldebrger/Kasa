@@ -44,7 +44,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         >
           {label}
           {required && (
-            <span className="ml-0.5 text-red-600 dark:text-red-400" aria-hidden="true">
+            <span className="ml-0.5 text-danger" aria-hidden="true">
               *
             </span>
           )}
@@ -58,14 +58,14 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         aria-describedby={describedBy}
         required={required}
         className={`focus-ring w-full rounded-md border bg-surface px-3 py-2 text-sm text-fg transition-colors disabled:bg-app-subtle disabled:text-fg-muted ${
-          error ? 'border-red-400 focus:border-red-500 dark:border-red-500/60' : 'border-border focus:border-accent'
+          error ? 'border-danger focus:border-danger' : 'border-border focus:border-accent'
         } ${className}`}
         {...rest}
       >
         {children}
       </select>
       {error ? (
-        <p id={errorId} role="alert" className="text-xs text-red-600 dark:text-red-400">
+        <p id={errorId} role="alert" className="text-xs text-danger">
           {error}
         </p>
       ) : hint ? (

@@ -13,8 +13,7 @@ const CounterSchema = new Schema(
   },
   { versionKey: false },
 )
-export const Counter =
-  mongoose.models.Counter || mongoose.model('Counter', CounterSchema)
+export const Counter = mongoose.models.Counter || mongoose.model('Counter', CounterSchema)
 
 /**
  * Atomically obtain the next sequence value for `scope`. Two concurrent

@@ -9,10 +9,7 @@ import { Types } from 'mongoose'
 import { Organization, Payment } from '@/lib/models'
 import { generateTaxReceiptPDF } from '@/lib/email-utils'
 import { streamZip, type ZipEntryInput } from '@/lib/zip'
-import {
-  membershipDuesYearFilter,
-  netMembershipPaymentAmount,
-} from '@/lib/tax-receipts/queries'
+import { membershipDuesYearFilter, netMembershipPaymentAmount } from '@/lib/tax-receipts/queries'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { loadAllByIdCursor, familyBatches } from '@/lib/org-pagination'
 import { handler } from '@/lib/api/handler'
@@ -43,7 +40,9 @@ export const GET = handler({
 
     const orgId = new Types.ObjectId(String(ctx!.organizationId))
 
-    const org = await Organization.findById(orgId).select('name letterhead currency locale').lean<any>()
+    const org = await Organization.findById(orgId)
+      .select('name letterhead currency locale')
+      .lean<any>()
     if (!org) {
       return { status: 404, data: { error: 'Organization not found' } }
     }

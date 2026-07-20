@@ -56,8 +56,6 @@ describe('import-csv parsers', () => {
     expect(xlsxCellToString(new Date('2021-03-02T12:00:00Z'))).toBe('2021-03-02')
     expect(xlsxCellToString({ text: 'hello' })).toBe('hello')
     expect(xlsxCellToString({ result: 42 })).toBe('42')
-    expect(
-      xlsxCellToString({ richText: [{ text: 'a' }, { text: 'b' }] }),
-    ).toBe('ab')
+    expect(xlsxCellToString({ richText: [{ text: 'a' }, { text: 'b' }] })).toBe('ab')
   })
 })

@@ -55,13 +55,7 @@ describe('import-templates', () => {
       { key: 'count', type: 'number' as const },
       { key: 'hebrew', rtl: true },
     ]
-    const columns: { numFmt?: string; alignment?: Record<string, unknown> }[] = [
-      {},
-      {},
-      {},
-      {},
-      {},
-    ]
+    const columns: { numFmt?: string; alignment?: Record<string, unknown> }[] = [{}, {}, {}, {}, {}]
     const ws = {
       columns: [] as { header?: string; key?: string; width?: number }[],
       getColumn: (i: number) => columns[i - 1]!,

@@ -53,3 +53,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# generated SBOM (uploaded as CI artifact)
+sbom.cdx.json

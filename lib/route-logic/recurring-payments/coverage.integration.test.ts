@@ -249,8 +249,8 @@ describe.sequential('recurring-payments process coverage', () => {
     const rateLimit = await import('@/lib/rate-limit')
     const spy = vi.spyOn(rateLimit, 'checkRateLimit').mockResolvedValueOnce({
       allowed: false,
-        remaining: 0,
-        resetAt: 0,
+      remaining: 0,
+      resetAt: 0,
     })
     const limited = await GET(orgJsonReq('/api/recurring-payments/process', 'GET'))
     expect(limited.status).toBe(429)
@@ -280,8 +280,8 @@ describe.sequential('recurring-payments process coverage', () => {
     const rateLimit = await import('@/lib/rate-limit')
     const spy = vi.spyOn(rateLimit, 'checkRateLimit').mockResolvedValueOnce({
       allowed: false,
-        remaining: 0,
-        resetAt: 0,
+      remaining: 0,
+      resetAt: 0,
     })
     const { POST } = await import('@/lib/route-logic/recurring-payments/process')
     const res = await POST(orgJsonReq('/api/recurring-payments/process', 'POST', {}))

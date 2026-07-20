@@ -34,9 +34,7 @@ describe('StatementsView smoke', () => {
   it('renders without crashing', () => {
     const { container } = render(
       <ToastProvider>
-        <StatementsView
-          initialStatements={[stubStatement]}
-        />
+        <StatementsView initialStatements={[stubStatement]} />
       </ToastProvider>,
     )
     expect(container).toBeDefined()

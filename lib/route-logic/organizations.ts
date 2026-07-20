@@ -117,11 +117,12 @@ export const POST = handler({
 
     const name = body.name
 
-    const baseSlug = name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 30) || 'org'
+    const baseSlug =
+      name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 30) || 'org'
 
     let slug = baseSlug
     let suffix = 0

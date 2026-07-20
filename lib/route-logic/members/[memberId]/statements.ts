@@ -37,8 +37,7 @@ export const GET = handler({
     }
 
     const statements = await collectCompoundCursorPages(
-      (filter, limit) =>
-        Statement.find(filter).sort({ date: -1, _id: -1 }).limit(limit).lean(),
+      (filter, limit) => Statement.find(filter).sort({ date: -1, _id: -1 }).limit(limit).lean(),
       { memberId, organizationId: ctx!.organizationId },
       'date',
       -1,
@@ -74,12 +73,19 @@ export const POST = handler({
 
     const { calculateMemberBalance } = await import('@/lib/calculations')
 
-    const member = await FamilyMember.findOne({ _id: memberId, organizationId: ctx!.organizationId })
+    const member = await FamilyMember.findOne({
+      _id: memberId,
+      organizationId: ctx!.organizationId,
+    })
     if (!member) {
       return { status: 404, data: { error: 'Member not found' } }
     }
 
-    const openingBalanceData = await calculateMemberBalance(memberId, ctx!.organizationId, new Date(from.getTime() - 1))
+    const openingBalanceData = await calculateMemberBalance(
+      memberId,
+      ctx!.organizationId,
+      new Date(from.getTime() - 1),
+    )
     const openingBalance = openingBalanceData.balance
 
     const payments = await loadAllByIdCursor<any>(
@@ -138,13 +144,11 @@ export const POST = handler({
       return { data: refreshed ?? existing }
     }
 
-    const seq = await nextCounter(
-      `stmt-mem:${ctx!.organizationId}:${memberId}`,
-      async () =>
-        Statement.countDocuments({
-          memberId,
-          organizationId: ctx!.organizationId,
-        }),
+    const seq = await nextCounter(`stmt-mem:${ctx!.organizationId}:${memberId}`, async () =>
+      Statement.countDocuments({
+        memberId,
+        organizationId: ctx!.organizationId,
+      }),
     )
     const statementNumber = `STMT-MEM-${memberId.slice(-6)}-${seq}`
 

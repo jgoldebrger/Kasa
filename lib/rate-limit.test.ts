@@ -73,7 +73,9 @@ describe('checkRateLimit (mongo-backed)', () => {
   it('fails open when upsert returns no document', async () => {
     await getCheck()
     const mongoose = (await import('mongoose')).default
-    const RateLimit = mongoose.models.RateLimit as unknown as { findOneAndUpdate: ReturnType<typeof vi.fn> }
+    const RateLimit = mongoose.models.RateLimit as unknown as {
+      findOneAndUpdate: ReturnType<typeof vi.fn>
+    }
     const lean = vi.fn().mockResolvedValue(null)
     const spy = vi.spyOn(RateLimit, 'findOneAndUpdate').mockReturnValue({ lean } as never)
 

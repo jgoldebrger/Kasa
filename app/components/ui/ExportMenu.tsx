@@ -6,11 +6,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import {
-  ArrowDownTrayIcon,
-  DocumentTextIcon,
-  TableCellsIcon,
-} from '@heroicons/react/24/outline'
+import { ArrowDownTrayIcon, DocumentTextIcon, TableCellsIcon } from '@heroicons/react/24/outline'
 
 interface Props {
   onExportCsv: () => void

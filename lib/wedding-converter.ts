@@ -56,112 +56,115 @@ export async function convertMembersOnWeddingDate(organizationId: string) {
     }
 
     for await (const membersToConvert of familyMemberBatches(organizationId, memberFilter)) {
-    for (const member of membersToConvert) {
-      let createdFamilyId: string | null = null
-      try {
-        // Claim the member atomically before doing any side-effecting
-        // work below. Without this, a transient failure in the delete
-        // step would leave the member with `convertedToFamily: false`
-        // while a NEW family had already been created — re-running the
-        // cron would create a duplicate family for the same wedding.
-        const claim = await FamilyMember.findOneAndUpdate(
-          { _id: member._id, organizationId, convertedToFamily: { $ne: true } },
-          { $set: { convertedToFamily: true } },
-          { new: false },
-        )
-        if (!claim) {
-          continue
-        }
+      for (const member of membersToConvert) {
+        let createdFamilyId: string | null = null
+        try {
+          // Claim the member atomically before doing any side-effecting
+          // work below. Without this, a transient failure in the delete
+          // step would leave the member with `convertedToFamily: false`
+          // while a NEW family had already been created — re-running the
+          // cron would create a duplicate family for the same wedding.
+          const claim = await FamilyMember.findOneAndUpdate(
+            { _id: member._id, organizationId, convertedToFamily: { $ne: true } },
+            { $set: { convertedToFamily: true } },
+            { new: false },
+          )
+          if (!claim) {
+            continue
+          }
 
-        const originalFamily = await Family.findOne({ _id: member.familyId, organizationId })
-        if (!originalFamily) {
-          console.error(`Original family not found for member ${member._id}`)
-          await releaseClaim(String(member._id))
-          continue
-        }
+          const originalFamily = await Family.findOne({ _id: member.familyId, organizationId })
+          if (!originalFamily) {
+            console.error(`Original family not found for member ${member._id}`)
+            await releaseClaim(String(member._id))
+            continue
+          }
 
-        const weddingDate = claim.weddingDate
-        if (!weddingDate) {
-          await releaseClaim(String(member._id))
-          continue
-        }
+          const weddingDate = claim.weddingDate
+          if (!weddingDate) {
+            await releaseClaim(String(member._id))
+            continue
+          }
 
-        const spouseFirstName = claim.spouseFirstName || ''
-        const spouseLastName = claim.spouseLastName || claim.lastName
-        const newFamilyName = spouseFirstName
-          ? `${member.firstName} ${member.lastName} & ${spouseFirstName} ${spouseLastName}`.trim()
-          : `${member.firstName} ${member.lastName} Family`
+          const spouseFirstName = claim.spouseFirstName || ''
+          const spouseLastName = claim.spouseLastName || claim.lastName
+          const newFamilyName = spouseFirstName
+            ? `${member.firstName} ${member.lastName} & ${spouseFirstName} ${spouseLastName}`.trim()
+            : `${member.firstName} ${member.lastName} Family`
 
-        const fatherHebrewName = member.gender === 'male'
-          ? originalFamily.husbandHebrewName || null
-          : originalFamily.wifeHebrewName || null
+          const fatherHebrewName =
+            member.gender === 'male'
+              ? originalFamily.husbandHebrewName || null
+              : originalFamily.wifeHebrewName || null
 
-        const newFamily = await Family.create({
-          name: newFamilyName,
-          weddingDate,
-          address: member.address || originalFamily.address,
-          street: member.address || originalFamily.street || originalFamily.address,
-          phone: member.phone || originalFamily.phone,
-          email: member.email || originalFamily.email,
-          city: member.city || originalFamily.city,
-          state: member.state || originalFamily.state,
-          zip: member.zip || originalFamily.zip,
-          ...(member.gender === 'male'
-            ? {
-                husbandFirstName: member.firstName,
-                husbandHebrewName: member.hebrewFirstName || null,
-                husbandFatherHebrewName: fatherHebrewName,
-                husbandCellPhone: member.phone || null,
-                wifeFirstName: spouseFirstName || null,
-                wifeHebrewName: member.spouseHebrewName || null,
-                wifeFatherHebrewName: member.spouseFatherHebrewName || null,
-                wifeCellPhone: member.spouseCellPhone || null,
-              }
-            : {
-                husbandFirstName: spouseFirstName || null,
-                husbandHebrewName: member.spouseHebrewName || null,
-                husbandFatherHebrewName: member.spouseFatherHebrewName || null,
-                husbandCellPhone: member.spouseCellPhone || null,
-                wifeFirstName: member.firstName,
-                wifeHebrewName: member.hebrewFirstName || null,
-                wifeFatherHebrewName: fatherHebrewName,
-                wifeCellPhone: member.phone || null,
-              }),
-          currentPlan: defaultPlanNumber ?? undefined,
-          paymentPlanId: defaultPlanId || undefined,
-          currentPayment: 0,
-          openBalance: 0,
-          parentFamilyId: originalFamily._id,
-          organizationId,
-        })
-        createdFamilyId = String(newFamily._id)
-
-        if (spouseFirstName) {
-          await FamilyMember.create({
-            familyId: newFamily._id,
-            firstName: spouseFirstName,
-            lastName: spouseLastName,
-            hebrewFirstName: member.spouseHebrewName || null,
-            birthDate: weddingDate,
-            gender: member.gender === 'male' ? 'female' : 'male',
+          const newFamily = await Family.create({
+            name: newFamilyName,
+            weddingDate,
+            address: member.address || originalFamily.address,
+            street: member.address || originalFamily.street || originalFamily.address,
+            phone: member.phone || originalFamily.phone,
+            email: member.email || originalFamily.email,
+            city: member.city || originalFamily.city,
+            state: member.state || originalFamily.state,
+            zip: member.zip || originalFamily.zip,
+            ...(member.gender === 'male'
+              ? {
+                  husbandFirstName: member.firstName,
+                  husbandHebrewName: member.hebrewFirstName || null,
+                  husbandFatherHebrewName: fatherHebrewName,
+                  husbandCellPhone: member.phone || null,
+                  wifeFirstName: spouseFirstName || null,
+                  wifeHebrewName: member.spouseHebrewName || null,
+                  wifeFatherHebrewName: member.spouseFatherHebrewName || null,
+                  wifeCellPhone: member.spouseCellPhone || null,
+                }
+              : {
+                  husbandFirstName: spouseFirstName || null,
+                  husbandHebrewName: member.spouseHebrewName || null,
+                  husbandFatherHebrewName: member.spouseFatherHebrewName || null,
+                  husbandCellPhone: member.spouseCellPhone || null,
+                  wifeFirstName: member.firstName,
+                  wifeHebrewName: member.hebrewFirstName || null,
+                  wifeFatherHebrewName: fatherHebrewName,
+                  wifeCellPhone: member.phone || null,
+                }),
+            currentPlan: defaultPlanNumber ?? undefined,
+            paymentPlanId: defaultPlanId || undefined,
+            currentPayment: 0,
+            openBalance: 0,
+            parentFamilyId: originalFamily._id,
             organizationId,
           })
-        }
+          createdFamilyId = String(newFamily._id)
 
-        // Remove the original member row — they now own the new family.
-        // `convertedToFamily: true` was already persisted via the atomic
-        // claim above, so a failure here only leaves a harmless tombstone.
-        await FamilyMember.deleteOne({ _id: member._id, organizationId })
+          if (spouseFirstName) {
+            await FamilyMember.create({
+              familyId: newFamily._id,
+              firstName: spouseFirstName,
+              lastName: spouseLastName,
+              hebrewFirstName: member.spouseHebrewName || null,
+              birthDate: weddingDate,
+              gender: member.gender === 'male' ? 'female' : 'male',
+              organizationId,
+            })
+          }
 
-        converted += 1
-        console.log(`Successfully converted ${member.firstName} ${member.lastName} to new family: ${newFamily.name}`)
-      } catch (error: any) {
-        console.error(`Error converting member ${member._id} to family:`, error)
-        if (!createdFamilyId) {
-          await releaseClaim(String(member._id)).catch(() => {})
+          // Remove the original member row — they now own the new family.
+          // `convertedToFamily: true` was already persisted via the atomic
+          // claim above, so a failure here only leaves a harmless tombstone.
+          await FamilyMember.deleteOne({ _id: member._id, organizationId })
+
+          converted += 1
+          console.log(
+            `Successfully converted ${member.firstName} ${member.lastName} to new family: ${newFamily.name}`,
+          )
+        } catch (error: any) {
+          console.error(`Error converting member ${member._id} to family:`, error)
+          if (!createdFamilyId) {
+            await releaseClaim(String(member._id)).catch(() => {})
+          }
         }
       }
-    }
     }
 
     return { converted }

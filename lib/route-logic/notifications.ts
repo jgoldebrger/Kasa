@@ -96,22 +96,18 @@ export const GET = handler({
       .lean<any[]>()
 
     const items = rows.map((r) => ({
-        _id: r._id.toString(),
-        kind: r.kind,
-        title: r.title,
-        body: r.body || '',
-        link: r.link || '',
-        orgWide: !r.userId,
-        read: isReadForUser(r, userId),
-        createdAt: r.createdAt,
-        metadata: r.metadata || {},
-      }))
+      _id: r._id.toString(),
+      kind: r.kind,
+      title: r.title,
+      body: r.body || '',
+      link: r.link || '',
+      orgWide: !r.userId,
+      read: isReadForUser(r, userId),
+      createdAt: r.createdAt,
+      metadata: r.metadata || {},
+    }))
 
-    const unreadCount = await countUnreadNotifications(
-      ctx!.organizationId,
-      userId,
-      isAdmin,
-    )
+    const unreadCount = await countUnreadNotifications(ctx!.organizationId, userId, isAdmin)
     return { data: { items, unreadCount } }
   },
 })

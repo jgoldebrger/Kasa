@@ -12,10 +12,13 @@ import {
 const mockAuth = vi.hoisted(() => vi.fn())
 const mockCookieGet = vi.hoisted(() => vi.fn())
 const familyName = vi.hoisted(() => `NsXlsx ${Date.now()}`)
-const rows = vi.hoisted(() => [
-  ['name', 'weddingDate'],
-  [familyName, '2019-03-01'],
-] as string[][])
+const rows = vi.hoisted(
+  () =>
+    [
+      ['name', 'weddingDate'],
+      [familyName, '2019-03-01'],
+    ] as string[][],
+)
 
 vi.mock('@/app/auth', () => ({ auth: mockAuth }))
 vi.mock('next/headers', () => ({

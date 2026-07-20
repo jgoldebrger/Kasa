@@ -35,7 +35,8 @@ describe('exportToCsv (browser)', () => {
       [{ name: 'Alice', note: 'line1\nline2' }],
     )
 
-    const anchor = vi.mocked(document.createElement).mock.results[0]?.value as unknown as unknown as HTMLAnchorElement
+    const anchor = vi.mocked(document.createElement).mock.results[0]
+      ?.value as unknown as unknown as HTMLAnchorElement
     expect(document.createElement).toHaveBeenCalledWith('a')
     expect(anchor.download).toBe('families.csv')
     expect(click).toHaveBeenCalled()
@@ -74,7 +75,8 @@ describe('exportToXlsx (browser)', () => {
       [{ name: 'Alice', when: new Date('2024-01-15'), amount: 42 }],
     )
 
-    const anchor = vi.mocked(document.createElement).mock.results[0]?.value as unknown as unknown as HTMLAnchorElement
+    const anchor = vi.mocked(document.createElement).mock.results[0]
+      ?.value as unknown as unknown as HTMLAnchorElement
     expect(document.createElement).toHaveBeenCalledWith('a')
     expect(anchor.download).toBe('report.xlsx')
     expect(click).toHaveBeenCalled()
@@ -82,7 +84,8 @@ describe('exportToXlsx (browser)', () => {
 
   it('keeps extension when filename already ends with .xlsx', async () => {
     await exportToXlsx('data.xlsx', [{ id: 'x', label: 'X', value: () => 'a' }], [])
-    const anchor = vi.mocked(document.createElement).mock.results[0]?.value as unknown as unknown as HTMLAnchorElement
+    const anchor = vi.mocked(document.createElement).mock.results[0]
+      ?.value as unknown as unknown as HTMLAnchorElement
     expect(anchor.download).toBe('data.xlsx')
   })
 
@@ -126,7 +129,9 @@ describe('exportToXlsx (browser)', () => {
 
 describe('export helpers', () => {
   it('reactNodeToText flattens nested nodes and handles primitives', () => {
-    expect(reactNodeToText(['a', { props: { children: 'b' } }] as import('react').ReactNode)).toBe('ab')
+    expect(reactNodeToText(['a', { props: { children: 'b' } }] as import('react').ReactNode)).toBe(
+      'ab',
+    )
     expect(reactNodeToText(null)).toBe('')
     expect(reactNodeToText(false)).toBe('')
     expect(reactNodeToText(42)).toBe('42')

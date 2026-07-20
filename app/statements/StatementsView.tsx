@@ -85,7 +85,7 @@ const buildStatementTxColumns = (formatMoney: (v: number) => string): DataColumn
             ? 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300'
             : t.type === 'withdrawal' || t.type === 'cycle-charge'
               ? 'bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-300'
-              : 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300'
+              : 'bg-danger/10 text-danger'
         }`}
       >
         {t.type === 'payment'
@@ -112,11 +112,7 @@ const buildStatementTxColumns = (formatMoney: (v: number) => string): DataColumn
     headerText: 'Amount',
     align: 'right',
     cell: (t) => (
-      <span
-        className={`font-medium tabular ${
-          t.amount >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'
-        }`}
-      >
+      <span className={`font-medium tabular ${t.amount >= 0 ? 'text-success' : 'text-danger'}`}>
         {formatMoney(t.amount)}
       </span>
     ),
@@ -977,7 +973,7 @@ export default function StatementsView({ initialStatements }: StatementsViewProp
                           </div>
                           <div>
                             <span className="text-fg-muted">Expenses: </span>
-                            <span className="font-medium text-red-700">
+                            <span className="font-medium text-danger">
                               {formatMoney(statement.expenses)}
                             </span>
                           </div>
@@ -1000,9 +996,7 @@ export default function StatementsView({ initialStatements }: StatementsViewProp
                                     <div className="text-fg">{t.description}</div>
                                     <div
                                       className={`font-medium tabular ${
-                                        t.amount >= 0
-                                          ? 'text-green-700 dark:text-green-400'
-                                          : 'text-red-700 dark:text-red-400'
+                                        t.amount >= 0 ? 'text-success' : 'text-danger'
                                       }`}
                                     >
                                       {formatMoney(t.amount)}

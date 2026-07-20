@@ -19,9 +19,7 @@ describe('CookieNotice', () => {
 
   it('renders when consent has not been given', async () => {
     render(<CookieNotice />)
-    expect(
-      await screen.findByRole('dialog', { name: /cookies & privacy/i }),
-    ).toBeDefined()
+    expect(await screen.findByRole('dialog', { name: /cookies & privacy/i })).toBeDefined()
     expect(screen.getByText(/kasa_active_org/i)).toBeDefined()
   })
 

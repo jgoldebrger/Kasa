@@ -90,12 +90,7 @@ export async function exportToXlsx<T>(
     let max = String(col.header || '').length
     col.eachCell?.({ includeEmpty: false }, (cell) => {
       const v = cell.value
-      const len =
-        v instanceof Date
-          ? 18
-          : v === null || v === undefined
-          ? 0
-          : String(v).length
+      const len = v instanceof Date ? 18 : v === null || v === undefined ? 0 : String(v).length
       if (len > max) max = len
     })
     col.width = Math.min(Math.max(max + 2, 10), 60)

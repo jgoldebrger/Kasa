@@ -25,9 +25,7 @@ export default function ReportsBuilderError({
             ? error.message
             : 'Something went wrong building this report. Try tweaking the filters or refreshing.'}
         </p>
-        {error?.digest && (
-          <p className="mt-1 text-xs text-fg-subtle">Ref: {error.digest}</p>
-        )}
+        {error?.digest && <p className="mt-1 text-xs text-fg-subtle">Ref: {error.digest}</p>}
         <div className="mt-5 flex justify-center gap-2">
           <button
             type="button"

@@ -17,7 +17,10 @@ export function parseEventsListResponse(data: unknown): EventsListPage {
   return { items: [], nextCursor: null }
 }
 
-export function eventsListUrl(cursor: string | null | undefined, limit = EVENTS_LIST_PAGE_SIZE): string {
+export function eventsListUrl(
+  cursor: string | null | undefined,
+  limit = EVENTS_LIST_PAGE_SIZE,
+): string {
   const params = new URLSearchParams({ limit: String(limit) })
   if (cursor) params.set('cursor', cursor)
   return `/api/events?${params.toString()}`

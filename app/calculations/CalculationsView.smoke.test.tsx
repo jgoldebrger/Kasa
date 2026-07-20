@@ -37,16 +37,12 @@ const stubCalculation = {
 
 describe('CalculationsView smoke', () => {
   it('renders without crashing', () => {
-    const { container } = render(
-      <CalculationsView initialCalculations={[stubCalculation]} />,
-    )
+    const { container } = render(<CalculationsView initialCalculations={[stubCalculation]} />)
     expect(container).toBeDefined()
   })
 
   it('renders the how-is-this-calculated help panel', () => {
-    const { getByText } = render(
-      <CalculationsView initialCalculations={[stubCalculation]} />,
-    )
+    const { getByText } = render(<CalculationsView initialCalculations={[stubCalculation]} />)
     expect(getByText('How is this calculated?')).toBeDefined()
   })
 })

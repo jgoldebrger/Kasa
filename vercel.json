@@ -10,8 +10,7 @@
   "git": {
     "deploymentEnabled": {
       "main": true,
-      "dependabot/*": false,
-      "*": false
+      "dependabot/**": false
     }
   },
   "env": {

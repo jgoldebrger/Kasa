@@ -19,7 +19,13 @@ export interface TooltipProps {
  * at the tooltip text, which is rendered as a visually-positioned element
  * with role="tooltip". Shows on hover + focus, hides on mouse-leave + blur.
  */
-export function Tooltip({ children, content, side = 'top', delayMs = 200, className = '' }: TooltipProps) {
+export function Tooltip({
+  children,
+  content,
+  side = 'top',
+  delayMs = 200,
+  className = '',
+}: TooltipProps) {
   const id = useId()
   const [open, setOpen] = useState(false)
   const timer = useRef<NodeJS.Timeout | null>(null)
@@ -34,18 +40,21 @@ export function Tooltip({ children, content, side = 'top', delayMs = 200, classN
     setOpen(false)
   }
 
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current)
-  }, [])
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current)
+    },
+    [],
+  )
 
   const posClass =
     side === 'top'
       ? 'bottom-full left-1/2 -translate-x-1/2 mb-2'
       : side === 'bottom'
-      ? 'top-full left-1/2 -translate-x-1/2 mt-2'
-      : side === 'left'
-      ? 'right-full top-1/2 -translate-y-1/2 mr-2'
-      : 'left-full top-1/2 -translate-y-1/2 ml-2'
+        ? 'top-full left-1/2 -translate-x-1/2 mt-2'
+        : side === 'left'
+          ? 'right-full top-1/2 -translate-y-1/2 mr-2'
+          : 'left-full top-1/2 -translate-y-1/2 ml-2'
 
   return (
     <span

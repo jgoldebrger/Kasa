@@ -36,11 +36,7 @@ function bindSession(c: ApiTestContext, role: 'owner' | 'admin' | 'member' = 'ow
   )
 }
 
-function cronJsonReq(
-  path: string,
-  method: string,
-  opts?: { query?: string },
-): NextRequest {
+function cronJsonReq(path: string, method: string, opts?: { query?: string }): NextRequest {
   const secret = process.env.CRON_SECRET || 'test-cron-secret'
   const headers: Record<string, string> = {
     host: 'localhost:3000',
@@ -57,8 +53,8 @@ async function withRateLimitBlocked<T>(fn: () => Promise<T>): Promise<T> {
   const rateLimit = await import('@/lib/rate-limit')
   const spy = vi.spyOn(rateLimit, 'checkRateLimit').mockResolvedValue({
     allowed: false,
-        remaining: 0,
-        resetAt: 0,
+    remaining: 0,
+    resetAt: 0,
   })
   try {
     return await fn()
@@ -224,8 +220,7 @@ describe.sequential('jobs route-logic branch coverage', () => {
       }
 
       const prev = process.env.NODE_ENV
-      setNodeEnv('development'
-)
+      setNodeEnv('development')
       const { FamilyMember } = await import('@/lib/models')
       const distinctSpy = vi
         .spyOn(FamilyMember, 'distinct')
@@ -237,8 +232,7 @@ describe.sequential('jobs route-logic branch coverage', () => {
         expect(body.details).toBe('distinct boom')
       } finally {
         distinctSpy.mockRestore()
-        setNodeEnv(prev
-)
+        setNodeEnv(prev)
       }
 
       vi.stubEnv('NODE_ENV', 'production')
@@ -303,18 +297,18 @@ describe.sequential('jobs route-logic branch coverage', () => {
     it('returns 429, lock skip, and GET alias', async () => {
       const { POST, GET } = await import('@/lib/route-logic/jobs/generate-monthly-statements')
       await withRateLimitBlocked(async () => {
-        expect((await POST(cronJsonReq('/api/jobs/generate-monthly-statements', 'POST'))).status).toBe(
-          429,
-        )
+        expect(
+          (await POST(cronJsonReq('/api/jobs/generate-monthly-statements', 'POST'))).status,
+        ).toBe(429)
       })
 
       const lockKey = await seedJobLock('generate-monthly-statements')
       try {
         const skipped = await POST(cronJsonReq('/api/jobs/generate-monthly-statements', 'POST'))
         expect((await skipped.json()).skipped).toBe(true)
-        expect((await GET(cronJsonReq('/api/jobs/generate-monthly-statements', 'GET'))).status).toBe(
-          200,
-        )
+        expect(
+          (await GET(cronJsonReq('/api/jobs/generate-monthly-statements', 'GET'))).status,
+        ).toBe(200)
       } finally {
         await clearJobLock('generate-monthly-statements', lockKey)
       }
@@ -322,7 +316,7 @@ describe.sequential('jobs route-logic branch coverage', () => {
 
     it('skips schedule-mismatched orgs, processes matching orgs, and accepts cursor batches', async () => {
       const { Organization, JobLock } = await import('@/lib/models')
-      const wrongDay = ((new Date().getUTCDate() % 28) + 1) || 1
+      const wrongDay = (new Date().getUTCDate() % 28) + 1 || 1
       const matchDay = new Date().getUTCDate()
       await Organization.updateOne(
         { _id: ctx.orgId },
@@ -337,7 +331,17 @@ describe.sequential('jobs route-logic branch coverage', () => {
       )
       await JobLock.deleteMany({ jobName: 'generate-monthly-statements' })
       const scheduler = await import('@/lib/scheduler')
-      const genSpy = vi.spyOn(scheduler, 'generateMonthlyStatements').mockResolvedValue({ success: true, month: 1, year: 2024, generated: 0, failed: 0, statements: [], errors: [], hasMore: false, familyCursorOut: null })
+      const genSpy = vi.spyOn(scheduler, 'generateMonthlyStatements').mockResolvedValue({
+        success: true,
+        month: 1,
+        year: 2024,
+        generated: 0,
+        failed: 0,
+        statements: [],
+        errors: [],
+        hasMore: false,
+        familyCursorOut: null,
+      })
       try {
         const { POST } = await import('@/lib/route-logic/jobs/generate-monthly-statements')
         const mismatch = await POST(cronJsonReq('/api/jobs/generate-monthly-statements', 'POST'))
@@ -486,7 +490,10 @@ describe.sequential('jobs route-logic branch coverage', () => {
 
       const { JobLock } = await import('@/lib/models')
       await JobLock.deleteMany({ jobName: 'process-recurring-payments' })
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => '' }))
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => '' }),
+      )
       const jobs = await import('@/lib/jobs')
       const spy = vi.spyOn(jobs, 'runChunked').mockImplementationOnce(async (opts) => {
         await opts.perOrg(ctx.orgId)
@@ -572,7 +579,10 @@ describe.sequential('jobs route-logic branch coverage', () => {
         await JobLock.deleteMany({ jobName: 'process-recurring-payments' })
       }
 
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => '' }))
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => '' }),
+      )
       const doneSpy = vi.spyOn(jobs, 'runChunked').mockResolvedValueOnce({
         hasMore: false,
         cursorOut: null,
@@ -610,13 +620,15 @@ describe.sequential('jobs route-logic branch coverage', () => {
       try {
         const skipped = await POST(cronJsonReq('/api/jobs/send-monthly-statements', 'POST'))
         expect((await skipped.json()).skipped).toBe(true)
-        expect((await GET(cronJsonReq('/api/jobs/send-monthly-statements', 'GET'))).status).toBe(200)
+        expect((await GET(cronJsonReq('/api/jobs/send-monthly-statements', 'GET'))).status).toBe(
+          200,
+        )
       } finally {
         await clearJobLock('send-monthly-statements', lockKey)
       }
 
       const { Organization } = await import('@/lib/models')
-      const wrongDay = ((new Date().getUTCDate() % 28) + 1) || 1
+      const wrongDay = (new Date().getUTCDate() % 28) + 1 || 1
       await Organization.updateOne(
         { _id: ctx.orgId },
         {
@@ -649,7 +661,10 @@ describe.sequential('jobs route-logic branch coverage', () => {
       } finally {
         spy.mockRestore()
         vi.unstubAllGlobals()
-        await Organization.updateOne({ _id: ctx.orgId }, { $unset: { monthlyStatementAutoEmail: 1 } })
+        await Organization.updateOne(
+          { _id: ctx.orgId },
+          { $unset: { monthlyStatementAutoEmail: 1 } },
+        )
       }
     })
 
@@ -697,7 +712,10 @@ describe.sequential('jobs route-logic branch coverage', () => {
       } finally {
         spy.mockRestore()
         vi.unstubAllGlobals()
-        await Organization.updateOne({ _id: ctx.orgId }, { $unset: { monthlyStatementAutoEmail: 1 } })
+        await Organization.updateOne(
+          { _id: ctx.orgId },
+          { $unset: { monthlyStatementAutoEmail: 1 } },
+        )
       }
 
       vi.stubGlobal(

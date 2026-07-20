@@ -52,7 +52,10 @@ export function listSupportedCurrencies(): SupportedCurrency[] {
  * client; never throws — falls back to a plain `$N` style string if
  * Intl can't find the requested currency/locale combination.
  */
-export function formatMoney(value: number | null | undefined, opts: MoneyFormatOptions = {}): string {
+export function formatMoney(
+  value: number | null | undefined,
+  opts: MoneyFormatOptions = {},
+): string {
   // Guard with Number.isFinite so we don't silently render `NaN` /
   // `Infinity` (and so a bogus string like '12abc' doesn't become 0).
   // We collapse all non-finite inputs to 0 deliberately — that matches

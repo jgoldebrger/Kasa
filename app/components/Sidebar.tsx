@@ -19,6 +19,7 @@ import {
 } from '@/lib/client/support-mode'
 import LegalFooterLinks from './legal/LegalFooterLinks'
 import { Badge } from '@/app/components/ui'
+import type { MessageKey } from '@/lib/i18n/load-locale'
 import {
   UserGroupIcon,
   CalculatorIcon,
@@ -71,32 +72,89 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
     void fetchSupportModeStatus().then(setSupportMode)
   }, [user?.isPlatformAdmin])
 
-  const navItems = [
-    { href: '/', label: t('nav.dashboard'), icon: ChartBarIcon },
-    { href: '/families', label: t('nav.families'), icon: UserGroupIcon },
-    { href: '/payments', label: t('nav.payments'), icon: CurrencyDollarIcon, adminOnly: true },
-    { href: '/collections', label: t('nav.collections'), icon: BanknotesIcon, adminOnly: true },
-    { href: '/tasks', label: t('nav.tasks'), icon: ClipboardDocumentListIcon, adminOnly: true },
-    { href: '/calendar', label: t('nav.calendar'), icon: CalendarDaysIcon, adminOnly: true },
-    { href: '/calculations', label: t('nav.calculations'), icon: CalculatorIcon, adminOnly: true },
-    { href: '/events', label: t('nav.events'), icon: CalendarIcon, adminOnly: true },
+  const navSections: {
+    id: string
+    labelKey?: MessageKey
+    items: { href: string; label: string; icon: typeof ChartBarIcon; adminOnly?: boolean }[]
+  }[] = [
     {
-      href: '/communications',
-      label: t('nav.communications'),
-      icon: EnvelopeOpenIcon,
-      adminOnly: true,
+      id: 'overview',
+      items: [{ href: '/', label: t('nav.dashboard'), icon: ChartBarIcon }],
     },
     {
-      href: '/projections',
-      label: t('nav.projections'),
-      icon: ChartBarSquareIcon,
-      adminOnly: true,
+      id: 'people',
+      labelKey: 'nav.section.people',
+      items: [
+        { href: '/families', label: t('nav.families'), icon: UserGroupIcon },
+        { href: '/events', label: t('nav.events'), icon: CalendarIcon, adminOnly: true },
+        { href: '/calendar', label: t('nav.calendar'), icon: CalendarDaysIcon, adminOnly: true },
+        { href: '/tasks', label: t('nav.tasks'), icon: ClipboardDocumentListIcon, adminOnly: true },
+      ],
     },
-    { href: '/reports', label: t('nav.reports'), icon: PresentationChartBarIcon, adminOnly: true },
-    { href: '/statements', label: t('nav.statements'), icon: DocumentTextIcon, adminOnly: true },
-    { href: '/help', label: t('nav.help'), icon: QuestionMarkCircleIcon },
-    { href: '/settings', label: t('nav.settings'), icon: CogIcon, adminOnly: true },
-  ].filter((item) => !('adminOnly' in item && item.adminOnly) || isAdmin)
+    {
+      id: 'money',
+      labelKey: 'nav.section.money',
+      items: [
+        { href: '/payments', label: t('nav.payments'), icon: CurrencyDollarIcon, adminOnly: true },
+        { href: '/collections', label: t('nav.collections'), icon: BanknotesIcon, adminOnly: true },
+        {
+          href: '/calculations',
+          label: t('nav.calculations'),
+          icon: CalculatorIcon,
+          adminOnly: true,
+        },
+        {
+          href: '/projections',
+          label: t('nav.projections'),
+          icon: ChartBarSquareIcon,
+          adminOnly: true,
+        },
+        {
+          href: '/statements',
+          label: t('nav.statements'),
+          icon: DocumentTextIcon,
+          adminOnly: true,
+        },
+      ],
+    },
+    {
+      id: 'comms',
+      labelKey: 'nav.section.comms',
+      items: [
+        {
+          href: '/communications',
+          label: t('nav.communications'),
+          icon: EnvelopeOpenIcon,
+          adminOnly: true,
+        },
+      ],
+    },
+    {
+      id: 'insights',
+      labelKey: 'nav.section.insights',
+      items: [
+        {
+          href: '/reports',
+          label: t('nav.reports'),
+          icon: PresentationChartBarIcon,
+          adminOnly: true,
+        },
+      ],
+    },
+    {
+      id: 'system',
+      labelKey: 'nav.section.system',
+      items: [
+        { href: '/help', label: t('nav.help'), icon: QuestionMarkCircleIcon },
+        { href: '/settings', label: t('nav.settings'), icon: CogIcon, adminOnly: true },
+      ],
+    },
+  ]
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.adminOnly || isAdmin),
+    }))
+    .filter((section) => section.items.length > 0)
 
   return (
     <aside
@@ -162,35 +220,44 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
         </div>
       )}
 
-      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
-        {navItems.map((item) => {
-          const isActive =
-            pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))
-          const Icon = item.icon
+      <nav className="flex-1 p-2 space-y-4 overflow-y-auto">
+        {navSections.map((section) => (
+          <div key={section.id} className="space-y-0.5">
+            {section.labelKey && (
+              <p className="px-3 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-fg-muted">
+                {t(section.labelKey)}
+              </p>
+            )}
+            {section.items.map((item) => {
+              const isActive =
+                pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))
+              const Icon = item.icon
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              prefetch={item.href !== pathname}
-              onClick={onClose}
-              aria-current={isActive ? 'page' : undefined}
-              className={`focus-ring relative flex items-center gap-2.5 px-3 py-2 min-h-[var(--touch-target)] md:min-h-0 md:h-9 rounded-md text-sm transition-colors ${
-                isActive
-                  ? 'bg-accent/10 text-accent font-semibold before:absolute before:start-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-accent before:rounded-e'
-                  : 'text-fg-muted font-medium hover:bg-fg/5 hover:text-fg'
-              }`}
-            >
-              <Icon
-                className={`h-[18px] w-[18px] shrink-0 ${
-                  isActive ? 'text-accent' : 'text-fg-subtle'
-                }`}
-                aria-hidden="true"
-              />
-              <span className="truncate">{item.label}</span>
-            </Link>
-          )
-        })}
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  prefetch={item.href !== pathname}
+                  onClick={onClose}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`focus-ring relative flex items-center gap-2.5 px-3 py-2 min-h-[var(--touch-target)] md:min-h-0 md:h-9 rounded-md text-sm transition-colors ${
+                    isActive
+                      ? 'bg-accent/10 text-accent font-semibold before:absolute before:start-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-accent before:rounded-e'
+                      : 'text-fg-muted font-medium hover:bg-fg/5 hover:text-fg'
+                  }`}
+                >
+                  <Icon
+                    className={`h-[18px] w-[18px] shrink-0 ${
+                      isActive ? 'text-accent' : 'text-fg-subtle'
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              )
+            })}
+          </div>
+        ))}
       </nav>
 
       <div className="p-3 border-t border-border space-y-2 shrink-0">

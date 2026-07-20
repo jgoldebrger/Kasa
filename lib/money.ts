@@ -100,6 +100,11 @@ export function resolveStripeCurrency(code?: string | null): string {
  * returns the prior PaymentIntent rather than charging again. Suitable
  * for the recurring-payment cron, retried confirm calls, etc.
  */
-export function buildIdempotencyKey(parts: ReadonlyArray<string | number | null | undefined>): string {
-  return parts.map((p) => String(p ?? '')).join(':').slice(0, 255)
+export function buildIdempotencyKey(
+  parts: ReadonlyArray<string | number | null | undefined>,
+): string {
+  return parts
+    .map((p) => String(p ?? ''))
+    .join(':')
+    .slice(0, 255)
 }

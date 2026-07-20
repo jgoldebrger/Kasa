@@ -12,11 +12,7 @@ import {
   DocumentArrowDownIcon,
   DocumentArrowUpIcon,
 } from '@heroicons/react/24/outline'
-import {
-  downloadImportTemplate,
-  IMPORT_LABELS,
-  type ImportType,
-} from '@/lib/import-templates'
+import { downloadImportTemplate, IMPORT_LABELS, type ImportType } from '@/lib/import-templates'
 
 interface Props {
   type: ImportType

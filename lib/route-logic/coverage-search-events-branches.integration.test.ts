@@ -60,8 +60,8 @@ async function withRateLimitBlocked<T>(fn: () => Promise<T>): Promise<T> {
   const rateLimit = await import('@/lib/rate-limit')
   const spy = vi.spyOn(rateLimit, 'checkRateLimit').mockResolvedValue({
     allowed: false,
-        remaining: 0,
-        resetAt: 0,
+    remaining: 0,
+    resetAt: 0,
   })
   try {
     return await fn()
@@ -80,7 +80,7 @@ describe.sequential('route-logic search/events branch coverage', () => {
     process.env.PLATFORM_ADMIN_EMAILS = ''
     ctx = await seedApiRouteFixtures()
     process.env.PLATFORM_ADMIN_EMAILS = ctx.email
-        bindSession(ctx, 'admin')
+    bindSession(ctx, 'admin')
   })
 
   afterAll(async () => {
@@ -93,9 +93,9 @@ describe.sequential('route-logic search/events branch coverage', () => {
       bindSession(ctx, 'admin')
       const { GET } = await import('@/lib/route-logic/search')
       await withRateLimitBlocked(async () => {
-        expect((await GET(orgJsonReq('/api/search', 'GET', undefined, { query: '?q=test' }))).status).toBe(
-          429,
-        )
+        expect(
+          (await GET(orgJsonReq('/api/search', 'GET', undefined, { query: '?q=test' }))).status,
+        ).toBe(429)
       })
     })
 
@@ -184,13 +184,13 @@ describe.sequential('route-logic search/events branch coverage', () => {
         hebrewFirstName: 'דוד',
         hebrewLastName: stamp,
       })
-      await FamilyMember.updateOne(
-        { _id: member._id },
-        { $set: { firstName: '', lastName: '' } },
-      )
+      await FamilyMember.updateOne({ _id: member._id }, { $set: { firstName: '', lastName: '' } })
       const { GET } = await import('@/lib/route-logic/search')
-      const hit = (await (await GET(orgJsonReq('/api/search', 'GET', undefined, { query: `?q=${stamp}` }))).json())
-        .items.find((i: { type: string }) => i.type === 'member')
+      const hit = (
+        await (
+          await GET(orgJsonReq('/api/search', 'GET', undefined, { query: `?q=${stamp}` }))
+        ).json()
+      ).items.find((i: { type: string }) => i.type === 'member')
       expect(hit?.label).toContain(stamp)
       await FamilyMember.deleteOne({ _id: member._id })
       await Family.deleteOne({ _id: fam._id })
@@ -212,8 +212,11 @@ describe.sequential('route-logic search/events branch coverage', () => {
         deletedAt: null,
       })
       const { GET } = await import('@/lib/route-logic/search')
-      const hit = (await (await GET(orgJsonReq('/api/search', 'GET', undefined, { query: `?q=${token}` }))).json())
-        .items.find((i: { type: string }) => i.type === 'payment')
+      const hit = (
+        await (
+          await GET(orgJsonReq('/api/search', 'GET', undefined, { query: `?q=${token}` }))
+        ).json()
+      ).items.find((i: { type: string }) => i.type === 'payment')
       expect(hit?.sublabel).toContain('••1234')
       expect(hit?.sublabel).not.toMatch(/\d{1,2}\/\d{1,2}\/\d{4}/)
       await Payment.deleteOne({ _id: paymentId })
@@ -229,8 +232,11 @@ describe.sequential('route-logic search/events branch coverage', () => {
         weddingDate: new Date('2013-01-01'),
       })
       const { GET } = await import('@/lib/route-logic/search')
-      const hit = (await (await GET(orgJsonReq('/api/search', 'GET', undefined, { query: `?q=${stamp}` }))).json())
-        .items.find((i: { type: string }) => i.type === 'family')
+      const hit = (
+        await (
+          await GET(orgJsonReq('/api/search', 'GET', undefined, { query: `?q=${stamp}` }))
+        ).json()
+      ).items.find((i: { type: string }) => i.type === 'family')
       expect(hit?.sublabel).toBe('')
       await Family.deleteOne({ _id: fam._id })
     })
@@ -290,8 +296,9 @@ describe.sequential('route-logic search/events branch coverage', () => {
       expect(row?.eventTypeLabel).toBe('Configured Label')
 
       const pag = await import('@/lib/pagination')
-      const nullDateSpy = vi.spyOn(pag, 'collectCompoundCursorPages').mockImplementationOnce(
-        async () => [
+      const nullDateSpy = vi
+        .spyOn(pag, 'collectCompoundCursorPages')
+        .mockImplementationOnce(async () => [
           {
             _id: new Types.ObjectId(),
             familyId: ctx.fixtures.familyId,
@@ -300,13 +307,10 @@ describe.sequential('route-logic search/events branch coverage', () => {
             year: y,
             amount: 1,
           },
-        ],
-      )
+        ])
       const res2 = await GET(orgJsonReq('/api/events', 'GET'))
       nullDateSpy.mockRestore()
-      const nullRow = (await res2.json()).find(
-        (r: { eventDate: unknown }) => r.eventDate === null,
-      )
+      const nullRow = (await res2.json()).find((r: { eventDate: unknown }) => r.eventDate === null)
       expect(nullRow?.eventTypeLabel).toBe('Configured Label')
 
       await LifecycleEventPayment.deleteOne({ _id: payment._id })
@@ -331,10 +335,11 @@ describe.sequential('route-logic search/events branch coverage', () => {
       }
       const pag = await import('@/lib/pagination')
       const realCollect = pag.collectCompoundCursorPages
-      const spy = vi.spyOn(pag, 'collectCompoundCursorPages').mockImplementation(
-        (loadPage, baseFilter, sortField, direction, getCursor) =>
+      const spy = vi
+        .spyOn(pag, 'collectCompoundCursorPages')
+        .mockImplementation((loadPage, baseFilter, sortField, direction, getCursor) =>
           realCollect(loadPage, baseFilter, sortField, direction, getCursor, 1),
-      )
+        )
       const { GET } = await import('@/lib/route-logic/events')
       const res = await GET(orgJsonReq('/api/events', 'GET'))
       spy.mockRestore()
@@ -604,7 +609,9 @@ describe.sequential('route-logic search/events branch coverage', () => {
         weddingDate: new Date('2018-01-01'),
       })
       const recycle = await import('@/lib/recycle-bin')
-      const spy = vi.spyOn(recycle, 'softDeleteFamilyCascade').mockRejectedValueOnce(new Error('cascade fail'))
+      const spy = vi
+        .spyOn(recycle, 'softDeleteFamilyCascade')
+        .mockRejectedValueOnce(new Error('cascade fail'))
       const { POST } = await import('@/lib/route-logic/families/bulk')
       const res = await POST(
         orgJsonReq('/api/families/bulk', 'POST', {

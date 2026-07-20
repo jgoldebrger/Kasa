@@ -384,7 +384,7 @@ export default function ReportBuilderView({
                         type="button"
                         onClick={() => deleteReport(r)}
                         aria-label={`Delete ${r.name}`}
-                        className="text-xs text-fg-muted hover:text-red-600"
+                        className="text-xs text-fg-muted hover:text-danger"
                       >
                         ✕
                       </button>

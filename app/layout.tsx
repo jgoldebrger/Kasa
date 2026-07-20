@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+import { Inter, Source_Serif_4 } from 'next/font/google'
 import './globals.css'
 import './error-handler'
 import SessionProviderWrapper from './components/SessionProviderWrapper'
@@ -20,6 +20,12 @@ const inter = Inter({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-inter',
+})
+
+const sourceSerif = Source_Serif_4({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-display',
 })
 
 export const metadata: Metadata = {
@@ -101,7 +107,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const initialDir = RTL_LOCALES_SERVER.includes(initialLocale) ? 'rtl' : 'ltr'
 
   return (
-    <html lang={initialLocale} dir={initialDir} className={inter.variable} suppressHydrationWarning>
+    <html
+      lang={initialLocale}
+      dir={initialDir}
+      className={`${inter.variable} ${sourceSerif.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         {/*
           Preconnect to Stripe origins. The payment form is dynamically

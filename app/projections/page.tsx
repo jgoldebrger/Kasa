@@ -24,7 +24,9 @@ async function ProjectionsServer() {
   } catch (err) {
     console.error('[projections] server prefetch failed:', err)
     // The client view falls back to /api/dues-recommendation.
-    return <ProjectionsView initialRecommendation={null} initialWindowYears={DEFAULT_WINDOW_YEARS} />
+    return (
+      <ProjectionsView initialRecommendation={null} initialWindowYears={DEFAULT_WINDOW_YEARS} />
+    )
   }
 }
 

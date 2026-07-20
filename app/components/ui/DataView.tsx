@@ -3,11 +3,7 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  MagnifyingGlassIcon,
-} from '@heroicons/react/24/outline'
+import { ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { useColumnVisibility } from '@/lib/client/useColumnVisibility'
 import {
   useDataFilters,
@@ -15,11 +11,7 @@ import {
   type ColumnFilterConfig,
   type FilterableColumn,
 } from '@/lib/client/useDataFilters'
-import {
-  reactNodeToText,
-  todayStamp,
-  type ExportColumn,
-} from '@/lib/client/export'
+import { reactNodeToText, todayStamp, type ExportColumn } from '@/lib/client/export'
 import type { ColumnPickerEntry } from './ColumnPicker'
 import type { FilterPopoverColumn } from './FilterPopover'
 import FilterChips from './FilterChips'
@@ -220,16 +212,8 @@ export function DataView<T>({
   const showColumns = toolbarEnabled && toolbarCfg.columns !== false
   const showExport = toolbarEnabled && toolbarCfg.export !== false
 
-  const {
-    visibility,
-    isVisible,
-    setVisible,
-    showAll,
-    reset,
-    visibleCount,
-    order,
-    moveColumn,
-  } = useColumnVisibility(tableId, columns)
+  const { visibility, isVisible, setVisible, showAll, reset, visibleCount, order, moveColumn } =
+    useColumnVisibility(tableId, columns)
 
   // Columns sorted according to the user's saved order. Built once per
   // (columns, order) change so the picker, headers, cells, and exports all
@@ -293,7 +277,8 @@ export function DataView<T>({
         .filter((c) => !!c.filter)
         .map((c) => ({
           id: c.id,
-          label: c.filter?.label || c.headerText || (typeof c.header === 'string' ? c.header : c.id),
+          label:
+            c.filter?.label || c.headerText || (typeof c.header === 'string' ? c.header : c.id),
           config: c.filter as ColumnFilterConfig<any>,
           options: filters.optionsByColumn[c.id],
         })),
@@ -518,18 +503,18 @@ export function DataView<T>({
     tableFrom === 'never'
       ? 'hidden'
       : tableFrom === 'sm'
-      ? 'hidden sm:block'
-      : tableFrom === 'lg'
-      ? 'hidden lg:block'
-      : 'hidden md:block'
+        ? 'hidden sm:block'
+        : tableFrom === 'lg'
+          ? 'hidden lg:block'
+          : 'hidden md:block'
   const cardVisible =
     tableFrom === 'never'
       ? 'block'
       : tableFrom === 'sm'
-      ? 'sm:hidden'
-      : tableFrom === 'lg'
-      ? 'lg:hidden'
-      : 'md:hidden'
+        ? 'sm:hidden'
+        : tableFrom === 'lg'
+          ? 'lg:hidden'
+          : 'md:hidden'
 
   // Virtualize when the list isn't paginated and grows past this many rows.
   // Below the threshold the cost of measuring + windowing isn't worth the
@@ -600,8 +585,8 @@ export function DataView<T>({
                           ? 'ascending'
                           : 'descending'
                         : col.sortable
-                        ? 'none'
-                        : undefined
+                          ? 'none'
+                          : undefined
                     }
                   >
                     {col.sortable && onSortChange ? (
@@ -702,8 +687,8 @@ function VirtualTable<T>({
                       ? 'ascending'
                       : 'descending'
                     : col.sortable
-                    ? 'none'
-                    : undefined
+                      ? 'none'
+                      : undefined
                 }
               >
                 {col.sortable && onSortChange ? (
@@ -840,7 +825,11 @@ function alignClass(a?: 'left' | 'right' | 'center') {
 }
 function hideClass(h?: 'sm' | 'md' | 'lg') {
   if (!h) return ''
-  return h === 'sm' ? 'hidden sm:table-cell' : h === 'md' ? 'hidden md:table-cell' : 'hidden lg:table-cell'
+  return h === 'sm'
+    ? 'hidden sm:table-cell'
+    : h === 'md'
+      ? 'hidden md:table-cell'
+      : 'hidden lg:table-cell'
 }
 
 function SortableHeader({
@@ -960,9 +949,7 @@ function PaginationFooter({
               onClick={() => onPageChange(p as number)}
               aria-current={p === page ? 'page' : undefined}
               className={`focus-ring inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded-md px-2 text-xs font-medium tabular ${
-                p === page
-                  ? 'bg-accent text-white'
-                  : 'text-fg-muted hover:bg-fg/5 hover:text-fg'
+                p === page ? 'bg-accent text-white' : 'text-fg-muted hover:bg-fg/5 hover:text-fg'
               }`}
             >
               {p}

@@ -17,10 +17,12 @@
   --c-border-strong:  209 213 219;
   --c-fg:             17 24 39;
   --c-fg-muted:       107 114 128;
-  --c-fg-subtle:      156 163 175;
-  --c-accent:         79 70 229;
-  --c-accent-hover:   67 56 202;
-  --c-accent-soft:    238 242 255;
+  /* gray-500 — 4.83:1 on white (AA for normal text); was gray-400 at 2.54:1 */
+  --c-fg-subtle:      107 114 128;
+  /* Deep teal — treasurer/kehilla brand; avoids indigo SaaS default */
+  --c-accent:         15 118 110;
+  --c-accent-hover:   17 94 89;
+  --c-accent-soft:    240 253 250;
   --c-accent-fg:      255 255 255;
 
   --c-success:        22 163 74;
@@ -65,10 +67,11 @@
   --c-border-strong:  63 63 70;
   --c-fg:             250 250 250;
   --c-fg-muted:       161 161 170;
-  --c-fg-subtle:      113 113 122;
-  --c-accent:         99 102 241;
-  --c-accent-hover:   129 140 248;
-  --c-accent-soft:    30 27 75;
+  /* zinc-400 — ~7.7:1 on #0A0A0A (AA); was zinc-500 at 4.10:1 */
+  --c-fg-subtle:      161 161 170;
+  --c-accent:         15 118 110;
+  --c-accent-hover:   20 184 166;
+  --c-accent-soft:    19 78 74;
   --c-accent-fg:      255 255 255;
 
   --c-success:        74 222 128;

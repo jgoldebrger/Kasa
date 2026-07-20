@@ -33,18 +33,8 @@ export interface LabelsPanelProps {
   setFilters: Dispatch<SetStateAction<LabelFilters>>
 }
 
-export default function LabelsPanel({
-  families,
-  plans,
-  filters,
-  setFilters,
-}: LabelsPanelProps) {
+export default function LabelsPanel({ families, plans, filters, setFilters }: LabelsPanelProps) {
   return (
-    <MailLabelsPanel
-      families={families}
-      plans={plans}
-      filters={filters}
-      setFilters={setFilters}
-    />
+    <MailLabelsPanel families={families} plans={plans} filters={filters} setFilters={setFilters} />
   )
 }

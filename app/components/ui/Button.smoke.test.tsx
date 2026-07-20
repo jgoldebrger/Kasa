@@ -9,7 +9,9 @@ import { Button as Component } from './Button'
 
 describe('Button smoke', () => {
   it('renders without crashing', () => {
-    const { container } = render(React.createElement(Component, null, 'Label') as React.ReactElement)
+    const { container } = render(
+      React.createElement(Component, null, 'Label') as React.ReactElement,
+    )
     expect(container).toBeDefined()
   })
 })

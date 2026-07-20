@@ -19,10 +19,7 @@ const listQuery = z.object({
 })
 
 /** Shared formatter for GET /api/events and SSR prefetch on /events. */
-export async function formatLifecycleEventPayments(
-  organizationId: string,
-  payments: any[],
-) {
+export async function formatLifecycleEventPayments(organizationId: string, payments: any[]) {
   const configuredTypes = await loadAllByIdCursor<any>(
     (filter, limit) =>
       LifecycleEvent.find(filter).select('type name').sort({ _id: 1 }).limit(limit).lean<any[]>(),
@@ -34,11 +31,7 @@ export async function formatLifecycleEventPayments(
   )
 
   const familyIds = [
-    ...new Set(
-      payments
-        .map((p) => (p.familyId ? String(p.familyId) : ''))
-        .filter(Boolean),
-    ),
+    ...new Set(payments.map((p) => (p.familyId ? String(p.familyId) : '')).filter(Boolean)),
   ]
   const families = await loadByIdsInChunks<any>(
     (chunk) =>
@@ -49,14 +42,11 @@ export async function formatLifecycleEventPayments(
         .lean<any[]>(),
     familyIds,
   )
-  const familyNameById = new Map<string, string>(
-    families.map((f) => [String(f._id), f.name]),
-  )
+  const familyNameById = new Map<string, string>(families.map((f) => [String(f._id), f.name]))
 
   return payments.map((p) => {
     const familyId = p.familyId ? String(p.familyId) : undefined
-    const familyName =
-      (familyId && familyNameById.get(familyId)) || 'Unknown Family'
+    const familyName = (familyId && familyNameById.get(familyId)) || 'Unknown Family'
 
     const rawType = String(p.eventType || '')
     return {

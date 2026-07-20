@@ -29,8 +29,7 @@ export const GET = handler({
     }
 
     const subFamilies = await collectCompoundCursorPages(
-      (filter, limit) =>
-        Family.find(filter).sort({ weddingDate: -1, _id: -1 }).limit(limit).lean(),
+      (filter, limit) => Family.find(filter).sort({ weddingDate: -1, _id: -1 }).limit(limit).lean(),
       { parentFamilyId: id, organizationId: ctx!.organizationId },
       'weddingDate',
       -1,

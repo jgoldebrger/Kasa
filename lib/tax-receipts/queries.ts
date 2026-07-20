@@ -41,8 +41,5 @@ export function netMembershipPaymentAmount(payment: {
   amount?: number | null
   refundedAmount?: number | null
 }): number {
-  return Math.max(
-    0,
-    Number(payment.amount || 0) - Number(payment.refundedAmount || 0),
-  )
+  return Math.max(0, Number(payment.amount || 0) - Number(payment.refundedAmount || 0))
 }

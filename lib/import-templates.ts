@@ -76,8 +76,19 @@ export const IMPORT_COLUMNS: Record<ImportType, ImportColumn[]> = {
     { key: 'paymentPlanNumber', type: 'number', hint: 'Integer matching a configured plan.' },
   ],
   members: [
-    { key: 'familyName', required: true, width: 22, familyKey: true, hint: 'Required (or familyEmail). Matches an existing family.' },
-    { key: 'familyEmail', width: 26, familyKey: true, hint: 'Required (or familyName). Matches an existing family.' },
+    {
+      key: 'familyName',
+      required: true,
+      width: 22,
+      familyKey: true,
+      hint: 'Required (or familyEmail). Matches an existing family.',
+    },
+    {
+      key: 'familyEmail',
+      width: 26,
+      familyKey: true,
+      hint: 'Required (or familyName). Matches an existing family.',
+    },
     { key: 'firstName', required: true },
     { key: 'lastName', required: true },
     { key: 'hebrewFirstName', rtl: true },
@@ -89,18 +100,49 @@ export const IMPORT_COLUMNS: Record<ImportType, ImportColumn[]> = {
     { key: 'weddingDate', type: 'date' },
   ],
   payments: [
-    { key: 'familyName', required: true, width: 22, familyKey: true, hint: 'Required (or familyEmail). Matches an existing family.' },
-    { key: 'familyEmail', width: 26, familyKey: true, hint: 'Required (or familyName). Matches an existing family.' },
-    { key: 'amount', type: 'currency', required: true, hint: 'Required. Positive number, no currency symbol.' },
+    {
+      key: 'familyName',
+      required: true,
+      width: 22,
+      familyKey: true,
+      hint: 'Required (or familyEmail). Matches an existing family.',
+    },
+    {
+      key: 'familyEmail',
+      width: 26,
+      familyKey: true,
+      hint: 'Required (or familyName). Matches an existing family.',
+    },
+    {
+      key: 'amount',
+      type: 'currency',
+      required: true,
+      hint: 'Required. Positive number, no currency symbol.',
+    },
     { key: 'paymentDate', type: 'date', required: true, hint: 'Required. YYYY-MM-DD.' },
     { key: 'type', hint: 'membership | donation | other. Defaults to membership.' },
     { key: 'paymentMethod', hint: 'cash | credit_card | check | quick_pay. Defaults to cash.' },
     { key: 'notes', width: 30 },
   ],
   'lifecycle-events': [
-    { key: 'familyName', required: true, width: 22, familyKey: true, hint: 'Required (or familyEmail). Matches an existing family.' },
-    { key: 'familyEmail', width: 26, familyKey: true, hint: 'Required (or familyName). Matches an existing family.' },
-    { key: 'eventType', required: true, hint: 'Required. Lowercase, must match a configured event type.' },
+    {
+      key: 'familyName',
+      required: true,
+      width: 22,
+      familyKey: true,
+      hint: 'Required (or familyEmail). Matches an existing family.',
+    },
+    {
+      key: 'familyEmail',
+      width: 26,
+      familyKey: true,
+      hint: 'Required (or familyName). Matches an existing family.',
+    },
+    {
+      key: 'eventType',
+      required: true,
+      hint: 'Required. Lowercase, must match a configured event type.',
+    },
     { key: 'eventDate', type: 'date', required: true, hint: 'Required. YYYY-MM-DD.' },
     { key: 'amount', type: 'currency', hint: 'Optional. Number, defaults to 0.' },
     { key: 'notes', width: 30 },
@@ -130,7 +172,8 @@ export function configureImportWorksheet(ws: ImportWorksheetLike, cols: ImportCo
   ws.columns = cols.map((c) => ({
     header: c.key,
     key: c.key,
-    width: c.width ?? (c.type === 'date' ? 14 : c.type === 'currency' || c.type === 'number' ? 12 : 16),
+    width:
+      c.width ?? (c.type === 'date' ? 14 : c.type === 'currency' || c.type === 'number' ? 12 : 16),
   }))
 
   cols.forEach((c, i) => {
@@ -164,7 +207,9 @@ type ExcelJsModule = {
 let excelJsLoader: (() => Promise<ExcelJsModule>) | undefined
 
 /** Test hook: avoid dynamic `import()` so Vitest attributes coverage. */
-export function setImportTemplateExcelLoader(loader: (() => Promise<ExcelJsModule>) | undefined): void {
+export function setImportTemplateExcelLoader(
+  loader: (() => Promise<ExcelJsModule>) | undefined,
+): void {
   excelJsLoader = loader
 }
 
@@ -220,8 +265,6 @@ export async function downloadImportTemplate(
   opts: TemplateOptions = {},
 ): Promise<void> {
   const buf = await createImportTemplateBuffer(type, opts)
-  const filename = opts.boundToFamily
-    ? `${type}-template-family.xlsx`
-    : `${type}-template.xlsx`
+  const filename = opts.boundToFamily ? `${type}-template-family.xlsx` : `${type}-template.xlsx`
   downloadXlsxBlob(buf, filename)
 }

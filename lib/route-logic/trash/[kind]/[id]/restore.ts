@@ -48,7 +48,8 @@ export const POST = handler({
         return {
           status: 409,
           data: {
-            error: 'Cannot restore: an existing item already uses the same unique identifier (e.g. plan number or event type). Rename or delete the live item first.',
+            error:
+              'Cannot restore: an existing item already uses the same unique identifier (e.g. plan number or event type). Rename or delete the live item first.',
           },
         }
       }

@@ -18,7 +18,13 @@ export interface SkeletonProps {
  * Visual placeholder block with a subtle shimmer.
  * Use during data fetching instead of "Loading…" text.
  */
-export function Skeleton({ w = '100%', h = 16, radius, className = '', inline = false }: SkeletonProps) {
+export function Skeleton({
+  w = '100%',
+  h = 16,
+  radius,
+  className = '',
+  inline = false,
+}: SkeletonProps) {
   const style: CSSProperties = {
     width: typeof w === 'number' ? `${w}px` : w,
     height: typeof h === 'number' ? `${h}px` : h,
@@ -37,7 +43,13 @@ export function Skeleton({ w = '100%', h = 16, radius, className = '', inline = 
 /**
  * Stack of N skeleton rows — quick drop-in replacement for table loading.
  */
-export function SkeletonRows({ count = 5, className = '' }: { count?: number; className?: string }) {
+export function SkeletonRows({
+  count = 5,
+  className = '',
+}: {
+  count?: number
+  className?: string
+}) {
   return (
     <div className={`flex flex-col gap-2 ${className}`} role="status" aria-label="Loading content">
       {Array.from({ length: count }, (_, i) => (
@@ -52,11 +64,7 @@ export function SkeletonRows({ count = 5, className = '' }: { count?: number; cl
  */
 export function SkeletonCard({ className = '' }: { className?: string }) {
   return (
-    <div
-      className={`surface-card p-4 ${className}`}
-      role="status"
-      aria-label="Loading card"
-    >
+    <div className={`surface-card p-4 ${className}`} role="status" aria-label="Loading card">
       <Skeleton h={14} w="35%" />
       <div className="mt-3">
         <Skeleton h={28} w="60%" />

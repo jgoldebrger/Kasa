@@ -21,7 +21,11 @@ vi.mock('next/headers', () => ({
 const API_ORIGIN = 'http://localhost:3000'
 let ctx: ApiTestContext
 
-function bindSession(c: ApiTestContext, role: 'owner' | 'admin' | 'member' = 'owner', orgId?: string) {
+function bindSession(
+  c: ApiTestContext,
+  role: 'owner' | 'admin' | 'member' = 'owner',
+  orgId?: string,
+) {
   mockAuth.mockResolvedValue({
     user: {
       id: c.userId,
@@ -76,8 +80,8 @@ async function withRateLimitBlocked<T>(fn: () => Promise<T>): Promise<T> {
   const rateLimit = await import('@/lib/rate-limit')
   const spy = vi.spyOn(rateLimit, 'checkRateLimit').mockResolvedValue({
     allowed: false,
-        remaining: 0,
-        resetAt: 0,
+    remaining: 0,
+    resetAt: 0,
   })
   try {
     return await fn()
@@ -88,13 +92,13 @@ async function withRateLimitBlocked<T>(fn: () => Promise<T>): Promise<T> {
 
 async function withCompoundCursorSpy(fn: () => Promise<void>) {
   const pag = await import('@/lib/pagination')
-  const spy = vi.spyOn(pag, 'collectCompoundCursorPages').mockImplementation(
-    async (loadPage, baseFilter, _sf, _dir, getCursor, _bs) => {
+  const spy = vi
+    .spyOn(pag, 'collectCompoundCursorPages')
+    .mockImplementation(async (loadPage, baseFilter, _sf, _dir, getCursor, _bs) => {
       const page = await loadPage(baseFilter, 3)
       if (page[0]) getCursor(page[0] as never)
       return page
-    },
-  )
+    })
   try {
     await fn()
   } finally {
@@ -167,7 +171,11 @@ describe.sequential('statements branch coverage', () => {
         (await POST(orgJsonReq('/api/statements/generate-pdf', 'POST', ['array']))).status,
       ).toBe(400)
       expect(
-        (await POST(orgJsonReq('/api/statements/generate-pdf', 'POST', { statement: { _id: 'bad' } }))).status,
+        (
+          await POST(
+            orgJsonReq('/api/statements/generate-pdf', 'POST', { statement: { _id: 'bad' } }),
+          )
+        ).status,
       ).toBe(400)
       expect(
         (
@@ -212,7 +220,10 @@ describe.sequential('statements branch coverage', () => {
         }),
       )
       expect(named.status).toBe(200)
-      await Family.updateOne({ _id: ctx.fixtures.familyId }, { $set: { name: 'API Route Marker Family' } })
+      await Family.updateOne(
+        { _id: ctx.fixtures.familyId },
+        { $set: { name: 'API Route Marker Family' } },
+      )
     })
   })
 
@@ -260,7 +271,9 @@ describe.sequential('statements branch coverage', () => {
 
       const dupErr = Object.assign(new Error('duplicate'), { code: 11000 })
       const createSpy = vi.spyOn(Statement, 'create').mockRejectedValueOnce(dupErr)
-      const raceUpdateSpy = vi.spyOn(Statement, 'findOneAndUpdate').mockResolvedValueOnce(null as never)
+      const raceUpdateSpy = vi
+        .spyOn(Statement, 'findOneAndUpdate')
+        .mockResolvedValueOnce(null as never)
       const raced = await POST(
         orgJsonReq(`/api/members/${ctx.fixtures.memberId}/statements`, 'POST', range),
         { params: { memberId: ctx.fixtures.memberId } },
@@ -371,7 +384,9 @@ describe.sequential('statements branch coverage', () => {
           pending: ids.map((f) => f._id),
         })
         const cont = await POST(
-          orgJsonReq('/api/statements/send-emails/worker', 'POST', { jobId: contJob._id.toString() }),
+          orgJsonReq('/api/statements/send-emails/worker', 'POST', {
+            jobId: contJob._id.toString(),
+          }),
         )
         expect(cont.status).toBe(200)
         await new Promise((r) => setTimeout(r, 80))
@@ -483,7 +498,9 @@ describe.sequential('statements branch coverage', () => {
       await seedEmailConfig()
       const { EmailJob } = await import('@/lib/models')
       const sendMod = await import('@/lib/statements/send-statement')
-      const sendSpy = vi.spyOn(sendMod, 'sendOneFamilyStatement').mockResolvedValue({ ok: true, email: null })
+      const sendSpy = vi
+        .spyOn(sendMod, 'sendOneFamilyStatement')
+        .mockResolvedValue({ ok: true, email: null })
       const job = await EmailJob.create({
         organizationId: ctx.orgId,
         userId: new Types.ObjectId(ctx.userId),
@@ -514,8 +531,13 @@ describe.sequential('statements branch coverage', () => {
       bindSession(ctx, 'admin')
       const { GET } = await import('@/lib/route-logic/statements/send-emails/status')
       expect(
-        (await GET(orgJsonReq('/api/statements/send-emails/status', 'GET', undefined, { query: '?jobId=bad' })))
-          .status,
+        (
+          await GET(
+            orgJsonReq('/api/statements/send-emails/status', 'GET', undefined, {
+              query: '?jobId=bad',
+            }),
+          )
+        ).status,
       ).toBe(400)
       expect(
         (
@@ -541,16 +563,24 @@ describe.sequential('statements branch coverage', () => {
         pending: [new Types.ObjectId()],
         processed: 1,
       })
-      await EmailJob.updateOne({ _id: job._id }, { $set: { updatedAt: staleAt } }, { timestamps: false })
+      await EmailJob.updateOne(
+        { _id: job._id },
+        { $set: { updatedAt: staleAt } },
+        { timestamps: false },
+      )
 
       const res = await GET(
-        orgJsonReq('/api/statements/send-emails/status', 'GET', undefined, { query: `?jobId=${job._id}` }),
+        orgJsonReq('/api/statements/send-emails/status', 'GET', undefined, {
+          query: `?jobId=${job._id}`,
+        }),
       )
       const body = await res.json()
       const payload = body.data ?? body
       expect(payload.status).toBe('failed')
       expect(payload.done).toBe(true)
-      const stored = await EmailJob.findById(job._id).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+      const stored = (await EmailJob.findById(job._id).lean()) as
+        | import('@/lib/test/type-helpers').LeanDoc
+        | null
       expect(String(stored?.lastError ?? '')).toMatch(/auto-failed/i)
       await EmailJob.deleteOne({ _id: job._id })
     })
@@ -573,7 +603,11 @@ describe.sequential('statements branch coverage', () => {
       bindSession(ctx)
       const { POST } = await import('@/lib/route-logic/tax-receipts/email/worker')
       expect(
-        (await POST(orgJsonReq('/api/tax-receipts/email/worker', 'POST', { jobId: stmtJob._id.toString() }))).status,
+        (
+          await POST(
+            orgJsonReq('/api/tax-receipts/email/worker', 'POST', { jobId: stmtJob._id.toString() }),
+          )
+        ).status,
       ).toBe(400)
       await EmailJob.deleteOne({ _id: stmtJob._id })
 
@@ -739,15 +773,16 @@ describe.sequential('statements branch coverage', () => {
 
       const charsetForm = new FormData()
       charsetForm.set('to', ctx.email)
-      charsetForm.set('file', new Blob(['%PDF'], { type: 'application/pdf; charset=utf-8' }), 'typed.pdf')
+      charsetForm.set(
+        'file',
+        new Blob(['%PDF'], { type: 'application/pdf; charset=utf-8' }),
+        'typed.pdf',
+      )
       expect((await POST(sendFileReq(charsetForm))).status).toBe(200)
 
       const sanitizedForm = new FormData()
       sanitizedForm.set('to', ctx.email)
-      sanitizedForm.set(
-        'file',
-        new File(['%PDF'], 'bad\r\nname.pdf', { type: 'application/pdf' }),
-      )
+      sanitizedForm.set('file', new File(['%PDF'], 'bad\r\nname.pdf', { type: 'application/pdf' }))
       expect((await POST(sendFileReq(sanitizedForm))).status).toBe(200)
 
       const unsafe = new FormData()

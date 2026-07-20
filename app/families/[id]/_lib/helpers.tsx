@@ -209,11 +209,11 @@ export function computeMemberDisplay(
 export const PLAN_COLOR_PALETTE = [
   'text-accent',
   'text-success dark:text-green-400',
-  'text-purple-600 dark:text-purple-400',
+  'text-cyan-700 dark:text-cyan-400',
   'text-warning dark:text-orange-400',
   'text-pink-600 dark:text-pink-400',
   'text-amber-600 dark:text-amber-400',
-  'text-cyan-600 dark:text-cyan-400',
+  'text-sky-700 dark:text-sky-400',
   'text-rose-600 dark:text-rose-400',
 ] as const
 export function planColorForNumber(planNumber: number | null | undefined): string {
@@ -281,7 +281,7 @@ export function buildMemberColumns({
           <div className="text-fg-muted">
             <div className="font-medium">{displayHebrewDate}</div>
             {m.barMitzvahDate && (
-              <div className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+              <div className="text-xs text-accent mt-1">
                 Bar/Bat Mitzvah: {new Date(m.barMitzvahDate).toLocaleDateString()}
               </div>
             )}

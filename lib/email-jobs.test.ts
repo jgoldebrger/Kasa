@@ -128,10 +128,7 @@ describe('kickoffEmailWorker', () => {
     })
 
     expect(result).toEqual({ ok: true })
-    expect(mocks.selfUrl).toHaveBeenCalledWith(
-      request,
-      '/api/statements/send-emails/worker',
-    )
+    expect(mocks.selfUrl).toHaveBeenCalledWith(request, '/api/statements/send-emails/worker')
     expect(mocks.fetch).toHaveBeenCalledWith(
       'https://app.test/api/worker',
       expect.objectContaining({

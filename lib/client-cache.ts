@@ -106,7 +106,10 @@ function isFresh(entry: Entry): boolean {
   return Date.now() - entry.fetchedAt < entry.ttl
 }
 
-export async function cachedFetch<T = unknown>(url: string, opts: CachedFetchOptions = {}): Promise<T> {
+export async function cachedFetch<T = unknown>(
+  url: string,
+  opts: CachedFetchOptions = {},
+): Promise<T> {
   hydrateFromStorage()
   const { ttl = DEFAULT_TTL_MS, bypass = false, ...init } = opts
 

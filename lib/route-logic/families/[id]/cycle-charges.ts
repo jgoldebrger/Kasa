@@ -2,10 +2,7 @@ import { Types } from 'mongoose'
 import { CycleCharge, Family } from '@/lib/models'
 import { handler } from '@/lib/api/handler'
 import { checkRateLimit } from '@/lib/rate-limit'
-import {
-  familyLedgerListQuery,
-  listFamilyLedger,
-} from '@/lib/family-ledger-list'
+import { familyLedgerListQuery, listFamilyLedger } from '@/lib/family-ledger-list'
 
 const LEDGER_CACHE_HEADERS = {
   'Cache-Control': 'private, max-age=15, stale-while-revalidate=60',
@@ -39,10 +36,7 @@ export const GET = handler({
 
     const baseFilter = { familyId: id, organizationId: ctx!.organizationId }
     const loadPage = (filter: Record<string, unknown>, limit: number) =>
-      CycleCharge.find(filter)
-        .sort({ chargeDate: -1, _id: -1 })
-        .limit(limit)
-        .lean()
+      CycleCharge.find(filter).sort({ chargeDate: -1, _id: -1 }).limit(limit).lean()
 
     const effectiveQuery = {
       limit: query.limit ?? 0,
