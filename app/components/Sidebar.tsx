@@ -72,11 +72,19 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
     void fetchSupportModeStatus().then(setSupportMode)
   }, [user?.isPlatformAdmin])
 
-  const navSections: {
+  type NavItem = {
+    href: string
+    label: string
+    icon: typeof ChartBarIcon
+    adminOnly?: boolean
+  }
+  type NavSection = {
     id: string
     labelKey?: MessageKey
-    items: { href: string; label: string; icon: typeof ChartBarIcon; adminOnly?: boolean }[]
-  }[] = [
+    items: NavItem[]
+  }
+
+  const allNavSections: NavSection[] = [
     {
       id: 'overview',
       items: [{ href: '/', label: t('nav.dashboard'), icon: ChartBarIcon }],
@@ -150,10 +158,14 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
       ],
     },
   ]
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) => !item.adminOnly || isAdmin),
-    }))
+
+  const navSections = allNavSections
+    .map(
+      (section): NavSection => ({
+        ...section,
+        items: section.items.filter((item) => !item.adminOnly || isAdmin),
+      }),
+    )
     .filter((section) => section.items.length > 0)
 
   return (
