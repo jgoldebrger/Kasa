@@ -202,7 +202,8 @@ describe.sequential('route-logic finish coverage', () => {
       expect(rows[0]._id).toBe(ctx.fixtures.familyId)
       expect(rows[0].openBalance).toBeUndefined()
 
-      const unassigned = await GET(
+      const { GET: getFamily } = await import('@/lib/route-logic/families/[id]')
+      const unassigned = await getFamily(
         orgJsonReq(`/api/families/${ctx.fixtures.unassignedFamilyId}`, 'GET'),
         { params: { id: ctx.fixtures.unassignedFamilyId } },
       )
