@@ -198,11 +198,18 @@ describe.sequential('statements branch coverage', () => {
       expect(pdfBytes.length).toBeGreaterThan(0)
 
       const { Organization } = await import('@/lib/models')
-      const orgSpy = vi.spyOn(Organization, 'findById').mockReturnValueOnce({
-        select: () => ({
-          lean: async () => null,
-        }),
-      } as never)
+      const realFindById = Organization.findById.bind(Organization)
+      const orgSpy = vi.spyOn(Organization, 'findById').mockImplementation(((id: unknown) => {
+        const query = realFindById(id as string)
+        const origSelect = query.select.bind(query)
+        query.select = ((fields: unknown) => {
+          if (typeof fields === 'string' && fields.includes('letterhead')) {
+            return { lean: async () => null } as never
+          }
+          return origSelect(fields)
+        }) as typeof query.select
+        return query
+      }) as typeof Organization.findById)
       const noOrg = await POST(
         orgJsonReq('/api/statements/generate-pdf', 'POST', {
           statement: { _id: ctx.fixtures.statementId },

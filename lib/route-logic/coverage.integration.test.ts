@@ -547,7 +547,11 @@ describe.sequential('route-logic coverage gaps', () => {
       await InviteRequest.create({ email, name: 'Pending User', status: 'pending' })
       const { POST } = await import('@/lib/route-logic/auth/request-invite')
       const res = await POST(
-        publicJsonReq('/api/auth/request-invite', 'POST', { email, name: 'Pending' }),
+        publicJsonReq('/api/auth/request-invite', 'POST', {
+          email,
+          name: 'Pending',
+          orgName: 'Test Community',
+        }),
       )
       expect(res.status).toBe(200)
       expect((await res.json()).ok).toBe(true)

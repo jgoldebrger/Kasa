@@ -185,14 +185,15 @@ describe.sequential('route-logic finish coverage', () => {
       )
       expect(createRes.status).toBe(201)
 
-      mockAuth.mockResolvedValueOnce({
+      const memberSession = {
         user: {
           id: ctx.fixtures.memberUserId,
           email: ctx.memberEmail,
           name: 'Member',
           memberships: [{ o: ctx.orgId, r: 'member' }],
         },
-      } as never)
+      } as never
+      mockAuth.mockResolvedValueOnce(memberSession)
       const memberList = await GET(orgJsonReq('/api/families', 'GET'))
       expect(memberList.status).toBe(200)
       const rows = await memberList.json()
@@ -201,6 +202,7 @@ describe.sequential('route-logic finish coverage', () => {
       expect(rows[0]._id).toBe(ctx.fixtures.familyId)
       expect(rows[0].openBalance).toBeUndefined()
 
+      mockAuth.mockResolvedValueOnce(memberSession)
       const unassigned = await GET(
         orgJsonReq(`/api/families/${ctx.fixtures.unassignedFamilyId}`, 'GET'),
         { params: { id: ctx.fixtures.unassignedFamilyId } },
@@ -2545,6 +2547,7 @@ describe.sequential('route-logic finish coverage', () => {
         publicJsonReq('/api/auth/request-invite', 'POST', {
           email: ctx.email,
           name: 'Existing User',
+          orgName: 'Test Community',
         }),
       )
       expect(existingUser.status).toBe(200)
@@ -2555,6 +2558,7 @@ describe.sequential('route-logic finish coverage', () => {
         publicJsonReq('/api/auth/request-invite', 'POST', {
           email: freshEmail,
           name: 'Finish Invite',
+          orgName: 'Test Community',
           message: 'please add me',
         }),
       )
@@ -2564,6 +2568,7 @@ describe.sequential('route-logic finish coverage', () => {
         publicJsonReq('/api/auth/request-invite', 'POST', {
           email: freshEmail,
           name: 'Finish Invite Updated',
+          orgName: 'Test Community',
           message: 'updated message',
         }),
       )
@@ -7378,6 +7383,7 @@ describe.sequential('route-logic finish coverage', () => {
           publicJsonReq('/api/auth/request-invite', 'POST', {
             email: `rate-${Date.now()}@example.com`,
             name: 'Rate Limited',
+            orgName: 'Test Community',
           }),
         )
         expect(res.status).toBe(429)

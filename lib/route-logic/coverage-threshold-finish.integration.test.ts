@@ -486,8 +486,15 @@ describe.sequential('route-logic threshold finish coverage', () => {
       const email = `finish-new-${Date.now()}@example.com`
       const { POST } = await import('@/lib/route-logic/auth/request-invite')
       expect(
-        (await POST(publicJsonReq('/api/auth/request-invite', 'POST', { email, name: 'New User' })))
-          .status,
+        (
+          await POST(
+            publicJsonReq('/api/auth/request-invite', 'POST', {
+              email,
+              name: 'New User',
+              orgName: 'Test Community',
+            }),
+          )
+        ).status,
       ).toBe(200)
 
       const { User, InviteRequest } = await import('@/lib/models')
@@ -497,6 +504,7 @@ describe.sequential('route-logic threshold finish coverage', () => {
             publicJsonReq('/api/auth/request-invite', 'POST', {
               email: ctx.email,
               name: 'Existing',
+              orgName: 'Test Community',
             }),
           )
         ).status,
@@ -735,6 +743,7 @@ describe.sequential('route-logic threshold finish coverage', () => {
               publicJsonReq('/api/auth/request-invite', 'POST', {
                 email: `rl-${Date.now()}@example.com`,
                 name: 'Rate Limited',
+                orgName: 'Test Community',
               }),
             )
           ).status,

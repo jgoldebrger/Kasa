@@ -310,7 +310,17 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
     })
 
     it('GET /api/families masks financial fields for members', async () => {
-      bindSession(ctx, 'member')
+      mockAuth.mockResolvedValue({
+        user: {
+          id: ctx.fixtures.memberUserId,
+          email: ctx.memberEmail,
+          name: 'Member',
+          memberships: [{ o: ctx.orgId, r: 'member' }],
+        },
+      } as never)
+      mockCookieGet.mockImplementation((name: string) =>
+        name === 'kasa_active_org' ? { value: ctx.orgId } : undefined,
+      )
       const { GET } = await import('@/lib/route-logic/families')
       const res = await GET(orgJsonReq('/api/families', 'GET', undefined, { query: '?limit=5' }))
       expect(res.status).toBe(200)
@@ -1175,7 +1185,11 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
       }
     })
 
-    it('process-recurring-payments throws when internal fetch fails', async () => {
+    it('process-recurring-payments throws when per-org processing fails', async () => {
+      const processOrg = await import('@/lib/recurring-payments/process-org')
+      const processSpy = vi
+        .spyOn(processOrg, 'processRecurringPaymentsForOrg')
+        .mockRejectedValueOnce(new Error('per-org fail'))
       const jobs = await import('@/lib/jobs')
       const spy = vi.spyOn(jobs, 'runChunked').mockImplementationOnce(async (opts) => {
         await opts.perOrg(ctx.orgId)
@@ -1188,10 +1202,6 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
           errors: [],
         }
       })
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => 'fail' }),
-      )
       try {
         const { POST } = await import('@/lib/route-logic/jobs/process-recurring-payments')
         const res = await POST(
@@ -1200,7 +1210,7 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
         expect(res.status).toBe(500)
       } finally {
         spy.mockRestore()
-        vi.unstubAllGlobals()
+        processSpy.mockRestore()
       }
     })
   })

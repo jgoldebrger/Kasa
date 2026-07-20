@@ -516,7 +516,7 @@ describe.sequential('jobs route-logic branch coverage', () => {
       }
     })
 
-    it('accepts cursor continuation and throws when fetch response text fails', async () => {
+    it('accepts cursor continuation and throws when per-org processing fails', async () => {
       const { POST } = await import('@/lib/route-logic/jobs/process-recurring-payments')
       const cursor = new Types.ObjectId('000000000000000000000001').toString()
       const cont = await POST(
@@ -526,16 +526,10 @@ describe.sequential('jobs route-logic branch coverage', () => {
       )
       expect(cont.status).toBe(200)
 
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          ok: false,
-          status: 502,
-          text: async () => {
-            throw new Error('text read fail')
-          },
-        }),
-      )
+      const processOrg = await import('@/lib/recurring-payments/process-org')
+      const processSpy = vi
+        .spyOn(processOrg, 'processRecurringPaymentsForOrg')
+        .mockRejectedValueOnce(new Error('per-org fail'))
       const jobs = await import('@/lib/jobs')
       const spy = vi.spyOn(jobs, 'runChunked').mockImplementationOnce(async (opts) => {
         await opts.perOrg(ctx.orgId)
@@ -553,7 +547,7 @@ describe.sequential('jobs route-logic branch coverage', () => {
         expect(fail.status).toBe(500)
       } finally {
         spy.mockRestore()
-        vi.unstubAllGlobals()
+        processSpy.mockRestore()
       }
     })
 
