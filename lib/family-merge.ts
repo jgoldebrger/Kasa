@@ -15,6 +15,8 @@ import { audit } from '@/lib/audit'
 import type { OrgContext } from '@/lib/auth-helpers'
 import { isFamilyDescendantOf } from '@/lib/family-sub-tree'
 import { scheduleYearlyCalculationRefresh } from '@/lib/calculations'
+import { runTransaction } from '@/lib/run-transaction'
+import { tenantMatch } from '@/lib/tenant-query'
 
 export interface FamilyMergeCounts {
   members: number
@@ -43,11 +45,8 @@ export interface FamilyMergeResult {
   moved: FamilyMergeCounts
 }
 
-const orgFamilyFilter = (orgId: string, familyId: string) => ({
-  organizationId: new Types.ObjectId(orgId),
-  familyId: new Types.ObjectId(familyId),
-  deletedAt: null,
-})
+const orgFamilyFilter = (orgId: string, familyId: string) =>
+  tenantMatch(orgId, { familyId: new Types.ObjectId(familyId) })
 
 export async function validateFamilyMerge(
   organizationId: string,
@@ -205,98 +204,104 @@ export async function mergeFamilies(
   const base = { organizationId: orgOid, familyId: sourceOid, deletedAt: null }
   const at = new Date()
 
-  // Resolve cycle-charge conflicts before bulk-moving the rest.
-  const sourceCharges = await CycleCharge.find(base).select('_id cycleYear').lean()
-  if (sourceCharges.length > 0) {
-    const years = [...new Set(sourceCharges.map((c) => c.cycleYear))]
-    const targetYears = await CycleCharge.find({
-      organizationId: orgOid,
-      familyId: targetOid,
-      cycleYear: { $in: years },
-      deletedAt: null,
-    })
-      .select('cycleYear')
-      .lean<Array<{ cycleYear: number }>>()
-    const conflictYears = new Set(targetYears.map((c) => c.cycleYear))
-    const conflictIds = sourceCharges
-      .filter((c) => conflictYears.has(c.cycleYear))
-      .map((c) => c._id)
+  const moved = await runTransaction(async (session) => {
+    const sessionOpt = session ? { session } : {}
 
-    if (conflictIds.length > 0) {
+    const sourceCharges = await CycleCharge.find(base).select('_id cycleYear').lean()
+    if (sourceCharges.length > 0) {
+      const years = [...new Set(sourceCharges.map((c) => c.cycleYear))]
+      const targetYears = await CycleCharge.find({
+        organizationId: orgOid,
+        familyId: targetOid,
+        cycleYear: { $in: years },
+        deletedAt: null,
+      })
+        .select('cycleYear')
+        .lean<Array<{ cycleYear: number }>>()
+      const conflictYears = new Set(targetYears.map((c) => c.cycleYear))
+      const conflictIds = sourceCharges
+        .filter((c) => conflictYears.has(c.cycleYear))
+        .map((c) => c._id)
+
+      if (conflictIds.length > 0) {
+        await CycleCharge.updateMany(
+          { _id: { $in: conflictIds }, organizationId: orgOid },
+          { $set: { deletedAt: at, deletedBy: ctx.userId, deletedKind: 'merge_conflict' } },
+          sessionOpt,
+        )
+      }
+
       await CycleCharge.updateMany(
-        { _id: { $in: conflictIds }, organizationId: orgOid },
-        { $set: { deletedAt: at, deletedBy: ctx.userId, deletedKind: 'merge_conflict' } },
+        { organizationId: orgOid, familyId: sourceOid, deletedAt: null },
+        { $set: { familyId: targetOid } },
+        sessionOpt,
       )
     }
 
-    await CycleCharge.updateMany(
+    const [
+      memberRes,
+      paymentRes,
+      lifecycleRes,
+      withdrawalRes,
+      statementRes,
+      taskRes,
+      savedPmRes,
+      recurringRes,
+      subFamilyRes,
+    ] = await Promise.all([
+      FamilyMember.updateMany(base, { $set: { familyId: targetOid } }, sessionOpt),
+      Payment.updateMany(base, { $set: { familyId: targetOid } }, sessionOpt),
+      LifecycleEventPayment.updateMany(base, { $set: { familyId: targetOid } }, sessionOpt),
+      Withdrawal.updateMany(base, { $set: { familyId: targetOid } }, sessionOpt),
+      Statement.updateMany(base, { $set: { familyId: targetOid } }, sessionOpt),
+      Task.updateMany(
+        { organizationId: orgOid, relatedFamilyId: sourceOid, deletedAt: null },
+        { $set: { relatedFamilyId: targetOid } },
+        sessionOpt,
+      ),
+      SavedPaymentMethod.updateMany(
+        { organizationId: orgOid, familyId: sourceOid },
+        { $set: { familyId: targetOid } },
+        sessionOpt,
+      ),
+      RecurringPayment.updateMany(
+        { organizationId: orgOid, familyId: sourceOid },
+        { $set: { familyId: targetOid } },
+        sessionOpt,
+      ),
+      Family.updateMany(
+        { organizationId: orgOid, parentFamilyId: sourceOid, deletedAt: null },
+        { $set: { parentFamilyId: targetOid } },
+        sessionOpt,
+      ),
+    ])
+
+    await Family.updateOne(
+      { _id: sourceOid, organizationId: orgOid, deletedAt: null },
       {
-        organizationId: orgOid,
-        familyId: sourceOid,
-        deletedAt: null,
+        $set: {
+          deletedAt: at,
+          deletedBy: ctx.userId,
+          deletedKind: 'merge',
+        },
       },
-      { $set: { familyId: targetOid } },
+      sessionOpt,
     )
-  }
 
-  const [
-    memberRes,
-    paymentRes,
-    lifecycleRes,
-    withdrawalRes,
-    statementRes,
-    taskRes,
-    savedPmRes,
-    recurringRes,
-    subFamilyRes,
-  ] = await Promise.all([
-    FamilyMember.updateMany(base, { $set: { familyId: targetOid } }),
-    Payment.updateMany(base, { $set: { familyId: targetOid } }),
-    LifecycleEventPayment.updateMany(base, { $set: { familyId: targetOid } }),
-    Withdrawal.updateMany(base, { $set: { familyId: targetOid } }),
-    Statement.updateMany(base, { $set: { familyId: targetOid } }),
-    Task.updateMany(
-      { organizationId: orgOid, relatedFamilyId: sourceOid, deletedAt: null },
-      { $set: { relatedFamilyId: targetOid } },
-    ),
-    SavedPaymentMethod.updateMany(
-      { organizationId: orgOid, familyId: sourceOid },
-      { $set: { familyId: targetOid } },
-    ),
-    RecurringPayment.updateMany(
-      { organizationId: orgOid, familyId: sourceOid },
-      { $set: { familyId: targetOid } },
-    ),
-    Family.updateMany(
-      { organizationId: orgOid, parentFamilyId: sourceOid, deletedAt: null },
-      { $set: { parentFamilyId: targetOid } },
-    ),
-  ])
-
-  const moved: FamilyMergeCounts = {
-    members: memberRes.modifiedCount,
-    payments: paymentRes.modifiedCount,
-    lifecycleEvents: lifecycleRes.modifiedCount,
-    withdrawals: withdrawalRes.modifiedCount,
-    cycleCharges: preview.counts.cycleCharges - preview.counts.cycleChargeConflicts,
-    cycleChargeConflicts: preview.counts.cycleChargeConflicts,
-    statements: statementRes.modifiedCount,
-    tasks: taskRes.modifiedCount,
-    savedPaymentMethods: savedPmRes.modifiedCount,
-    recurringPayments: recurringRes.modifiedCount,
-    subFamilies: subFamilyRes.modifiedCount,
-  }
-
-  await Family.updateOne(
-    { _id: sourceOid, organizationId: orgOid, deletedAt: null },
-    {
-      $set: {
-        deletedAt: at,
-        deletedBy: ctx.userId,
-        deletedKind: 'merge',
-      },
-    },
-  )
+    return {
+      members: memberRes.modifiedCount,
+      payments: paymentRes.modifiedCount,
+      lifecycleEvents: lifecycleRes.modifiedCount,
+      withdrawals: withdrawalRes.modifiedCount,
+      cycleCharges: preview.counts.cycleCharges - preview.counts.cycleChargeConflicts,
+      cycleChargeConflicts: preview.counts.cycleChargeConflicts,
+      statements: statementRes.modifiedCount,
+      tasks: taskRes.modifiedCount,
+      savedPaymentMethods: savedPmRes.modifiedCount,
+      recurringPayments: recurringRes.modifiedCount,
+      subFamilies: subFamilyRes.modifiedCount,
+    } satisfies FamilyMergeCounts
+  })
 
   const paymentYears = await Payment.find({
     organizationId: orgOid,

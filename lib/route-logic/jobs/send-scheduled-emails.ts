@@ -2,7 +2,7 @@ import { Family, ScheduledEmail } from '@/lib/models'
 import {
   sendEmail,
   applyMergeFields,
-  loadMergeFieldContext,
+  loadMergeFieldContexts,
   delayBetweenSendsMs,
   sleep,
 } from '@/lib/mail'
@@ -49,6 +49,7 @@ export const POST = handler({
         _id: { $in: familyIds },
       }).lean<any[]>()
       const byId = new Map(families.map((f) => [String(f._id), f]))
+      const mergeContexts = await loadMergeFieldContexts(familyIds, orgId)
 
       const pacingMs = delayBetweenSendsMs(familyIds.length)
       let sendIndex = 0
@@ -72,7 +73,7 @@ export const POST = handler({
           continue
         }
 
-        const mergeCtx = await loadMergeFieldContext(familyId, orgId)
+        const mergeCtx = mergeContexts.get(familyId) ?? { familyName: '', orgName: '' }
         const html = applyMergeFields(job.html, mergeCtx).replace(
           /\{\{familyName\}\}/g,
           escapeHtml(family.name || ''),

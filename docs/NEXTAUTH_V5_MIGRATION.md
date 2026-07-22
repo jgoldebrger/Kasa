@@ -124,7 +124,7 @@ Review the [next-auth changelog](https://github.com/nextauthjs/next-auth/release
 Custom logic in `app/auth.ts` must survive any library bump:
 
 1. **Password revocation:** `passwordChangedAt` vs token `iat` (strict `>` comparison).
-2. **Membership cache:** `token.memberships` refreshed every `TOKEN_REFRESH_TTL_SEC` (30s).
+2. **Membership cache:** `token.memberships` refreshed every `TOKEN_REFRESH_TTL_SEC` (10s).
 3. **Fail-closed:** Mongo errors during revocation check delete `token.id`.
 4. **2FA:** TOTP replay guard + atomic backup-code consume in `authorize()`.
 5. **Platform admin:** `isPlatformAdmin` from `PLATFORM_ADMIN_EMAILS` in edge jwt callback.

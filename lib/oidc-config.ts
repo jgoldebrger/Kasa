@@ -21,9 +21,10 @@ function trimEnv(value: string | undefined): string | undefined {
 
 /**
  * Parse `OIDC_DOMAIN_ORG_MAP` entries like `example.com:my-org,other.org:other-slug`.
- * Domains are normalized to lowercase; org slugs are trimmed but case-preserved
- * (Organization.slug is stored lowercase).
+ * Domains are normalized to lowercase; org slugs must match `^[a-z0-9-]+$`.
  */
+const ORG_SLUG_RE = /^[a-z0-9-]+$/
+
 export function parseOidcDomainOrgMap(raw: string | undefined): Map<string, string> {
   const map = new Map<string, string>()
   const input = raw?.trim()
@@ -39,7 +40,8 @@ export function parseOidcDomainOrgMap(raw: string | undefined): Map<string, stri
       .slice(colon + 1)
       .trim()
       .toLowerCase()
-    if (domain && slug) map.set(domain, slug)
+    if (!domain || !slug || !ORG_SLUG_RE.test(slug)) continue
+    map.set(domain, slug)
   }
 
   return map

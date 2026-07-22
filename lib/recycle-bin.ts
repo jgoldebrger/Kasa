@@ -30,6 +30,8 @@ import { audit } from './audit'
 import type { OrgContext } from './auth-helpers'
 import { netPaymentAmount } from './money'
 import { scheduleYearlyCalculationRefreshForPayment } from './calculations'
+import { runTransaction } from './run-transaction'
+import { tenantMatch } from './tenant-query'
 
 export const RECYCLE_BIN_RETENTION_DAYS = 30
 
@@ -200,43 +202,59 @@ export async function softDeleteFamilyCascade(
   const cascadeUpdate = {
     $set: { deletedAt: at, deletedBy: ctx.userId, deletedKind: 'cascade' },
   }
-  const baseFilter = { organizationId: orgId, familyId, deletedAt: null }
+  const baseFilter = tenantMatch(orgId, { familyId })
 
-  const [
-    memberRes,
-    paymentRes,
-    statementRes,
-    lifecycleRes,
-    taskRes,
-    withdrawalRes,
-    cycleChargeRes,
-    recurringRes,
-    savedPmRes,
-  ] = await Promise.all([
-    FamilyMember.updateMany(baseFilter, cascadeUpdate),
-    Payment.updateMany(baseFilter, cascadeUpdate),
-    Statement.updateMany(baseFilter, cascadeUpdate),
-    LifecycleEventPayment.updateMany(baseFilter, cascadeUpdate),
-    Task.updateMany(
-      { organizationId: orgId, relatedFamilyId: familyId, deletedAt: null },
-      cascadeUpdate,
-    ),
-    Withdrawal.updateMany(baseFilter, cascadeUpdate),
-    CycleCharge.updateMany(baseFilter, cascadeUpdate),
-    RecurringPayment.updateMany(
-      { organizationId: orgId, familyId, isActive: true },
-      { $set: { isActive: false } },
-    ),
-    SavedPaymentMethod.updateMany(
-      { organizationId: orgId, familyId, isActive: true },
-      { $set: { isActive: false } },
-    ),
-  ])
+  const cascadeCounts = await runTransaction(async (session) => {
+    const sessionOpt = session ? { session } : {}
 
-  await Family.updateOne(
-    { _id: familyId, organizationId: orgId, deletedAt: null },
-    { $set: { deletedAt: at, deletedBy: ctx.userId, deletedKind: 'manual' } },
-  )
+    const [
+      memberRes,
+      paymentRes,
+      statementRes,
+      lifecycleRes,
+      taskRes,
+      withdrawalRes,
+      cycleChargeRes,
+      recurringRes,
+      savedPmRes,
+    ] = await Promise.all([
+      FamilyMember.updateMany(baseFilter, cascadeUpdate, sessionOpt),
+      Payment.updateMany(baseFilter, cascadeUpdate, sessionOpt),
+      Statement.updateMany(baseFilter, cascadeUpdate, sessionOpt),
+      LifecycleEventPayment.updateMany(baseFilter, cascadeUpdate, sessionOpt),
+      Task.updateMany(tenantMatch(orgId, { relatedFamilyId: familyId }), cascadeUpdate, sessionOpt),
+      Withdrawal.updateMany(baseFilter, cascadeUpdate, sessionOpt),
+      CycleCharge.updateMany(baseFilter, cascadeUpdate, sessionOpt),
+      RecurringPayment.updateMany(
+        { organizationId: orgId, familyId, isActive: true },
+        { $set: { isActive: false } },
+        sessionOpt,
+      ),
+      SavedPaymentMethod.updateMany(
+        { organizationId: orgId, familyId, isActive: true },
+        { $set: { isActive: false } },
+        sessionOpt,
+      ),
+    ])
+
+    await Family.updateOne(
+      { _id: familyId, organizationId: orgId, deletedAt: null },
+      { $set: { deletedAt: at, deletedBy: ctx.userId, deletedKind: 'manual' } },
+      sessionOpt,
+    )
+
+    return {
+      memberCount: memberRes.modifiedCount,
+      paymentCount: paymentRes.modifiedCount,
+      statementCount: statementRes.modifiedCount,
+      lifecycleCount: lifecycleRes.modifiedCount,
+      taskCount: taskRes.modifiedCount,
+      withdrawalCount: withdrawalRes.modifiedCount,
+      cycleChargeCount: cycleChargeRes.modifiedCount,
+      recurringDeactivated: recurringRes.modifiedCount,
+      savedPaymentMethodsDeactivated: savedPmRes.modifiedCount,
+    }
+  })
 
   await audit({
     organizationId: orgId,
@@ -246,17 +264,7 @@ export async function softDeleteFamilyCascade(
     resourceId: familyId,
     metadata: {
       name: fam.name,
-      cascade: {
-        memberCount: memberRes.modifiedCount,
-        paymentCount: paymentRes.modifiedCount,
-        statementCount: statementRes.modifiedCount,
-        lifecycleCount: lifecycleRes.modifiedCount,
-        taskCount: taskRes.modifiedCount,
-        withdrawalCount: withdrawalRes.modifiedCount,
-        cycleChargeCount: cycleChargeRes.modifiedCount,
-        recurringDeactivated: recurringRes.modifiedCount,
-        savedPaymentMethodsDeactivated: savedPmRes.modifiedCount,
-      },
+      cascade: cascadeCounts,
     },
     request: opts.request,
   })
@@ -320,40 +328,46 @@ export async function restoreFromBin(
       ...extra,
     })
 
-    const [
-      memberRes,
-      paymentRes,
-      statementRes,
-      lifecycleRes,
-      taskRes,
-      withdrawalRes,
-      cycleChargeRes,
-    ] = await Promise.all([
-      FamilyMember.updateMany(childFilter(), clearFields, { includeDeleted: true }),
-      Payment.updateMany(childFilter(), clearFields, { includeDeleted: true }),
-      Statement.updateMany(childFilter(), clearFields, { includeDeleted: true }),
-      LifecycleEventPayment.updateMany(childFilter(), clearFields, { includeDeleted: true }),
-      Task.updateMany(
-        {
-          organizationId: ctx.organizationId,
-          relatedFamilyId: id,
-          deletedAt: cascadeAt,
-          deletedKind: 'cascade',
-        },
-        clearFields,
-        { includeDeleted: true },
-      ),
-      Withdrawal.updateMany(childFilter(), clearFields, { includeDeleted: true }),
-      CycleCharge.updateMany(childFilter(), clearFields, { includeDeleted: true }),
-    ])
-    cascadeRestored =
-      memberRes.modifiedCount +
-      paymentRes.modifiedCount +
-      statementRes.modifiedCount +
-      lifecycleRes.modifiedCount +
-      taskRes.modifiedCount +
-      withdrawalRes.modifiedCount +
-      cycleChargeRes.modifiedCount
+    cascadeRestored = await runTransaction(async (session) => {
+      const sessionOpt = session ? { session, includeDeleted: true } : { includeDeleted: true }
+
+      const [
+        memberRes,
+        paymentRes,
+        statementRes,
+        lifecycleRes,
+        taskRes,
+        withdrawalRes,
+        cycleChargeRes,
+      ] = await Promise.all([
+        FamilyMember.updateMany(childFilter(), clearFields, sessionOpt),
+        Payment.updateMany(childFilter(), clearFields, sessionOpt),
+        Statement.updateMany(childFilter(), clearFields, sessionOpt),
+        LifecycleEventPayment.updateMany(childFilter(), clearFields, sessionOpt),
+        Task.updateMany(
+          {
+            organizationId: ctx.organizationId,
+            relatedFamilyId: id,
+            deletedAt: cascadeAt,
+            deletedKind: 'cascade',
+          },
+          clearFields,
+          sessionOpt,
+        ),
+        Withdrawal.updateMany(childFilter(), clearFields, sessionOpt),
+        CycleCharge.updateMany(childFilter(), clearFields, sessionOpt),
+      ])
+
+      return (
+        memberRes.modifiedCount +
+        paymentRes.modifiedCount +
+        statementRes.modifiedCount +
+        lifecycleRes.modifiedCount +
+        taskRes.modifiedCount +
+        withdrawalRes.modifiedCount +
+        cycleChargeRes.modifiedCount
+      )
+    })
   }
 
   await audit({

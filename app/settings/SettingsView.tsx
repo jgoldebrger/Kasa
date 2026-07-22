@@ -1474,7 +1474,7 @@ export default function SettingsView({
     (activeTab === 'activity' && auditLoading && auditItems.length === 0)
 
   return (
-    <main className="min-h-screen p-4 sm:p-6 md:p-8 bg-app-subtle">
+    <div className="min-h-screen p-4 sm:p-6 md:p-8 bg-app-subtle">
       <div className="max-w-6xl mx-auto">
         <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
 
@@ -1784,6 +1784,6 @@ export default function SettingsView({
           </div>
         </div>
       </div>
-    </main>
+    </div>
   )
 }

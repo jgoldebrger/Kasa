@@ -9,6 +9,20 @@ import {
 } from './email-utils'
 
 describe('compose email body formatting', () => {
+  it('rejects javascript: markdown links', () => {
+    const html = markdownToHtml('Click [evil](javascript:alert(1))')
+    expect(html).not.toContain('javascript:')
+    expect(html).not.toContain('<a ')
+    expect(html).toContain('evil')
+  })
+
+  it('rejects data: markdown links', () => {
+    const html = markdownToHtml('Open [payload](data:text/html,<script>alert(1)</script>)')
+    expect(html).not.toContain('data:')
+    expect(html).not.toContain('<a ')
+    expect(html).toContain('payload')
+  })
+
   it('renders markdown bold and italic without showing markers', () => {
     const html = markdownToHtml('Hello **bold** and *italic*')
     expect(html).toContain('<strong>bold</strong>')

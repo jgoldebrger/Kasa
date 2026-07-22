@@ -54,6 +54,7 @@ FamilySchema.index({ organizationId: 1, createdAt: -1 })
 // has to do an in-memory sort of every family in the org on every list call.
 FamilySchema.index({ organizationId: 1, name: 1 })
 FamilySchema.index({ organizationId: 1, parentFamilyId: 1 })
+FamilySchema.index({ organizationId: 1, email: 1 })
 FamilySchema.plugin(softDeletePlugin)
 
 export const Family = mongoose.models.Family || mongoose.model('Family', FamilySchema)

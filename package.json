@@ -44,6 +44,8 @@
     "typecheck": "tsc --noEmit",
     "check:env": "npx tsx scripts/check-env.ts",
     "encrypt-legacy-secrets": "npx tsx scripts/encrypt-legacy-secrets.ts",
+    "sync-indexes": "npx tsx scripts/sync-indexes.ts",
+    "migrate": "npx tsx scripts/run-migrations.ts",
     "encrypt-legacy-secrets:dry-run": "npx tsx scripts/encrypt-legacy-secrets.ts --dry-run",
     "prepare": "simple-git-hooks",
     "generate-statements": "npx tsx scripts/generate-monthly-statements.ts",

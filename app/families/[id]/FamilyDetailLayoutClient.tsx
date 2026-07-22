@@ -32,7 +32,7 @@ function FamilyDetailShell({ children }: { children: React.ReactNode }) {
 
   if (roleLoading || loading) {
     return (
-      <main className="min-h-screen p-4 sm:p-6 md:p-8 bg-app">
+      <div className="min-h-screen p-4 sm:p-6 md:p-8 bg-app">
         <div className="max-w-7xl mx-auto">
           <div className="ui-skeleton h-8 w-40 mb-4" />
           <div className="ui-skeleton h-10 w-2/3 mb-2" />
@@ -44,13 +44,13 @@ function FamilyDetailShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="ui-skeleton h-96" />
         </div>
-      </main>
+      </div>
     )
   }
 
   if (!data?.family) {
     return (
-      <main className="min-h-screen p-4 sm:p-6 md:p-8 bg-app">
+      <div className="min-h-screen p-4 sm:p-6 md:p-8 bg-app">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-2xl font-bold mb-4 text-fg">Family not found</h1>
           <p className="text-fg">
@@ -63,12 +63,12 @@ function FamilyDetailShell({ children }: { children: React.ReactNode }) {
             ← Back to Families
           </button>
         </div>
-      </main>
+      </div>
     )
   }
 
   return (
-    <main className="min-h-screen p-4 sm:p-6 md:p-8 bg-app">
+    <div className="min-h-screen p-4 sm:p-6 md:p-8 bg-app">
       <div className="max-w-7xl mx-auto">
         <Link
           href="/families"
@@ -107,7 +107,7 @@ function FamilyDetailShell({ children }: { children: React.ReactNode }) {
 
         <FamilyModals />
       </div>
-    </main>
+    </div>
   )
 }
 
@@ -122,9 +122,9 @@ export default function FamilyDetailLayoutClient({
     <FamilyDetailProvider initialSummary={initialSummary}>
       <Suspense
         fallback={
-          <main className="min-h-screen p-4 sm:p-6 md:p-8 bg-app">
+          <div className="min-h-screen p-4 sm:p-6 md:p-8 bg-app">
             <div className="max-w-7xl mx-auto ui-skeleton h-96" />
-          </main>
+          </div>
         }
       >
         <FamilyDetailShell>{children}</FamilyDetailShell>

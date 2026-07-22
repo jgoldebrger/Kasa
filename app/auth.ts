@@ -19,7 +19,7 @@ const oidcConfig = getOidcConfig()
 // many seconds per token. Keeps a sane upper bound on DB load while still
 // revoking JWTs shortly after a password reset and picking up membership
 // changes quickly.
-const TOKEN_REFRESH_TTL_SEC = 30
+const TOKEN_REFRESH_TTL_SEC = 10
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,

@@ -658,7 +658,7 @@ export default function StatementsView({ initialStatements }: StatementsViewProp
   }
 
   return (
-    <main className="min-h-screen p-4 sm:p-6 md:p-8 bg-app-subtle">
+    <div className="min-h-screen p-4 sm:p-6 md:p-8 bg-app-subtle">
       <div className="max-w-7xl mx-auto">
         <PageHeader
           title="Statements"
@@ -1282,6 +1282,6 @@ export default function StatementsView({ initialStatements }: StatementsViewProp
           </form>
         </Modal>
       </div>
-    </main>
+    </div>
   )
 }

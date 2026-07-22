@@ -265,7 +265,7 @@ This was hardened in a dedicated security pass. Highlights:
 - **JWT sessions**: 7-day `maxAge`, 24-hour sliding `updateAge`,
   invalidated on password reset via `passwordChangedAt`.
 - **Membership cache in JWT** — `requireOrg` reads role from token,
-  falls back to DB on miss / 30s refresh window.
+  falls back to DB on miss / 10s refresh window.
 - **CSRF**: middleware rejects state-changing requests whose `Origin`
   or `Referer` doesn't match the host.
 - **CSP**: strict per-request nonce-based CSP applied in **production**

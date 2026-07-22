@@ -1,4 +1,5 @@
 import { ScheduledEmail } from '@/lib/models'
+import { sanitizeEmailHtml } from '@/lib/client/sanitize-email-html'
 import { audit } from '@/lib/audit'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { scheduledEmail as scheduledEmailSchemas } from '@/lib/schemas'
@@ -68,7 +69,7 @@ export const POST = handler({
     const doc = await ScheduledEmail.create({
       organizationId: ctx!.organizationId,
       subject: body.subject,
-      html: body.html,
+      html: sanitizeEmailHtml(body.html),
       text: body.text,
       familyIds: body.familyIds,
       scheduledFor: body.scheduledFor,

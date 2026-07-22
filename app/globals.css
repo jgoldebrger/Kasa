@@ -25,8 +25,9 @@
   --c-accent-soft:    240 253 250;
   --c-accent-fg:      255 255 255;
 
-  --c-success:        22 163 74;
-  --c-warning:        217 119 6;
+  /* green-700 / amber-700 — AA normal text on white (was green-600/amber-600) */
+  --c-success:        21 128 61;
+  --c-warning:        180 83 9;
   --c-danger:         220 38 38;
 
   /* Spacing scale (multiples of 4px). */

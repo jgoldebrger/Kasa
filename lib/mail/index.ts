@@ -10,6 +10,7 @@ export { normalizeGmailAppPassword } from './normalize-app-password'
 export {
   applyMergeFields,
   loadMergeFieldContext,
+  loadMergeFieldContexts,
   MERGE_FIELD_DEFINITIONS,
   mergeFieldToken,
   mergeFieldSamples,

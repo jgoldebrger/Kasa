@@ -360,45 +360,40 @@ export default function FamilyModals() {
               <h3 className="text-lg font-semibold mb-4 text-fg">Basic Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">Family Name *</label>
-                  <input
+                  <Input
+                    label="Family Name *"
                     type="text"
                     required
                     value={infoForm.name}
                     onChange={(e) => setInfoForm({ ...infoForm, name: e.target.value })}
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">
-                    Family Name (Hebrew)
-                  </label>
-                  <input
+                  <Input
+                    label="Family Name (Hebrew)"
                     type="text"
                     dir="rtl"
                     lang="he"
                     value={infoForm.hebrewName}
                     onChange={(e) => setInfoForm({ ...infoForm, hebrewName: e.target.value })}
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none text-right"
+                    className="text-right"
                     style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">Wedding Date *</label>
-                  <input
+                  <Input
+                    label="Wedding Date *"
                     type="date"
                     required
                     value={infoForm.weddingDate}
                     onChange={(e) => setInfoForm({ ...infoForm, weddingDate: e.target.value })}
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">Payment Plan</label>
-                  <select
+                  <Select
+                    label="Payment Plan"
                     value={infoForm.paymentPlanId}
                     onChange={(e) => setInfoForm({ ...infoForm, paymentPlanId: e.target.value })}
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
                   >
                     <option value="">Select a plan</option>
                     {paymentPlans.map((plan: { _id: string; name: string }) => (
@@ -406,7 +401,7 @@ export default function FamilyModals() {
                         {plan.name}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               </div>
             </div>
@@ -415,54 +410,40 @@ export default function FamilyModals() {
             <div>
               <h3 className="text-lg font-semibold mb-4 text-fg">Husband Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">First Name</label>
-                  <input
-                    type="text"
-                    value={infoForm.husbandFirstName}
-                    onChange={(e) => setInfoForm({ ...infoForm, husbandFirstName: e.target.value })}
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">Hebrew Name</label>
-                  <input
-                    type="text"
-                    dir="rtl"
-                    lang="he"
-                    value={infoForm.husbandHebrewName}
-                    onChange={(e) =>
-                      setInfoForm({ ...infoForm, husbandHebrewName: e.target.value })
-                    }
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none text-right"
-                    style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">
-                    Father's Hebrew Name
-                  </label>
-                  <input
-                    type="text"
-                    dir="rtl"
-                    lang="he"
-                    value={infoForm.husbandFatherHebrewName}
-                    onChange={(e) =>
-                      setInfoForm({ ...infoForm, husbandFatherHebrewName: e.target.value })
-                    }
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none text-right"
-                    style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">Cell Phone</label>
-                  <input
-                    type="tel"
-                    value={infoForm.husbandCellPhone}
-                    onChange={(e) => setInfoForm({ ...infoForm, husbandCellPhone: e.target.value })}
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                  />
-                </div>
+                <Input
+                  label="First Name"
+                  type="text"
+                  value={infoForm.husbandFirstName}
+                  onChange={(e) => setInfoForm({ ...infoForm, husbandFirstName: e.target.value })}
+                />
+                <Input
+                  label="Hebrew Name"
+                  type="text"
+                  dir="rtl"
+                  lang="he"
+                  value={infoForm.husbandHebrewName}
+                  onChange={(e) => setInfoForm({ ...infoForm, husbandHebrewName: e.target.value })}
+                  className="text-right"
+                  style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
+                />
+                <Input
+                  label="Father's Hebrew Name"
+                  type="text"
+                  dir="rtl"
+                  lang="he"
+                  value={infoForm.husbandFatherHebrewName}
+                  onChange={(e) =>
+                    setInfoForm({ ...infoForm, husbandFatherHebrewName: e.target.value })
+                  }
+                  className="text-right"
+                  style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
+                />
+                <Input
+                  label="Cell Phone"
+                  type="tel"
+                  value={infoForm.husbandCellPhone}
+                  onChange={(e) => setInfoForm({ ...infoForm, husbandCellPhone: e.target.value })}
+                />
               </div>
             </div>
 
@@ -470,52 +451,40 @@ export default function FamilyModals() {
             <div>
               <h3 className="text-lg font-semibold mb-4 text-fg">Wife Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">First Name</label>
-                  <input
-                    type="text"
-                    value={infoForm.wifeFirstName}
-                    onChange={(e) => setInfoForm({ ...infoForm, wifeFirstName: e.target.value })}
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">Hebrew Name</label>
-                  <input
-                    type="text"
-                    dir="rtl"
-                    lang="he"
-                    value={infoForm.wifeHebrewName}
-                    onChange={(e) => setInfoForm({ ...infoForm, wifeHebrewName: e.target.value })}
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none text-right"
-                    style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">
-                    Father's Hebrew Name
-                  </label>
-                  <input
-                    type="text"
-                    dir="rtl"
-                    lang="he"
-                    value={infoForm.wifeFatherHebrewName}
-                    onChange={(e) =>
-                      setInfoForm({ ...infoForm, wifeFatherHebrewName: e.target.value })
-                    }
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none text-right"
-                    style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">Cell Phone</label>
-                  <input
-                    type="tel"
-                    value={infoForm.wifeCellPhone}
-                    onChange={(e) => setInfoForm({ ...infoForm, wifeCellPhone: e.target.value })}
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                  />
-                </div>
+                <Input
+                  label="First Name"
+                  type="text"
+                  value={infoForm.wifeFirstName}
+                  onChange={(e) => setInfoForm({ ...infoForm, wifeFirstName: e.target.value })}
+                />
+                <Input
+                  label="Hebrew Name"
+                  type="text"
+                  dir="rtl"
+                  lang="he"
+                  value={infoForm.wifeHebrewName}
+                  onChange={(e) => setInfoForm({ ...infoForm, wifeHebrewName: e.target.value })}
+                  className="text-right"
+                  style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
+                />
+                <Input
+                  label="Father's Hebrew Name"
+                  type="text"
+                  dir="rtl"
+                  lang="he"
+                  value={infoForm.wifeFatherHebrewName}
+                  onChange={(e) =>
+                    setInfoForm({ ...infoForm, wifeFatherHebrewName: e.target.value })
+                  }
+                  className="text-right"
+                  style={{ fontFamily: 'Arial Hebrew, David, sans-serif' }}
+                />
+                <Input
+                  label="Cell Phone"
+                  type="tel"
+                  value={infoForm.wifeCellPhone}
+                  onChange={(e) => setInfoForm({ ...infoForm, wifeCellPhone: e.target.value })}
+                />
               </div>
             </div>
 
@@ -523,72 +492,56 @@ export default function FamilyModals() {
             <div>
               <h3 className="text-lg font-semibold mb-4 text-fg">Contact Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-2 text-fg">Email</label>
-                  <input
-                    type="email"
-                    value={infoForm.email}
-                    onChange={(e) => setInfoForm({ ...infoForm, email: e.target.value })}
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                    placeholder="family@example.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">Phone</label>
-                  <input
-                    type="tel"
-                    value={infoForm.phone}
-                    onChange={(e) => setInfoForm({ ...infoForm, phone: e.target.value })}
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                    placeholder="(555) 123-4567"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">ZIP Code</label>
-                  <input
-                    type="text"
-                    value={infoForm.zip}
-                    onChange={(e) => setInfoForm({ ...infoForm, zip: e.target.value })}
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                    placeholder="12345"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-2 text-fg">Street Address</label>
-                  <input
-                    type="text"
-                    value={infoForm.street || infoForm.address}
-                    onChange={(e) =>
-                      setInfoForm({
-                        ...infoForm,
-                        street: e.target.value,
-                        address: e.target.value,
-                      })
-                    }
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                    placeholder="123 Main Street"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">City</label>
-                  <input
-                    type="text"
-                    value={infoForm.city}
-                    onChange={(e) => setInfoForm({ ...infoForm, city: e.target.value })}
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                    placeholder="New York"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-fg">State</label>
-                  <input
-                    type="text"
-                    value={infoForm.state}
-                    onChange={(e) => setInfoForm({ ...infoForm, state: e.target.value })}
-                    className="w-full border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                    placeholder="NY"
-                  />
-                </div>
+                <Input
+                  label="Email"
+                  type="email"
+                  wrapperClassName="md:col-span-2"
+                  value={infoForm.email}
+                  onChange={(e) => setInfoForm({ ...infoForm, email: e.target.value })}
+                  placeholder="family@example.com"
+                />
+                <Input
+                  label="Phone"
+                  type="tel"
+                  value={infoForm.phone}
+                  onChange={(e) => setInfoForm({ ...infoForm, phone: e.target.value })}
+                  placeholder="(555) 123-4567"
+                />
+                <Input
+                  label="ZIP Code"
+                  type="text"
+                  value={infoForm.zip}
+                  onChange={(e) => setInfoForm({ ...infoForm, zip: e.target.value })}
+                  placeholder="12345"
+                />
+                <Input
+                  label="Street Address"
+                  type="text"
+                  wrapperClassName="md:col-span-2"
+                  value={infoForm.street || infoForm.address}
+                  onChange={(e) =>
+                    setInfoForm({
+                      ...infoForm,
+                      street: e.target.value,
+                      address: e.target.value,
+                    })
+                  }
+                  placeholder="123 Main Street"
+                />
+                <Input
+                  label="City"
+                  type="text"
+                  value={infoForm.city}
+                  onChange={(e) => setInfoForm({ ...infoForm, city: e.target.value })}
+                  placeholder="New York"
+                />
+                <Input
+                  label="State"
+                  type="text"
+                  value={infoForm.state}
+                  onChange={(e) => setInfoForm({ ...infoForm, state: e.target.value })}
+                  placeholder="NY"
+                />
               </div>
             </div>
 
@@ -618,29 +571,25 @@ export default function FamilyModals() {
             {/* Payment For Selection - Only show if opened from member view, otherwise default to family */}
             {viewingMemberId && memberActiveTab === 'payments' ? (
               <>
-                {/* When viewing a member, allow selecting payment for member or family */}
-                <div>
-                  <label className="block text-sm font-medium mb-1">Payment For *</label>
-                  <select
-                    value={paymentForm.paymentFor}
-                    onChange={(e) =>
-                      setPaymentForm({
-                        ...paymentForm,
-                        paymentFor: e.target.value as 'family' | 'member',
-                        memberId: e.target.value === 'family' ? '' : viewingMemberId,
-                      })
-                    }
-                    className="w-full border rounded px-3 py-2"
-                    required
-                  >
-                    <option value="member">
-                      Member (Current:{' '}
-                      {data?.members?.find((m: any) => m._id === viewingMemberId)?.firstName}{' '}
-                      {data?.members?.find((m: any) => m._id === viewingMemberId)?.lastName})
-                    </option>
-                    <option value="family">Family</option>
-                  </select>
-                </div>
+                <Select
+                  label="Payment For"
+                  value={paymentForm.paymentFor}
+                  onChange={(e) =>
+                    setPaymentForm({
+                      ...paymentForm,
+                      paymentFor: e.target.value as 'family' | 'member',
+                      memberId: e.target.value === 'family' ? '' : viewingMemberId,
+                    })
+                  }
+                  required
+                >
+                  <option value="member">
+                    Member (Current:{' '}
+                    {data?.members?.find((m: any) => m._id === viewingMemberId)?.firstName}{' '}
+                    {data?.members?.find((m: any) => m._id === viewingMemberId)?.lastName})
+                  </option>
+                  <option value="family">Family</option>
+                </Select>
               </>
             ) : (
               <>
@@ -651,114 +600,93 @@ export default function FamilyModals() {
 
             {/* Member Selection - Show only if paymentFor is 'member' and not viewing a specific member */}
             {paymentForm.paymentFor === 'member' && !viewingMemberId && (
-              <div>
-                <label className="block text-sm font-medium mb-1">Select Member *</label>
-                <select
-                  value={paymentForm.memberId}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, memberId: e.target.value })}
-                  className="w-full border rounded px-3 py-2"
-                  required={paymentForm.paymentFor === 'member'}
-                >
-                  <option value="">Select a member...</option>
-                  {data?.members?.map((member: any) => (
-                    <option key={member._id} value={member._id}>
-                      {member.firstName} {member.lastName}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <Select
+                label="Select Member"
+                value={paymentForm.memberId}
+                onChange={(e) => setPaymentForm({ ...paymentForm, memberId: e.target.value })}
+                required={paymentForm.paymentFor === 'member'}
+              >
+                <option value="">Select a member...</option>
+                {data?.members?.map((member: any) => (
+                  <option key={member._id} value={member._id}>
+                    {member.firstName} {member.lastName}
+                  </option>
+                ))}
+              </Select>
             )}
 
-            <div>
-              <label className="block text-sm font-medium mb-1">Amount *</label>
-              <input
-                type="number"
-                required
-                min="0.01"
-                step="0.01"
-                value={paymentForm.amount || ''}
-                onChange={(e) => {
-                  const value = e.target.value
-                  setPaymentForm({ ...paymentForm, amount: value ? parseFloat(value) : 0 })
-                }}
-                className="w-full border rounded px-3 py-2"
-                placeholder="0.00"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Payment Date *</label>
-              <input
-                type="date"
-                required
-                value={paymentForm.paymentDate}
-                onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
-                className="w-full border rounded px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Year *</label>
-              <input
-                type="number"
-                required
-                value={paymentForm.year}
-                onChange={(e) => setPaymentForm({ ...paymentForm, year: parseInt(e.target.value) })}
-                className="w-full border rounded px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Type</label>
-              <select
-                value={paymentForm.type}
-                onChange={(e) => setPaymentForm({ ...paymentForm, type: e.target.value as any })}
-                className="w-full border rounded px-3 py-2"
-              >
-                <option value="membership">Membership</option>
-                <option value="donation">Donation</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Payment Frequency *</label>
-              <select
-                value={paymentForm.paymentFrequency}
-                onChange={(e) =>
-                  setPaymentForm({
-                    ...paymentForm,
-                    paymentFrequency: e.target.value as 'one-time' | 'monthly',
-                  })
-                }
-                className="w-full border rounded px-3 py-2"
-                required
-              >
-                <option value="one-time">One-Time Payment</option>
-                <option value="monthly">Monthly Payment</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Payment Method *</label>
-              <select
-                value={paymentForm.paymentMethod || 'cash'}
-                onChange={(e) => {
-                  const selectedMethod = e.target.value as
-                    | 'cash'
-                    | 'credit_card'
-                    | 'check'
-                    | 'quick_pay'
-                  setPaymentForm({
-                    ...paymentForm,
-                    paymentMethod: selectedMethod,
-                    useSavedCard: false,
-                  })
-                }}
-                className="w-full border rounded px-3 py-2"
-                required
-              >
-                <option value="cash">Cash</option>
-                <option value="credit_card">Credit Card</option>
-                <option value="check">Check</option>
-                <option value="quick_pay">Quick Pay</option>
-              </select>
-            </div>
+            <Input
+              label="Amount"
+              type="number"
+              required
+              min="0.01"
+              step="0.01"
+              value={paymentForm.amount || ''}
+              onChange={(e) => {
+                const value = e.target.value
+                setPaymentForm({ ...paymentForm, amount: value ? parseFloat(value) : 0 })
+              }}
+              placeholder="0.00"
+            />
+            <Input
+              label="Payment Date"
+              type="date"
+              required
+              value={paymentForm.paymentDate}
+              onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
+            />
+            <Input
+              label="Year"
+              type="number"
+              required
+              value={paymentForm.year}
+              onChange={(e) => setPaymentForm({ ...paymentForm, year: parseInt(e.target.value) })}
+            />
+            <Select
+              label="Type"
+              value={paymentForm.type}
+              onChange={(e) => setPaymentForm({ ...paymentForm, type: e.target.value as any })}
+            >
+              <option value="membership">Membership</option>
+              <option value="donation">Donation</option>
+              <option value="other">Other</option>
+            </Select>
+            <Select
+              label="Payment Frequency"
+              value={paymentForm.paymentFrequency}
+              onChange={(e) =>
+                setPaymentForm({
+                  ...paymentForm,
+                  paymentFrequency: e.target.value as 'one-time' | 'monthly',
+                })
+              }
+              required
+            >
+              <option value="one-time">One-Time Payment</option>
+              <option value="monthly">Monthly Payment</option>
+            </Select>
+            <Select
+              label="Payment Method"
+              value={paymentForm.paymentMethod || 'cash'}
+              onChange={(e) => {
+                const selectedMethod = e.target.value as
+                  | 'cash'
+                  | 'credit_card'
+                  | 'check'
+                  | 'quick_pay'
+                setPaymentForm({
+                  ...paymentForm,
+                  paymentMethod: selectedMethod,
+                  useSavedCard: false,
+                })
+              }}
+              required
+            >
+              <option value="cash">Cash</option>
+              <option value="credit_card">Credit Card</option>
+              <option value="check">Check</option>
+              <option value="quick_pay">Quick Pay</option>
+            </Select>
 
             {/* Credit Card Fields */}
             {paymentForm.paymentMethod === 'credit_card' && (
@@ -899,87 +827,70 @@ export default function FamilyModals() {
                     ) : (
                       <>
                         <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-sm font-medium mb-1">
-                              Last 4 Digits *
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              maxLength={4}
-                              value={paymentForm.ccLast4}
-                              onChange={(e) =>
-                                setPaymentForm({
-                                  ...paymentForm,
-                                  ccLast4: e.target.value.replace(/\D/g, '').slice(0, 4),
-                                })
-                              }
-                              className="w-full border rounded px-3 py-2"
-                              placeholder="1234"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium mb-1">Card Type</label>
-                            <select
-                              value={paymentForm.ccCardType}
-                              onChange={(e) =>
-                                setPaymentForm({ ...paymentForm, ccCardType: e.target.value })
-                              }
-                              className="w-full border rounded px-3 py-2"
-                            >
-                              <option value="">Select...</option>
-                              <option value="Visa">Visa</option>
-                              <option value="Mastercard">Mastercard</option>
-                              <option value="American Express">American Express</option>
-                              <option value="Discover">Discover</option>
-                              <option value="Other">Other</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium mb-1">Expiry Month</label>
-                            <input
-                              type="text"
-                              maxLength={2}
-                              value={paymentForm.ccExpiryMonth}
-                              onChange={(e) =>
-                                setPaymentForm({
-                                  ...paymentForm,
-                                  ccExpiryMonth: e.target.value.replace(/\D/g, '').slice(0, 2),
-                                })
-                              }
-                              className="w-full border rounded px-3 py-2"
-                              placeholder="MM"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium mb-1">Expiry Year</label>
-                            <input
-                              type="text"
-                              maxLength={4}
-                              value={paymentForm.ccExpiryYear}
-                              onChange={(e) =>
-                                setPaymentForm({
-                                  ...paymentForm,
-                                  ccExpiryYear: e.target.value.replace(/\D/g, '').slice(0, 4),
-                                })
-                              }
-                              className="w-full border rounded px-3 py-2"
-                              placeholder="YYYY"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Name on Card</label>
-                          <input
+                          <Input
+                            label="Last 4 Digits"
                             type="text"
-                            value={paymentForm.ccNameOnCard}
+                            required
+                            maxLength={4}
+                            value={paymentForm.ccLast4}
                             onChange={(e) =>
-                              setPaymentForm({ ...paymentForm, ccNameOnCard: e.target.value })
+                              setPaymentForm({
+                                ...paymentForm,
+                                ccLast4: e.target.value.replace(/\D/g, '').slice(0, 4),
+                              })
                             }
-                            className="w-full border rounded px-3 py-2"
-                            placeholder="John Doe"
+                            placeholder="1234"
+                          />
+                          <Select
+                            label="Card Type"
+                            value={paymentForm.ccCardType}
+                            onChange={(e) =>
+                              setPaymentForm({ ...paymentForm, ccCardType: e.target.value })
+                            }
+                          >
+                            <option value="">Select...</option>
+                            <option value="Visa">Visa</option>
+                            <option value="Mastercard">Mastercard</option>
+                            <option value="American Express">American Express</option>
+                            <option value="Discover">Discover</option>
+                            <option value="Other">Other</option>
+                          </Select>
+                          <Input
+                            label="Expiry Month"
+                            type="text"
+                            maxLength={2}
+                            value={paymentForm.ccExpiryMonth}
+                            onChange={(e) =>
+                              setPaymentForm({
+                                ...paymentForm,
+                                ccExpiryMonth: e.target.value.replace(/\D/g, '').slice(0, 2),
+                              })
+                            }
+                            placeholder="MM"
+                          />
+                          <Input
+                            label="Expiry Year"
+                            type="text"
+                            maxLength={4}
+                            value={paymentForm.ccExpiryYear}
+                            onChange={(e) =>
+                              setPaymentForm({
+                                ...paymentForm,
+                                ccExpiryYear: e.target.value.replace(/\D/g, '').slice(0, 4),
+                              })
+                            }
+                            placeholder="YYYY"
                           />
                         </div>
+                        <Input
+                          label="Name on Card"
+                          type="text"
+                          value={paymentForm.ccNameOnCard}
+                          onChange={(e) =>
+                            setPaymentForm({ ...paymentForm, ccNameOnCard: e.target.value })
+                          }
+                          placeholder="John Doe"
+                        />
                         {paymentForm.amount > 0 && (
                           <label className="flex items-center gap-2 text-sm mt-3">
                             <input
@@ -1016,59 +927,45 @@ export default function FamilyModals() {
             {paymentForm.paymentMethod === 'check' && (
               <div className="space-y-3 rounded-lg border border-success/20 bg-success/10 p-4">
                 <h4 className="font-medium text-fg mb-2">Check Information</h4>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Check Number *</label>
-                  <input
-                    type="text"
-                    required
-                    value={paymentForm.checkNumber}
-                    onChange={(e) =>
-                      setPaymentForm({ ...paymentForm, checkNumber: e.target.value })
-                    }
-                    className="w-full border rounded px-3 py-2"
-                    placeholder="1234"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Bank Name</label>
-                  <input
-                    type="text"
-                    value={paymentForm.checkBankName}
-                    onChange={(e) =>
-                      setPaymentForm({ ...paymentForm, checkBankName: e.target.value })
-                    }
-                    className="w-full border rounded px-3 py-2"
-                    placeholder="Bank Name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Routing Number</label>
-                  <input
-                    type="text"
-                    value={paymentForm.checkRoutingNumber}
-                    onChange={(e) =>
-                      setPaymentForm({
-                        ...paymentForm,
-                        checkRoutingNumber: e.target.value.replace(/\D/g, ''),
-                      })
-                    }
-                    className="w-full border rounded px-3 py-2"
-                    placeholder="9-digit routing number"
-                    maxLength={9}
-                  />
-                </div>
+                <Input
+                  label="Check Number"
+                  type="text"
+                  required
+                  value={paymentForm.checkNumber}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, checkNumber: e.target.value })}
+                  placeholder="1234"
+                />
+                <Input
+                  label="Bank Name"
+                  type="text"
+                  value={paymentForm.checkBankName}
+                  onChange={(e) =>
+                    setPaymentForm({ ...paymentForm, checkBankName: e.target.value })
+                  }
+                  placeholder="Bank Name"
+                />
+                <Input
+                  label="Routing Number"
+                  type="text"
+                  value={paymentForm.checkRoutingNumber}
+                  onChange={(e) =>
+                    setPaymentForm({
+                      ...paymentForm,
+                      checkRoutingNumber: e.target.value.replace(/\D/g, ''),
+                    })
+                  }
+                  placeholder="9-digit routing number"
+                  maxLength={9}
+                />
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium mb-1">Notes</label>
-              <textarea
-                value={paymentForm.notes}
-                onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-                className="w-full border rounded px-3 py-2"
-                rows={3}
-              />
-            </div>
+            <Textarea
+              label="Notes"
+              value={paymentForm.notes}
+              onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+              rows={3}
+            />
             {!(paymentForm.paymentMethod === 'credit_card' && useStripe) && (
               <div className="flex justify-end gap-3">
                 <Button
