@@ -74,7 +74,7 @@ const ALL_SECTIONS: NavSection[] = [
         labelKey: 'settings.nav.members',
         icon: <UserGroupIcon className="h-4 w-4" aria-hidden="true" />,
         privileged: true,
-        keywords: 'invite users roles',
+        keywords: 'invite users roles team teams members',
       },
       {
         id: 'localization',

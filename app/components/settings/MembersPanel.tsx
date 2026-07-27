@@ -44,7 +44,8 @@ interface PendingInvite {
 }
 
 const ROLE_BADGE: Record<string, string> = {
-  owner: 'bg-accent/10 text-accent border-accent/20',
+  owner:
+    'bg-amber-100 text-amber-950 border-amber-300 dark:bg-amber-500/15 dark:text-amber-100 dark:border-amber-500/40',
   admin: 'bg-accent/10 text-accent border-accent/20',
   member: 'bg-fg/5 text-fg border-border',
   treasurer:
@@ -146,12 +147,18 @@ export default function MembersPanel({ onRoleResolved }: MembersPanelProps = {})
 
   const invite = async (e: React.FormEvent) => {
     e.preventDefault()
+    const roleToInvite =
+      currentUserRole === 'owner' ? inviteRole : inviteRole === 'owner' ? 'member' : inviteRole
+    if (roleToInvite === 'owner' && currentUserRole !== 'owner') {
+      toast.error('Only owners can invite other owners.')
+      return
+    }
     setInviteBusy(true)
     try {
       const res = await fetch('/api/auth/invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+        body: JSON.stringify({ email: inviteEmail, role: roleToInvite }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -175,6 +182,16 @@ export default function MembersPanel({ onRoleResolved }: MembersPanelProps = {})
   }
 
   const changeRole = async (member: Member, role: string) => {
+    // Client-side guard — server enforces the same policy. Prevents admins
+    // from attempting owner promotion via crafted select options.
+    if (role === 'owner' && currentUserRole !== 'owner') {
+      toast.error('Only owners can promote to owner.')
+      return
+    }
+    if (member.role === 'owner' && currentUserRole !== 'owner') {
+      toast.error('Only owners can change an owner’s role.')
+      return
+    }
     if (member.role === 'owner' && role !== 'owner') {
       const ok = await confirm({
         title: 'Demote owner?',
@@ -270,7 +287,7 @@ export default function MembersPanel({ onRoleResolved }: MembersPanelProps = {})
       {canManage && (
         <div className="surface-card p-4 sm:p-6">
           <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-fg">
-            <UserPlusIcon className="h-5 w-5" aria-hidden="true" /> Invite a new member
+            <UserPlusIcon className="h-5 w-5" aria-hidden="true" /> Invite to the team
           </h2>
           <form
             onSubmit={invite}
@@ -293,8 +310,18 @@ export default function MembersPanel({ onRoleResolved }: MembersPanelProps = {})
               <Select
                 label="Role"
                 labelHidden
-                value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value as any)}
+                value={
+                  currentUserRole === 'owner'
+                    ? inviteRole
+                    : inviteRole === 'owner'
+                      ? 'member'
+                      : inviteRole
+                }
+                onChange={(e) => {
+                  const next = e.target.value as typeof inviteRole
+                  if (next === 'owner' && currentUserRole !== 'owner') return
+                  setInviteRole(next)
+                }}
               >
                 <option value="member">Member</option>
                 <option value="treasurer">Treasurer</option>
@@ -441,7 +468,12 @@ function MembersTable({
       },
       cell: (m) => {
         const isYou = m.userId === currentUserId
-        if (canManage && !isYou) {
+        // Admins must not get a role <select> on owner rows — a value of
+        // "owner" with no matching <option> is invalid HTML and can confuse
+        // browsers. Owner mutation stays owner-only on the server too.
+        const canEditRole =
+          canManage && !isYou && (currentUserRole === 'owner' || m.role !== 'owner')
+        if (canEditRole) {
           return (
             <>
               <label className="sr-only" htmlFor={`role-${m.membershipId}`}>
@@ -507,7 +539,7 @@ function MembersTable({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-fg">Active members ({members.length})</h2>
+        <h2 className="text-base font-semibold text-fg">Team members ({members.length})</h2>
       </div>
       <DataView
         tableId="org-members"

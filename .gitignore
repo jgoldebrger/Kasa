@@ -57,3 +57,5 @@ next-env.d.ts
 
 # generated SBOM (uploaded as CI artifact)
 sbom.cdx.json
+
+.env*
