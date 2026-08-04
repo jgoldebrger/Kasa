@@ -216,7 +216,7 @@ export default function ActionMenu({
                 disabled={item.disabled}
                 onClick={(e) => {
                   e.stopPropagation()
-                  setOpen(false)
+                  closeAndRestoreFocus()
                   item.onClick()
                 }}
                 className={`flex w-full items-center gap-2 px-3 py-2 text-start text-sm transition-colors disabled:opacity-50 ${

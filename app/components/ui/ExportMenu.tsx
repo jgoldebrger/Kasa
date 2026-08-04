@@ -78,7 +78,7 @@ export default function ExportMenu({ onExportCsv, onExportXlsx, disabled, rowCou
   }, [open])
 
   const handleCsv = () => {
-    setOpen(false)
+    closeAndRestoreFocus()
     onExportCsv()
   }
 
@@ -88,7 +88,7 @@ export default function ExportMenu({ onExportCsv, onExportXlsx, disabled, rowCou
       await onExportXlsx()
     } finally {
       setBusy(false)
-      setOpen(false)
+      closeAndRestoreFocus()
     }
   }
 

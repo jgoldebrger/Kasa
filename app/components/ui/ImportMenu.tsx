@@ -87,12 +87,12 @@ export default function ImportMenu({ type, onUpload, disabled, boundToFamily }: 
   }, [open])
 
   const handleTemplate = () => {
-    setOpen(false)
+    closeAndRestoreFocus()
     void downloadImportTemplate(type, { boundToFamily: !!boundToFamily })
   }
 
   const handleUpload = () => {
-    setOpen(false)
+    closeAndRestoreFocus()
     onUpload()
   }
 
