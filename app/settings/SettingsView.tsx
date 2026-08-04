@@ -3,16 +3,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type React from 'react'
 import dynamic from 'next/dynamic'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { useConfirm, useToast } from '@/app/components/Toast'
 import { cachedFetch, invalidate as invalidateCache } from '@/lib/client-cache'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { isFiniteDate } from '@/lib/date-utils'
+import { SETTINGS_TAB_IDS, type SettingsTabId } from '@/lib/nav/settings-tabs'
 import { PageHeader, SkeletonRows, Card, Input, Modal, Button } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
 import type { Role } from '@/types/auth'
-import SettingsNav, { type SettingsTabId } from '@/app/components/settings/SettingsNav'
 import PanelSkeleton from './panels/PanelSkeleton'
 import type { BillingSnapshot } from '@/app/components/settings/BillingPanel'
 
@@ -55,26 +55,8 @@ const EMPTY_LETTERHEAD = {
 
 type TabType = SettingsTabId
 
-const VALID_TABS: readonly TabType[] = [
-  'email',
-  'eventTypes',
-  'paymentPlans',
-  'automation',
-  'kevittel',
-  'cycle',
-  'branding',
-  'letterhead',
-  'labels',
-  'localization',
-  'activity',
-  'members',
-  'billing',
-  'trash',
-  'dataExport',
-] as const
-
 function isValidTab(s: string | null | undefined): s is TabType {
-  return !!s && (VALID_TABS as readonly string[]).includes(s)
+  return !!s && (SETTINGS_TAB_IDS as readonly string[]).includes(s)
 }
 
 const DynamicEmailPanel = dynamic(() => import('./panels/EmailPanel'), {
@@ -148,7 +130,6 @@ export default function SettingsView({
   const toast = useToast()
   const t = useT()
   const { format: formatMoney, symbol: currencySymbol } = useCurrency()
-  const router = useRouter()
   const searchParams = useSearchParams()
 
   // Deep-link support: `?tab=members` and friends.
@@ -208,19 +189,6 @@ export default function SettingsView({
       cancelled = true
     }
   }, [])
-
-  const changeTab = useCallback(
-    (id: SettingsTabId) => {
-      if (!isValidTab(id)) return
-      setActiveTab(id)
-      // Keep the URL in sync so reload / back works.
-      const url = new URL(window.location.href)
-      if (id === 'email') url.searchParams.delete('tab')
-      else url.searchParams.set('tab', id)
-      router.replace(url.pathname + (url.search || ''), { scroll: false })
-    },
-    [router],
-  )
 
   // Email Configuration state. When the server provided initial data we
   // seed both the config and the form so the email-tab form is pre-filled
@@ -1478,310 +1446,298 @@ export default function SettingsView({
       <div className="max-w-6xl mx-auto">
         <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
 
-        <div className="flex flex-col md:flex-row gap-6 items-start">
-          <aside className="w-full md:w-56 lg:w-64 shrink-0 md:sticky md:top-6">
-            <SettingsNav
-              activeId={activeTab}
-              onChange={changeTab}
-              canSeePrivilegedTabs={canSeePrivilegedTabs}
+        <div className="min-w-0 w-full">
+          {/* Per-tab skeleton while the relevant fetch is in flight. */}
+          {isTabLoading && (
+            <Card className="mb-6">
+              <SkeletonRows count={5} />
+            </Card>
+          )}
+
+          {/* Email Configuration Tab */}
+          {activeTab === 'email' && !isTabLoading && (
+            <DynamicEmailPanel
+              emailConfig={emailConfig}
+              emailFormData={emailFormData}
+              setEmailFormData={setEmailFormData}
+              saving={saving}
+              message={emailMessage}
+              onSubmit={handleSaveEmailConfig}
+              onTest={handleTestEmail}
             />
-          </aside>
+          )}
 
-          <div className="flex-1 min-w-0 w-full">
-            {/* Per-tab skeleton while the relevant fetch is in flight. */}
-            {isTabLoading && (
-              <Card className="mb-6">
-                <SkeletonRows count={5} />
-              </Card>
-            )}
+          {/* Event Types Tab */}
+          {activeTab === 'eventTypes' && !isTabLoading && (
+            <DynamicEventTypesPanel
+              eventTypes={eventTypes}
+              formatMoney={formatMoney}
+              onAdd={() => {
+                resetEventTypeForm()
+                setShowEventTypeModal(true)
+              }}
+              onEdit={handleEditEventType}
+              onDelete={handleDeleteEventType}
+            />
+          )}
 
-            {/* Email Configuration Tab */}
-            {activeTab === 'email' && !isTabLoading && (
-              <DynamicEmailPanel
-                emailConfig={emailConfig}
-                emailFormData={emailFormData}
-                setEmailFormData={setEmailFormData}
-                saving={saving}
-                message={emailMessage}
-                onSubmit={handleSaveEmailConfig}
-                onTest={handleTestEmail}
-              />
-            )}
+          {/* Payment Plans Tab */}
+          {activeTab === 'paymentPlans' && !isTabLoading && (
+            <DynamicPaymentPlansPanel
+              plans={plans}
+              onAdd={() => {
+                resetPlanForm()
+                setEditingPlan(null)
+                setShowPlanModal(true)
+              }}
+              onEdit={handleEditPlan}
+              onDelete={handleDeletePlan}
+            />
+          )}
 
-            {/* Event Types Tab */}
-            {activeTab === 'eventTypes' && !isTabLoading && (
-              <DynamicEventTypesPanel
-                eventTypes={eventTypes}
-                formatMoney={formatMoney}
-                onAdd={() => {
-                  resetEventTypeForm()
-                  setShowEventTypeModal(true)
-                }}
-                onEdit={handleEditEventType}
-                onDelete={handleDeleteEventType}
-              />
-            )}
-
-            {/* Payment Plans Tab */}
-            {activeTab === 'paymentPlans' && !isTabLoading && (
-              <DynamicPaymentPlansPanel
-                plans={plans}
-                onAdd={() => {
-                  resetPlanForm()
-                  setEditingPlan(null)
-                  setShowPlanModal(true)
-                }}
-                onEdit={handleEditPlan}
-                onDelete={handleDeletePlan}
-              />
-            )}
-
-            {/* Event Type Modal */}
-            <Modal
-              open={showEventTypeModal}
-              onClose={closeEventTypeModal}
-              title={
-                editingEventType
-                  ? t('settings.eventTypeModal.editTitle')
-                  : t('settings.eventTypeModal.addTitle')
-              }
-              maxWidth="max-w-md"
-            >
-              <form onSubmit={handleSubmitEventType} className="space-y-4">
-                {!editingEventType && (
-                  <Input
-                    label={t('settings.eventTypeModal.typeCode')}
-                    required
-                    type="text"
-                    value={eventTypeFormData.type}
-                    onChange={(e) =>
-                      setEventTypeFormData({ ...eventTypeFormData, type: e.target.value })
-                    }
-                    placeholder={t('settings.eventTypeModal.typeCodePlaceholder')}
-                    hint={t('settings.eventTypeModal.typeCodeHint')}
-                  />
-                )}
-                {editingEventType && (
-                  <Input
-                    label={t('settings.eventTypeModal.typeCode')}
-                    type="text"
-                    value={eventTypeFormData.type}
-                    disabled
-                    hint={t('settings.eventTypeModal.typeCodeReadonlyHint')}
-                  />
-                )}
+          {/* Event Type Modal */}
+          <Modal
+            open={showEventTypeModal}
+            onClose={closeEventTypeModal}
+            title={
+              editingEventType
+                ? t('settings.eventTypeModal.editTitle')
+                : t('settings.eventTypeModal.addTitle')
+            }
+            maxWidth="max-w-md"
+          >
+            <form onSubmit={handleSubmitEventType} className="space-y-4">
+              {!editingEventType && (
                 <Input
-                  label={t('settings.eventTypeModal.name')}
+                  label={t('settings.eventTypeModal.typeCode')}
                   required
                   type="text"
-                  value={eventTypeFormData.name}
+                  value={eventTypeFormData.type}
                   onChange={(e) =>
-                    setEventTypeFormData({ ...eventTypeFormData, name: e.target.value })
+                    setEventTypeFormData({ ...eventTypeFormData, type: e.target.value })
                   }
-                  placeholder={t('settings.eventTypeModal.namePlaceholder')}
+                  placeholder={t('settings.eventTypeModal.typeCodePlaceholder')}
+                  hint={t('settings.eventTypeModal.typeCodeHint')}
                 />
-                <Input
-                  label={t('settings.eventTypeModal.amount').replace('{symbol}', currencySymbol)}
-                  required
-                  type="number"
-                  step="0.01"
-                  value={eventTypeFormData.amount}
-                  onChange={(e) =>
-                    setEventTypeFormData({ ...eventTypeFormData, amount: e.target.value })
-                  }
-                  placeholder="0.00"
-                />
-                <div className="flex gap-3 pt-2">
-                  <Button type="submit" loading={eventTypeSubmitting} className="flex-1">
-                    {eventTypeSubmitting
-                      ? t('settings.eventTypeModal.saving')
-                      : editingEventType
-                        ? t('settings.eventTypeModal.update')
-                        : t('settings.eventTypeModal.create')}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="flex-1"
-                    onClick={() => {
-                      setShowEventTypeModal(false)
-                      resetEventTypeForm()
-                    }}
-                  >
-                    {t('settings.eventTypeModal.cancel')}
-                  </Button>
-                </div>
-              </form>
-            </Modal>
-
-            {/* Automation Tab */}
-            {activeTab === 'automation' && !isTabLoading && (
-              <DynamicAutomationPanel
-                automationConfig={automationConfig}
-                setAutomationConfig={setAutomationConfig}
-                plans={plans}
-                eventTypes={eventTypes}
-                formatMoney={formatMoney}
-                emailConfig={emailConfig}
-                saving={automationSaving}
-                onSave={handleSaveAutomationConfig}
-              />
-            )}
-
-            {/* Kevittel Tab */}
-            {activeTab === 'kevittel' && !isTabLoading && (
-              <DynamicKevittelPanel families={kevittelFamilies} loading={kevittelLoading} />
-            )}
-
-            {/* Payment Plan Modal */}
-            <Modal
-              open={showPlanModal}
-              onClose={closePlanModal}
-              title={
-                editingPlan ? t('settings.planModal.editTitle') : t('settings.planModal.addTitle')
-              }
-              maxWidth="max-w-md"
-            >
-              <form onSubmit={handleSubmitPlan} className="space-y-4">
-                <Input
-                  label={t('settings.planModal.name')}
-                  required
-                  type="text"
-                  value={planFormData.name}
-                  onChange={(e) => setPlanFormData({ ...planFormData, name: e.target.value })}
-                  placeholder={t('settings.planModal.namePlaceholder')}
-                />
-                <Input
-                  label={t('settings.planModal.yearlyPrice').replace('{symbol}', currencySymbol)}
-                  required
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={planFormData.yearlyPrice}
-                  onChange={(e) =>
-                    setPlanFormData({ ...planFormData, yearlyPrice: e.target.value })
-                  }
-                />
-                <div className="flex gap-3 justify-end pt-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      setShowPlanModal(false)
-                      setEditingPlan(null)
-                      resetPlanForm()
-                    }}
-                  >
-                    {t('settings.planModal.cancel')}
-                  </Button>
-                  <Button type="submit" loading={planSubmitting}>
-                    {planSubmitting
-                      ? t('settings.planModal.saving')
-                      : editingPlan
-                        ? t('settings.planModal.update')
-                        : t('settings.planModal.create')}
-                  </Button>
-                </div>
-              </form>
-            </Modal>
-
-            {/* Branding Tab — visible to all members, write-gated by role inside. */}
-            {activeTab === 'branding' && <DynamicBrandingPanel canManage={canSeePrivilegedTabs} />}
-
-            {/* Members Tab — admin / owner only. */}
-            {activeTab === 'members' && canSeePrivilegedTabs && (
-              <DynamicMembersPanel onRoleResolved={setCurrentRole} />
-            )}
-
-            {/* Billing Tab — admin / owner can view; owner manages subscription. */}
-            {activeTab === 'billing' && canSeePrivilegedTabs && (
-              <DynamicBillingPanel
-                canManage={canSeePrivilegedTabs}
-                isOwner={isOwner}
-                initialBilling={initialBilling}
-              />
-            )}
-
-            {/* Trash Tab — admin / owner only, purge is owner-only. */}
-            {activeTab === 'trash' && canSeePrivilegedTabs && (
-              <DynamicTrashPanel canPurge={canPurge} />
-            )}
-
-            {activeTab === 'dataExport' && canSeePrivilegedTabs && <DynamicDataExportPanel />}
-
-            {/* If a privileged tab was deep-linked by a non-privileged user,
-            show a friendly fallback instead of a silent blank page. */}
-            {(activeTab === 'members' ||
-              activeTab === 'billing' ||
-              activeTab === 'trash' ||
-              activeTab === 'dataExport' ||
-              activeTab === 'letterhead' ||
-              activeTab === 'activity') &&
-              !canSeePrivilegedTabs &&
-              currentRole !== null && (
-                <Card className="text-sm text-fg-muted">{t('settings.privilegedTabDenied')}</Card>
               )}
-
-            {/* Letterhead Tab — admin / owner only. */}
-            {activeTab === 'letterhead' && canSeePrivilegedTabs && !isTabLoading && (
-              <DynamicLetterheadPanel
-                letterhead={letterhead}
-                setLetterhead={setLetterhead}
-                saving={letterheadSaving}
-                onSubmit={handleSaveLetterhead}
-              />
-            )}
-
-            {/* Mail Labels Tab — visible to all members. Print-only. */}
-            {activeTab === 'labels' && !isTabLoading && (
-              <DynamicLabelsPanel
-                families={labelFamilies}
-                plans={plans}
-                filters={labelFilters}
-                setFilters={setLabelFilters}
-              />
-            )}
-
-            {/* Localization (currency + locale) Tab — admin/owner only. */}
-            {activeTab === 'localization' && canSeePrivilegedTabs && <DynamicLocalizationPanel />}
-
-            {/* Activity (audit log) Tab — admin / owner only. */}
-            {activeTab === 'activity' && canSeePrivilegedTabs && (
-              <>
-                <DynamicSecurityPanel isOwner={isOwner} />
-                <DynamicActivityPanel
-                  items={auditItems}
-                  nextCursor={auditNextCursor}
-                  loading={auditLoading}
-                  usersMap={auditUsersMap}
-                  actionFilter={auditActionFilter}
-                  setActionFilter={setAuditActionFilter}
-                  userFilter={auditUserFilter}
-                  setUserFilter={setAuditUserFilter}
-                  resourceTypeFilter={auditResourceTypeFilter}
-                  setResourceTypeFilter={setAuditResourceTypeFilter}
-                  fromDate={auditFromDate}
-                  setFromDate={setAuditFromDate}
-                  toDate={auditToDate}
-                  setToDate={setAuditToDate}
-                  onLoadMore={() => fetchAuditPage(auditNextCursor)}
-                  onExportCsv={exportAuditCsv}
-                  isOwner={isOwner}
+              {editingEventType && (
+                <Input
+                  label={t('settings.eventTypeModal.typeCode')}
+                  type="text"
+                  value={eventTypeFormData.type}
+                  disabled
+                  hint={t('settings.eventTypeModal.typeCodeReadonlyHint')}
                 />
-              </>
+              )}
+              <Input
+                label={t('settings.eventTypeModal.name')}
+                required
+                type="text"
+                value={eventTypeFormData.name}
+                onChange={(e) =>
+                  setEventTypeFormData({ ...eventTypeFormData, name: e.target.value })
+                }
+                placeholder={t('settings.eventTypeModal.namePlaceholder')}
+              />
+              <Input
+                label={t('settings.eventTypeModal.amount').replace('{symbol}', currencySymbol)}
+                required
+                type="number"
+                step="0.01"
+                value={eventTypeFormData.amount}
+                onChange={(e) =>
+                  setEventTypeFormData({ ...eventTypeFormData, amount: e.target.value })
+                }
+                placeholder="0.00"
+              />
+              <div className="flex gap-3 pt-2">
+                <Button type="submit" loading={eventTypeSubmitting} className="flex-1">
+                  {eventTypeSubmitting
+                    ? t('settings.eventTypeModal.saving')
+                    : editingEventType
+                      ? t('settings.eventTypeModal.update')
+                      : t('settings.eventTypeModal.create')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowEventTypeModal(false)
+                    resetEventTypeForm()
+                  }}
+                >
+                  {t('settings.eventTypeModal.cancel')}
+                </Button>
+              </div>
+            </form>
+          </Modal>
+
+          {/* Automation Tab */}
+          {activeTab === 'automation' && !isTabLoading && (
+            <DynamicAutomationPanel
+              automationConfig={automationConfig}
+              setAutomationConfig={setAutomationConfig}
+              plans={plans}
+              eventTypes={eventTypes}
+              formatMoney={formatMoney}
+              emailConfig={emailConfig}
+              saving={automationSaving}
+              onSave={handleSaveAutomationConfig}
+            />
+          )}
+
+          {/* Kevittel Tab */}
+          {activeTab === 'kevittel' && !isTabLoading && (
+            <DynamicKevittelPanel families={kevittelFamilies} loading={kevittelLoading} />
+          )}
+
+          {/* Payment Plan Modal */}
+          <Modal
+            open={showPlanModal}
+            onClose={closePlanModal}
+            title={
+              editingPlan ? t('settings.planModal.editTitle') : t('settings.planModal.addTitle')
+            }
+            maxWidth="max-w-md"
+          >
+            <form onSubmit={handleSubmitPlan} className="space-y-4">
+              <Input
+                label={t('settings.planModal.name')}
+                required
+                type="text"
+                value={planFormData.name}
+                onChange={(e) => setPlanFormData({ ...planFormData, name: e.target.value })}
+                placeholder={t('settings.planModal.namePlaceholder')}
+              />
+              <Input
+                label={t('settings.planModal.yearlyPrice').replace('{symbol}', currencySymbol)}
+                required
+                type="number"
+                step="0.01"
+                min="0"
+                value={planFormData.yearlyPrice}
+                onChange={(e) => setPlanFormData({ ...planFormData, yearlyPrice: e.target.value })}
+              />
+              <div className="flex gap-3 justify-end pt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setShowPlanModal(false)
+                    setEditingPlan(null)
+                    resetPlanForm()
+                  }}
+                >
+                  {t('settings.planModal.cancel')}
+                </Button>
+                <Button type="submit" loading={planSubmitting}>
+                  {planSubmitting
+                    ? t('settings.planModal.saving')
+                    : editingPlan
+                      ? t('settings.planModal.update')
+                      : t('settings.planModal.create')}
+                </Button>
+              </div>
+            </form>
+          </Modal>
+
+          {/* Branding Tab — visible to all members, write-gated by role inside. */}
+          {activeTab === 'branding' && <DynamicBrandingPanel canManage={canSeePrivilegedTabs} />}
+
+          {/* Members Tab — admin / owner only. */}
+          {activeTab === 'members' && canSeePrivilegedTabs && (
+            <DynamicMembersPanel onRoleResolved={setCurrentRole} />
+          )}
+
+          {/* Billing Tab — admin / owner can view; owner manages subscription. */}
+          {activeTab === 'billing' && canSeePrivilegedTabs && (
+            <DynamicBillingPanel
+              canManage={canSeePrivilegedTabs}
+              isOwner={isOwner}
+              initialBilling={initialBilling}
+            />
+          )}
+
+          {/* Trash Tab — admin / owner only, purge is owner-only. */}
+          {activeTab === 'trash' && canSeePrivilegedTabs && (
+            <DynamicTrashPanel canPurge={canPurge} />
+          )}
+
+          {activeTab === 'dataExport' && canSeePrivilegedTabs && <DynamicDataExportPanel />}
+
+          {/* If a privileged tab was deep-linked by a non-privileged user,
+            show a friendly fallback instead of a silent blank page. */}
+          {(activeTab === 'members' ||
+            activeTab === 'billing' ||
+            activeTab === 'trash' ||
+            activeTab === 'dataExport' ||
+            activeTab === 'letterhead' ||
+            activeTab === 'activity') &&
+            !canSeePrivilegedTabs &&
+            currentRole !== null && (
+              <Card className="text-sm text-fg-muted">{t('settings.privilegedTabDenied')}</Card>
             )}
 
-            {/* Cycle Configuration Tab */}
-            {activeTab === 'cycle' && !isTabLoading && (
-              <DynamicCyclePanel
-                cycleConfig={cycleConfig}
-                cycleFormData={cycleFormData}
-                setCycleFormData={setCycleFormData}
-                saving={cycleSaving}
-                onSubmit={handleSaveCycleConfig}
+          {/* Letterhead Tab — admin / owner only. */}
+          {activeTab === 'letterhead' && canSeePrivilegedTabs && !isTabLoading && (
+            <DynamicLetterheadPanel
+              letterhead={letterhead}
+              setLetterhead={setLetterhead}
+              saving={letterheadSaving}
+              onSubmit={handleSaveLetterhead}
+            />
+          )}
+
+          {/* Mail Labels Tab — visible to all members. Print-only. */}
+          {activeTab === 'labels' && !isTabLoading && (
+            <DynamicLabelsPanel
+              families={labelFamilies}
+              plans={plans}
+              filters={labelFilters}
+              setFilters={setLabelFilters}
+            />
+          )}
+
+          {/* Localization (currency + locale) Tab — admin/owner only. */}
+          {activeTab === 'localization' && canSeePrivilegedTabs && <DynamicLocalizationPanel />}
+
+          {/* Activity (audit log) Tab — admin / owner only. */}
+          {activeTab === 'activity' && canSeePrivilegedTabs && (
+            <>
+              <DynamicSecurityPanel isOwner={isOwner} />
+              <DynamicActivityPanel
+                items={auditItems}
+                nextCursor={auditNextCursor}
+                loading={auditLoading}
+                usersMap={auditUsersMap}
+                actionFilter={auditActionFilter}
+                setActionFilter={setAuditActionFilter}
+                userFilter={auditUserFilter}
+                setUserFilter={setAuditUserFilter}
+                resourceTypeFilter={auditResourceTypeFilter}
+                setResourceTypeFilter={setAuditResourceTypeFilter}
+                fromDate={auditFromDate}
+                setFromDate={setAuditFromDate}
+                toDate={auditToDate}
+                setToDate={setAuditToDate}
+                onLoadMore={() => fetchAuditPage(auditNextCursor)}
+                onExportCsv={exportAuditCsv}
+                isOwner={isOwner}
               />
-            )}
-          </div>
+            </>
+          )}
+
+          {/* Cycle Configuration Tab */}
+          {activeTab === 'cycle' && !isTabLoading && (
+            <DynamicCyclePanel
+              cycleConfig={cycleConfig}
+              cycleFormData={cycleFormData}
+              setCycleFormData={setCycleFormData}
+              saving={cycleSaving}
+              onSubmit={handleSaveCycleConfig}
+            />
+          )}
         </div>
       </div>
     </div>
