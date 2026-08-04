@@ -79,8 +79,8 @@ export default function FilterPopover({
       {open && (
         <div
           role="dialog"
-          aria-label="Filter rows"
-          className="absolute right-0 top-full z-50 mt-2 w-[20rem] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-md border border-border bg-surface shadow-popover"
+          aria-label="Filters"
+          className="absolute end-0 top-full z-50 mt-2 w-[20rem] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-md border border-border bg-surface text-start shadow-popover"
         >
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-fg-muted">
@@ -119,7 +119,7 @@ export default function FilterPopover({
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="flex-1 border-l border-border px-3 py-2 text-xs font-medium text-fg hover:bg-fg/5"
+              className="flex-1 border-s border-border px-3 py-2 text-xs font-medium text-fg hover:bg-fg/5"
             >
               Done
             </button>

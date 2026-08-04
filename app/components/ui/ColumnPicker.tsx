@@ -164,8 +164,8 @@ export default function ColumnPicker({
       {open && (
         <div
           role="dialog"
-          aria-label="Show, hide, or reorder columns"
-          className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-md border border-border bg-surface shadow-popover"
+          aria-label="Columns"
+          className="absolute end-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-md border border-border bg-surface text-start shadow-popover"
         >
           <div className="border-b border-border px-3 py-2">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-fg-muted">
@@ -277,7 +277,7 @@ export default function ColumnPicker({
             <button
               type="button"
               onClick={onReset}
-              className="flex-1 border-l border-border px-3 py-2 text-xs font-medium text-fg-muted hover:bg-fg/5 hover:text-fg flex items-center justify-center gap-1"
+              className="flex-1 border-s border-border px-3 py-2 text-xs font-medium text-fg-muted hover:bg-fg/5 hover:text-fg flex items-center justify-center gap-1"
             >
               <EyeSlashIcon className="h-3.5 w-3.5" aria-hidden="true" />
               Reset
