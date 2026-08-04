@@ -2,8 +2,8 @@
 
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { useCallback, useEffect, useState } from 'react'
-import { usePathname } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import OrgSwitcher from './OrgSwitcher'
 import OrgLogo from './OrgLogo'
@@ -21,27 +21,95 @@ import LegalFooterLinks from './legal/LegalFooterLinks'
 import { Badge } from '@/app/components/ui'
 import type { MessageKey } from '@/lib/i18n/load-locale'
 import {
-  UserGroupIcon,
+  PRIMARY_NAV_SECTIONS,
+  filterNavSections,
+  findActiveNavItem,
+  readOpenSections,
+  writeOpenSections,
+  ensureSectionOpen,
+  sectionIdForPath,
+  type NavItem,
+} from '@/lib/nav'
+import {
+  ArrowDownTrayIcon,
+  ArrowRightOnRectangleIcon,
+  BanknotesIcon,
+  BoltIcon,
   CalculatorIcon,
-  DocumentTextIcon,
+  CalendarDaysIcon,
+  CalendarIcon,
   ChartBarIcon,
   ChartBarSquareIcon,
-  CalendarIcon,
-  CalendarDaysIcon,
-  CogIcon,
-  PresentationChartBarIcon,
-  CurrencyDollarIcon,
+  ChevronDownIcon,
   ClipboardDocumentListIcon,
+  ClockIcon,
+  Cog6ToothIcon,
+  CreditCardIcon,
+  CurrencyDollarIcon,
+  DocumentDuplicateIcon,
+  DocumentTextIcon,
+  EnvelopeIcon,
   EnvelopeOpenIcon,
-  ArrowRightOnRectangleIcon,
-  UserCircleIcon,
-  BanknotesIcon,
-  ShieldCheckIcon,
+  ExclamationTriangleIcon,
+  GlobeAltIcon,
+  IdentificationIcon,
+  PhotoIcon,
+  PresentationChartBarIcon,
+  PresentationChartLineIcon,
+  QueueListIcon,
   QuestionMarkCircleIcon,
+  ShieldCheckIcon,
+  TagIcon,
+  TrashIcon,
+  UserCircleIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/outline'
 
 const GlobalSearch = dynamic(() => import('./GlobalSearch'), { ssr: false })
 const NotificationsBell = dynamic(() => import('./NotificationsBell'), { ssr: false })
+
+/** Maps `NavItem.iconName` (declared in lib/nav/config.ts) to its Heroicon component. */
+const NAV_ICONS: Record<string, typeof ChartBarIcon> = {
+  ArrowDownTrayIcon,
+  BanknotesIcon,
+  BoltIcon,
+  CalculatorIcon,
+  CalendarDaysIcon,
+  CalendarIcon,
+  ChartBarIcon,
+  ChartBarSquareIcon,
+  ClipboardDocumentListIcon,
+  ClockIcon,
+  Cog6ToothIcon,
+  CreditCardIcon,
+  CurrencyDollarIcon,
+  DocumentDuplicateIcon,
+  DocumentTextIcon,
+  EnvelopeIcon,
+  EnvelopeOpenIcon,
+  ExclamationTriangleIcon,
+  GlobeAltIcon,
+  IdentificationIcon,
+  PhotoIcon,
+  PresentationChartBarIcon,
+  PresentationChartLineIcon,
+  QueueListIcon,
+  QuestionMarkCircleIcon,
+  TagIcon,
+  TrashIcon,
+  UserGroupIcon,
+}
+
+function iconForNavItem(item: NavItem): typeof ChartBarIcon {
+  return (item.iconName && NAV_ICONS[item.iconName]) || QuestionMarkCircleIcon
+}
+
+/** Settings deep links use `/settings?tab=<id>`; the email tab is the
+ * SettingsView default, so its link omits the query entirely. */
+function hrefForNavItem(item: NavItem): string {
+  if (!item.settingsTab) return item.href
+  return item.settingsTab === 'email' ? item.href : `${item.href}?tab=${item.settingsTab}`
+}
 
 interface SidebarProps {
   onClose?: () => void
@@ -49,6 +117,11 @@ interface SidebarProps {
 
 export default function Sidebar({ onClose }: SidebarProps = {}) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const search = useMemo(() => {
+    const qs = searchParams?.toString()
+    return qs ? `?${qs}` : ''
+  }, [searchParams])
   const { data: session } = useSession()
   const user = session?.user as
     | { name?: string | null; email?: string | null; isPlatformAdmin?: boolean }
@@ -72,101 +145,45 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
     void fetchSupportModeStatus().then(setSupportMode)
   }, [user?.isPlatformAdmin])
 
-  type NavItem = {
-    href: string
-    label: string
-    icon: typeof ChartBarIcon
-    adminOnly?: boolean
-  }
-  type NavSection = {
-    id: string
-    labelKey?: MessageKey
-    items: NavItem[]
-  }
-
-  const allNavSections: NavSection[] = [
-    {
-      id: 'overview',
-      items: [{ href: '/', label: t('nav.dashboard'), icon: ChartBarIcon }],
-    },
-    {
-      id: 'people',
-      labelKey: 'nav.section.people',
-      items: [
-        { href: '/families', label: t('nav.families'), icon: UserGroupIcon },
-        { href: '/events', label: t('nav.events'), icon: CalendarIcon, adminOnly: true },
-        { href: '/calendar', label: t('nav.calendar'), icon: CalendarDaysIcon, adminOnly: true },
-        { href: '/tasks', label: t('nav.tasks'), icon: ClipboardDocumentListIcon, adminOnly: true },
-      ],
-    },
-    {
-      id: 'money',
-      labelKey: 'nav.section.money',
-      items: [
-        { href: '/payments', label: t('nav.payments'), icon: CurrencyDollarIcon, adminOnly: true },
-        { href: '/collections', label: t('nav.collections'), icon: BanknotesIcon, adminOnly: true },
-        {
-          href: '/calculations',
-          label: t('nav.calculations'),
-          icon: CalculatorIcon,
-          adminOnly: true,
-        },
-        {
-          href: '/projections',
-          label: t('nav.projections'),
-          icon: ChartBarSquareIcon,
-          adminOnly: true,
-        },
-        {
-          href: '/statements',
-          label: t('nav.statements'),
-          icon: DocumentTextIcon,
-          adminOnly: true,
-        },
-      ],
-    },
-    {
-      id: 'comms',
-      labelKey: 'nav.section.comms',
-      items: [
-        {
-          href: '/communications',
-          label: t('nav.communications'),
-          icon: EnvelopeOpenIcon,
-          adminOnly: true,
-        },
-      ],
-    },
-    {
-      id: 'insights',
-      labelKey: 'nav.section.insights',
-      items: [
-        {
-          href: '/reports',
-          label: t('nav.reports'),
-          icon: PresentationChartBarIcon,
-          adminOnly: true,
-        },
-      ],
-    },
-    {
-      id: 'system',
-      labelKey: 'nav.section.system',
-      items: [
-        { href: '/help', label: t('nav.help'), icon: QuestionMarkCircleIcon },
-        { href: '/settings', label: t('nav.settings'), icon: CogIcon, adminOnly: true },
-      ],
-    },
-  ]
-
-  const navSections = allNavSections
-    .map(
-      (section): NavSection => ({
-        ...section,
-        items: section.items.filter((item) => !item.adminOnly || isAdmin),
+  const navSections = useMemo(
+    () =>
+      filterNavSections(PRIMARY_NAV_SECTIONS, {
+        isAdmin,
+        isPlatformAdmin: Boolean(user?.isPlatformAdmin),
       }),
-    )
-    .filter((section) => section.items.length > 0)
+    [isAdmin, user?.isPlatformAdmin],
+  )
+
+  const activeItem = useMemo(
+    () => findActiveNavItem(pathname ?? '', search, navSections),
+    [pathname, search, navSections],
+  )
+
+  const [openSectionIds, setOpenSectionIds] = useState<string[]>(() => {
+    const stored = readOpenSections()
+    const activeSectionId = sectionIdForPath(pathname ?? '', search, navSections)
+    return activeSectionId ? ensureSectionOpen(stored, activeSectionId) : stored
+  })
+
+  useEffect(() => {
+    const activeSectionId = sectionIdForPath(pathname ?? '', search, navSections)
+    if (!activeSectionId) return
+    setOpenSectionIds((prev) => {
+      const next = ensureSectionOpen(prev, activeSectionId)
+      if (next !== prev) writeOpenSections(next)
+      return next
+    })
+  }, [pathname, search, navSections])
+
+  const toggleSection = useCallback((sectionId: string) => {
+    setOpenSectionIds((prev) => {
+      const next = prev.includes(sectionId)
+        ? prev.filter((id) => id !== sectionId)
+        : [...prev, sectionId]
+      writeOpenSections(next)
+      return next
+    })
+  }, [])
 
   return (
     <aside
@@ -232,44 +249,64 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
         </div>
       )}
 
-      <nav className="flex-1 p-2 space-y-4 overflow-y-auto">
-        {navSections.map((section) => (
-          <div key={section.id} className="space-y-0.5">
-            {section.labelKey && (
-              <p className="px-3 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-fg-muted">
-                {t(section.labelKey)}
-              </p>
-            )}
-            {section.items.map((item) => {
-              const isActive =
-                pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))
-              const Icon = item.icon
+      <nav className="flex-1 p-2 space-y-1 overflow-y-auto" aria-label={t('nav.primary')}>
+        {navSections.map((section) => {
+          const isOpen = openSectionIds.includes(section.id)
+          const sectionLabel = section.labelKey ? t(section.labelKey as MessageKey) : null
+          const panelId = `nav-section-${section.id}`
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  prefetch={item.href !== pathname}
-                  onClick={onClose}
-                  aria-current={isActive ? 'page' : undefined}
-                  className={`focus-ring relative flex items-center gap-2.5 px-3 py-2 min-h-[var(--touch-target)] md:min-h-0 md:h-9 rounded-md text-sm transition-colors ${
-                    isActive
-                      ? 'bg-accent/10 text-accent font-semibold before:absolute before:start-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-accent before:rounded-e'
-                      : 'text-fg-muted font-medium hover:bg-fg/5 hover:text-fg'
-                  }`}
+          return (
+            <div key={section.id} className="space-y-0.5">
+              {sectionLabel && (
+                <button
+                  type="button"
+                  onClick={() => toggleSection(section.id)}
+                  aria-expanded={isOpen}
+                  aria-controls={panelId}
+                  className="focus-ring flex w-full items-center justify-between gap-2 rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-fg-muted hover:text-fg"
                 >
-                  <Icon
-                    className={`h-[18px] w-[18px] shrink-0 ${
-                      isActive ? 'text-accent' : 'text-fg-subtle'
-                    }`}
+                  <span className="truncate">{sectionLabel}</span>
+                  <ChevronDownIcon
+                    className={`h-3.5 w-3.5 shrink-0 transition-transform ${isOpen ? '' : '-rotate-90'}`}
                     aria-hidden="true"
                   />
-                  <span className="truncate">{item.label}</span>
-                </Link>
-              )
-            })}
-          </div>
-        ))}
+                </button>
+              )}
+              {isOpen && (
+                <div id={panelId} className="space-y-0.5">
+                  {section.items.map((item) => {
+                    const isActive = activeItem?.id === item.id
+                    const Icon = iconForNavItem(item)
+                    const href = hrefForNavItem(item)
+
+                    return (
+                      <Link
+                        key={item.id}
+                        href={href}
+                        prefetch={href !== pathname}
+                        onClick={onClose}
+                        aria-current={isActive ? 'page' : undefined}
+                        className={`focus-ring relative flex items-center gap-2.5 px-3 py-2 min-h-[var(--touch-target)] md:min-h-0 md:h-9 rounded-md text-sm transition-colors ${
+                          isActive
+                            ? 'bg-accent/10 text-accent font-semibold before:absolute before:start-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-accent before:rounded-e'
+                            : 'text-fg-muted font-medium hover:bg-fg/5 hover:text-fg'
+                        }`}
+                      >
+                        <Icon
+                          className={`h-[18px] w-[18px] shrink-0 ${
+                            isActive ? 'text-accent' : 'text-fg-subtle'
+                          }`}
+                          aria-hidden="true"
+                        />
+                        <span className="truncate">{t(item.labelKey as MessageKey)}</span>
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </nav>
 
       <div className="p-3 border-t border-border space-y-2 shrink-0">
@@ -279,7 +316,7 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
             aria-label="Organization role"
           >
             <UserCircleIcon className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden="true" />
-            <span>Member — view only</span>
+            <span>{t('nav.memberLimited')}</span>
           </div>
         )}
         {user?.isPlatformAdmin && (
