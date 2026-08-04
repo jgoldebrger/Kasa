@@ -455,7 +455,7 @@ function FilePreviewTable({
       </h3>
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-xs">
-          <thead className="border-b border-border bg-app-subtle text-left text-muted-on-subtle">
+          <thead className="border-b border-border bg-app-subtle text-start text-muted-on-subtle">
             <tr>
               {headers.map((h) => (
                 <th key={h} className="whitespace-nowrap px-3 py-1.5 font-medium">
@@ -511,7 +511,7 @@ function ColumnMappingPanel({
         <p className="mt-0.5 text-xs text-fg-muted">{t('import.mapping.description')}</p>
       </div>
       {unmappedRequired.length > 0 && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
+        <div className="rounded-lg border border-warning/40 bg-warning-soft px-3 py-2 text-xs text-warning">
           {t('import.mapping.missingRequired').replace(
             '{fields}',
             unmappedRequired.map((c) => c.key).join(', '),
@@ -520,7 +520,7 @@ function ColumnMappingPanel({
       )}
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-xs">
-          <thead className="border-b border-border bg-app-subtle text-left text-muted-on-subtle">
+          <thead className="border-b border-border bg-app-subtle text-start text-muted-on-subtle">
             <tr>
               <th className="px-3 py-2 font-medium">{t('import.mapping.templateColumn')}</th>
               <th className="px-3 py-2 font-medium">{t('import.mapping.fileColumn')}</th>
@@ -533,7 +533,7 @@ function ColumnMappingPanel({
                 <tr key={col.key} className="border-t border-border">
                   <td className="px-3 py-2 text-fg">
                     <span className="font-medium">{col.key}</span>
-                    {col.required && <span className="ml-1 text-danger">*</span>}
+                    {col.required && <span className="ms-1 text-danger">*</span>}
                     {col.hint && <p className="mt-0.5 text-fg-muted">{col.hint}</p>}
                   </td>
                   <td className="px-3 py-2">
@@ -541,6 +541,7 @@ function ColumnMappingPanel({
                       className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-fg"
                       value={mappedHeader}
                       onChange={(e) => onChange(col.key, e.target.value)}
+                      aria-label={`${t('import.mapping.fileColumn')}: ${col.key}`}
                     >
                       <option value={SKIP_COLUMN}>{t('import.mapping.skip')}</option>
                       {fileHeaders.map((h) => (
@@ -568,17 +569,13 @@ function DryRunPreview({ result, t }: { result: DryRunResult; t: ReturnType<type
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-3 text-center text-sm">
-        <div className="rounded-lg border border-green-300 bg-green-50 px-3 py-2 dark:border-green-700 dark:bg-green-950/30">
-          <p className="text-2xl font-semibold text-green-700 dark:text-green-300">
-            {result.imported}
-          </p>
-          <p className="text-xs text-green-800 dark:text-green-200">{t('import.wouldImport')}</p>
+        <div className="rounded-lg border border-success/40 bg-success-soft px-3 py-2">
+          <p className="text-2xl font-semibold text-success">{result.imported}</p>
+          <p className="text-xs text-success">{t('import.wouldImport')}</p>
         </div>
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-700 dark:bg-amber-950/30">
-          <p className="text-2xl font-semibold text-amber-700 dark:text-amber-300">
-            {result.skipped}
-          </p>
-          <p className="text-xs text-amber-800 dark:text-amber-200">{t('import.wouldSkip')}</p>
+        <div className="rounded-lg border border-warning/40 bg-warning-soft px-3 py-2">
+          <p className="text-2xl font-semibold text-warning">{result.skipped}</p>
+          <p className="text-xs text-warning">{t('import.wouldSkip')}</p>
         </div>
         <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2">
           <p className="text-2xl font-semibold text-danger">{result.failed}</p>
@@ -587,14 +584,12 @@ function DryRunPreview({ result, t }: { result: DryRunResult; t: ReturnType<type
       </div>
 
       {duplicateRows.length > 0 && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950/30">
+        <div className="rounded-lg border border-warning/40 bg-warning-soft p-3">
           <div className="flex items-start gap-2">
-            <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+            <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-warning" />
             <div className="flex-1 space-y-2 text-sm">
-              <p className="font-medium text-amber-800 dark:text-amber-200">
-                {t('import.duplicates.title')}
-              </p>
-              <ul className="space-y-2 text-xs text-amber-800 dark:text-amber-300">
+              <p className="font-medium text-warning">{t('import.duplicates.title')}</p>
+              <ul className="space-y-2 text-xs text-warning">
                 {duplicateRows.slice(0, 8).map((row) => (
                   <li key={row.rowNumber}>
                     <span className="font-medium">
@@ -602,7 +597,7 @@ function DryRunPreview({ result, t }: { result: DryRunResult; t: ReturnType<type
                         .replace('{row}', String(row.rowNumber))
                         .replace('{label}', row.label || '')}
                     </span>
-                    <ul className="ml-4 mt-1 list-disc">
+                    <ul className="ms-4 mt-1 list-disc">
                       {row.similarFamilies!.map((match) => (
                         <li key={match.familyId}>
                           {t('import.duplicates.match')
@@ -627,7 +622,7 @@ function DryRunPreview({ result, t }: { result: DryRunResult; t: ReturnType<type
         </h3>
         <div className="max-h-64 overflow-y-auto rounded-lg border border-border">
           <table className="w-full text-xs">
-            <thead className="sticky top-0 border-b border-border bg-app-subtle text-left text-muted-on-subtle">
+            <thead className="sticky top-0 border-b border-border bg-app-subtle text-start text-muted-on-subtle">
               <tr>
                 <th className="px-3 py-1.5 font-medium">{t('import.col.row')}</th>
                 <th className="px-3 py-1.5 font-medium">{t('import.col.action')}</th>
@@ -667,8 +662,8 @@ function ActionBadge({
   t: ReturnType<typeof useT>
 }) {
   const styles = {
-    import: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200',
-    skip: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200',
+    import: 'bg-success/10 text-success',
+    skip: 'bg-warning/10 text-warning',
     error: 'bg-danger/10 text-danger',
   }
   const labels = {
@@ -689,23 +684,17 @@ function ResultBlock({ result, t }: { result: ImportResult; t: ReturnType<typeof
   return (
     <div
       className={`rounded-lg border p-4 ${
-        result.success
-          ? 'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/30'
-          : 'border-danger/40 bg-danger/10'
+        result.success ? 'border-success/40 bg-success-soft' : 'border-danger/40 bg-danger/10'
       }`}
     >
       <div className="flex items-start gap-3">
         {result.success ? (
-          <CheckCircleIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-green-600 dark:text-green-400" />
+          <CheckCircleIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-success" />
         ) : (
           <XCircleIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-danger" />
         )}
         <div className="flex-1 space-y-1.5 text-sm">
-          <p
-            className={`font-medium ${
-              result.success ? 'text-green-800 dark:text-green-200' : 'text-danger'
-            }`}
-          >
+          <p className={`font-medium ${result.success ? 'text-success' : 'text-danger'}`}>
             {result.success ? t('import.result.complete') : t('import.result.failed')}
           </p>
           {result.success && (
@@ -718,10 +707,8 @@ function ResultBlock({ result, t }: { result: ImportResult; t: ReturnType<typeof
           )}
           {result.warnings.length > 0 && (
             <div>
-              <p className="mt-1 font-medium text-amber-700 dark:text-amber-300">
-                {t('import.result.warnings')}
-              </p>
-              <ul className="ml-4 list-disc text-xs text-amber-700 dark:text-amber-300">
+              <p className="mt-1 font-medium text-warning">{t('import.result.warnings')}</p>
+              <ul className="ms-4 list-disc text-xs text-warning">
                 {result.warnings.slice(0, 10).map((w, i) => (
                   <li key={i}>{w}</li>
                 ))}
@@ -739,7 +726,7 @@ function ResultBlock({ result, t }: { result: ImportResult; t: ReturnType<typeof
           {result.errors.length > 0 && (
             <div>
               <p className="mt-1 font-medium text-danger">{t('import.result.errors')}</p>
-              <ul className="ml-4 list-disc text-xs text-danger">
+              <ul className="ms-4 list-disc text-xs text-danger">
                 {result.errors.slice(0, 10).map((e, i) => (
                   <li key={i}>{e}</li>
                 ))}
