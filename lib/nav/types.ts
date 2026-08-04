@@ -5,6 +5,7 @@ export interface NavItem {
   href: string
   labelKey: string
   icon?: string
+  iconName?: string
   roles: NavRole[]
   shortcut?: string
   children?: NavItem[]
