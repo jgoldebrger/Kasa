@@ -12,7 +12,7 @@ describe('Tabs a11y', () => {
   })
 
   afterEach(() => {
-    document.documentElement.setAttribute('dir', 'ltr')
+    document.documentElement.removeAttribute('dir')
   })
 
   it('moves selection with ArrowRight toward the previous item in rtl', () => {
