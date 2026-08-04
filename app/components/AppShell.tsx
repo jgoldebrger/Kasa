@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import MobileTopBar from './MobileTopBar'
@@ -38,6 +38,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [supportMode, setSupportMode] = useState<SupportModeDetail>({ active: false })
+  const drawerRef = useRef<HTMLDivElement>(null)
 
   useSupportModeChanged(
     useCallback((detail) => {
@@ -56,13 +57,47 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     setMenuOpen(false)
   }, [pathname])
 
-  // Close on Escape — Modal handles its own, but the drawer needs its own listener.
+  // Move focus into the drawer on open — mirrors Modal's focus-trap pattern.
+  // The drawer is rendered inline (not a portal), so the ref is already
+  // attached by the time this effect runs; no need for Modal's setTimeout.
+  // Focus restoration on close is handled explicitly below (Escape) or by
+  // Sidebar's close button / backdrop click returning focus naturally.
+  useEffect(() => {
+    if (!menuOpen) return
+    const node = drawerRef.current
+    const focusable = node?.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    )
+    ;(focusable || node)?.focus()
+  }, [menuOpen])
+
+  // Escape closes + restores focus to the trigger; Tab/Shift+Tab cycle
+  // focus within the drawer's focusable elements while it's open.
   useEffect(() => {
     if (!menuOpen) return
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         setMenuOpen(false)
         document.getElementById('mobile-nav-trigger')?.focus()
+        return
+      }
+      if (e.key !== 'Tab') return
+      const node = drawerRef.current
+      if (!node) return
+      const focusables = Array.from(
+        node.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.offsetParent !== null || el === document.activeElement)
+      if (focusables.length === 0) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
       }
     }
     document.addEventListener('keydown', onKey)
@@ -102,10 +137,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             aria-hidden="true"
           />
           <div
+            ref={drawerRef}
             id="primary-sidebar"
             role="dialog"
             aria-modal="true"
-            aria-label="Navigation menu"
+            aria-label={t('nav.primary')}
+            tabIndex={-1}
             className="relative h-full w-72 max-w-[85vw] animate-ui-slide shadow-2xl"
           >
             <Sidebar onClose={() => setMenuOpen(false)} />
