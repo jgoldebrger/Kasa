@@ -59,6 +59,19 @@ In-repo notes for the `app/components/ui/*` kit. Full spec: [Design System Found
 - Semantic `--c-*` tokens define light (`:root`) and dark (`.dark`) RGB triplets.
 - Soft status surfaces use quieter dark-mode values for subtle backgrounds.
 
+## App shell IA
+
+Primary navigation is **config-driven** — do not hardcode sidebar links in components.
+
+- **Config:** `lib/nav/config.ts` exports `PRIMARY_NAV_SECTIONS` (sections: overview, people, money, comms, insights, settings). Each `NavItem` has `href`, `labelKey`, `iconName`, `roles`, optional `shortcut`, and optional `settingsTab` for `/settings?tab=…` deep links.
+- **Types & barrel:** `lib/nav/types.ts` (`NavItem`, `NavSection`); re-exported from `lib/nav/index.ts`.
+- **Role filtering:** `filterNavSections` in `lib/nav/roles.ts` trims the tree by `member` / `admin`. Members see Dashboard, Families, and Help only; admins see the full tree.
+- **Active match:** `findActiveNavItem` in `lib/nav/match.ts` picks the most specific item (longest path, then `settingsTab`).
+- **Collapsible sections:** `lib/nav/collapse.ts` — `readOpenSections` / `writeOpenSections` persist open section ids in `localStorage` (`kasa-nav-open-sections`); `sectionIdForPath` + `ensureSectionOpen` auto-expand the section containing the current route.
+- **Shortcuts:** `lib/nav/shortcuts.ts` derives help entries and route targets from each item's `shortcut` field (e.g. `g f`, `g p`, `g c`, `g s`).
+
+When adding or moving a primary route, update the nav config and locale keys; run `lib/nav` tests and `lib/i18n/messages/validate.test.ts`.
+
 ## Manual QA checklist
 
 Per component or PR touching the kit:
