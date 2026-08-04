@@ -6,7 +6,7 @@
  * upload modal. Used internally by <DataView> when `import` is configured.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   ArrowUpTrayIcon,
   DocumentArrowDownIcon,
@@ -29,6 +29,46 @@ interface Props {
 export default function ImportMenu({ type, onUpload, disabled, boundToFamily }: Props) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement | null>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
+
+  const closeAndRestoreFocus = () => {
+    setOpen(false)
+    triggerRef.current?.focus()
+  }
+
+  useLayoutEffect(() => {
+    if (!open) return
+    menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus()
+  }, [open])
+
+  const focusMenuItem = (offset: number) => {
+    const enabledItems = Array.from(
+      menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ??
+        [],
+    )
+    if (enabledItems.length === 0) return
+
+    const currentIndex = enabledItems.findIndex((item) => item === document.activeElement)
+    const startIndex = currentIndex >= 0 ? currentIndex : offset > 0 ? -1 : 0
+    const nextIndex = (startIndex + offset + enabledItems.length) % enabledItems.length
+    enabledItems[nextIndex]?.focus()
+  }
+
+  const onMenuKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      closeAndRestoreFocus()
+      return
+    }
+
+    const delta = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0
+    if (delta !== 0) {
+      e.preventDefault()
+      focusMenuItem(delta)
+    }
+  }
 
   useEffect(() => {
     if (!open) return
@@ -36,7 +76,7 @@ export default function ImportMenu({ type, onUpload, disabled, boundToFamily }: 
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key === 'Escape') closeAndRestoreFocus()
     }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -59,6 +99,7 @@ export default function ImportMenu({ type, onUpload, disabled, boundToFamily }: 
   return (
     <div className="relative" ref={ref}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => !disabled && setOpen((o) => !o)}
         disabled={disabled}
@@ -74,7 +115,9 @@ export default function ImportMenu({ type, onUpload, disabled, boundToFamily }: 
 
       {open && (
         <div
+          ref={menuRef}
           role="menu"
+          onKeyDown={onMenuKeyDown}
           className="absolute end-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-md border border-border bg-surface shadow-popover"
         >
           <div className="border-b border-border px-3 py-2">

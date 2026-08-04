@@ -41,15 +41,16 @@ describe('ActionMenu a11y', () => {
   })
 
   it('supports Home, End, and direction-aware horizontal navigation', () => {
-    document.documentElement.dir = 'rtl'
     render(
-      <ActionMenu
-        items={[
-          { label: 'Edit', onClick: () => {} },
-          { label: 'Archive', onClick: () => {} },
-          { label: 'Delete', onClick: () => {} },
-        ]}
-      />,
+      <div dir="rtl">
+        <ActionMenu
+          items={[
+            { label: 'Edit', onClick: () => {} },
+            { label: 'Archive', onClick: () => {} },
+            { label: 'Delete', onClick: () => {} },
+          ]}
+        />
+      </div>,
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Actions' }))
@@ -65,6 +66,26 @@ describe('ActionMenu a11y', () => {
     expect(document.activeElement).toBe(items[2])
     fireEvent.keyDown(items[1], { key: 'Home' })
     expect(document.activeElement).toBe(items[0])
+  })
+
+  it('does not reset focus when positioning updates', () => {
+    render(
+      <ActionMenu
+        items={[
+          { label: 'Edit', onClick: () => {} },
+          { label: 'Delete', onClick: () => {} },
+        ]}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions' }))
+    const items = screen.getAllByRole('menuitem')
+    fireEvent.keyDown(items[0], { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(items[1])
+
+    fireEvent(window, new Event('resize'))
+
+    expect(document.activeElement).toBe(items[1])
   })
 
   it('accepts logical and legacy physical alignment values', () => {

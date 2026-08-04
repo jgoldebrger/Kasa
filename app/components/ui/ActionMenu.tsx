@@ -48,6 +48,7 @@ export default function ActionMenu({
   )
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const focusedOnOpenRef = useRef(false)
 
   useEffect(() => {
     setMounted(true)
@@ -95,8 +96,13 @@ export default function ActionMenu({
   }, [open])
 
   useLayoutEffect(() => {
-    if (!open || !pos) return
+    if (!open) {
+      focusedOnOpenRef.current = false
+      return
+    }
+    if (!pos || focusedOnOpenRef.current) return
     menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus()
+    focusedOnOpenRef.current = true
   }, [open, pos])
 
   const closeAndRestoreFocus = () => {
@@ -137,7 +143,7 @@ export default function ActionMenu({
     }
 
     const verticalDelta = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0
-    const direction = getWritingDirection(menuRef.current)
+    const direction = getWritingDirection(triggerRef.current)
     const delta = verticalDelta || horizontalNavDelta(e.key, direction)
     if (delta !== 0) {
       e.preventDefault()
