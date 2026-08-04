@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { useColumnVisibility } from '@/lib/client/useColumnVisibility'
+import { textAlignClass, type TextAlign } from '@/lib/ui/align'
 import {
   useDataFilters,
   filterDataRows,
@@ -67,8 +68,8 @@ export interface DataColumn<T> {
   className?: string
   /** Hide this column under the given Tailwind breakpoint (eg "md"). */
   hideBelow?: 'sm' | 'md' | 'lg'
-  /** Header text-alignment. */
-  align?: 'left' | 'right' | 'center'
+  /** Header text-alignment. Physical (`left`/`right`) or logical (`start`/`end`). */
+  align?: TextAlign
   /**
    * Declare that this column should be filterable in the DataView toolbar.
    * The DataView extracts the value (via `filter.getValue`, else `exportValue`,
@@ -488,11 +489,21 @@ export function DataView<T>({
       />
     ) : null
 
+  // Visually hidden status announcing the filtered/visible row count so
+  // screen reader users learn when a search or column filter narrows the
+  // list, without relying on sighted feedback from the row list itself.
+  const liveRegion = (
+    <div className="sr-only" aria-live="polite" aria-atomic="true">
+      {`${totalRows.toLocaleString()} ${totalRows === 1 ? 'result' : 'results'}`}
+    </div>
+  )
+
   if (filteredAll.length === 0 && empty) {
     return (
       <div className={className}>
         {renderToolbar()}
         {chips}
+        {liveRegion}
         {empty}
         {renderImportModal()}
       </div>
@@ -526,6 +537,7 @@ export function DataView<T>({
     <div className={className}>
       {renderToolbar()}
       {chips}
+      {liveRegion}
 
       {/* Mobile: card list */}
       {shouldVirtualize ? (
@@ -578,7 +590,7 @@ export function DataView<T>({
                   <th
                     key={col.id}
                     scope="col"
-                    className={`px-4 py-2.5 font-medium ${alignClass(col.align)} ${hideClass(col.hideBelow)}`}
+                    className={`px-4 py-2.5 font-medium ${textAlignClass(col.align)} ${hideClass(col.hideBelow)}`}
                     aria-sort={
                       col.sortable && sort?.id === col.id
                         ? sort.dir === 'asc'
@@ -615,7 +627,7 @@ export function DataView<T>({
                   {renderColumns.map((col) => (
                     <td
                       key={col.id}
-                      className={`px-4 py-2.5 align-middle text-fg ${alignClass(col.align)} ${hideClass(col.hideBelow)} ${col.className || ''}`}
+                      className={`px-4 py-2.5 align-middle text-fg ${textAlignClass(col.align)} ${hideClass(col.hideBelow)} ${col.className || ''}`}
                     >
                       {col.cell(row, i)}
                     </td>
@@ -680,7 +692,7 @@ function VirtualTable<T>({
               <th
                 key={col.id}
                 scope="col"
-                className={`px-4 py-2.5 font-medium ${alignClass(col.align)} ${hideClass(col.hideBelow)}`}
+                className={`px-4 py-2.5 font-medium ${textAlignClass(col.align)} ${hideClass(col.hideBelow)}`}
                 aria-sort={
                   col.sortable && sort?.id === col.id
                     ? sort.dir === 'asc'
@@ -730,7 +742,7 @@ function VirtualTable<T>({
                 {columns.map((col) => (
                   <td
                     key={col.id}
-                    className={`px-4 py-2.5 align-middle text-fg ${alignClass(col.align)} ${hideClass(col.hideBelow)} ${col.className || ''}`}
+                    className={`px-4 py-2.5 align-middle text-fg ${textAlignClass(col.align)} ${hideClass(col.hideBelow)} ${col.className || ''}`}
                   >
                     {col.cell(row, vi.index)}
                   </td>
@@ -820,9 +832,6 @@ function defaultSizesFor(initial: number): number[] {
   return Array.from(set).sort((a, b) => a - b)
 }
 
-function alignClass(a?: 'left' | 'right' | 'center') {
-  return a === 'right' ? 'text-right' : a === 'center' ? 'text-center' : 'text-left'
-}
 function hideClass(h?: 'sm' | 'md' | 'lg') {
   if (!h) return ''
   return h === 'sm'
@@ -935,7 +944,7 @@ function PaginationFooter({
           className="focus-ring inline-flex h-7 w-7 items-center justify-center rounded-md text-fg-muted hover:bg-fg/5 hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Previous page"
         >
-          <ChevronLeftIcon className="h-4 w-4" />
+          <ChevronLeftIcon className="h-4 w-4 rtl:rotate-180" />
         </button>
         {pages.map((p, i) =>
           p === '…' ? (
@@ -963,7 +972,7 @@ function PaginationFooter({
           className="focus-ring inline-flex h-7 w-7 items-center justify-center rounded-md text-fg-muted hover:bg-fg/5 hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Next page"
         >
-          <ChevronRightIcon className="h-4 w-4" />
+          <ChevronRightIcon className="h-4 w-4 rtl:rotate-180" />
         </button>
       </nav>
     </div>
