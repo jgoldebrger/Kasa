@@ -159,20 +159,17 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
     [pathname, search, navSections],
   )
 
-  const [openSectionIds, setOpenSectionIds] = useState<string[]>(() => {
-    const stored = readOpenSections()
-    const activeSectionId = sectionIdForPath(pathname ?? '', search, navSections)
-    return activeSectionId ? ensureSectionOpen(stored, activeSectionId) : stored
-  })
+  // Start empty (no localStorage read during render) to avoid SSR/client
+  // hydration mismatches; hydrate persisted + route-derived open sections
+  // in the effect below, after mount.
+  const [openSectionIds, setOpenSectionIds] = useState<string[]>([])
 
   useEffect(() => {
+    const stored = readOpenSections()
     const activeSectionId = sectionIdForPath(pathname ?? '', search, navSections)
-    if (!activeSectionId) return
-    setOpenSectionIds((prev) => {
-      const next = ensureSectionOpen(prev, activeSectionId)
-      if (next !== prev) writeOpenSections(next)
-      return next
-    })
+    const next = activeSectionId ? ensureSectionOpen(stored, activeSectionId) : stored
+    setOpenSectionIds(next)
+    if (next !== stored) writeOpenSections(next)
   }, [pathname, search, navSections])
 
   const toggleSection = useCallback((sectionId: string) => {
@@ -272,38 +269,36 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
                   />
                 </button>
               )}
-              {isOpen && (
-                <div id={panelId} className="space-y-0.5">
-                  {section.items.map((item) => {
-                    const isActive = activeItem?.id === item.id
-                    const Icon = iconForNavItem(item)
-                    const href = hrefForNavItem(item)
+              <div id={panelId} hidden={!isOpen} className="space-y-0.5">
+                {section.items.map((item) => {
+                  const isActive = activeItem?.id === item.id
+                  const Icon = iconForNavItem(item)
+                  const href = hrefForNavItem(item)
 
-                    return (
-                      <Link
-                        key={item.id}
-                        href={href}
-                        prefetch={href !== pathname}
-                        onClick={onClose}
-                        aria-current={isActive ? 'page' : undefined}
-                        className={`focus-ring relative flex items-center gap-2.5 px-3 py-2 min-h-[var(--touch-target)] md:min-h-0 md:h-9 rounded-md text-sm transition-colors ${
-                          isActive
-                            ? 'bg-accent/10 text-accent font-semibold before:absolute before:start-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-accent before:rounded-e'
-                            : 'text-fg-muted font-medium hover:bg-fg/5 hover:text-fg'
+                  return (
+                    <Link
+                      key={item.id}
+                      href={href}
+                      prefetch={href !== pathname}
+                      onClick={onClose}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={`focus-ring relative flex items-center gap-2.5 px-3 py-2 min-h-[var(--touch-target)] md:min-h-0 md:h-9 rounded-md text-sm transition-colors ${
+                        isActive
+                          ? 'bg-accent/10 text-accent font-semibold before:absolute before:start-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-accent before:rounded-e'
+                          : 'text-fg-muted font-medium hover:bg-fg/5 hover:text-fg'
+                      }`}
+                    >
+                      <Icon
+                        className={`h-[18px] w-[18px] shrink-0 ${
+                          isActive ? 'text-accent' : 'text-fg-subtle'
                         }`}
-                      >
-                        <Icon
-                          className={`h-[18px] w-[18px] shrink-0 ${
-                            isActive ? 'text-accent' : 'text-fg-subtle'
-                          }`}
-                          aria-hidden="true"
-                        />
-                        <span className="truncate">{t(item.labelKey as MessageKey)}</span>
-                      </Link>
-                    )
-                  })}
-                </div>
-              )}
+                        aria-hidden="true"
+                      />
+                      <span className="truncate">{t(item.labelKey as MessageKey)}</span>
+                    </Link>
+                  )
+                })}
+              </div>
             </div>
           )
         })}
