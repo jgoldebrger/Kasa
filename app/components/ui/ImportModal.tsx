@@ -662,9 +662,9 @@ function ActionBadge({
   t: ReturnType<typeof useT>
 }) {
   const styles = {
-    import: 'bg-success/10 text-success',
-    skip: 'bg-warning/10 text-warning',
-    error: 'bg-danger/10 text-danger',
+    import: 'bg-success-soft text-success',
+    skip: 'bg-warning-soft text-warning',
+    error: 'bg-danger-soft text-danger',
   }
   const labels = {
     import: t('import.action.import'),
