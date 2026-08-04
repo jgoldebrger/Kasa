@@ -1,8 +1,13 @@
 'use client'
 
-import { TextareaHTMLAttributes, forwardRef, useId } from 'react'
+import { TextareaHTMLAttributes, forwardRef } from 'react'
+import { useFieldIds } from '@/lib/ui/field-ids'
 
 export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  /**
+   * Field label rendered above the textarea.
+   * At least one of `label`, `aria-label`, or `aria-labelledby` is required for accessibility.
+   */
   label?: string
   hint?: string
   error?: string | null
@@ -25,11 +30,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
   },
   ref,
 ) {
-  const autoId = useId()
-  const fieldId = id || `t-${autoId}`
-  const hintId = hint ? `${fieldId}-hint` : undefined
-  const errorId = error ? `${fieldId}-err` : undefined
-  const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined
+  const { fieldId, hintId, errorId, describedBy } = useFieldIds(id)
 
   return (
     <div className={`flex flex-col gap-1.5 ${wrapperClassName}`}>
@@ -40,7 +41,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
         >
           {label}
           {required && (
-            <span className="ml-0.5 text-danger" aria-hidden="true">
+            <span className="ms-0.5 text-danger" aria-hidden="true">
               *
             </span>
           )}
@@ -52,7 +53,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
         rows={rows}
         aria-invalid={error ? true : undefined}
         aria-required={required || undefined}
-        aria-describedby={describedBy}
+        aria-describedby={describedBy(hint, error)}
         required={required}
         className={`focus-ring w-full rounded-md border bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-subtle transition-colors disabled:bg-app-subtle ${
           error ? 'border-danger focus:border-danger' : 'border-border focus:border-accent'

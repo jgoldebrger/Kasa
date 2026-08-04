@@ -1,10 +1,14 @@
 'use client'
 
-import { InputHTMLAttributes, forwardRef, useId } from 'react'
+import { InputHTMLAttributes, forwardRef } from 'react'
 import { cn } from '@/lib/cn'
+import { useFieldIds } from '@/lib/ui/field-ids'
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  /** Field label rendered above the input. Required for a11y unless `aria-label` is supplied. */
+  /**
+   * Field label rendered above the input.
+   * At least one of `label`, `aria-label`, or `aria-labelledby` is required for accessibility.
+   */
   label?: string
   /** Soft helper text shown when there is no error. */
   hint?: string
@@ -40,11 +44,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   },
   ref,
 ) {
-  const autoId = useId()
-  const fieldId = id || `f-${autoId}`
-  const hintId = hint ? `${fieldId}-hint` : undefined
-  const errorId = error ? `${fieldId}-err` : undefined
-  const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined
+  const { fieldId, hintId, errorId, describedBy } = useFieldIds(id)
 
   return (
     <div className={cn('flex flex-col gap-1.5', wrapperClassName)}>
@@ -55,7 +55,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         >
           {label}
           {required && (
-            <span className="ml-0.5 text-danger" aria-hidden="true">
+            <span className="ms-0.5 text-danger" aria-hidden="true">
               *
             </span>
           )}
@@ -63,7 +63,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       )}
       <div className="relative">
         {leftIcon && (
-          <span className="pointer-events-none absolute inset-y-0 left-3 inline-flex items-center text-fg-subtle">
+          <span className="pointer-events-none absolute inset-y-0 start-3 inline-flex items-center text-fg-subtle">
             {leftIcon}
           </span>
         )}
@@ -72,19 +72,19 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           id={fieldId}
           aria-invalid={error ? true : undefined}
           aria-required={required || undefined}
-          aria-describedby={describedBy}
+          aria-describedby={describedBy(hint, error)}
           required={required}
           className={cn(
             'focus-ring w-full rounded-md border bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-subtle transition-colors disabled:bg-app-subtle disabled:text-fg-muted',
             error ? 'border-danger focus:border-danger' : 'border-border focus:border-accent',
-            leftIcon && 'pl-10',
-            rightIcon && 'pr-10',
+            leftIcon && 'ps-10',
+            rightIcon && 'pe-10',
             className,
           )}
           {...rest}
         />
         {rightIcon && (
-          <span className="pointer-events-none absolute inset-y-0 right-3 inline-flex items-center text-fg-subtle">
+          <span className="pointer-events-none absolute inset-y-0 end-3 inline-flex items-center text-fg-subtle">
             {rightIcon}
           </span>
         )}
