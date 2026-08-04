@@ -17,10 +17,16 @@ const variantClass: Record<AlertVariant, string> = {
   danger: 'border-danger/30 bg-danger/5 text-fg',
 }
 
-export function Alert({ variant = 'info', title, className, children, ...rest }: AlertProps) {
+/**
+ * Polite status feedback by default. Danger alerts use the assertive alert role.
+ * Pass `role` explicitly when the surrounding interaction requires different semantics.
+ */
+export function Alert({ variant = 'info', title, className, children, role, ...rest }: AlertProps) {
+  const resolvedRole = role ?? (variant === 'danger' ? 'alert' : 'status')
+
   return (
     <div
-      role="status"
+      role={resolvedRole}
       className={cn('rounded-lg border p-4 text-sm', variantClass[variant], className)}
       {...rest}
     >
