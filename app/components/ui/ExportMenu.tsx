@@ -62,6 +62,7 @@ export default function ExportMenu({ onExportCsv, onExportXlsx, disabled, rowCou
         disabled={isDisabled}
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label={isDisabled ? 'Nothing to export' : 'Export'}
         title={isDisabled ? 'Nothing to export' : 'Export'}
         className="focus-ring inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-fg-muted hover:bg-fg/5 hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
       >
@@ -72,7 +73,7 @@ export default function ExportMenu({ onExportCsv, onExportXlsx, disabled, rowCou
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-md border border-border bg-surface shadow-popover"
+          className="absolute end-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-md border border-border bg-surface shadow-popover"
         >
           <div className="border-b border-border px-3 py-2">
             <p className="text-[11px] font-medium text-fg-muted">
@@ -84,7 +85,7 @@ export default function ExportMenu({ onExportCsv, onExportXlsx, disabled, rowCou
             role="menuitem"
             onClick={handleCsv}
             disabled={busy}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-fg hover:bg-fg/5 disabled:opacity-50"
+            className="flex w-full items-center gap-2 px-3 py-2 text-start text-sm text-fg hover:bg-fg/5 disabled:opacity-50"
           >
             <DocumentTextIcon className="h-4 w-4 text-fg-subtle" aria-hidden="true" />
             <div>
@@ -97,7 +98,7 @@ export default function ExportMenu({ onExportCsv, onExportXlsx, disabled, rowCou
             role="menuitem"
             onClick={handleXlsx}
             disabled={busy}
-            className="flex w-full items-center gap-2 border-t border-border px-3 py-2 text-left text-sm text-fg hover:bg-fg/5 disabled:opacity-50"
+            className="flex w-full items-center gap-2 border-t border-border px-3 py-2 text-start text-sm text-fg hover:bg-fg/5 disabled:opacity-50"
           >
             <TableCellsIcon className="h-4 w-4 text-fg-subtle" aria-hidden="true" />
             <div>

@@ -13,6 +13,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { EllipsisVerticalIcon } from '@heroicons/react/24/outline'
+import { getWritingDirection, horizontalNavDelta } from '@/lib/ui/writing-direction'
 
 export interface ActionMenuItem {
   label: string
@@ -25,7 +26,7 @@ export interface ActionMenuItem {
 export interface ActionMenuProps {
   items: ActionMenuItem[]
   ariaLabel?: string
-  align?: 'left' | 'right'
+  align?: 'start' | 'end' | 'left' | 'right'
   /** Optional override for the trigger size (default h-8 w-8). */
   className?: string
 }
@@ -37,7 +38,7 @@ const VIEWPORT_PADDING = 8
 export default function ActionMenu({
   items,
   ariaLabel = 'Actions',
-  align = 'right',
+  align = 'end',
   className,
 }: ActionMenuProps) {
   const [open, setOpen] = useState(false)
@@ -61,8 +62,14 @@ export default function ActionMenu({
     const spaceAbove = rect.top - VIEWPORT_PADDING
     const flipUp = spaceBelow < menuHeight + VERTICAL_GAP && spaceAbove > spaceBelow
 
+    const logicalAlign = align === 'left' ? 'start' : align === 'right' ? 'end' : align
+    const direction = getWritingDirection(trigger)
+    const alignToRightEdge =
+      (logicalAlign === 'end' && direction === 'ltr') ||
+      (logicalAlign === 'start' && direction === 'rtl')
+
     let left: number
-    if (align === 'right') {
+    if (alignToRightEdge) {
       left = rect.right - MENU_WIDTH
     } else {
       left = rect.left
@@ -87,6 +94,57 @@ export default function ActionMenu({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
+  useLayoutEffect(() => {
+    if (!open || !pos) return
+    menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus()
+  }, [open, pos])
+
+  const closeAndRestoreFocus = () => {
+    setOpen(false)
+    triggerRef.current?.focus()
+  }
+
+  const getEnabledMenuItems = () =>
+    Array.from(
+      menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ??
+        [],
+    )
+
+  const focusMenuItem = (offset: number) => {
+    const enabledItems = getEnabledMenuItems()
+    if (enabledItems.length === 0) return
+
+    const currentIndex = enabledItems.findIndex((item) => item === document.activeElement)
+    const startIndex = currentIndex >= 0 ? currentIndex : offset > 0 ? -1 : 0
+    const nextIndex = (startIndex + offset + enabledItems.length) % enabledItems.length
+    enabledItems[nextIndex]?.focus()
+  }
+
+  const onMenuKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      closeAndRestoreFocus()
+      return
+    }
+    if (e.key === 'Home' || e.key === 'End') {
+      e.preventDefault()
+      const enabledItems = getEnabledMenuItems()
+      const boundaryItem =
+        e.key === 'Home' ? enabledItems[0] : enabledItems[enabledItems.length - 1]
+      boundaryItem?.focus()
+      return
+    }
+
+    const verticalDelta = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0
+    const direction = getWritingDirection(menuRef.current)
+    const delta = verticalDelta || horizontalNavDelta(e.key, direction)
+    if (delta !== 0) {
+      e.preventDefault()
+      focusMenuItem(delta)
+    }
+  }
+
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
@@ -96,7 +154,7 @@ export default function ActionMenu({
       setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key === 'Escape') closeAndRestoreFocus()
     }
     const onScrollOrResize = () => updatePosition()
     document.addEventListener('mousedown', onDown)
@@ -140,6 +198,7 @@ export default function ActionMenu({
           <div
             ref={menuRef}
             role="menu"
+            onKeyDown={onMenuKeyDown}
             style={{ position: 'fixed', top: pos.top, left: pos.left, width: MENU_WIDTH }}
             className="z-[1000] overflow-hidden rounded-md border border-border bg-surface shadow-popover"
           >
@@ -154,7 +213,7 @@ export default function ActionMenu({
                   setOpen(false)
                   item.onClick()
                 }}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors disabled:opacity-50 ${
+                className={`flex w-full items-center gap-2 px-3 py-2 text-start text-sm transition-colors disabled:opacity-50 ${
                   item.destructive ? 'text-danger hover:bg-danger/10' : 'text-fg hover:bg-fg/5'
                 } ${idx > 0 ? 'border-t border-border' : ''}`}
               >
