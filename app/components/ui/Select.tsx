@@ -56,7 +56,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         id={fieldId}
         aria-invalid={error ? true : undefined}
         aria-required={required || undefined}
-        aria-describedby={describedBy(hint, error)}
+        aria-describedby={describedBy(error ? undefined : hint, error)}
         required={required}
         className={`focus-ring w-full rounded-md border bg-surface px-3 py-2 text-sm text-fg transition-colors disabled:bg-app-subtle disabled:text-fg-muted ${
           error ? 'border-danger focus:border-danger' : 'border-border focus:border-accent'

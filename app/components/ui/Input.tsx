@@ -72,7 +72,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           id={fieldId}
           aria-invalid={error ? true : undefined}
           aria-required={required || undefined}
-          aria-describedby={describedBy(hint, error)}
+          aria-describedby={describedBy(error ? undefined : hint, error)}
           required={required}
           className={cn(
             'focus-ring w-full rounded-md border bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-subtle transition-colors disabled:bg-app-subtle disabled:text-fg-muted',
