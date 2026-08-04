@@ -70,7 +70,7 @@ export default function FilterPopover({
         <FunnelIcon className="h-4 w-4" aria-hidden="true" />
         <span className="hidden sm:inline">Filters</span>
         {activeCount > 0 && (
-          <span className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-none text-white">
+          <span className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-none text-accent-fg">
             {activeCount}
           </span>
         )}

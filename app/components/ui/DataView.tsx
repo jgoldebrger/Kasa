@@ -958,7 +958,9 @@ function PaginationFooter({
               onClick={() => onPageChange(p as number)}
               aria-current={p === page ? 'page' : undefined}
               className={`focus-ring inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded-md px-2 text-xs font-medium tabular ${
-                p === page ? 'bg-accent text-white' : 'text-fg-muted hover:bg-fg/5 hover:text-fg'
+                p === page
+                  ? 'bg-accent text-accent-fg'
+                  : 'text-fg-muted hover:bg-fg/5 hover:text-fg'
               }`}
             >
               {p}
