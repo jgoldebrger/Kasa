@@ -5,7 +5,7 @@ In-repo notes for the `app/components/ui/*` kit. Full spec: [Design System Found
 ## Token policy
 
 - Kit components use **semantic tokens only** (`fg`, `surface`, `accent`, `success`, `warning`, `danger`, spacing, radius, shadow).
-- Raw Tailwind palette colors (`green-600`, `amber-50`, …) inside the kit are allowed only when they map to named status semantics or are promoted into tokens during a kit pass.
+- Raw Tailwind palette colors (`green-600`, `amber-50`, …) are forbidden inside the kit; promote needed colors to named semantic tokens.
 - Light and dark contrast are both in scope.
 - Status tokens include soft surfaces: `success-soft`, `warning-soft`, `danger-soft`, and `danger-fg` for destructive button text.
 
@@ -64,7 +64,14 @@ In-repo notes for the `app/components/ui/*` kit. Full spec: [Design System Found
 Per component or PR touching the kit:
 
 - [ ] Keyboard-only path through primary interactions
+  - Use `Tab`/`Shift+Tab`, arrow keys, `Enter`, `Space`, and `Escape`; verify visible focus, modal focus trapping/restoration, DataView sorting, and row actions.
 - [ ] VoiceOver or NVDA spot-check on forms and DataView
-- [ ] LTR and one RTL locale (`he` or `yi`)
+  - With VoiceOver + Safari or NVDA + Firefox/Chrome, verify form labels, help/error associations, invalid state, DataView result counts, and sort state announcements.
+- [ ] LTR and the `he` RTL locale
+  - Set the app locale to `he` (or temporarily set the page root to `dir="rtl"`); verify Tabs arrow direction, icon padding, pagination chevrons, and end-aligned menus.
 - [ ] Light and dark theme — contrast and readability
+  - Scan Button, Input, Alert, and DataView states in both themes, including hover, focus, disabled, and soft status surfaces.
 - [ ] `prefers-reduced-motion: reduce` — non-essential animations disabled
+  - Enable reduced motion in the operating system, reload, and confirm that essential state changes remain understandable without non-essential animation.
+
+Record the tester, date, browser/screen-reader combination, locale, and any follow-up issue in the PR before checking off each item.
