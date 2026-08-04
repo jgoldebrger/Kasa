@@ -399,7 +399,7 @@ export function DataView<T>({
             placeholder={searchPlaceholder}
           />
         )}
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="ms-auto flex flex-wrap items-center gap-2">
           {showFilters && (
             <FilterPopover
               columns={filterColumns}
@@ -556,7 +556,7 @@ export function DataView<T>({
                 <button
                   type="button"
                   onClick={() => onRowClick(row, i)}
-                  className="focus-ring w-full text-left [&_.surface-card]:transition-colors [&_.surface-card]:hover:bg-fg/[0.02] [&_.surface-card]:active:bg-fg/[0.04]"
+                  className="focus-ring w-full text-start [&_.surface-card]:transition-colors [&_.surface-card]:hover:bg-fg/[0.02] [&_.surface-card]:active:bg-fg/[0.04]"
                 >
                   {mobileCard(row, i)}
                 </button>
@@ -584,7 +584,7 @@ export function DataView<T>({
           />
         ) : (
           <table className="w-full text-sm">
-            <thead className="border-b border-border bg-app-subtle text-left text-[11px] uppercase tracking-wider text-muted-on-subtle">
+            <thead className="border-b border-border bg-app-subtle text-start text-[11px] uppercase tracking-wider text-muted-on-subtle">
               <tr>
                 {renderColumns.map((col) => (
                   <th
@@ -686,7 +686,7 @@ function VirtualTable<T>({
       aria-label="Scrollable table"
     >
       <table className="w-full text-sm">
-        <thead className="sticky top-0 z-10 border-b border-border bg-app-subtle text-left text-[11px] uppercase tracking-wider text-muted-on-subtle">
+        <thead className="sticky top-0 z-10 border-b border-border bg-app-subtle text-start text-[11px] uppercase tracking-wider text-muted-on-subtle">
           <tr>
             {columns.map((col) => (
               <th
@@ -811,7 +811,7 @@ function VirtualCardList<T>({
                 <button
                   type="button"
                   onClick={() => onRowClick(row, vi.index)}
-                  className="focus-ring w-full text-left"
+                  className="focus-ring w-full text-start"
                 >
                   {mobileCard(row, vi.index)}
                 </button>
@@ -1013,7 +1013,7 @@ function SearchInput({
   return (
     <div className="relative w-full max-w-xs">
       <MagnifyingGlassIcon
-        className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle"
+        className="pointer-events-none absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle"
         aria-hidden="true"
       />
       <input
@@ -1026,7 +1026,7 @@ function SearchInput({
         }}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="focus-ring min-h-[var(--touch-target)] w-full rounded-md border border-border bg-surface py-2.5 pl-8 pr-2.5 text-sm text-fg placeholder:text-fg-subtle focus:border-accent md:min-h-0 md:py-1.5"
+        className="focus-ring min-h-[var(--touch-target)] w-full rounded-md border border-border bg-surface py-2.5 ps-8 pe-2.5 text-sm text-fg placeholder:text-fg-subtle focus:border-accent md:min-h-0 md:py-1.5"
       />
     </div>
   )
