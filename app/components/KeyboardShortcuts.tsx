@@ -5,15 +5,17 @@ import { useRouter } from 'next/navigation'
 import { Modal } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
+import { getNavShortcutHelpItems } from '@/lib/nav/shortcuts'
 
 const GO_SEQUENCE_MS = 1000
 
-const GO_ROUTES: Record<string, string> = {
-  f: '/families',
-  p: '/payments',
-  e: '/events',
-  t: '/tasks',
-}
+const NAV_SHORTCUTS = getNavShortcutHelpItems()
+const GO_ROUTES = Object.fromEntries(
+  NAV_SHORTCUTS.flatMap((item) => {
+    const [prefix, key] = item.keys.split(' ')
+    return prefix === 'g' && key && item.href ? [[key, item.href]] : []
+  }),
+)
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!target || !(target instanceof HTMLElement)) return false
@@ -34,10 +36,10 @@ const SHORTCUT_ROWS: ShortcutRow[] = [
   { keys: '?', labelKey: 'shortcuts.showHelp' },
   { keys: '/', labelKey: 'shortcuts.openSearch' },
   { keys: 'Ctrl+K', labelKey: 'shortcuts.openSearch' },
-  { keys: 'g f', labelKey: 'shortcuts.goFamilies' },
-  { keys: 'g p', labelKey: 'shortcuts.goPayments' },
-  { keys: 'g e', labelKey: 'shortcuts.goEvents' },
-  { keys: 'g t', labelKey: 'shortcuts.goTasks' },
+  ...NAV_SHORTCUTS.map((item) => ({
+    keys: item.keys,
+    labelKey: item.labelKey as MessageKey,
+  })),
 ]
 
 export default function KeyboardShortcuts() {

@@ -6,8 +6,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, fireEvent } from '@testing-library/react'
 import KeyboardShortcuts from './KeyboardShortcuts'
 
+const { pushMock } = vi.hoisted(() => ({
+  pushMock: vi.fn(),
+}))
+
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: pushMock }),
 }))
 
 vi.mock('@/lib/client/i18n', () => ({
@@ -28,5 +32,14 @@ describe('KeyboardShortcuts smoke', () => {
     render(<KeyboardShortcuts />)
     fireEvent.keyDown(window, { key: '?' })
     expect(document.body.textContent).toContain('shortcuts.title')
+  })
+
+  it('navigates with a shortcut declared in nav config', () => {
+    render(<KeyboardShortcuts />)
+
+    fireEvent.keyDown(window, { key: 'g' })
+    fireEvent.keyDown(window, { key: 'c' })
+
+    expect(pushMock).toHaveBeenCalledWith('/communications')
   })
 })
