@@ -29,6 +29,10 @@
   --c-success:        21 128 61;
   --c-warning:        180 83 9;
   --c-danger:         220 38 38;
+  --c-success-soft: 220 252 231; /* green-100-ish */
+  --c-warning-soft: 255 251 235; /* amber-50-ish */
+  --c-danger-soft:  254 242 242; /* red-50-ish */
+  --c-danger-fg:    255 255 255;
 
   /* Spacing scale (multiples of 4px). */
   --space-1: 4px;
@@ -78,6 +82,10 @@
   --c-success:        74 222 128;
   --c-warning:        251 191 36;
   --c-danger:         248 113 113;
+  --c-success-soft: 6 46 26;
+  --c-warning-soft: 69 26 3;
+  --c-danger-soft:  69 10 10;
+  --c-danger-fg:    255 255 255;
 }
 
 html {
@@ -221,4 +229,15 @@ body {
   outline: 2px solid rgb(var(--c-accent));
   outline-offset: 2px;
   border-radius: var(--radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-ui-fade,
+  .animate-ui-scale,
+  .animate-ui-slide {
+    animation: none !important;
+  }
 }
