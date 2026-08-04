@@ -170,13 +170,6 @@ export const PRIMARY_NAV_SECTIONS: NavSection[] = [
     labelKey: 'nav.section.settings',
     items: [
       {
-        id: 'help',
-        href: '/help',
-        labelKey: 'nav.help',
-        iconName: 'QuestionMarkCircleIcon',
-        roles: MEMBER_ROLES,
-      },
-      {
         id: 'settings-email',
         href: '/settings',
         labelKey: 'settings.email',
@@ -296,6 +289,19 @@ export const PRIMARY_NAV_SECTIONS: NavSection[] = [
         iconName: 'TrashIcon',
         roles: ADMIN_ROLES,
         settingsTab: 'trash',
+      },
+    ],
+  },
+  {
+    id: 'help',
+    labelKey: 'nav.section.help',
+    items: [
+      {
+        id: 'help',
+        href: '/help',
+        labelKey: 'nav.help',
+        iconName: 'QuestionMarkCircleIcon',
+        roles: MEMBER_ROLES,
       },
     ],
   },

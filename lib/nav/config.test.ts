@@ -57,6 +57,17 @@ describe('PRIMARY_NAV_SECTIONS', () => {
     expect(ids).toEqual(['dashboard', 'families', 'help'].sort())
   })
 
+  it('gives members a top-level help section, not a settings section', () => {
+    const output = filterNavSections(PRIMARY_NAV_SECTIONS, {
+      isAdmin: false,
+      isPlatformAdmin: false,
+    })
+    const sectionIds = output.map((section) => section.id)
+
+    expect(sectionIds).toContain('help')
+    expect(sectionIds).not.toContain('settings')
+  })
+
   it('declares icon names without React nodes', () => {
     const items = PRIMARY_NAV_SECTIONS.flatMap((section) => section.items)
 
