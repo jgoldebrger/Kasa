@@ -67,6 +67,7 @@ export default function MobileTopBar({ onOpenMenu, menuOpen }: MobileTopBarProps
       role="banner"
     >
       <button
+        id="mobile-nav-trigger"
         type="button"
         onClick={onOpenMenu}
         aria-label={t('nav.openMenu')}

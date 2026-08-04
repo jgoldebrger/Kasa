@@ -10,6 +10,7 @@ import OfflineSyncIndicator from './OfflineSyncIndicator'
 import OfflineQueueSyncHost from './OfflineQueueSyncHost'
 import KeyboardShortcuts from './KeyboardShortcuts'
 import GlobalQuickActionModals from './GlobalQuickActionModals'
+import { useT } from '@/lib/client/i18n'
 import {
   fetchSupportModeStatus,
   useSupportModeChanged,
@@ -32,6 +33,7 @@ const FULLSCREEN_PATHS = [
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || ''
+  const t = useT()
   const isFullscreen = FULLSCREEN_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 
   const [menuOpen, setMenuOpen] = useState(false)
@@ -58,7 +60,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!menuOpen) return
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setMenuOpen(false)
+      if (e.key === 'Escape') {
+        setMenuOpen(false)
+        document.getElementById('mobile-nav-trigger')?.focus()
+      }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
@@ -72,7 +77,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <>
       {/* Skip-to-content link — first focusable element in the page. */}
       <a href="#main-content" className="skip-link">
-        Skip to main content
+        {t('nav.skipToContent')}
       </a>
 
       {/* Mobile top bar (hidden on md+). */}

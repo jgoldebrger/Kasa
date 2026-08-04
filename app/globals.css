@@ -214,7 +214,7 @@ body {
 .skip-link {
   position: absolute;
   top: 8px;
-  left: 8px;
+  inset-inline-start: 8px;
   z-index: 200;
   background: rgb(var(--c-fg));
   color: rgb(var(--c-app));
