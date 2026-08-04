@@ -6,7 +6,6 @@ import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useToast } from '@/app/components/Toast'
 import { Button, Card, EmptyState, PageHeader, Select, SkeletonRows } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
-import CommunicationsNav from './CommunicationsNav'
 import type { EmailAnalytics, TopCampaignRow } from './types'
 
 const PERIOD_OPTIONS = ['30', '90'] as const
@@ -103,8 +102,6 @@ export default function AnalyticsView() {
             </Select>
           }
         />
-
-        <CommunicationsNav />
 
         {loading ? (
           <Card>

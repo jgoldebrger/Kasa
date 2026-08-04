@@ -16,7 +16,6 @@ import {
 import { formatLocaleDate } from '@/lib/date-utils'
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
-import CommunicationsNav from './CommunicationsNav'
 import type { EmailJobRow } from './types'
 
 function statusVariant(status: string): 'default' | 'success' | 'warning' | 'danger' {
@@ -147,8 +146,6 @@ export default function JobsView() {
           title={t('communications.jobs.title')}
           subtitle={t('communications.jobs.subtitle')}
         />
-
-        <CommunicationsNav />
 
         <Card className="overflow-hidden">
           {loading ? (

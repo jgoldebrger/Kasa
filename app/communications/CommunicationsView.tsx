@@ -22,7 +22,6 @@ import { useT } from '@/lib/client/i18n'
 import ComposeTab from './_components/ComposeTab'
 import EmailDetailDrawer from './_components/EmailDetailDrawer'
 import CampaignStatsModal from './_components/CampaignStatsModal'
-import CommunicationsNav from './_components/CommunicationsNav'
 import EmailLogFilters, { type EmailLogFilterValues } from './_components/EmailLogFilters'
 import BulkJobProgressBanner from './_components/BulkJobProgressBanner'
 import { useBulkJobPoll } from './_components/useBulkJobPoll'
@@ -306,8 +305,6 @@ export default function CommunicationsView() {
     <div className="min-h-screen p-4 sm:p-6 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         <PageHeader title={t('communications.title')} subtitle={t('communications.subtitle')} />
-
-        <CommunicationsNav />
 
         {jobStatus && <BulkJobProgressBanner status={jobStatus} polling={jobPolling} />}
 

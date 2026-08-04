@@ -16,7 +16,6 @@ import {
 } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
-import CommunicationsNav from './CommunicationsNav'
 import ScheduledEmailDetailDrawer from './ScheduledEmailDetailDrawer'
 import type { FamilyOption, ScheduledEmailRow } from './types'
 
@@ -183,8 +182,6 @@ export default function ScheduledView() {
           title={t('communications.scheduled.title')}
           subtitle={t('communications.scheduled.subtitle')}
         />
-
-        <CommunicationsNav />
 
         {loading ? (
           <Card>

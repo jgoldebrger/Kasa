@@ -30,7 +30,6 @@ import { useCurrency } from '@/lib/client/useCurrency'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { useSupportModeReadOnly } from '@/lib/client/support-mode'
-import PaymentsNav from './_components/PaymentsNav'
 import { PAYMENTS_LIST_PAGE_SIZE, parsePaymentsListResponse } from '@/lib/client/payments-list'
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
@@ -411,10 +410,6 @@ export default function PaymentsView({
             </div>
           }
         />
-
-        <div className="mt-4">
-          <PaymentsNav />
-        </div>
 
         {loading ? (
           <Card>

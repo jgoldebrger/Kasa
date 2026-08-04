@@ -17,7 +17,6 @@ import {
 } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
-import CommunicationsNav from './CommunicationsNav'
 import AutomationRecipientsModal from './AutomationRecipientsModal'
 import type { EmailAutomationRuleRow, EmailTemplate } from './types'
 
@@ -251,8 +250,6 @@ export default function AutomationsView() {
             'Automatically email families when a rule matches.',
           )}
         />
-
-        <CommunicationsNav />
 
         <Card className="p-4 sm:p-6 space-y-4">
           <h2 className="text-sm font-medium text-fg">

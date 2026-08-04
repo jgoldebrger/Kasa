@@ -20,7 +20,6 @@ import { useCurrency } from '@/lib/client/useCurrency'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
-import PaymentsNav from '../_components/PaymentsNav'
 
 type DisputeFilter = 'open' | 'closed' | 'all'
 
@@ -193,7 +192,6 @@ export default function DisputesView() {
           title={t('payments.disputes.title')}
           subtitle={t('payments.disputes.subtitle')}
         />
-        <PaymentsNav />
 
         <Tabs
           items={tabs.map((tab) => ({
