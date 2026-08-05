@@ -111,6 +111,20 @@ describe('FamiliesView smoke', () => {
     expect((await screen.findAllByText('Page Two Family')).length).toBeGreaterThan(0)
   })
 
+  it('does not show open balance column headers for member role', async () => {
+    render(
+      <FamiliesView
+        initialFamilies={[stubFamily]}
+        initialPaymentPlans={[stubPlan]}
+        isAdmin={false}
+      />,
+    )
+
+    expect((await screen.findAllByText('Smoke Family')).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/open balance/i)).toBeNull()
+    expect(screen.queryByText(/^Balance$/)).toBeNull()
+  })
+
   it('POSTs family create when the modal form is submitted', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
