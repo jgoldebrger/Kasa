@@ -6,6 +6,7 @@ import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
 import { DataView, EmptyState, SkeletonRows, Button, Card, type SortDir } from '@/app/components/ui'
+import { FamilyPageHeader } from '@/app/families/_lib'
 import { calculateHebrewAge, convertToHebrewDate } from '@/lib/hebrew-date'
 import { buildMemberColumns, computeMemberDisplay } from '../_lib/helpers'
 import { paymentColumnsFor, paymentMobileCard } from '../_lib/helpers'
@@ -672,23 +673,22 @@ function MembersTabContent(props: FamilyDetailContextValue) {
       ) : (
         // Members List View
         <>
-          <div className="flex justify-between mb-6">
-            <div>
-              <h3 className="text-xl font-semibold text-fg mb-1">Family Members (Children)</h3>
-              <p className="text-sm text-fg-muted">
-                Add children to track their ages for payment plan calculations
-              </p>
-            </div>
-            {isAdmin && (
-              <Button
-                size="lg"
-                leftIcon={<PlusIcon className="h-5 w-5" aria-hidden="true" />}
-                onClick={openAddMemberModal}
-              >
-                Add Child
-              </Button>
-            )}
-          </div>
+          <FamilyPageHeader
+            title="Family Members (Children)"
+            description="Add children to track their ages for payment plan calculations"
+            primaryAction={
+              isAdmin ? (
+                <Button
+                  size="lg"
+                  leftIcon={<PlusIcon className="h-5 w-5" aria-hidden="true" />}
+                  onClick={openAddMemberModal}
+                >
+                  Add Child
+                </Button>
+              ) : undefined
+            }
+            className="mb-6"
+          />
           <DataView
             tableId="family-children"
             rows={data.members}
