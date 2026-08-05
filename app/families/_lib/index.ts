@@ -8,3 +8,6 @@ export {
 } from './tabs'
 export { filterVisibleFamilyTabs } from './visibility'
 export { groupVisibleFamilyTabs } from './groups'
+export { FamilyPageHeader } from './FamilyPageHeader'
+export type { FamilyPageHeaderProps } from './FamilyPageHeader'
+export { moneyAmountCell, moneyStatusCell } from './money-table'
