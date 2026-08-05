@@ -72,6 +72,24 @@ Primary navigation is **config-driven** — do not hardcode sidebar links in com
 
 When adding or moving a primary route, update the nav config and locale keys; run `lib/nav` tests and `lib/i18n/messages/validate.test.ts`.
 
+## Families hub
+
+The Families critical workflow (list → detail → tabs → modals) uses shared contracts under `app/families/_lib/`:
+
+- **Tab registry:** `tabs.ts` — `FAMILY_TABS` ordered Profile → Money → Activity; stable URL segments; `familyTabHref` / `familyTabFromPathname`.
+- **Visibility:** `visibility.ts` — `filterVisibleFamilyTabs` mirrors admin / `memberFinancialAccess` gating (Statements only when linked).
+- **Clustered TabNav:** `FamilyClusteredTabNav.tsx` — group labels + horizontal links; used by detail shell.
+- **Page chrome:** `FamilyPageHeader.tsx` — shared tab/list toolbar (title + primary/secondary actions).
+- **Money tables:** `money-table.tsx` — `moneyAmountCell`, `moneyStatusCell` for DataView a11y (status not color-only).
+- **List columns:** `list-columns.ts` — `filterFamiliesListColumns` strips privileged columns for members.
+- **Modals:** `app/families/[id]/_components/modals/*` — domain modules; `FamilyModals.tsx` orchestrates.
+
+Legacy imports from `app/families/[id]/_lib/constants.ts` remain during migration; prefer `app/families/_lib` for new code.
+
+**Manual QA (Families hub):** keyboard TabNav overflow on narrow viewport; SR on one money table + one form modal; RTL (`he-IL`); member vs admin gating; linked-member Statements / make-payment path.
+
+Run: `npx vitest run app/families lib/client/families-list.test.ts lib/member-family-access.test.ts`
+
 ## Manual QA checklist
 
 Per component or PR touching the kit:
