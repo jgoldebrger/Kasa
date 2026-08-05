@@ -4,6 +4,7 @@
 import type { FamilyDetailContextValue } from '../FamilyDetailContext'
 import { PrinterIcon, DocumentArrowDownIcon, EnvelopeIcon } from '@heroicons/react/24/outline'
 import { Button, Card, EmptyState } from '@/app/components/ui'
+import { FamilyPageHeader } from '@/app/families/_lib'
 import { useFamilyDetail } from '../FamilyDetailContext'
 
 function StatementsTabContent(props: FamilyDetailContextValue) {
@@ -23,18 +24,20 @@ function StatementsTabContent(props: FamilyDetailContextValue) {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-fg">Statements</h3>
-        {!readOnly && statements.length > 0 && (
-          <Button
-            size="sm"
-            leftIcon={<PrinterIcon className="h-4 w-4" aria-hidden="true" />}
-            onClick={() => handlePrintAllStatements()}
-          >
-            Print All Statements
-          </Button>
-        )}
-      </div>
+      <FamilyPageHeader
+        title="Statements"
+        primaryAction={
+          !readOnly && statements.length > 0 ? (
+            <Button
+              size="sm"
+              leftIcon={<PrinterIcon className="h-4 w-4" aria-hidden="true" />}
+              onClick={() => handlePrintAllStatements()}
+            >
+              Print All Statements
+            </Button>
+          ) : undefined
+        }
+      />
       {statements.length === 0 ? (
         <EmptyState
           icon="📄"

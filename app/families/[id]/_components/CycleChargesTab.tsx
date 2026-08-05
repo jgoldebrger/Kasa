@@ -3,6 +3,7 @@
 
 import type { FamilyDetailContextValue } from '../FamilyDetailContext'
 import { DataView, EmptyState, Button } from '@/app/components/ui'
+import { FamilyPageHeader, moneyAmountCell } from '@/app/families/_lib'
 import { useFamilyDetail } from '../FamilyDetailContext'
 
 function CycleChargesTabContent(props: FamilyDetailContextValue) {
@@ -11,16 +12,10 @@ function CycleChargesTabContent(props: FamilyDetailContextValue) {
   const cycleCharges = data.cycleCharges || []
   return (
     <div>
-      <div className="flex justify-between mb-4 gap-3 flex-wrap">
-        <div>
-          <h3 className="text-lg font-semibold">Cycle Charges</h3>
-          <p className="text-xs text-fg-muted mt-1 max-w-prose">
-            Annual membership-dues charges captured by the cycle-rollover job on each cycle start.
-            Each row reduces the family balance by one year&rsquo;s plan price; the current
-            in-progress cycle is shown as &ldquo;Plan Cost (Annual)&rdquo; on the Info tab instead.
-          </p>
-        </div>
-      </div>
+      <FamilyPageHeader
+        title="Cycle Charges"
+        description="Annual membership-dues charges captured by the cycle-rollover job on each cycle start. Each row reduces the family balance by one year's plan price; the current in-progress cycle is shown as “Plan Cost (Annual)” on the Info tab instead."
+      />
       <DataView
         tableId="family-cycle-charges"
         rows={cycleCharges}
@@ -65,11 +60,7 @@ function CycleChargesTabContent(props: FamilyDetailContextValue) {
             header: 'Amount',
             headerText: 'Amount',
             align: 'right',
-            cell: (c: any) => (
-              <span className="font-medium tabular text-orange-600">
-                {formatMoney(-(c.amount || 0))}
-              </span>
-            ),
+            cell: (c: any) => moneyAmountCell(-(c.amount || 0), formatMoney, 'negative'),
             exportValue: (c: any) => -(c.amount || 0),
             filter: { type: 'numberRange', getValue: (c: any) => c.amount || 0 },
           },
@@ -89,7 +80,7 @@ function CycleChargesTabContent(props: FamilyDetailContextValue) {
             <div className="flex items-start justify-between gap-3">
               <div className="font-medium text-fg">Cycle {c.cycleYear}</div>
               <div className="font-medium tabular text-orange-600">
-                {formatMoney(-(c.amount || 0))}
+                {moneyAmountCell(-(c.amount || 0), formatMoney, 'negative')}
               </div>
             </div>
             <div className="mt-2 text-xs text-fg-muted tabular">

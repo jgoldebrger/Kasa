@@ -1,5 +1,6 @@
 import type React from 'react'
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { moneyAmountCell } from '@/app/families/_lib'
 import { calculateHebrewAge, convertToHebrewDate } from '@/lib/hebrew-date'
 import { handleHebrewInput, qwertyToHebrew } from '@/lib/client/hebrew-input'
 import { netPaymentAmount } from '@/lib/money'
@@ -50,11 +51,18 @@ export function paymentColumnsFor(
       headerText: 'Amount',
       sortable: true,
       align: 'right',
-      cell: (p) => (
-        <span className="font-semibold tabular text-green-700 dark:text-green-400">
-          {formatPaymentAmount(p, fmt)}
-        </span>
-      ),
+      cell: (p) => {
+        const net = netPaymentAmount(p)
+        const refunded = Number(p.refundedAmount || 0)
+        return (
+          <span>
+            {moneyAmountCell(net, fmt, 'positive')}
+            {refunded > 0 && (
+              <span className="text-xs text-fg-muted"> (refunded {fmt(refunded)})</span>
+            )}
+          </span>
+        )
+      },
       exportValue: (p) => netPaymentAmount(p),
       filter: { type: 'numberRange', getValue: (p) => netPaymentAmount(p) },
     },
@@ -134,7 +142,9 @@ export function paymentMobileCard(p: any, fmt: (n: number) => string) {
     <div className="surface-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="font-semibold text-fg tabular">{formatPaymentAmount(p, fmt)}</div>
+          <div className="font-semibold text-fg tabular">
+            {moneyAmountCell(netPaymentAmount(p), fmt, 'positive')}
+          </div>
           <div className="text-xs text-fg-muted capitalize">{p.type}</div>
         </div>
         <div className="text-right text-xs">

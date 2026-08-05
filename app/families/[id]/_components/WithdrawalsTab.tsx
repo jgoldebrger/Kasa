@@ -4,6 +4,7 @@
 import type { FamilyDetailContextValue } from '../FamilyDetailContext'
 import { PlusIcon } from '@heroicons/react/24/outline'
 import { DataView, EmptyState, Button, Card } from '@/app/components/ui'
+import { FamilyPageHeader, moneyAmountCell } from '@/app/families/_lib'
 import { useFamilyDetail } from '../FamilyDetailContext'
 
 function WithdrawalsTabContent(props: FamilyDetailContextValue) {
@@ -21,16 +22,18 @@ function WithdrawalsTabContent(props: FamilyDetailContextValue) {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-fg">Withdrawals</h3>
-        <Button
-          size="sm"
-          leftIcon={<PlusIcon className="h-4 w-4" aria-hidden="true" />}
-          onClick={openAddWithdrawal}
-        >
-          Add Withdrawal
-        </Button>
-      </div>
+      <FamilyPageHeader
+        title="Withdrawals"
+        primaryAction={
+          <Button
+            size="sm"
+            leftIcon={<PlusIcon className="h-4 w-4" aria-hidden="true" />}
+            onClick={openAddWithdrawal}
+          >
+            Add Withdrawal
+          </Button>
+        }
+      />
       <DataView
         tableId="family-withdrawals"
         rows={withdrawals}
@@ -59,11 +62,7 @@ function WithdrawalsTabContent(props: FamilyDetailContextValue) {
             header: 'Amount',
             headerText: 'Amount',
             align: 'right',
-            cell: (w: any) => (
-              <span className="font-medium tabular text-warning">
-                {formatMoney(-Number(w.amount || 0))}
-              </span>
-            ),
+            cell: (w: any) => moneyAmountCell(-Number(w.amount || 0), formatMoney, 'negative'),
             exportValue: (w: any) => w.amount || 0,
             filter: { type: 'numberRange', getValue: (w: any) => w.amount || 0 },
           },
@@ -104,7 +103,7 @@ function WithdrawalsTabContent(props: FamilyDetailContextValue) {
             <div className="flex items-start justify-between gap-3">
               <div className="font-medium text-fg">{w.reason || 'Withdrawal'}</div>
               <div className="font-medium tabular text-warning">
-                {formatMoney(-Number(w.amount || 0))}
+                {moneyAmountCell(-Number(w.amount || 0), formatMoney, 'negative')}
               </div>
             </div>
             <div className="mt-2 text-xs text-fg-muted tabular">
