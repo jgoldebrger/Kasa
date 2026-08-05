@@ -4,6 +4,7 @@
 import type { FamilyDetailContextValue } from '../FamilyDetailContext'
 import { PlusIcon } from '@heroicons/react/24/outline'
 import { DataView, EmptyState, Button, Card } from '@/app/components/ui'
+import { FamilyPageHeader, moneyAmountCell } from '@/app/families/_lib'
 import { useFamilyDetail } from '../FamilyDetailContext'
 
 function EventsTabContent(props: FamilyDetailContextValue) {
@@ -20,16 +21,18 @@ function EventsTabContent(props: FamilyDetailContextValue) {
   const events = data.lifecycleEvents || []
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-fg">Lifecycle Events</h3>
-        <Button
-          size="sm"
-          leftIcon={<PlusIcon className="h-4 w-4" aria-hidden="true" />}
-          onClick={() => setShowEventModal(true)}
-        >
-          Add Event
-        </Button>
-      </div>
+      <FamilyPageHeader
+        title="Lifecycle Events"
+        primaryAction={
+          <Button
+            size="sm"
+            leftIcon={<PlusIcon className="h-4 w-4" aria-hidden="true" />}
+            onClick={() => setShowEventModal(true)}
+          >
+            Add Event
+          </Button>
+        }
+      />
       <DataView
         tableId="family-events"
         rows={events}
@@ -69,7 +72,7 @@ function EventsTabContent(props: FamilyDetailContextValue) {
             header: 'Amount',
             headerText: 'Amount',
             align: 'right',
-            cell: (e: any) => <span className="font-medium tabular">{formatMoney(e.amount)}</span>,
+            cell: (e: any) => moneyAmountCell(e.amount, formatMoney),
             exportValue: (e: any) => e.amount || 0,
             filter: { type: 'numberRange', getValue: (e: any) => e.amount || 0 },
           },
@@ -97,7 +100,9 @@ function EventsTabContent(props: FamilyDetailContextValue) {
           <Card compact>
             <div className="flex items-start justify-between gap-3">
               <div className="capitalize font-medium text-fg">{e.eventType.replace('_', ' ')}</div>
-              <div className="font-medium tabular text-fg">{formatMoney(e.amount)}</div>
+              <div className="font-medium tabular text-fg">
+                {moneyAmountCell(e.amount, formatMoney)}
+              </div>
             </div>
             <div className="mt-2 text-xs text-fg-muted tabular">
               {new Date(e.eventDate).toLocaleDateString()} · {e.year}
