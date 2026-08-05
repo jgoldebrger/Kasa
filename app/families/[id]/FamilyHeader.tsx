@@ -1,20 +1,56 @@
 'use client'
 
-import { useState } from 'react'
-import { PaperAirplaneIcon, PlusIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import {
+  DocumentTextIcon,
+  PaperAirplaneIcon,
+  PlusIcon,
+  QuestionMarkCircleIcon,
+} from '@heroicons/react/24/outline'
 import { Button, Card, Tooltip } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
 import EmailFamilyModal from '@/app/families/_components/EmailFamilyModal'
 import FamilyEmailAdminActions from '@/app/families/_components/FamilyEmailAdminActions'
 import FamilyEmailIndicators from '@/app/families/_components/FamilyEmailIndicators'
 import FamilyTagsEditor from '@/app/families/_components/FamilyTagsEditor'
+import { familyTabHref } from './_lib/constants'
+import MemberMakePaymentModal from './_components/MemberMakePaymentModal'
 import { useFamilyDetail } from './FamilyDetailContext'
 
 export default function FamilyHeader() {
   const t = useT()
-  const { data, isAdmin, formatMoney, getPlanNameById, setShowTaskModal, setData } =
-    useFamilyDetail()
+  const {
+    familyId,
+    data,
+    isAdmin,
+    memberFinancialAccess,
+    formatMoney,
+    getPlanNameById,
+    setShowTaskModal,
+    setData,
+  } = useFamilyDetail()
   const [showEmailModal, setShowEmailModal] = useState(false)
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  const [cardPaymentsEnabled, setCardPaymentsEnabled] = useState(false)
+
+  useEffect(() => {
+    if (isAdmin || !memberFinancialAccess) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(`/api/families/${familyId}/member-financials`)
+        if (!res.ok || cancelled) return
+        const payload = await res.json()
+        if (!cancelled) setCardPaymentsEnabled(Boolean(payload.cardPaymentsEnabled))
+      } catch {
+        /* header CTAs still work for offline payments */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [familyId, isAdmin, memberFinancialAccess])
 
   if (!data?.family) return null
 
@@ -60,7 +96,7 @@ export default function FamilyHeader() {
             />
           )}
         </div>
-        {isAdmin && (
+        {isAdmin ? (
           <div className="flex flex-wrap items-center gap-2">
             {canEmail && (
               <Button
@@ -80,7 +116,20 @@ export default function FamilyHeader() {
               {t('family.header.addTask')}
             </Button>
           </div>
-        )}
+        ) : memberFinancialAccess ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" onClick={() => setPaymentModalOpen(true)}>
+              {t('memberPortal.makePayment')}
+            </Button>
+            <Link
+              href={familyTabHref(familyId, 'statements')}
+              className="focus-ring inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-fg hover:bg-app-subtle"
+            >
+              <DocumentTextIcon className="h-4 w-4" aria-hidden="true" />
+              {t('memberPortal.viewStatements')}
+            </Link>
+          </div>
+        ) : null}
       </div>
       <EmailFamilyModal
         open={showEmailModal}
@@ -94,6 +143,14 @@ export default function FamilyHeader() {
           emailFormatInvalid: family.emailFormatInvalid,
         }}
       />
+      {!isAdmin && memberFinancialAccess && (
+        <MemberMakePaymentModal
+          open={paymentModalOpen}
+          onClose={() => setPaymentModalOpen(false)}
+          familyId={familyId}
+          cardPaymentsEnabled={cardPaymentsEnabled}
+        />
+      )}
       <div
         className={`mt-4 grid grid-cols-2 gap-4 border-t border-border pt-4${isAdmin ? ' md:grid-cols-7' : ''}`}
       >

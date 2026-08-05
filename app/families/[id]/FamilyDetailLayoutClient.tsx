@@ -99,7 +99,7 @@ function FamilyDetailShell({ children }: { children: React.ReactNode }) {
 
         <FamilyHeader />
 
-        <div className="bg-surface rounded-lg shadow mt-3">
+        <div className="mt-3 rounded-lg bg-surface shadow">
           <FamilyTabNav />
           {!isAdmin && <MemberHiddenTabsNotice />}
           <div className="p-6">{children}</div>
