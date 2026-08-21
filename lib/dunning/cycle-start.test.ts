@@ -1,6 +1,6 @@
 import { HDate } from '@hebcal/hdate'
 import { describe, expect, it } from 'vitest'
-import { startOfDayInTimeZone } from '@/lib/date-utils'
+import { startOfDayInTimeZone, zonedWallClockToUtc } from '@/lib/date-utils'
 import { currentBillingCycleStart } from './cycle-start'
 
 describe('currentBillingCycleStart', () => {
@@ -43,6 +43,32 @@ describe('currentBillingCycleStart', () => {
         cycleStartHebrewMonth: 7,
         cycleStartHebrewDay: 1,
         timezone: 'UTC',
+        now: afterCycleStart,
+      })
+      expect(start.getTime()).toBe(expected.getTime())
+    })
+
+    it('uses org wall-clock day for hebrew cycle start in non-UTC timezone', () => {
+      const cycleStart = new HDate(1, 7, 5786)
+      const greg = cycleStart.greg()
+      const expected = zonedWallClockToUtc(
+        greg.getFullYear(),
+        greg.getMonth() + 1,
+        greg.getDate(),
+        0,
+        0,
+        0,
+        0,
+        'America/New_York',
+      )
+      const afterCycleStart = new HDate(15, 7, 5786).greg()
+      const start = currentBillingCycleStart({
+        calendar: 'hebrew',
+        cycleStartMonth: 9,
+        cycleStartDay: 1,
+        cycleStartHebrewMonth: 7,
+        cycleStartHebrewDay: 1,
+        timezone: 'America/New_York',
         now: afterCycleStart,
       })
       expect(start.getTime()).toBe(expected.getTime())

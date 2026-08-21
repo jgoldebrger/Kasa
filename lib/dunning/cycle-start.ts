@@ -26,7 +26,17 @@ export function currentBillingCycleStart(input: CycleStartInput): Date {
     if (today.abs() < start.abs()) {
       start = new HDate(day, month, year - 1)
     }
-    return startOfDayInTimeZone(input.timezone, start.greg())
+    const greg = start.greg()
+    return zonedWallClockToUtc(
+      greg.getFullYear(),
+      greg.getMonth() + 1,
+      greg.getDate(),
+      0,
+      0,
+      0,
+      0,
+      input.timezone,
+    )
   }
 
   const yearNow = getYearInTimeZone(input.timezone, input.now)
