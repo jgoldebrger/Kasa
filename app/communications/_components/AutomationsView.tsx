@@ -19,6 +19,7 @@ import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
 import CommunicationsNav from './CommunicationsNav'
 import AutomationRecipientsModal from './AutomationRecipientsModal'
+import { automationRuleTypeLabel } from './automation-rule-type-label'
 import type { EmailAutomationRuleRow, EmailTemplate } from './types'
 
 function tf(t: ReturnType<typeof useT>, key: string, fallback: string) {
@@ -32,6 +33,10 @@ interface DraftRule {
   enabled: boolean
   templateId: string
   ruleType: RuleType
+  minOwed: string
+  daysSinceObligation: string
+  maxAttempts: string
+  intervalDays: string
 }
 
 const EMPTY_DRAFT: DraftRule = {
@@ -39,6 +44,17 @@ const EMPTY_DRAFT: DraftRule = {
   enabled: false,
   templateId: '',
   ruleType: 'balance_gt_zero',
+  minOwed: '',
+  daysSinceObligation: '',
+  maxAttempts: '',
+  intervalDays: '',
+}
+
+function parseOptionalNumber(value: string): number | undefined {
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  const n = Number(trimmed)
+  return Number.isFinite(n) ? n : undefined
 }
 
 function formatLastRun(value?: string | null) {
@@ -126,7 +142,8 @@ export default function AutomationsView() {
   })
 
   const createRule = async () => {
-    if (!draft.name.trim() || !draft.templateId) {
+    const missingMinOwed = draft.ruleType === 'dunning_arrears' && !(Number(draft.minOwed) > 0)
+    if (!draft.name.trim() || !draft.templateId || missingMinOwed) {
       toast.error(
         tf(t, 'communications.automations.missingFields', 'Name and template are required.'),
       )
@@ -134,15 +151,25 @@ export default function AutomationsView() {
     }
     setCreating(true)
     try {
+      const body: Record<string, unknown> = {
+        name: draft.name.trim(),
+        enabled: draft.enabled,
+        templateId: draft.templateId,
+        ruleType: draft.ruleType,
+      }
+      if (draft.ruleType === 'dunning_arrears') {
+        body.minOwed = Number(draft.minOwed)
+        const daysSinceObligation = parseOptionalNumber(draft.daysSinceObligation)
+        const maxAttempts = parseOptionalNumber(draft.maxAttempts)
+        const intervalDays = parseOptionalNumber(draft.intervalDays)
+        if (daysSinceObligation != null) body.daysSinceObligation = daysSinceObligation
+        if (maxAttempts != null) body.maxAttempts = maxAttempts
+        if (intervalDays != null) body.intervalDays = intervalDays
+      }
       const res = await fetch('/api/email-automation-rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: draft.name.trim(),
-          enabled: draft.enabled,
-          templateId: draft.templateId,
-          ruleType: draft.ruleType,
-        }),
+        body: JSON.stringify(body),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Create failed')
@@ -233,12 +260,7 @@ export default function AutomationsView() {
     }
   }
 
-  const ruleTypeLabel = (ruleType: RuleType) => {
-    if (ruleType === 'balance_gt_zero') {
-      return tf(t, 'communications.automations.ruleType.balance', 'Balance greater than zero')
-    }
-    return tf(t, 'communications.automations.ruleType.event', 'Lifecycle event within 30 days')
-  }
+  const ruleTypeLabel = (ruleType: RuleType) => automationRuleTypeLabel(ruleType, t)
 
   return (
     <div className="min-h-screen p-4 sm:p-6 md:p-8">
@@ -290,7 +312,54 @@ export default function AutomationsView() {
             >
               <option value="balance_gt_zero">{ruleTypeLabel('balance_gt_zero')}</option>
               <option value="event_within_30_days">{ruleTypeLabel('event_within_30_days')}</option>
+              <option value="dunning_arrears">{ruleTypeLabel('dunning_arrears')}</option>
             </Select>
+            {draft.ruleType === 'dunning_arrears' ? (
+              <>
+                <Input
+                  type="number"
+                  min={0}
+                  step="any"
+                  required
+                  label={tf(t, 'communications.automations.field.minOwed', 'Minimum amount owed')}
+                  value={draft.minOwed}
+                  onChange={(e) => setDraft((d) => ({ ...d, minOwed: e.target.value }))}
+                />
+                <Input
+                  type="number"
+                  min={1}
+                  label={tf(
+                    t,
+                    'communications.automations.field.daysSinceObligation',
+                    'Days since obligation',
+                  )}
+                  value={draft.daysSinceObligation}
+                  onChange={(e) => setDraft((d) => ({ ...d, daysSinceObligation: e.target.value }))}
+                />
+                <Input
+                  type="number"
+                  min={1}
+                  label={tf(
+                    t,
+                    'communications.automations.field.maxAttempts',
+                    'Max emails per episode',
+                  )}
+                  value={draft.maxAttempts}
+                  onChange={(e) => setDraft((d) => ({ ...d, maxAttempts: e.target.value }))}
+                />
+                <Input
+                  type="number"
+                  min={1}
+                  label={tf(
+                    t,
+                    'communications.automations.field.intervalDays',
+                    'Days between emails',
+                  )}
+                  value={draft.intervalDays}
+                  onChange={(e) => setDraft((d) => ({ ...d, intervalDays: e.target.value }))}
+                />
+              </>
+            ) : null}
             <label className="flex items-center gap-2 text-sm text-fg self-end pb-2">
               <input
                 type="checkbox"
@@ -347,6 +416,16 @@ export default function AutomationsView() {
                       <p className="text-sm text-fg-muted">
                         {ruleTypeLabel(rule.ruleType)} · {templateName}
                       </p>
+                      {rule.ruleType === 'dunning_arrears' && rule.minOwed != null ? (
+                        <p className="text-xs text-fg-muted">
+                          {tf(t, 'communications.automations.field.minOwed', 'Minimum amount owed')}
+                          {': '}
+                          {rule.minOwed}
+                          {rule.daysSinceObligation != null
+                            ? ` · ${tf(t, 'communications.automations.field.daysSinceObligation', 'Days since obligation')}: ${rule.daysSinceObligation}`
+                            : null}
+                        </p>
+                      ) : null}
                       <p className="text-xs text-fg-muted">{formatLastRunStats(t, rule)}</p>
                       {rule.lastRunError ? (
                         <p className="text-xs text-danger">
