@@ -14,14 +14,20 @@ export async function obligationStartDate(args: {
   })
     .sort({ chargeDate: 1 })
     .limit(1)
-    .lean()
+    .lean<{ chargeDate?: Date }[]>()
 
   const chargeDate = earliest[0]?.chargeDate
   if (chargeDate) return chargeDate
 
   const [config, org] = await Promise.all([
-    CycleConfig.findOne({ organizationId: args.organizationId, isActive: true }).lean(),
-    Organization.findById(args.organizationId).lean(),
+    CycleConfig.findOne({ organizationId: args.organizationId, isActive: true }).lean<{
+      cycleCalendar?: string
+      cycleStartMonth?: number
+      cycleStartDay?: number
+      cycleStartHebrewMonth?: number
+      cycleStartHebrewDay?: number
+    } | null>(),
+    Organization.findById(args.organizationId).lean<{ timezone?: string } | null>(),
   ])
 
   if (config) {
