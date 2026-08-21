@@ -147,4 +147,43 @@ describe('DunningEpisode model', () => {
       expect(ep?.status).toBe('closed')
     })
   })
+
+  describe('Payment.create closes episodes', () => {
+    afterEach(async () => {
+      const { Payment } = await import('@/lib/models')
+      await Payment.deleteMany({})
+    })
+
+    it('closes an open episode when Payment.create saves a row', async () => {
+      const { planDunningAction } = await import('./episodes')
+      const { DunningEpisode, Payment } = await import('@/lib/models')
+      const organizationId = new Types.ObjectId()
+      const familyId = new Types.ObjectId()
+      const rule = { _id: new Types.ObjectId(), maxAttempts: 3, intervalDays: 7 }
+      await planDunningAction({
+        organizationId: String(organizationId),
+        familyId: String(familyId),
+        rule,
+        qualifies: true,
+        now: new Date('2026-08-01T12:00:00.000Z'),
+        timezone: 'UTC',
+      })
+
+      await Payment.create({
+        organizationId,
+        familyId,
+        amount: 1,
+        paymentDate: new Date('2026-08-01T12:00:00.000Z'),
+      })
+
+      const deadline = Date.now() + 2000
+      let episode = await DunningEpisode.findOne({ organizationId, familyId })
+      while (episode?.status !== 'closed' && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 25))
+        episode = await DunningEpisode.findOne({ organizationId, familyId })
+      }
+      expect(episode?.status).toBe('closed')
+      expect(episode?.closedReason).toBe('payment')
+    })
+  })
 })
