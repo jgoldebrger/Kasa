@@ -25,10 +25,10 @@ describe('qualifiesForDunning', () => {
   const obligationStart = new Date('2026-01-01T00:00:00.000Z')
   const now = new Date('2026-02-01T12:00:00.000Z')
 
-  it('returns false when balance is below minOwed', () => {
+  it('returns false when amount owed is below minOwed', () => {
     expect(
       qualifiesForDunning({
-        balance: 50,
+        balance: -50,
         minOwed: 100,
         obligationStart,
         now,
@@ -41,7 +41,7 @@ describe('qualifiesForDunning', () => {
   it('returns false when obligation is too recent', () => {
     expect(
       qualifiesForDunning({
-        balance: 200,
+        balance: -200,
         minOwed: 100,
         obligationStart: new Date('2026-01-20T00:00:00.000Z'),
         now,
@@ -51,10 +51,10 @@ describe('qualifiesForDunning', () => {
     ).toBe(false)
   })
 
-  it('returns true when balance and age both meet thresholds', () => {
+  it('returns true when amount owed and age both meet thresholds', () => {
     expect(
       qualifiesForDunning({
-        balance: 100,
+        balance: -200,
         minOwed: 100,
         obligationStart,
         now,
@@ -62,6 +62,19 @@ describe('qualifiesForDunning', () => {
         daysSinceObligation: 30,
       }),
     ).toBe(true)
+  })
+
+  it('returns false when balance is a credit', () => {
+    expect(
+      qualifiesForDunning({
+        balance: 200,
+        minOwed: 100,
+        obligationStart,
+        now,
+        timezone: 'UTC',
+        daysSinceObligation: 30,
+      }),
+    ).toBe(false)
   })
 })
 

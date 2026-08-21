@@ -38,7 +38,8 @@ export function qualifiesForDunning(input: {
   timezone: string | null | undefined
   daysSinceObligation: number
 }): boolean {
-  if (!(input.balance >= input.minOwed)) return false
+  const owed = Math.max(0, -input.balance)
+  if (!(owed >= input.minOwed)) return false
   const days = calendarDaysBetween(input.obligationStart, input.now, input.timezone)
   return days >= input.daysSinceObligation
 }

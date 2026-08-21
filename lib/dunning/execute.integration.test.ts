@@ -41,15 +41,8 @@ describe('executeEmailAutomationRule dunning_arrears', () => {
   })
 
   async function seedDunningFixture(opts?: { lastRunAt?: Date | null }) {
-    const {
-      Organization,
-      Family,
-      PaymentPlan,
-      Payment,
-      CycleCharge,
-      EmailTemplate,
-      EmailAutomationRule,
-    } = await import('@/lib/models')
+    const { Organization, Family, PaymentPlan, CycleCharge, EmailTemplate, EmailAutomationRule } =
+      await import('@/lib/models')
 
     const ownerId = new Types.ObjectId()
     const org = await Organization.create({
@@ -74,15 +67,8 @@ describe('executeEmailAutomationRule dunning_arrears', () => {
       paymentPlanId: plan._id,
     })
 
-    // calculateFamilyBalance = payments - charges - planCost; seed a credit so
-    // balance >= minOwed (positive) matches qualifiesForDunning as implemented.
-    await Payment.create({
-      organizationId: org._id,
-      familyId: family._id,
-      amount: 500,
-      paymentDate: new Date(),
-    })
-
+    // calculateFamilyBalance = payments − withdrawals − cycleCharges − planCost;
+    // negative net means the family owes. No payments so owed = planCost + cycle charge.
     const fortyDaysAgo = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000)
     await CycleCharge.create({
       organizationId: org._id,
