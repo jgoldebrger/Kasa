@@ -211,6 +211,56 @@ describe('executeEmailAutomationRule dunning_arrears', () => {
     expect(sendSpy).not.toHaveBeenCalled()
   })
 
+  it('closes episode and skips send when payment was inserted after lastSentAt', async () => {
+    vi.spyOn(mail, 'sleep').mockResolvedValue(undefined)
+    const sendSpy = vi
+      .spyOn(mail, 'sendEmail')
+      .mockResolvedValue({ ok: true } as mail.SendEmailResult)
+
+    const { org, family, rule } = await seedDunningFixture()
+    const { DunningEpisode, Payment } = await import('@/lib/models')
+    const lastSentAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
+    await DunningEpisode.create({
+      organizationId: org._id,
+      familyId: family._id,
+      ruleId: rule._id,
+      status: 'open',
+      sendCount: 1,
+      lastSentAt,
+    })
+    await Payment.collection.insertOne({
+      organizationId: org._id,
+      familyId: family._id,
+      amount: 1,
+      paymentDate: new Date(),
+      deletedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+
+    const { executeEmailAutomationRule } =
+      await import('@/lib/route-logic/email-automation-rules/execute-rule')
+    const result = await executeEmailAutomationRule(String(org._id), {
+      _id: rule._id,
+      templateId: rule.templateId,
+      ruleType: 'dunning_arrears',
+      minOwed: rule.minOwed,
+      daysSinceObligation: rule.daysSinceObligation,
+      maxAttempts: rule.maxAttempts,
+      intervalDays: rule.intervalDays,
+      lastRunAt: rule.lastRunAt,
+    })
+
+    expect(sendSpy).not.toHaveBeenCalled()
+    expect(result.sent).toBe(0)
+    const episode = await DunningEpisode.findOne({
+      organizationId: org._id,
+      familyId: family._id,
+    })
+    expect(episode?.status).toBe('closed')
+    expect(episode?.closedReason).toBe('payment')
+  })
+
   it('does not record sendCount when sendEmail fails', async () => {
     vi.spyOn(mail, 'sleep').mockResolvedValue(undefined)
     vi.spyOn(mail, 'sendEmail').mockResolvedValue({ ok: false } as mail.SendEmailResult)

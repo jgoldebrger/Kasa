@@ -1,4 +1,4 @@
-import { DunningEpisode } from '@/lib/models'
+import { DunningEpisode, Payment } from '@/lib/models'
 import { calendarDaysBetween } from './qualify'
 import type { DunningClosedReason, DunningEpisodeStatus } from './types'
 
@@ -50,6 +50,7 @@ type ClosableEpisode = {
   _id: { toString(): string }
   sendCount: number
   lastSentAt: Date | null
+  createdAt?: Date
   status: string
   closedReason: DunningClosedReason | null
   closedAt: Date | null
@@ -152,6 +153,29 @@ export async function closeDunningEpisodesForPayment(args: {
   return result.modifiedCount
 }
 
+export async function closeIfPaymentSinceLastSend(args: {
+  organizationId: string
+  familyId: string
+  lastSentAt: Date | null | undefined
+  episodeCreatedAt: Date | undefined
+}): Promise<boolean> {
+  const since = args.lastSentAt ?? args.episodeCreatedAt
+  if (!since) return false
+  const laterPayment = await Payment.findOne({
+    organizationId: args.organizationId,
+    familyId: args.familyId,
+    $expr: { $gt: [{ $ifNull: ['$paymentDate', '$createdAt'] }, since] },
+  })
+    .select('_id')
+    .lean()
+  if (!laterPayment) return false
+  await closeDunningEpisodesForPayment({
+    organizationId: args.organizationId,
+    familyId: args.familyId,
+  })
+  return true
+}
+
 export async function recordSuccessfulDunningSend(args: {
   episodeId: string
   now: Date
@@ -176,6 +200,15 @@ export async function planDunningAction(args: PlanArgs): Promise<PlanResult> {
     ruleId: args.rule._id.toString(),
   }
   const open = await findOpenEpisode(ids)
+  if (open) {
+    const closedForPayment = await closeIfPaymentSinceLastSend({
+      organizationId: ids.organizationId,
+      familyId: ids.familyId,
+      lastSentAt: open.lastSentAt,
+      episodeCreatedAt: open.createdAt,
+    })
+    if (closedForPayment) return { action: 'close', reason: 'payment' }
+  }
   if (!args.qualifies) {
     if (!open) return { action: 'skip' }
     await persistClose(open, 'no_longer_qualifies', args.now)

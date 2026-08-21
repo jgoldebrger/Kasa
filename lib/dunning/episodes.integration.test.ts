@@ -12,8 +12,8 @@ describe('DunningEpisode model', () => {
     await teardownMongo()
   })
   afterEach(async () => {
-    const { DunningEpisode } = await import('@/lib/models')
-    await DunningEpisode.deleteMany({})
+    const { DunningEpisode, Payment } = await import('@/lib/models')
+    await Promise.all([DunningEpisode.deleteMany({}), Payment.deleteMany({})])
   })
 
   it('rejects a second open episode for the same org/family/rule', async () => {
@@ -118,6 +118,64 @@ describe('DunningEpisode model', () => {
         timezone: 'UTC',
       })
       expect(later.action).toBe('send')
+    })
+
+    it('closes open episode when a payment lands after lastSentAt without the Payment.create hook', async () => {
+      const { planDunningAction, recordSuccessfulDunningSend, latestEpisode } =
+        await import('./episodes')
+      const { DunningEpisode, Payment } = await import('@/lib/models')
+      const organizationId = new Types.ObjectId()
+      const familyId = new Types.ObjectId()
+      const rule = { _id: new Types.ObjectId(), maxAttempts: 3, intervalDays: 7 }
+      const first = await planDunningAction({
+        organizationId: String(organizationId),
+        familyId: String(familyId),
+        rule,
+        qualifies: true,
+        now: new Date('2026-08-01T12:00:00.000Z'),
+        timezone: 'UTC',
+      })
+      if (first.action !== 'send') throw new Error('expected send')
+      await recordSuccessfulDunningSend({
+        episodeId: first.episodeId,
+        now: new Date('2026-08-01T12:00:00.000Z'),
+        maxAttempts: 3,
+      })
+
+      await Payment.collection.insertOne({
+        organizationId,
+        familyId,
+        amount: 1,
+        paymentDate: new Date('2026-08-08T12:00:00.000Z'),
+        deletedAt: null,
+        createdAt: new Date('2026-08-08T12:00:00.000Z'),
+        updatedAt: new Date('2026-08-08T12:00:00.000Z'),
+      })
+
+      const stillOpen = await DunningEpisode.findOne({
+        organizationId,
+        familyId,
+        status: 'open',
+      })
+      expect(stillOpen).not.toBeNull()
+
+      const planned = await planDunningAction({
+        organizationId: String(organizationId),
+        familyId: String(familyId),
+        rule,
+        qualifies: true,
+        now: new Date('2026-08-10T12:00:00.000Z'),
+        timezone: 'UTC',
+      })
+      expect(planned).toEqual({ action: 'close', reason: 'payment' })
+      const ep = await latestEpisode({
+        organizationId: String(organizationId),
+        familyId: String(familyId),
+        ruleId: String(rule._id),
+      })
+      expect(ep?.status).toBe('closed')
+      const closed = await DunningEpisode.findOne({ organizationId, familyId })
+      expect(closed?.closedReason).toBe('payment')
     })
 
     it('closes with no_longer_qualifies when qualifies is false and an episode is open', async () => {
