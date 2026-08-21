@@ -19,7 +19,7 @@ export const POST = handler({
       return { status: 404, data: { error: 'Email automation rule not found' } }
     }
 
-    const preview = await resolveAutomationRecipients(ctx!.organizationId, rule.ruleType)
+    const preview = await resolveAutomationRecipients(ctx!.organizationId, rule)
     return { data: preview }
   },
 })
