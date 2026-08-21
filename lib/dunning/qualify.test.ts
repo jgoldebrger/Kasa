@@ -13,6 +13,12 @@ describe('calendarDaysBetween', () => {
     const b = new Date('2026-06-15T23:00:00.000Z')
     expect(calendarDaysBetween(a, b, 'UTC')).toBe(0)
   })
+
+  it('counts civil calendar days across DST spring-forward', () => {
+    const from = new Date('2026-03-07T17:00:00.000Z')
+    const to = new Date('2026-03-09T16:00:00.000Z')
+    expect(calendarDaysBetween(from, to, 'America/New_York')).toBe(2)
+  })
 })
 
 describe('qualifiesForDunning', () => {
