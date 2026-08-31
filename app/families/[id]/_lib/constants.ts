@@ -3,7 +3,6 @@ import {
   FAMILY_TABS as REGISTRY_TABS,
   familyTabFromPathname,
   familyTabHref,
-  resolveFamilyTabLabel,
   type FamilyTabDef as RegistryFamilyTabDef,
   type FamilyTabId,
 } from '../../_lib'
