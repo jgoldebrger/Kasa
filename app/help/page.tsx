@@ -1,17 +1,43 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import JsonLd from '@/app/components/seo/JsonLd'
 import LegalFooterLinks from '@/app/components/legal/LegalFooterLinks'
+import { resolveAppBaseUrl } from '@/lib/app-base-url'
 import { HELP_ARTICLES, HELP_CATEGORIES } from '@/lib/help/articles'
 import { SUPPORT_CONTACT_EMAIL } from '@/lib/legal/contacts'
+import {
+  faqPageJsonLd,
+  helpHubFaqItems,
+  organizationJsonLd,
+  webPageJsonLd,
+} from '@/lib/seo/json-ld'
+import { publicPageMetadata } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Help Center — Kasa',
-  description: 'Guides for kehilla treasurers using Kasa.',
-}
+const TITLE = 'Treasurer Help Center — Kasa'
+const DESCRIPTION =
+  'How kehilla treasurers set up Kasa: payment plans, CSV import, statements, Stripe, and Hebrew-calendar billing.'
+
+export const metadata: Metadata = publicPageMetadata({
+  title: TITLE,
+  description: DESCRIPTION,
+  path: '/help',
+})
 
 export default function HelpCenterPage() {
+  const baseUrl = resolveAppBaseUrl()
+  const faqItems = helpHubFaqItems()
   return (
     <div className="min-h-screen bg-app">
+      <JsonLd data={organizationJsonLd(baseUrl)} />
+      <JsonLd
+        data={webPageJsonLd({
+          baseUrl,
+          path: '/help',
+          name: TITLE,
+          description: DESCRIPTION,
+        })}
+      />
+      <JsonLd data={faqPageJsonLd(faqItems)} />
       <div className="max-w-3xl mx-auto px-6 py-12 sm:py-16">
         <header className="mb-10">
           <Link
@@ -26,9 +52,11 @@ export default function HelpCenterPage() {
             </div>
             <span className="text-lg font-semibold text-fg">Kasa Help Center</span>
           </div>
-          <h1 className="text-3xl font-semibold tracking-tight text-fg mb-2">How can we help?</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-fg mb-2">
+            Guides for kehilla treasurers
+          </h1>
           <p className="text-sm text-fg-muted">
-            Guides for treasurers setting up and running membership on Kasa.
+            Step-by-step guides for dues, statements, family import, and Hebrew-calendar billing.
           </p>
         </header>
 
@@ -56,6 +84,21 @@ export default function HelpCenterPage() {
             )
           })}
         </div>
+
+        <section className="mt-12">
+          <h2 className="text-lg font-semibold text-fg mb-3">Frequently asked</h2>
+          <dl className="space-y-4">
+            {faqItems.map((item) => (
+              <div
+                key={item.question}
+                className="rounded-lg border border-border bg-surface px-4 py-3"
+              >
+                <dt className="font-medium text-fg">{item.question}</dt>
+                <dd className="text-sm text-fg-muted mt-1">{item.answer}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
 
         <section className="mt-12 rounded-lg border border-border bg-surface p-6">
           <h2 className="font-semibold text-fg mb-2">Still need help?</h2>

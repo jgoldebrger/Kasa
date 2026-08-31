@@ -2,15 +2,26 @@ import type { Metadata } from 'next'
 import LegalPageLayout from '@/app/components/legal/LegalPageLayout'
 import { LEGAL_LAST_UPDATED, PRIVACY_CONTACT_EMAIL } from '@/lib/legal/contacts'
 import { SUBPROCESSORS } from '@/lib/legal/subprocessors'
+import { publicPageMetadata } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Subprocessors — Kasa',
-  description: 'Third-party subprocessors that support the Kasa platform.',
-}
+const TITLE = 'Subprocessors — Kasa'
+const DESCRIPTION =
+  'Third-party processors Kasa uses to host, send email, and take card payments. Each is bound to data-protection terms.'
+
+export const metadata: Metadata = publicPageMetadata({
+  title: TITLE,
+  description: DESCRIPTION,
+  path: '/subprocessors',
+})
 
 export default function SubprocessorsPage() {
   return (
-    <LegalPageLayout title="Subprocessors" lastUpdated={LEGAL_LAST_UPDATED}>
+    <LegalPageLayout
+      title="Subprocessors"
+      lastUpdated={LEGAL_LAST_UPDATED}
+      canonicalPath="/subprocessors"
+      description={DESCRIPTION}
+    >
       <section>
         <h2>Overview</h2>
         <p>

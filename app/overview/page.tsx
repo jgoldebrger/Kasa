@@ -1,15 +1,23 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import JsonLd from '@/app/components/seo/JsonLd'
 import { ButtonLink, Card } from '@/app/components/ui'
 import LegalFooterLinks from '@/app/components/legal/LegalFooterLinks'
+import { resolveAppBaseUrl } from '@/lib/app-base-url'
 import { PLAN_DEFINITIONS } from '@/lib/billing/plans'
 import { SUPPORT_CONTACT_EMAIL } from '@/lib/legal/contacts'
+import { organizationJsonLd, softwareApplicationJsonLd, webPageJsonLd } from '@/lib/seo/json-ld'
+import { publicPageMetadata } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Kasa for Kehillos — Overview',
-  description:
-    'Membership management built for kehilla treasurers. Pricing, security, and onboarding at a glance.',
-}
+const TITLE = 'Kasa for Kehillos — Overview'
+const DESCRIPTION =
+  'Replace spreadsheet membership books: age-based dues, Hebrew-calendar statements, and family balances. Starter is $49/mo for 75 families; Community $149/mo for 300.'
+
+export const metadata: Metadata = publicPageMetadata({
+  title: TITLE,
+  description: DESCRIPTION,
+  path: '/overview',
+})
 
 const SECURITY_HIGHLIGHTS = [
   {
@@ -39,8 +47,19 @@ const ONBOARDING_STEPS = [
 ] as const
 
 export default function OverviewPage() {
+  const baseUrl = resolveAppBaseUrl()
   return (
     <div className="min-h-screen bg-app">
+      <JsonLd data={organizationJsonLd(baseUrl)} />
+      <JsonLd data={softwareApplicationJsonLd(baseUrl)} />
+      <JsonLd
+        data={webPageJsonLd({
+          baseUrl,
+          path: '/overview',
+          name: TITLE,
+          description: DESCRIPTION,
+        })}
+      />
       <div className="max-w-4xl mx-auto px-6 py-12 sm:py-16">
         <header className="mb-10">
           <Link
@@ -55,13 +74,55 @@ export default function OverviewPage() {
             </div>
             <span className="text-lg font-semibold text-fg">Kasa</span>
           </div>
-          <h1 className="text-3xl font-semibold tracking-tight text-fg mb-3">Kasa for Kehillos</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-fg mb-3">
+            Membership books built for kehilla treasurers
+          </h1>
           <p className="text-fg-muted leading-relaxed max-w-2xl">
-            Replace spreadsheet membership books with a purpose-built platform for dues, lifecycle
-            events, statements, and Hebrew-calendar automation. This one-pager summarizes pricing,
-            security, and onboarding for treasurers evaluating Kasa.
+            Stop reconciling dues by age bracket across spreadsheets. Kasa tracks families,
+            statements, and Hebrew-calendar cycles in one ledger. Figures below are the published
+            Starter, Community, and Institution plans.
           </p>
         </header>
+
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold text-fg mb-4">Published plan figures</h2>
+          <p className="text-sm text-fg-muted mb-4 leading-relaxed">
+            List prices and family caps come from the same{' '}
+            <Link href="/pricing" className="text-accent hover:underline">
+              pricing
+            </Link>{' '}
+            catalog used at checkout. SMTP credentials and TOTP secrets are stored with AES-256-GCM;
+            each record is scoped to one organization (
+            <Link href="/trust" className="text-accent hover:underline">
+              Trust &amp; Security
+            </Link>
+            ).
+          </p>
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-surface text-fg">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Plan</th>
+                  <th className="px-4 py-3 font-semibold">Monthly list price</th>
+                  <th className="px-4 py-3 font-semibold">Family cap</th>
+                </tr>
+              </thead>
+              <tbody className="text-fg-muted">
+                {PLAN_DEFINITIONS.map((plan) => (
+                  <tr key={plan.tier} className="border-t border-border">
+                    <td className="px-4 py-3 text-fg">{plan.name}</td>
+                    <td className="px-4 py-3">{plan.monthlyPriceLabel}</td>
+                    <td className="px-4 py-3">
+                      {plan.familyCap === null
+                        ? 'Unlimited'
+                        : plan.familyCap.toLocaleString('en-US')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
         <section className="mb-12">
           <h2 className="text-xl font-semibold text-fg mb-4">What Kasa does</h2>

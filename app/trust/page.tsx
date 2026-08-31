@@ -3,11 +3,17 @@ import Link from 'next/link'
 import LegalPageLayout from '@/app/components/legal/LegalPageLayout'
 import { LEGAL_LAST_UPDATED, PRIVACY_CONTACT_EMAIL } from '@/lib/legal/contacts'
 import { SUBPROCESSORS } from '@/lib/legal/subprocessors'
+import { publicPageMetadata } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Trust & Security — Kasa',
-  description: 'Security practices, data handling, and incident response for Kasa.',
-}
+const TITLE = 'Trust & Security — Kasa'
+const DESCRIPTION =
+  'Kasa encrypts SMTP and 2FA secrets with AES-256-GCM, isolates each kehilla with org-scoped RBAC, and publishes subprocessors. Incident contact: privacy@kasa.com.'
+
+export const metadata: Metadata = publicPageMetadata({
+  title: TITLE,
+  description: DESCRIPTION,
+  path: '/trust',
+})
 
 const SECURITY_CONTROLS = [
   {
@@ -49,7 +55,12 @@ const SECURITY_CONTROLS = [
 
 export default function TrustPage() {
   return (
-    <LegalPageLayout title="Trust & Security" lastUpdated={LEGAL_LAST_UPDATED}>
+    <LegalPageLayout
+      title="Trust & Security"
+      lastUpdated={LEGAL_LAST_UPDATED}
+      canonicalPath="/trust"
+      description={DESCRIPTION}
+    >
       <section>
         <h2>Our commitment</h2>
         <p>

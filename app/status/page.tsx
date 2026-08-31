@@ -1,16 +1,23 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import JsonLd from '@/app/components/seo/JsonLd'
 import { Card } from '@/app/components/ui'
 import connectDB from '@/lib/database'
 import mongoose from 'mongoose'
+import { resolveAppBaseUrl } from '@/lib/app-base-url'
+import { organizationJsonLd, webPageJsonLd } from '@/lib/seo/json-ld'
+import { publicPageMetadata } from '@/lib/seo/metadata'
 
 export const dynamic = 'force-dynamic'
 
-export const metadata: Metadata = {
-  title: 'System Status — Kasa',
-  description: 'Kasa platform availability and health checks.',
-  robots: { index: true, follow: true },
-}
+const TITLE = 'System Status — Kasa'
+const DESCRIPTION = 'Live MongoDB health check for the Kasa kehilla membership platform.'
+
+export const metadata: Metadata = publicPageMetadata({
+  title: TITLE,
+  description: DESCRIPTION,
+  path: '/status',
+})
 
 async function fetchHealth(): Promise<{
   status: 'ok' | 'unhealthy'
@@ -38,9 +45,19 @@ async function fetchHealth(): Promise<{
 export default async function StatusPage() {
   const health = await fetchHealth()
   const allOk = health.status === 'ok'
+  const baseUrl = resolveAppBaseUrl()
 
   return (
     <div className="min-h-screen bg-app flex items-center justify-center p-6">
+      <JsonLd data={organizationJsonLd(baseUrl)} />
+      <JsonLd
+        data={webPageJsonLd({
+          baseUrl,
+          path: '/status',
+          name: TITLE,
+          description: DESCRIPTION,
+        })}
+      />
       <Card className="max-w-md w-full p-8 space-y-6 text-center">
         <div className="mx-auto inline-flex items-center justify-center w-12 h-12 rounded-lg bg-accent text-accent-fg font-semibold">
           K

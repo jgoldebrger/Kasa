@@ -6,15 +6,26 @@ import {
   PRIVACY_CONTACT_EMAIL,
   SUPPORT_CONTACT_EMAIL,
 } from '@/lib/legal/contacts'
+import { publicPageMetadata } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Privacy Policy — Kasa',
-  description: 'How Kasa collects, uses, and protects personal information.',
-}
+const TITLE = 'Privacy Policy — Kasa'
+const DESCRIPTION =
+  'How Kasa collects, uses, and protects kehilla membership and payment data, including cookies and subprocessors.'
+
+export const metadata: Metadata = publicPageMetadata({
+  title: TITLE,
+  description: DESCRIPTION,
+  path: '/privacy',
+})
 
 export default function PrivacyPolicyPage() {
   return (
-    <LegalPageLayout title="Privacy Policy" lastUpdated={LEGAL_LAST_UPDATED}>
+    <LegalPageLayout
+      title="Privacy Policy"
+      lastUpdated={LEGAL_LAST_UPDATED}
+      canonicalPath="/privacy"
+      description={DESCRIPTION}
+    >
       <section>
         <h2>1. Introduction</h2>
         <p>

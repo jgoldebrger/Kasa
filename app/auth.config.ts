@@ -1,20 +1,6 @@
 import type { NextAuthConfig } from 'next-auth'
 import { isCronRequest } from '@/lib/auth-cron-verify'
-
-const PUBLIC_PATHS = [
-  '/welcome',
-  '/login',
-  '/signup',
-  '/invite',
-  '/reset-password',
-  '/request-invite',
-  '/pricing',
-  '/status',
-  '/privacy',
-  '/terms',
-  '/subprocessors',
-  '/manifest.webmanifest',
-]
+import { AUTH_PUBLIC_PATH_PREFIXES } from '@/lib/seo/public-routes'
 
 // Public APIs that don't require a session.
 const PUBLIC_API_PREFIXES = [
@@ -91,7 +77,7 @@ export default {
       }
 
       // Public pages
-      if (PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`))) {
+      if (AUTH_PUBLIC_PATH_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) {
         if (
           isLoggedIn &&
           (path === '/login' ||

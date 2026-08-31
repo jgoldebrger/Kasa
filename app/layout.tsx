@@ -15,6 +15,8 @@ import { enforceLayoutSubscriptionGate } from '@/lib/billing/layout-subscription
 import { loadServerOrgShell } from '@/lib/server-org-shell'
 import { OrgRoleProvider } from '@/lib/client/useOrgRole'
 import { headers, cookies } from 'next/headers'
+import { resolveAppBaseUrl } from '@/lib/app-base-url'
+import { NOINDEX_NOFOLLOW } from '@/lib/seo/metadata'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -29,8 +31,22 @@ const sourceSerif = Source_Serif_4({
 })
 
 export const metadata: Metadata = {
-  title: 'Kasa Family Management',
-  description: 'Family financial management system with age-based payment plans',
+  metadataBase: new URL(resolveAppBaseUrl()),
+  title: {
+    default: 'Kasa',
+    template: '%s',
+  },
+  description:
+    'Membership books for kehilla treasurers. Age-based dues, Hebrew-calendar statements, and family balances — without spreadsheet reconciliation.',
+  robots: NOINDEX_NOFOLLOW,
+  openGraph: {
+    type: 'website',
+    siteName: 'Kasa',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image',
+  },
   manifest: '/manifest.webmanifest',
   icons: {
     icon: '/icons/icon.svg',

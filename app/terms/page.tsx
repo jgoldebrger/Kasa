@@ -7,15 +7,26 @@ import {
   PRIVACY_CONTACT_EMAIL,
   SUPPORT_CONTACT_EMAIL,
 } from '@/lib/legal/contacts'
+import { publicPageMetadata } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Terms of Service — Kasa',
-  description: 'Terms governing use of the Kasa family membership management platform.',
-}
+const TITLE = 'Terms of Service — Kasa'
+const DESCRIPTION =
+  'Terms for the Kasa kehilla membership platform: invitation-only early access, organization accounts, and acceptable use.'
+
+export const metadata: Metadata = publicPageMetadata({
+  title: TITLE,
+  description: DESCRIPTION,
+  path: '/terms',
+})
 
 export default function TermsOfServicePage() {
   return (
-    <LegalPageLayout title="Terms of Service" lastUpdated={LEGAL_LAST_UPDATED}>
+    <LegalPageLayout
+      title="Terms of Service"
+      lastUpdated={LEGAL_LAST_UPDATED}
+      canonicalPath="/terms"
+      description={DESCRIPTION}
+    >
       <section>
         <h2>1. Agreement</h2>
         <p>

@@ -58,11 +58,11 @@ describe('AppShell smoke', () => {
   })
 
   it('bypasses application chrome on fullscreen routes', () => {
-    navigation.pathname = '/login'
+    navigation.pathname = '/help'
 
-    render(<AppShell>Sign in</AppShell>)
+    render(<AppShell>Help</AppShell>)
 
-    expect(screen.getByText('Sign in')).toBeDefined()
+    expect(screen.getByText('Help')).toBeDefined()
     expect(screen.queryByRole('link')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Open menu' })).toBeNull()
   })
