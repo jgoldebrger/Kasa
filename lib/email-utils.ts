@@ -1,4 +1,5 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+import { formatPhoneDisplay } from '@/lib/phone-format'
 
 export interface StatementTransaction {
   type: 'payment' | 'withdrawal' | 'event' | 'cycle-charge'
@@ -164,7 +165,7 @@ export async function generateStatementPDF(
       lh.addressLine1,
       lh.addressLine2,
       cityStateZip,
-      [lh.phone, lh.email].filter(Boolean).join('  •  '),
+      [lh.phone ? formatPhoneDisplay(lh.phone) : '', lh.email].filter(Boolean).join('  •  '),
     ].filter(Boolean) as string[]
     for (const line of letterheadLines) {
       addText(line, margin, {
@@ -542,7 +543,7 @@ export async function generateTaxReceiptPDF(
     .filter(Boolean)
     .join(' ')
   if (cityStateZip) draw(cityStateZip, margin, { size: 10, color: rgb(0.35, 0.35, 0.4) })
-  const contactPieces = [lh.phone, lh.email].filter(Boolean)
+  const contactPieces = [lh.phone ? formatPhoneDisplay(lh.phone) : '', lh.email].filter(Boolean)
   if (contactPieces.length > 0)
     draw(contactPieces.join('  •  '), margin, { size: 10, color: rgb(0.35, 0.35, 0.4) })
   if (lh.taxId) draw(`EIN: ${lh.taxId}`, margin, { size: 10, color: rgb(0.35, 0.35, 0.4) })

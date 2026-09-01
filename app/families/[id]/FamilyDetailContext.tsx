@@ -30,6 +30,7 @@ import {
   handleHebrewInput,
   capitalizeName,
   formatPhone,
+  formatPhoneInput,
   validateEmail,
   type FamilyDetails,
 } from './_lib/helpers'
@@ -359,6 +360,8 @@ export function FamilyDetailProvider({
       setEditValue(Number.isFinite(date.getTime()) ? date.toISOString().split('T')[0] : '')
     } else if (fieldName === 'paymentPlanId') {
       setEditValue(currentValue != null && currentValue !== '' ? String(currentValue) : '')
+    } else if (['phone', 'husbandCellPhone', 'wifeCellPhone'].includes(fieldName)) {
+      setEditValue(formatPhoneInput(currentValue != null ? String(currentValue) : ''))
     } else {
       setEditValue(currentValue != null ? String(currentValue) : '')
     }
@@ -469,7 +472,7 @@ export function FamilyDetailProvider({
           type: 'tel' as const,
           value: editValue,
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-            setEditValue(formatPhone(e.target.value))
+            setEditValue(formatPhoneInput(e.target.value))
           },
           onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
             if (e.key === 'Enter') handleFieldSave(fieldName)
@@ -600,6 +603,25 @@ export function FamilyDetailProvider({
             aria-label="Cancel"
           >
             ✕
+          </button>
+        </div>
+      )
+    }
+
+    const isContactField = fieldType === 'phone' || fieldType === 'email'
+
+    if (isContactField) {
+      return (
+        <div className="group flex min-h-[2.5rem] items-center justify-between gap-2 rounded-md border border-transparent px-3 py-2 transition-colors hover:border-border hover:bg-app-subtle">
+          <div className="min-w-0 flex-1 text-sm">{displayValue}</div>
+          <button
+            type="button"
+            onClick={() => handleFieldEdit(fieldName, currentValue)}
+            className="focus-ring inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-fg-subtle opacity-70 transition-opacity hover:bg-fg/5 group-hover:opacity-100"
+            title="Edit"
+            aria-label="Edit"
+          >
+            <PencilIcon className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       )

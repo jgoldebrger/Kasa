@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useFamilyDetail } from '../../FamilyDetailContext'
 import { invalidate as invalidateCache } from '@/lib/client-cache'
 import { normalizePlanId } from '@/lib/payment-plan-display'
+import { formatPhoneInput, normalizePhoneDigits } from '@/lib/phone-format'
 import { Modal } from '@/app/components/ui/Modal'
 import { Button, Input, Select } from '@/app/components/ui'
 
@@ -42,6 +43,9 @@ export function FamilyInfoModal() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 ...infoForm,
+                phone: normalizePhoneDigits(infoForm.phone),
+                husbandCellPhone: normalizePhoneDigits(infoForm.husbandCellPhone),
+                wifeCellPhone: normalizePhoneDigits(infoForm.wifeCellPhone),
                 weddingDate: infoForm.weddingDate
                   ? new Date(infoForm.weddingDate).toISOString()
                   : undefined,
@@ -158,7 +162,10 @@ export function FamilyInfoModal() {
               label="Cell Phone"
               type="tel"
               value={infoForm.husbandCellPhone}
-              onChange={(e) => setInfoForm({ ...infoForm, husbandCellPhone: e.target.value })}
+              onChange={(e) =>
+                setInfoForm({ ...infoForm, husbandCellPhone: formatPhoneInput(e.target.value) })
+              }
+              placeholder="(555) 123-4567"
             />
           </div>
         </div>
@@ -196,7 +203,10 @@ export function FamilyInfoModal() {
               label="Cell Phone"
               type="tel"
               value={infoForm.wifeCellPhone}
-              onChange={(e) => setInfoForm({ ...infoForm, wifeCellPhone: e.target.value })}
+              onChange={(e) =>
+                setInfoForm({ ...infoForm, wifeCellPhone: formatPhoneInput(e.target.value) })
+              }
+              placeholder="(555) 123-4567"
             />
           </div>
         </div>
@@ -216,7 +226,9 @@ export function FamilyInfoModal() {
               label="Phone"
               type="tel"
               value={infoForm.phone}
-              onChange={(e) => setInfoForm({ ...infoForm, phone: e.target.value })}
+              onChange={(e) =>
+                setInfoForm({ ...infoForm, phone: formatPhoneInput(e.target.value) })
+              }
               placeholder="(555) 123-4567"
             />
             <Input

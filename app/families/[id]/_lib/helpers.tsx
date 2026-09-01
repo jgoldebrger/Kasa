@@ -387,11 +387,12 @@ export const capitalizeName = (text: string): string => {
     .join(' ')
 }
 
-// Helper function to format phone number (numbers only)
-export const formatPhone = (value: string): string => {
-  // Remove all non-numeric characters
-  return value.replace(/\D/g, '')
-}
+// Helper function to normalize phone number for storage (digits only)
+export {
+  normalizePhoneDigits as formatPhone,
+  formatPhoneDisplay,
+  formatPhoneInput,
+} from '@/lib/phone-format'
 
 // Helper function to validate email format
 export const validateEmail = (email: string): boolean => {
