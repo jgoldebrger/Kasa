@@ -7,6 +7,13 @@ import { PrinterIcon, TagIcon } from '@heroicons/react/24/outline'
 import { SettingsPanel } from '@/app/components/settings/SettingsPanel'
 import { Button, EmptyState, Input } from '@/app/components/ui'
 import { escapeHtml } from '@/lib/html-escape'
+import {
+  resolveAudience,
+  type FamilyShape,
+  type LabelRow,
+  type MailLabelFilters,
+  type MemberShape,
+} from '@/lib/client/mail-label-audience'
 
 /**
  * Mail Labels — Avery 5160 (3×10 grid, 30 labels/sheet, US Letter).
@@ -24,34 +31,16 @@ import { escapeHtml } from '@/lib/html-escape'
  * can verify alignment on a real sheet before wasting label stock.
  */
 
-interface FamilyShape {
-  _id: string
-  name: string
-  street?: string
-  address?: string
-  city?: string
-  state?: string
-  zip?: string
-  paymentPlanId?: string | null
-}
-
 interface PlanShape {
   _id: string
   name: string
 }
 
-interface Filters {
-  planIds: string[]
-  balance: 'all' | 'negative'
-  requireAddress: boolean
-  search: string
-}
-
 interface Props {
   families: FamilyShape[]
   plans: PlanShape[]
-  filters: Filters
-  setFilters: React.Dispatch<React.SetStateAction<Filters>>
+  filters: MailLabelFilters
+  setFilters: React.Dispatch<React.SetStateAction<MailLabelFilters>>
 }
 
 // Avery 5160 exact dimensions in inches. Encoded as CSS literals so
@@ -66,7 +55,7 @@ const AVERY_5160 = {
   rows: 10,
 }
 
-function buildLabelHTML(rows: Array<{ name: string; street: string; cityState: string }>): string {
+function buildLabelHTML(rows: LabelRow[]): string {
   // Pad the array up to a full sheet so the grid renders consistently.
   const perSheet = AVERY_5160.cols * AVERY_5160.rows
   const padded = rows.slice()
@@ -169,15 +158,8 @@ function buildTestSheetHTML(): string {
 </html>`
 }
 
-function formatAddressRow(f: FamilyShape) {
-  const cityState = [f.city, f.state].filter(Boolean).join(', ')
-  const cityStateZip = [cityState, f.zip?.trim()].filter(Boolean).join(' ')
-  return {
-    name: f.name || '',
-    street: (f.street || f.address || '').trim(),
-    cityState: cityStateZip,
-  }
-}
+/** Placeholder until member fetching lands — a stable identity for the memo. */
+const EMPTY_MEMBERS: Record<string, MemberShape[]> = {}
 
 export default function MailLabelsPanel({ families, plans, filters, setFilters }: Props) {
   // Lazy-fetch balances only when the user actually flips the filter
@@ -213,7 +195,9 @@ export default function MailLabelsPanel({ families, plans, filters, setFilters }
     }, []),
   )
 
-  const filtered = useMemo(() => {
+  // Family-level filters run first; person expansion happens only inside the
+  // families that survive them.
+  const filteredFamilies = useMemo(() => {
     const search = filters.search.trim().toLowerCase()
     return families.filter((f) => {
       const streetLine = (f.street || f.address || '').trim()
@@ -238,16 +222,21 @@ export default function MailLabelsPanel({ families, plans, filters, setFilters }
     })
   }, [families, filters, balanceMap])
 
-  const previewRows = useMemo(() => filtered.slice(0, 12).map(formatAddressRow), [filtered])
+  const audience = useMemo(
+    () => resolveAudience(filteredFamilies, EMPTY_MEMBERS, filters, new Date()),
+    [filteredFamilies, filters],
+  )
+
+  const previewRows = useMemo(() => audience.rows.slice(0, 12), [audience.rows])
 
   const handlePrint = () => {
-    if (filtered.length === 0) {
-      window.alert('No families match the current filters.')
+    if (audience.rows.length === 0) {
+      window.alert('No labels match the current filters.')
       return
     }
     const w = window.open('', '_blank')
     if (!w) return
-    w.document.write(buildLabelHTML(filtered.map(formatAddressRow)))
+    w.document.write(buildLabelHTML(audience.rows))
     w.document.close()
     w.focus()
     w.print()
@@ -374,15 +363,15 @@ export default function MailLabelsPanel({ families, plans, filters, setFilters }
       <div className="mt-4">
         <div className="flex items-baseline justify-between mb-2">
           <h3 className="text-sm font-semibold text-fg">
-            Preview ({filtered.length} {filtered.length === 1 ? 'family' : 'families'})
+            Preview ({audience.rows.length} {audience.rows.length === 1 ? 'label' : 'labels'})
           </h3>
-          {filtered.length > previewRows.length && (
+          {audience.rows.length > previewRows.length && (
             <span className="text-xs text-fg-muted">Showing first {previewRows.length}.</span>
           )}
         </div>
-        {filtered.length === 0 ? (
+        {audience.rows.length === 0 ? (
           <EmptyState
-            title="No families match the current filters"
+            title="No labels match the current filters"
             description="Adjust filters above or clear them to see all families with mailing addresses."
           />
         ) : (

@@ -2,35 +2,18 @@
 
 import type { Dispatch, SetStateAction } from 'react'
 import MailLabelsPanel from '@/app/components/settings/MailLabelsPanel'
-
-interface FamilyShape {
-  _id: string
-  name: string
-  street?: string
-  address?: string
-  city?: string
-  state?: string
-  zip?: string
-  paymentPlanId?: string | null
-}
+import type { FamilyShape, MailLabelFilters } from '@/lib/client/mail-label-audience'
 
 interface PlanShape {
   _id: string
   name: string
 }
 
-interface LabelFilters {
-  planIds: string[]
-  balance: 'all' | 'negative'
-  requireAddress: boolean
-  search: string
-}
-
 export interface LabelsPanelProps {
   families: FamilyShape[]
   plans: PlanShape[]
-  filters: LabelFilters
-  setFilters: Dispatch<SetStateAction<LabelFilters>>
+  filters: MailLabelFilters
+  setFilters: Dispatch<SetStateAction<MailLabelFilters>>
 }
 
 export default function LabelsPanel({ families, plans, filters, setFilters }: LabelsPanelProps) {

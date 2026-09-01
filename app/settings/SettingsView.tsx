@@ -15,6 +15,7 @@ import { useT } from '@/lib/client/i18n'
 import type { Role } from '@/types/auth'
 import PanelSkeleton from './panels/PanelSkeleton'
 import type { BillingSnapshot } from '@/app/components/settings/BillingPanel'
+import { DEFAULT_MAIL_LABEL_FILTERS, type MailLabelFilters } from '@/lib/client/mail-label-audience'
 
 interface LifecycleEventType {
   _id: string
@@ -357,17 +358,7 @@ export default function SettingsView({
   // families directly. We fetch families + plans lazily on first visit.
   const [labelFamilies, setLabelFamilies] = useState<any[]>([])
   const [labelsLoading, setLabelsLoading] = useState(true)
-  const [labelFilters, setLabelFilters] = useState<{
-    planIds: string[]
-    balance: 'all' | 'negative'
-    requireAddress: boolean
-    search: string
-  }>({
-    planIds: [],
-    balance: 'all',
-    requireAddress: true,
-    search: '',
-  })
+  const [labelFilters, setLabelFilters] = useState<MailLabelFilters>(DEFAULT_MAIL_LABEL_FILTERS)
 
   // Activity (audit log) viewer state. Cursor-paginated read-only view
   // backed by GET /api/audit-log. We accumulate pages into `auditItems`
