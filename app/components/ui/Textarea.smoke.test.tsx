@@ -9,7 +9,9 @@ import { Textarea as Component } from './Textarea'
 
 describe('Textarea smoke', () => {
   it('renders without crashing', () => {
-    const { container } = render(React.createElement(Component, { 'aria-label': 'smoke' }) as React.ReactElement)
+    const { container } = render(
+      React.createElement(Component, { 'aria-label': 'smoke' }) as React.ReactElement,
+    )
     expect(container).toBeDefined()
   })
 })

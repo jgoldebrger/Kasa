@@ -1,4 +1,6 @@
 // One-shot index cleanup. Drops stale indexes on collections we use.
+// WARNING: Prefer `npm run sync-indexes` after deploy. This script drops indexes
+// without recreating them — run sync-indexes before restarting the app in production.
 const path = require('path')
 const fs = require('fs')
 
@@ -19,6 +21,11 @@ if (fs.existsSync(envPath)) {
 const mongoose = require('mongoose')
 
 async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    console.warn(
+      '[fix-indexes] WARNING: production use — run `npm run sync-indexes` after this script to recreate indexes.',
+    )
+  }
   await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 10000 })
   const db = mongoose.connection.db
 
@@ -26,9 +33,15 @@ async function main() {
   // affected collection; mongoose will re-create the correct (multi-tenant)
   // ones automatically on next app startup.
   const COLLECTIONS_TO_RESET = [
-    'organizations', 'users', 'orgmemberships', 'invites',
-    'paymentplans', 'lifecycleevents', 'yearlycalculations',
-    'emailconfigs', 'cycleconfigs',
+    'organizations',
+    'users',
+    'orgmemberships',
+    'invites',
+    'paymentplans',
+    'lifecycleevents',
+    'yearlycalculations',
+    'emailconfigs',
+    'cycleconfigs',
   ]
 
   for (const collName of COLLECTIONS_TO_RESET) {
@@ -55,5 +68,8 @@ async function main() {
 }
 
 main()
-  .catch((e) => { console.error(e); process.exitCode = 1 })
+  .catch((e) => {
+    console.error(e)
+    process.exitCode = 1
+  })
   .finally(() => mongoose.disconnect().catch(() => {}))

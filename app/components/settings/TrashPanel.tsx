@@ -3,11 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
-import {
-  ArrowUturnLeftIcon,
-  TrashIcon,
-  ExclamationTriangleIcon,
-} from '@heroicons/react/24/outline'
+import { ArrowUturnLeftIcon, TrashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { Button, EmptyState, SkeletonRows } from '@/app/components/ui'
 import { useConfirm, useToast } from '@/app/components/Toast'
 
@@ -102,11 +98,13 @@ export default function TrashPanel({ canPurge }: TrashPanelProps) {
     }
   }, [refresh])
 
-  useOrgChanged(useCallback(() => {
-    invalidate()
-    setData(null)
-    void refresh()
-  }, [refresh, invalidate]))
+  useOrgChanged(
+    useCallback(() => {
+      invalidate()
+      setData(null)
+      void refresh()
+    }, [refresh, invalidate]),
+  )
 
   const groups = useMemo(() => {
     if (!data) return [] as { kind: string; heading: string; items: TrashItem[] }[]
@@ -116,13 +114,11 @@ export default function TrashPanel({ canPurge }: TrashPanelProps) {
       list.push(item)
       byKind.set(item.kind, list)
     }
-    return KIND_ORDER
-      .filter((k) => byKind.has(k))
-      .map((k) => ({
-        kind: k,
-        heading: KIND_HEADINGS[k] || k,
-        items: byKind.get(k)!,
-      }))
+    return KIND_ORDER.filter((k) => byKind.has(k)).map((k) => ({
+      kind: k,
+      heading: KIND_HEADINGS[k] || k,
+      items: byKind.get(k)!,
+    }))
   }, [data])
 
   async function handleRestore(item: TrashItem) {
@@ -136,9 +132,7 @@ export default function TrashPanel({ canPurge }: TrashPanelProps) {
         toast.error(body.error || 'Failed to restore.')
         return
       }
-      const restored = body.cascadeRestored
-        ? ` (+${body.cascadeRestored} related)`
-        : ''
+      const restored = body.cascadeRestored ? ` (+${body.cascadeRestored} related)` : ''
       toast.success(`Restored "${item.description}"${restored}`)
       await refresh()
     } catch {
@@ -240,8 +234,8 @@ export default function TrashPanel({ canPurge }: TrashPanelProps) {
       <div className="surface-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-sm text-fg-muted">
           <span className="font-medium text-fg">{data.totalCount}</span> item
-          {data.totalCount === 1 ? '' : 's'} in the recycle bin. Items are
-          purged automatically after 30 days.
+          {data.totalCount === 1 ? '' : 's'} in the recycle bin. Items are purged automatically
+          after 30 days.
         </div>
         {canPurge && (
           <Button
@@ -261,9 +255,7 @@ export default function TrashPanel({ canPurge }: TrashPanelProps) {
           <header className="flex items-center justify-between border-b border-border bg-app-subtle px-4 py-2.5">
             <h3 className="text-sm font-semibold text-fg">
               {group.heading}{' '}
-              <span className="ml-1 text-xs font-normal text-fg-muted">
-                ({group.items.length})
-              </span>
+              <span className="ml-1 text-xs font-normal text-fg-muted">({group.items.length})</span>
             </h3>
           </header>
           <ul className="divide-y divide-border">
@@ -273,9 +265,7 @@ export default function TrashPanel({ canPurge }: TrashPanelProps) {
                 className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-fg">
-                    {item.description}
-                  </div>
+                  <div className="truncate text-sm font-medium text-fg">{item.description}</div>
                   <div className="mt-0.5 text-xs text-fg-muted">
                     Deleted {formatRelative(item.deletedAt)}
                     {item.deletedKind === 'cascade' && (
@@ -284,7 +274,11 @@ export default function TrashPanel({ canPurge }: TrashPanelProps) {
                       </span>
                     )}
                     {' · '}
-                    <span className={item.daysUntilPurge <= 3 ? 'text-amber-600 dark:text-amber-400' : ''}>
+                    <span
+                      className={
+                        item.daysUntilPurge <= 3 ? 'text-amber-600 dark:text-amber-400' : ''
+                      }
+                    >
                       purges in {item.daysUntilPurge} day
                       {item.daysUntilPurge === 1 ? '' : 's'}
                     </span>

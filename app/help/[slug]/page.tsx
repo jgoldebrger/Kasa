@@ -1,9 +1,18 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import JsonLd from '@/app/components/seo/JsonLd'
 import LegalFooterLinks from '@/app/components/legal/LegalFooterLinks'
+import { resolveAppBaseUrl } from '@/lib/app-base-url'
 import { getHelpArticle, HELP_ARTICLES } from '@/lib/help/articles'
 import { SUPPORT_CONTACT_EMAIL } from '@/lib/legal/contacts'
+import {
+  faqPageJsonLd,
+  helpArticleFaqItems,
+  organizationJsonLd,
+  webPageJsonLd,
+} from '@/lib/seo/json-ld'
+import { NOINDEX_NOFOLLOW, publicPageMetadata } from '@/lib/seo/metadata'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -16,11 +25,12 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const article = getHelpArticle(slug)
-  if (!article) return { title: 'Help — Kasa' }
-  return {
+  if (!article) return { title: 'Help — Kasa', robots: NOINDEX_NOFOLLOW }
+  return publicPageMetadata({
     title: `${article.title} — Kasa Help`,
     description: article.summary,
-  }
+    path: `/help/${article.slug}`,
+  })
 }
 
 export default async function HelpArticlePage({ params }: Props) {
@@ -28,8 +38,21 @@ export default async function HelpArticlePage({ params }: Props) {
   const article = getHelpArticle(slug)
   if (!article) notFound()
 
+  const baseUrl = resolveAppBaseUrl()
+  const faqItems = helpArticleFaqItems(article)
+
   return (
     <div className="min-h-screen bg-app">
+      <JsonLd data={organizationJsonLd(baseUrl)} />
+      <JsonLd
+        data={webPageJsonLd({
+          baseUrl,
+          path: `/help/${article.slug}`,
+          name: article.title,
+          description: article.summary,
+        })}
+      />
+      <JsonLd data={faqPageJsonLd(faqItems)} />
       <div className="max-w-3xl mx-auto px-6 py-12 sm:py-16">
         <header className="mb-8">
           <Link

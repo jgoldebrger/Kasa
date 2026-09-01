@@ -22,14 +22,8 @@ describe('report-builder (integration)', () => {
   })
 
   afterEach(async () => {
-    const {
-      Organization,
-      Family,
-      PaymentPlan,
-      Payment,
-      LifecycleEventPayment,
-      FamilyMember,
-    } = await import('./models')
+    const { Organization, Family, PaymentPlan, Payment, LifecycleEventPayment, FamilyMember } =
+      await import('./models')
     await Promise.all([
       Payment.deleteMany({}),
       LifecycleEventPayment.deleteMany({}),
@@ -377,22 +371,13 @@ describe('report-builder (integration)', () => {
       year: 2024,
     })
 
-    const payments = await runReport(
-      { source: 'payments', aggregate: 'count' },
-      orgId.toString(),
-    )
+    const payments = await runReport({ source: 'payments', aggregate: 'count' }, orgId.toString())
     expect(payments.rowCount).toBeGreaterThanOrEqual(1)
 
-    const events = await runReport(
-      { source: 'events', aggregate: 'count' },
-      orgId.toString(),
-    )
+    const events = await runReport({ source: 'events', aggregate: 'count' }, orgId.toString())
     expect(events.rowCount).toBeGreaterThanOrEqual(1)
 
-    const families = await runReport(
-      { source: 'families', aggregate: 'count' },
-      orgId.toString(),
-    )
+    const families = await runReport({ source: 'families', aggregate: 'count' }, orgId.toString())
     expect(families.rowCount).toBeGreaterThanOrEqual(1)
   })
 
@@ -448,5 +433,4 @@ describe('report-builder (integration)', () => {
     )
     expect(unknownAgg.totals.grand).toBeGreaterThan(0)
   })
-
 })

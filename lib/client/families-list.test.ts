@@ -12,9 +12,7 @@ describe('families-list client helpers', () => {
       items: [{ _id: '1' }],
       nextCursor: null,
     })
-    expect(
-      parseFamiliesListResponse({ items: [{ _id: '2' }], nextCursor: 'abc' }),
-    ).toEqual({
+    expect(parseFamiliesListResponse({ items: [{ _id: '2' }], nextCursor: 'abc' })).toEqual({
       items: [{ _id: '2' }],
       nextCursor: 'abc',
     })

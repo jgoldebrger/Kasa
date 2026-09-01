@@ -8,7 +8,9 @@ import { Organization } from './models'
 
 /** Fetch an organization's stored ISO-4217 currency (defaults to 'USD'). */
 export async function getOrgCurrency(organizationId: string): Promise<string> {
-  const org = await Organization.findById(organizationId).select('currency').lean<{ currency?: string }>()
+  const org = await Organization.findById(organizationId)
+    .select('currency')
+    .lean<{ currency?: string }>()
   return String(org?.currency || 'USD').toUpperCase()
 }
 

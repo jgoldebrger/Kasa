@@ -42,13 +42,7 @@ describe('createPaymentDeclinedTask', () => {
     mocks.familyLean.mockResolvedValue(null)
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    const result = await createPaymentDeclinedTask(
-      familyId,
-      'pay-1',
-      50,
-      'card_declined',
-      orgId,
-    )
+    const result = await createPaymentDeclinedTask(familyId, 'pay-1', 50, 'card_declined', orgId)
 
     expect(result).toBeNull()
     expect(mocks.connectDB).toHaveBeenCalled()

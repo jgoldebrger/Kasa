@@ -35,6 +35,8 @@ export type { PageHeaderProps } from './PageHeader'
 
 export { Tabs } from './Tabs'
 export type { TabItem, TabsProps } from './Tabs'
+export { TabNav } from './TabNav'
+export type { TabNavItem, TabNavProps } from './TabNav'
 
 export { Tooltip } from './Tooltip'
 export type { TooltipProps } from './Tooltip'

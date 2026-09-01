@@ -24,6 +24,7 @@ const EmailTemplateVersionSchema = new Schema(
 )
 
 EmailTemplateVersionSchema.index({ templateId: 1, version: -1 })
+EmailTemplateVersionSchema.index({ organizationId: 1, templateId: 1, version: -1 })
 
 export const EmailTemplateVersion =
   mongoose.models.EmailTemplateVersion ||

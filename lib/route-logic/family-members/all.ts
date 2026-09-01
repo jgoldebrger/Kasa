@@ -58,7 +58,7 @@ export const GET = handler({
       }
 
       const rows = await FamilyMember.find(filter)
-        .select('_id familyId firstName lastName birthDate gender')
+        .select('_id familyId firstName lastName birthDate gender weddingDate')
         .sort({ _id: 1 })
         .limit(effectiveLimit + 1)
         .lean<any[]>()
@@ -72,7 +72,7 @@ export const GET = handler({
       members = await loadAllByIdCursor<any>(
         (filter, limit) =>
           FamilyMember.find(filter)
-            .select('_id familyId firstName lastName birthDate gender')
+            .select('_id familyId firstName lastName birthDate gender weddingDate')
             .sort({ _id: 1 })
             .limit(limit)
             .lean<any[]>(),
@@ -80,8 +80,9 @@ export const GET = handler({
       )
     }
 
-    // Group by familyId. Keep payload compact — clients only ever want
-    // a list of {id, name} pairs from this endpoint.
+    // Group by familyId. Keep the payload compact — consumers need names
+    // plus the few fields used for audience filtering (Mail Labels filters
+    // on gender, birthDate, and weddingDate).
     const byFamily: Record<string, any[]> = {}
     for (const m of members) {
       const key = String(m.familyId)
@@ -92,6 +93,7 @@ export const GET = handler({
         lastName: m.lastName,
         birthDate: m.birthDate,
         gender: m.gender,
+        weddingDate: m.weddingDate,
       })
     }
 

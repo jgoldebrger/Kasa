@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { objectId, role as roleSchema } from '@/lib/schemas'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { loadAllByIdCursor } from '@/lib/org-pagination'
+import { canAssignOrgRole, canMutateMemberRole } from '@/lib/org-role-policy'
 
 // GET /api/org-members — list members + pending invites.
 export const GET = handler({
@@ -89,15 +90,16 @@ export const PATCH = handler({
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    if (body.role === 'owner' && ctx!.role !== 'owner') {
-      return { status: 403, data: { error: 'Only owners can promote to owner' } }
-    }
-    if (
-      (body.role === 'treasurer' || body.role === 'communications') &&
-      ctx!.role !== 'owner' &&
-      ctx!.role !== 'admin'
-    ) {
-      return { status: 403, data: { error: 'Only admins can assign specialist roles' } }
+    if (!canAssignOrgRole(ctx!.role, body.role)) {
+      return {
+        status: 403,
+        data: {
+          error:
+            body.role === 'owner'
+              ? 'Only owners can promote to owner'
+              : 'Insufficient permissions to assign this role',
+        },
+      }
     }
 
     const membership = await OrgMembership.findOne({
@@ -106,7 +108,7 @@ export const PATCH = handler({
     })
     if (!membership) return { status: 404, data: { error: 'Membership not found' } }
 
-    if (membership.role === 'owner' && ctx!.role !== 'owner') {
+    if (!canMutateMemberRole(ctx!.role, membership.role)) {
       return { status: 403, data: { error: 'Only owners can change an owner\u2019s role' } }
     }
 

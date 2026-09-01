@@ -707,6 +707,7 @@ describe.sequential('route-logic remaining coverage', () => {
           publicJsonReq('/api/auth/request-invite', 'POST', {
             email: `capped-${Date.now()}@example.com`,
             name: 'Capped',
+            orgName: 'Test Community',
           }),
         )
         expect(res.status).toBe(200)

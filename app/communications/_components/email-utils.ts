@@ -1,5 +1,5 @@
 import { mergeFieldSamples } from '@/lib/mail/merge-field-definitions'
-import { sanitizeEmailHtml } from '@/lib/client/sanitize-email-html'
+import { isSafeEmailHref, sanitizeEmailHtml } from '@/lib/client/sanitize-email-html'
 
 /** Escape HTML entities in plain text. */
 function escapeHtml(text: string): string {
@@ -14,7 +14,8 @@ function escapeHtml(text: string): string {
 function processInline(text: string): string {
   let out = escapeHtml(text)
   out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
-    const safeUrl = escapeHtml(url)
+    if (!isSafeEmailHref(url)) return label
+    const safeUrl = escapeHtml(url.trim())
     return `<a href="${safeUrl}" style="color: #2563eb;">${label}</a>`
   })
   out = out.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
@@ -139,7 +140,7 @@ export function markdownToHtml(md: string): string {
   }
   if (inList) parts.push('</ul>')
 
-  return wrapEmailHtml(parts.join(''))
+  return sanitizeEmailHtml(wrapEmailHtml(parts.join('')))
 }
 
 /** Strip markdown to plain text for the text fallback. */

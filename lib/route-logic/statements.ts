@@ -68,7 +68,8 @@ export const GET = handler({
             'openingBalance income withdrawals expenses cycleCharges closingBalance',
         )
         .sort({ date: -1, _id: -1 })
-        .limit(limit).lean()) as any[]
+        .limit(limit)
+        .lean()) as any[]
 
     let nextCursor: string | null = null
     let data: any[]
@@ -86,16 +87,10 @@ export const GET = handler({
         }
       }
     } else {
-      data = await collectCompoundCursorPages(
-        loadStatementPage,
-        filter,
-        'date',
-        -1,
-        (last) => ({
-          v: last.date ? new Date(last.date as string | Date).getTime() : null,
-          id: String(last._id),
-        }),
-      )
+      data = await collectCompoundCursorPages(loadStatementPage, filter, 'date', -1, (last) => ({
+        v: last.date ? new Date(last.date as string | Date).getTime() : null,
+        id: String(last._id),
+      }))
     }
 
     return { data: clientLimit > 0 ? { items: data, nextCursor } : data }

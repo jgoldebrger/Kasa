@@ -66,8 +66,8 @@ async function withRateLimitBlocked<T>(fn: () => Promise<T>): Promise<T> {
   const rateLimit = await import('@/lib/rate-limit')
   const spy = vi.spyOn(rateLimit, 'checkRateLimit').mockResolvedValue({
     allowed: false,
-        remaining: 0,
-        resetAt: 0,
+    remaining: 0,
+    resetAt: 0,
   })
   try {
     return await fn()
@@ -78,13 +78,13 @@ async function withRateLimitBlocked<T>(fn: () => Promise<T>): Promise<T> {
 
 async function withCompoundCursorSpy(fn: () => Promise<void>) {
   const pag = await import('@/lib/pagination')
-  const spy = vi.spyOn(pag, 'collectCompoundCursorPages').mockImplementation(
-    async (loadPage, baseFilter, _sf, _dir, getCursor, _bs) => {
+  const spy = vi
+    .spyOn(pag, 'collectCompoundCursorPages')
+    .mockImplementation(async (loadPage, baseFilter, _sf, _dir, getCursor, _bs) => {
       const page = await loadPage(baseFilter, 3)
       if (page[0]) getCursor(page[0] as never)
       return page
-    },
-  )
+    })
   try {
     await fn()
   } finally {
@@ -103,7 +103,7 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
     process.env.PLATFORM_ADMIN_EMAILS = ''
     ctx = await seedApiRouteFixtures()
     process.env.PLATFORM_ADMIN_EMAILS = ctx.email
-        process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
+    process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
     process.env.KASA_TEST_STRIPE_FAMILY = ctx.fixtures.familyId
     bindSession(ctx)
   })
@@ -195,7 +195,8 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
       bindSession(ctx)
       const { GET } = await import('@/lib/route-logic/families')
       expect(
-        (await GET(orgJsonReq('/api/families', 'GET', undefined, { query: '?limit=1&cursor=bad' }))).status,
+        (await GET(orgJsonReq('/api/families', 'GET', undefined, { query: '?limit=1&cursor=bad' })))
+          .status,
       ).toBe(400)
 
       const { Family } = await import('@/lib/models')
@@ -243,9 +244,7 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
     it('GET /api/families?view=names rejects oversized familyIds', async () => {
       bindSession(ctx)
       const { GET } = await import('@/lib/route-logic/families')
-      const tooMany = Array.from({ length: 101 }, (_, i) =>
-        String(i).padStart(24, '0'),
-      ).join(',')
+      const tooMany = Array.from({ length: 101 }, (_, i) => String(i).padStart(24, '0')).join(',')
       expect(
         (
           await GET(
@@ -290,9 +289,7 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
           )
         ).status,
       ).toBe(400)
-      const tooMany = Array.from({ length: 101 }, (_, i) =>
-        String(i).padStart(24, '0'),
-      ).join(',')
+      const tooMany = Array.from({ length: 101 }, (_, i) => String(i).padStart(24, '0')).join(',')
       expect(
         (
           await GET(
@@ -313,7 +310,17 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
     })
 
     it('GET /api/families masks financial fields for members', async () => {
-      bindSession(ctx, 'member')
+      mockAuth.mockResolvedValue({
+        user: {
+          id: ctx.fixtures.memberUserId,
+          email: ctx.memberEmail,
+          name: 'Member',
+          memberships: [{ o: ctx.orgId, r: 'member' }],
+        },
+      } as never)
+      mockCookieGet.mockImplementation((name: string) =>
+        name === 'kasa_active_org' ? { value: ctx.orgId } : undefined,
+      )
       const { GET } = await import('@/lib/route-logic/families')
       const res = await GET(orgJsonReq('/api/families', 'GET', undefined, { query: '?limit=5' }))
       expect(res.status).toBe(200)
@@ -444,9 +451,10 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
       bindSession(ctx)
       const bad = new Types.ObjectId().toString()
       const { GET, POST } = await import('@/lib/route-logic/families/[id]/members')
-      expect((await GET(orgJsonReq(`/api/families/${bad}/members`, 'GET'), { params: { id: bad } })).status).toBe(
-        404,
-      )
+      expect(
+        (await GET(orgJsonReq(`/api/families/${bad}/members`, 'GET'), { params: { id: bad } }))
+          .status,
+      ).toBe(404)
       expect(
         (
           await POST(
@@ -533,9 +541,12 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
       await withCompoundCursorSpy(async () => {
         expect(
           (
-            await GET(orgJsonReq(`/api/families/${ctx.fixtures.familyId}/lifecycle-events`, 'GET'), {
-              params: { id: ctx.fixtures.familyId },
-            })
+            await GET(
+              orgJsonReq(`/api/families/${ctx.fixtures.familyId}/lifecycle-events`, 'GET'),
+              {
+                params: { id: ctx.fixtures.familyId },
+              },
+            )
           ).status,
         ).toBe(200)
       })
@@ -636,10 +647,9 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
     it('members GET masks payment plan fields for non-admins', async () => {
       bindSession(ctx, 'member')
       const { GET } = await import('@/lib/route-logic/families/[id]/members')
-      const res = await GET(
-        orgJsonReq(`/api/families/${ctx.fixtures.familyId}/members`, 'GET'),
-        { params: { id: ctx.fixtures.familyId } },
-      )
+      const res = await GET(orgJsonReq(`/api/families/${ctx.fixtures.familyId}/members`, 'GET'), {
+        params: { id: ctx.fixtures.familyId },
+      })
       expect(res.status).toBe(200)
       const rows = await res.json()
       expect(rows.length).toBeGreaterThan(0)
@@ -659,7 +669,8 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
         lastName: 'Gap',
         gender: 'male',
       })
-      const { POST } = await import('@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family')
+      const { POST } =
+        await import('@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family')
       const params = { id: ctx.fixtures.familyId, memberId: stray._id.toString() }
 
       const noDate = await POST(
@@ -734,7 +745,8 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
         { _id: ctx.orgId },
         { $set: { weddingConversionDefaultPlanId: ctx.fixtures.paymentPlanId } },
       )
-      const { POST } = await import('@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family')
+      const { POST } =
+        await import('@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family')
       const planSpy = vi.spyOn(PaymentPlan, 'findOne').mockImplementationOnce(() => {
         throw new Error('plan lookup failed')
       })
@@ -749,7 +761,10 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
       expect(res.status).toBe(201)
       planSpy.mockRestore()
       await FamilyMember.deleteOne({ _id: member._id })
-      await Organization.updateOne({ _id: ctx.orgId }, { $unset: { weddingConversionDefaultPlanId: 1 } })
+      await Organization.updateOne(
+        { _id: ctx.orgId },
+        { $unset: { weddingConversionDefaultPlanId: 1 } },
+      )
     })
   })
 
@@ -798,7 +813,9 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
       await FamilyMember.deleteOne({ _id: otherMember._id })
 
       const Stripe = (await import('stripe')).default
-      const client = new Stripe('sk_test') as unknown as { paymentIntents: { create: ReturnType<typeof vi.fn> } }
+      const client = new Stripe('sk_test') as unknown as {
+        paymentIntents: { create: ReturnType<typeof vi.fn> }
+      }
       client.paymentIntents.create.mockRejectedValueOnce(new Error('stripe boom'))
       const taskHelpers = await import('@/lib/task-helpers')
       const taskSpy = vi
@@ -852,7 +869,10 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
     it('handles duplicate-key ledger miss after successful Stripe charge', async () => {
       bindSession(ctx)
       const { Payment } = await import('@/lib/models')
-      await Payment.deleteMany({ organizationId: ctx.orgId, stripePaymentIntentId: 'pi_apiprobemock' })
+      await Payment.deleteMany({
+        organizationId: ctx.orgId,
+        stripePaymentIntentId: 'pi_apiprobemock',
+      })
       const dupErr = Object.assign(new Error('duplicate'), { code: 11000 })
       const createSpy = vi.spyOn(Payment, 'create').mockRejectedValueOnce(dupErr)
       const findSpy = vi.spyOn(Payment, 'findOne').mockResolvedValueOnce(null as never)
@@ -887,7 +907,10 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
         nextPaymentDate: new Date(),
         isActive: true,
       })
-      await Payment.deleteMany({ organizationId: ctx.orgId, stripePaymentIntentId: 'pi_apiprobemock' })
+      await Payment.deleteMany({
+        organizationId: ctx.orgId,
+        stripePaymentIntentId: 'pi_apiprobemock',
+      })
       const { POST } = await import('@/lib/route-logic/families/[id]/charge-saved-card')
       const res = await POST(
         orgJsonReq(`/api/families/${ctx.fixtures.familyId}/charge-saved-card`, 'POST', {
@@ -1068,7 +1091,9 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
       expect(raced.status).toBe(200)
       createSpy.mockRestore()
 
-      const boomSpy = vi.spyOn(Statement, 'create').mockRejectedValueOnce(new Error('statement write failed'))
+      const boomSpy = vi
+        .spyOn(Statement, 'create')
+        .mockRejectedValueOnce(new Error('statement write failed'))
       const boom = await POST(
         orgJsonReq(`/api/members/${ctx.fixtures.memberId}/statements`, 'POST', {
           fromDate: `${year()}-04-01`,
@@ -1084,8 +1109,7 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
   describe('jobs', () => {
     it('wedding-converter sanitizes per-org errors in production', async () => {
       const prev = process.env.NODE_ENV
-      setNodeEnv('production'
-)
+      setNodeEnv('production')
       const { FamilyMember } = await import('@/lib/models')
       const member = await FamilyMember.create({
         organizationId: ctx.orgId,
@@ -1096,27 +1120,31 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
         gender: 'male',
       })
       const wc = await import('@/lib/wedding-converter')
-      const spy = vi.spyOn(wc, 'convertMembersOnWeddingDate').mockRejectedValueOnce(new Error('stripe secret detail'))
+      const spy = vi
+        .spyOn(wc, 'convertMembersOnWeddingDate')
+        .mockRejectedValueOnce(new Error('stripe secret detail'))
       try {
         const { POST } = await import('@/lib/route-logic/jobs/wedding-converter')
-        const res = await POST(orgJsonReq('/api/jobs/wedding-converter', 'POST', {}, { cron: true }))
+        const res = await POST(
+          orgJsonReq('/api/jobs/wedding-converter', 'POST', {}, { cron: true }),
+        )
         expect(res.status).toBe(200)
         const body = await res.json()
         expect(body.failed).toBeGreaterThanOrEqual(1)
       } finally {
         spy.mockRestore()
-        setNodeEnv(prev
-)
+        setNodeEnv(prev)
         await FamilyMember.deleteOne({ _id: member._id })
       }
     })
 
     it('cycle-rollover sanitizes errors and throws on outer failure', async () => {
       const prev = process.env.NODE_ENV
-      setNodeEnv('production'
-)
+      setNodeEnv('production')
       const cr = await import('@/lib/cycle-rollover')
-      const spy = vi.spyOn(cr, 'runCycleRolloverForOrg').mockRejectedValueOnce(new Error('rollover secret'))
+      const spy = vi
+        .spyOn(cr, 'runCycleRolloverForOrg')
+        .mockRejectedValueOnce(new Error('rollover secret'))
       try {
         const { POST } = await import('@/lib/route-logic/jobs/cycle-rollover')
         const res = await POST(orgJsonReq('/api/jobs/cycle-rollover', 'POST', {}, { cron: true }))
@@ -1127,12 +1155,13 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
         }
       } finally {
         spy.mockRestore()
-        setNodeEnv(prev
-)
+        setNodeEnv(prev)
       }
 
       const cronLock = await import('@/lib/cron-lock')
-      const lockSpy = vi.spyOn(cronLock, 'acquireCronLock').mockRejectedValueOnce(new Error('lock boom'))
+      const lockSpy = vi
+        .spyOn(cronLock, 'acquireCronLock')
+        .mockRejectedValueOnce(new Error('lock boom'))
       try {
         const { POST } = await import('@/lib/route-logic/jobs/cycle-rollover')
         const fail = await POST(orgJsonReq('/api/jobs/cycle-rollover', 'POST', {}, { cron: true }))
@@ -1147,14 +1176,20 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
       const spy = vi.spyOn(jobs, 'runChunked').mockRejectedValueOnce(new Error('chunk fail'))
       try {
         const { POST } = await import('@/lib/route-logic/jobs/generate-monthly-statements')
-        const res = await POST(orgJsonReq('/api/jobs/generate-monthly-statements', 'POST', {}, { cron: true }))
+        const res = await POST(
+          orgJsonReq('/api/jobs/generate-monthly-statements', 'POST', {}, { cron: true }),
+        )
         expect(res.status).toBe(500)
       } finally {
         spy.mockRestore()
       }
     })
 
-    it('process-recurring-payments throws when internal fetch fails', async () => {
+    it('process-recurring-payments throws when per-org processing fails', async () => {
+      const processOrg = await import('@/lib/recurring-payments/process-org')
+      const processSpy = vi
+        .spyOn(processOrg, 'processRecurringPaymentsForOrg')
+        .mockRejectedValueOnce(new Error('per-org fail'))
       const jobs = await import('@/lib/jobs')
       const spy = vi.spyOn(jobs, 'runChunked').mockImplementationOnce(async (opts) => {
         await opts.perOrg(ctx.orgId)
@@ -1167,14 +1202,15 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
           errors: [],
         }
       })
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => 'fail' }))
       try {
         const { POST } = await import('@/lib/route-logic/jobs/process-recurring-payments')
-        const res = await POST(orgJsonReq('/api/jobs/process-recurring-payments', 'POST', {}, { cron: true }))
+        const res = await POST(
+          orgJsonReq('/api/jobs/process-recurring-payments', 'POST', {}, { cron: true }),
+        )
         expect(res.status).toBe(500)
       } finally {
         spy.mockRestore()
-        vi.unstubAllGlobals()
+        processSpy.mockRestore()
       }
     })
   })
@@ -1205,16 +1241,23 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
           errors: [],
         }
       })
-      const fetchSpy = vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => 'fail' })
+      const fetchSpy = vi
+        .fn()
+        .mockResolvedValue({ ok: false, status: 500, text: async () => 'fail' })
       vi.stubGlobal('fetch', fetchSpy)
       try {
         const { POST } = await import('@/lib/route-logic/jobs/send-monthly-statements')
-        const res = await POST(orgJsonReq('/api/jobs/send-monthly-statements', 'POST', {}, { cron: true }))
+        const res = await POST(
+          orgJsonReq('/api/jobs/send-monthly-statements', 'POST', {}, { cron: true }),
+        )
         expect(res.status).toBe(500)
       } finally {
         spy.mockRestore()
         vi.unstubAllGlobals()
-        await Organization.updateOne({ _id: ctx.orgId }, { $unset: { monthlyStatementAutoEmail: 1 } })
+        await Organization.updateOne(
+          { _id: ctx.orgId },
+          { $unset: { monthlyStatementAutoEmail: 1 } },
+        )
       }
     })
   })
@@ -1223,7 +1266,11 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
     it('GET /api/trash lists soft-deleted items with limit', async () => {
       bindSession(ctx)
       const { softDeleteOne } = await import('@/lib/recycle-bin')
-      const orgCtx = mockOrgContext({ organizationId: ctx.orgId, userId: ctx.userId, role: 'owner' })
+      const orgCtx = mockOrgContext({
+        organizationId: ctx.orgId,
+        userId: ctx.userId,
+        role: 'owner',
+      })
       await softDeleteOne('task', ctx.fixtures.disposableTaskId, orgCtx)
 
       const { GET } = await import('@/lib/route-logic/trash')
@@ -1237,7 +1284,11 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
       bindSession(ctx)
       const { Task } = await import('@/lib/models')
       const { softDeleteOne } = await import('@/lib/recycle-bin')
-      const orgCtx = mockOrgContext({ organizationId: ctx.orgId, userId: ctx.userId, role: 'owner' })
+      const orgCtx = mockOrgContext({
+        organizationId: ctx.orgId,
+        userId: ctx.userId,
+        role: 'owner',
+      })
       const task = await Task.create({
         organizationId: ctx.orgId,
         title: `Trash Probe ${Date.now()}`,
@@ -1253,10 +1304,9 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
       const got = await GET(orgJsonReq(`/api/trash/task/${task._id}`, 'GET'), { params })
       expect(got.status).toBe(200)
 
-      const gone = await GET(
-        orgJsonReq(`/api/trash/task/${new Types.ObjectId()}`, 'GET'),
-        { params: { kind: 'task', id: new Types.ObjectId().toString() } },
-      )
+      const gone = await GET(orgJsonReq(`/api/trash/task/${new Types.ObjectId()}`, 'GET'), {
+        params: { kind: 'task', id: new Types.ObjectId().toString() },
+      })
       expect(gone.status).toBe(404)
 
       await withRateLimitBlocked(async () => {
@@ -1285,7 +1335,9 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
       )
       expect(restored.status).toBe(200)
 
-      const throwSpy = vi.spyOn(recycle, 'restoreFromBin').mockRejectedValueOnce(new Error('restore boom'))
+      const throwSpy = vi
+        .spyOn(recycle, 'restoreFromBin')
+        .mockRejectedValueOnce(new Error('restore boom'))
       const boom = await restoreMod.POST(
         orgJsonReq(`/api/trash/task/${task2._id}/restore`, 'POST', {}),
         { params: { kind: 'task', id: task2._id.toString() } },
@@ -1299,7 +1351,11 @@ describe.sequential('route-logic families/jobs/trash domain coverage', () => {
       bindSession(ctx)
       const { Task } = await import('@/lib/models')
       const { softDeleteOne } = await import('@/lib/recycle-bin')
-      const orgCtx = mockOrgContext({ organizationId: ctx.orgId, userId: ctx.userId, role: 'owner' })
+      const orgCtx = mockOrgContext({
+        organizationId: ctx.orgId,
+        userId: ctx.userId,
+        role: 'owner',
+      })
       const task = await Task.create({
         organizationId: ctx.orgId,
         title: `Purge All ${Date.now()}`,

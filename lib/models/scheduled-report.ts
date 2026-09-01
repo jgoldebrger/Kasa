@@ -31,6 +31,7 @@ const ScheduledReportSchema = new Schema(
 )
 
 ScheduledReportSchema.index({ organizationId: 1, savedReportId: 1 }, { unique: true })
+ScheduledReportSchema.index({ enabled: 1, nextRunAt: 1 })
 
 export const ScheduledReport =
   mongoose.models.ScheduledReport || mongoose.model('ScheduledReport', ScheduledReportSchema)

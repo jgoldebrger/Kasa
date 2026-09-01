@@ -15,8 +15,7 @@ const MAX_INPUT_BYTES = 1.5 * 1024 * 1024
 /** Target dimensions for the rendered logo. 256×256 is plenty for sidebar use. */
 const TARGET_PX = 256
 
-const DATA_URL_RE =
-  /^data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);base64,([A-Za-z0-9+/=]+)$/i
+const DATA_URL_RE = /^data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);base64,([A-Za-z0-9+/=]+)$/i
 
 export interface ProcessedLogo {
   dataUrl: string

@@ -222,7 +222,7 @@ export default function OrgSwitcher() {
                 onClick={() => setOpen(false)}
                 className="block px-2 py-1.5 text-sm text-fg-muted hover:bg-fg/5 hover:text-fg rounded"
               >
-                Manage members
+                Manage team
               </Link>
             </div>
           )}

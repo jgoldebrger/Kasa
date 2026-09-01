@@ -9,9 +9,9 @@ describe('validateDateRange', () => {
   })
 
   it('rejects inverted ranges', () => {
-    expect(
-      validateDateRange(new Date('2024-06-01'), new Date('2024-01-01')),
-    ).toMatch(/on or before/)
+    expect(validateDateRange(new Date('2024-06-01'), new Date('2024-01-01'))).toMatch(
+      /on or before/,
+    )
   })
 
   it('rejects spans longer than the max', () => {
@@ -22,8 +22,6 @@ describe('validateDateRange', () => {
 
   it('rejects invalid and out-of-range years', () => {
     expect(validateDateRange(new Date('invalid'), new Date())).toBe('Invalid date')
-    expect(
-      validateDateRange(new Date('1800-01-01'), new Date('1800-12-31')),
-    ).toMatch(/1900/)
+    expect(validateDateRange(new Date('1800-01-01'), new Date('1800-12-31'))).toMatch(/1900/)
   })
 })

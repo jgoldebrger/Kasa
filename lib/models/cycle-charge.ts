@@ -20,17 +20,25 @@ import { softDeletePlugin } from './soft-delete-plugin'
 // org used at rollover time (e.g. 2026 for Gregorian, 5786 for Hebrew).
 // We keep the calendar context in `calendar` so the UI can render a
 // human label without guessing.
-const CycleChargeSchema = new Schema({
-  organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
-  familyId: { type: Schema.Types.ObjectId, ref: 'Family', required: true },
-  cycleYear: { type: Number, required: true },
-  calendar: { type: String, enum: ['gregorian', 'hebrew'], required: true },
-  chargeDate: { type: Date, required: true },
-  amount: { type: Number, required: true, min: 0 },
-  planId: { type: Schema.Types.ObjectId, ref: 'PaymentPlan' },
-  planName: { type: String, default: '' },
-  notes: { type: String, default: '' },
-}, { timestamps: true })
+const CycleChargeSchema = new Schema(
+  {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: true,
+      index: true,
+    },
+    familyId: { type: Schema.Types.ObjectId, ref: 'Family', required: true },
+    cycleYear: { type: Number, required: true },
+    calendar: { type: String, enum: ['gregorian', 'hebrew'], required: true },
+    chargeDate: { type: Date, required: true },
+    amount: { type: Number, required: true, min: 0 },
+    planId: { type: Schema.Types.ObjectId, ref: 'PaymentPlan' },
+    planName: { type: String, default: '' },
+    notes: { type: String, default: '' },
+  },
+  { timestamps: true },
+)
 CycleChargeSchema.index({ organizationId: 1, familyId: 1, chargeDate: -1 })
 // Idempotency: the rollover cron tries to create the same row on each
 // run; the unique index lets us safely `insertMany({ ordered: false })`
@@ -41,4 +49,5 @@ CycleChargeSchema.index(
 )
 CycleChargeSchema.plugin(softDeletePlugin)
 
-export const CycleCharge = mongoose.models.CycleCharge || mongoose.model('CycleCharge', CycleChargeSchema)
+export const CycleCharge =
+  mongoose.models.CycleCharge || mongoose.model('CycleCharge', CycleChargeSchema)

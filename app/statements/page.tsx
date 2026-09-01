@@ -35,9 +35,7 @@ async function StatementsServer() {
   const ctx = await requireServerOrgContext({ minRole: 'admin' })
   try {
     const data = await fetchInitialData(ctx.organizationId)
-    return (
-      <StatementsView initialStatements={data.initialStatements} />
-    )
+    return <StatementsView initialStatements={data.initialStatements} />
   } catch (err) {
     console.error('[statements] server prefetch failed:', err)
     return <StatementsView />

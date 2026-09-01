@@ -12,8 +12,7 @@ describe('cycle-rollover (integration)', () => {
   })
 
   afterEach(async () => {
-    const { Organization, CycleConfig, CycleCharge, Family, PaymentPlan } =
-      await import('./models')
+    const { Organization, CycleConfig, CycleCharge, Family, PaymentPlan } = await import('./models')
     await Promise.all([
       CycleCharge.deleteMany({}),
       Family.deleteMany({}),
@@ -121,10 +120,7 @@ describe('cycle-rollover (integration)', () => {
   it('uses hebrew calendar from active CycleConfig', async () => {
     const { orgId } = await seedOrgWithFamilies()
     const { CycleConfig } = await import('./models')
-    await CycleConfig.updateOne(
-      { organizationId: orgId },
-      { cycleCalendar: 'hebrew' },
-    )
+    await CycleConfig.updateOne({ organizationId: orgId }, { cycleCalendar: 'hebrew' })
 
     const { runCycleRolloverForOrg } = await import('./cycle-rollover')
     const chargeDate = new Date('2024-09-01T12:00:00.000Z')
@@ -154,11 +150,9 @@ describe('cycle-rollover (integration)', () => {
   it('records per-family errors when plan lookup throws', async () => {
     const { orgId, withPlan } = await seedOrgWithFamilies()
     const { PaymentPlan } = await import('./models')
-    const findSpy = vi
-      .spyOn(PaymentPlan, 'findOne')
-      .mockImplementationOnce(() => {
-        throw new Error('plan lookup failed')
-      })
+    const findSpy = vi.spyOn(PaymentPlan, 'findOne').mockImplementationOnce(() => {
+      throw new Error('plan lookup failed')
+    })
 
     const { runCycleRolloverForOrg } = await import('./cycle-rollover')
     const chargeDate = new Date('2024-07-01T12:00:00.000Z')

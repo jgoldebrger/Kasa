@@ -25,10 +25,7 @@ describe('validateImportFile', () => {
     expect(validateImportFile(file('data.csv', 'text/csv')).ok).toBe(true)
     expect(
       validateImportFile(
-        file(
-          'data.xlsx',
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        ),
+        file('data.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
       ).ok,
     ).toBe(true)
   })
@@ -87,7 +84,9 @@ describe('validateEmailAttachmentFile', () => {
   })
 
   it('rejects blocked attachment mime types', () => {
-    const res = validateEmailAttachmentFile(file('app.apk', 'application/vnd.android.package-archive'))
+    const res = validateEmailAttachmentFile(
+      file('app.apk', 'application/vnd.android.package-archive'),
+    )
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.status).toBe(415)
   })

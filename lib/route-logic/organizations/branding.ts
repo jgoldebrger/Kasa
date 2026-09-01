@@ -119,7 +119,9 @@ export const PUT = handler({
       ctx!.organizationId,
       { $set: update },
       { new: true },
-    ).select('branding').lean<any>()
+    )
+      .select('branding')
+      .lean<any>()
 
     if (!org) return { status: 404, data: { error: 'Organization not found' } }
 

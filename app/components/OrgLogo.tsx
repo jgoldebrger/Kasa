@@ -29,8 +29,7 @@ export default function OrgLogo({
   // Falls back to the data URL when an older cached response (or a stale
   // build) doesn't include logoUrl yet.
   const logo = branding.logoUrl || branding.logoDataUrl
-  const initial =
-    (fallbackChar || branding.name?.trim()?.[0] || 'K').toUpperCase()
+  const initial = (fallbackChar || branding.name?.trim()?.[0] || 'K').toUpperCase()
 
   const sizeStyle = { width: size, height: size }
   const fontSize = Math.max(10, Math.round(size * 0.45))

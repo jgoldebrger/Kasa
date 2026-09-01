@@ -170,11 +170,7 @@ export const PATCH = handler({
       return { status: 400, data: { error: 'Nothing to update.' } }
     }
 
-    const updated = await User.findByIdAndUpdate(
-      session!.user.id,
-      { $set: update },
-      { new: true },
-    )
+    const updated = await User.findByIdAndUpdate(session!.user.id, { $set: update }, { new: true })
       .select('preferences')
       .lean<any>()
 

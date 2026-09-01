@@ -40,7 +40,10 @@ export function EmptyState({
       aria-label={title}
     >
       {icon && (
-        <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-surface border border-border text-fg-subtle [&_svg]:h-6 [&_svg]:w-6" aria-hidden="true">
+        <div
+          className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-surface border border-border text-fg-subtle [&_svg]:h-6 [&_svg]:w-6"
+          aria-hidden="true"
+        >
           {icon}
         </div>
       )}
@@ -48,9 +51,7 @@ export function EmptyState({
       {description && <p className="mt-1 max-w-md text-sm text-fg-muted">{description}</p>}
       {(cta || secondaryCta) && (
         <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:gap-3">
-          {secondaryCta && (
-            <CtaButton {...secondaryCta} variant="secondary" />
-          )}
+          {secondaryCta && <CtaButton {...secondaryCta} variant="secondary" />}
           {cta && <CtaButton {...cta} variant="primary" />}
         </div>
       )}

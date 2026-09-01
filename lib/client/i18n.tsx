@@ -1,13 +1,6 @@
 'use client'
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { cachedFetch } from '@/lib/client-cache'
 import {
@@ -17,14 +10,7 @@ import {
   type MessageKey,
 } from '@/lib/i18n/load-locale'
 
-export const SUPPORTED_LOCALES = [
-  'en-US',
-  'en-GB',
-  'he-IL',
-  'yi',
-  'fr-FR',
-  'es-MX',
-] as const
+export const SUPPORTED_LOCALES = ['en-US', 'en-GB', 'he-IL', 'yi', 'fr-FR', 'es-MX'] as const
 export type Locale = (typeof SUPPORTED_LOCALES)[number]
 
 const RTL_LOCALES: ReadonlyArray<Locale> = ['he-IL', 'yi']
@@ -88,8 +74,7 @@ export interface I18nProviderProps {
 export function I18nProvider({ children, initialOrgLocale }: I18nProviderProps) {
   const { status } = useSession()
   const seededOrgLocale =
-    initialOrgLocale &&
-    (SUPPORTED_LOCALES as readonly string[]).includes(initialOrgLocale)
+    initialOrgLocale && (SUPPORTED_LOCALES as readonly string[]).includes(initialOrgLocale)
       ? (initialOrgLocale as Locale)
       : null
 

@@ -41,9 +41,7 @@ export function OrgCurrencyProvider({
   const { data: session, status } = useSession()
   const sessionUserId = session?.user?.id
   const serverSeeded = initialCurrency !== undefined
-  const [currency, setCurrency] = useState(
-    (initialCurrency || 'USD').toUpperCase(),
-  )
+  const [currency, setCurrency] = useState((initialCurrency || 'USD').toUpperCase())
   const [locale, setLocale] = useState(initialLocale || 'en-US')
   const [loading, setLoading] = useState(false)
 
@@ -53,10 +51,10 @@ export function OrgCurrencyProvider({
 
     const fetchCurrent = (opts?: { bypass?: boolean }) => {
       setLoading(true)
-      cachedFetch<{ currency?: string; locale?: string }>(
-        '/api/organizations/current',
-        { ttl: 60_000, bypass: opts?.bypass },
-      )
+      cachedFetch<{ currency?: string; locale?: string }>('/api/organizations/current', {
+        ttl: 60_000,
+        bypass: opts?.bypass,
+      })
         .then((data) => {
           if (cancelled || !data) return
           if (typeof data.currency === 'string') setCurrency(data.currency.toUpperCase())
@@ -85,8 +83,7 @@ export function OrgCurrencyProvider({
       currency,
       locale,
       symbol: currencySymbol(currency, locale),
-      format: (v, opts) =>
-        formatMoney(v, { currency, locale, noSymbol: opts?.noSymbol }),
+      format: (v, opts) => formatMoney(v, { currency, locale, noSymbol: opts?.noSymbol }),
       loading,
     }),
     [currency, locale, loading],

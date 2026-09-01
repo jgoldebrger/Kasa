@@ -6,15 +6,26 @@ import {
   LEGAL_LAST_UPDATED,
   PRIVACY_CONTACT_EMAIL,
 } from '@/lib/legal/contacts'
+import { publicPageMetadata } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Data Processing Addendum — Kasa',
-  description: 'Data processing terms for organizations using Kasa.',
-}
+const TITLE = 'Data Processing Addendum — Kasa'
+const DESCRIPTION =
+  'DPA for kehillos using Kasa: roles, subprocessors, and how organization data is processed on your instructions.'
+
+export const metadata: Metadata = publicPageMetadata({
+  title: TITLE,
+  description: DESCRIPTION,
+  path: '/dpa',
+})
 
 export default function DpaPage() {
   return (
-    <LegalPageLayout title="Data Processing Addendum" lastUpdated={LEGAL_LAST_UPDATED}>
+    <LegalPageLayout
+      title="Data Processing Addendum"
+      lastUpdated={LEGAL_LAST_UPDATED}
+      canonicalPath="/dpa"
+      description={DESCRIPTION}
+    >
       <section>
         <h2>1. Scope</h2>
         <p>

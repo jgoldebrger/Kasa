@@ -29,9 +29,7 @@ export async function setupMongo(): Promise<void> {
   await connectDB()
 
   // Ensure unique indexes exist before integration tests that rely on E11000 races.
-  await Promise.all(
-    Object.values(mongoose.connection.models).map((model) => model.syncIndexes()),
-  )
+  await Promise.all(Object.values(mongoose.connection.models).map((model) => model.syncIndexes()))
 }
 
 /** Drop worker database and disconnect (shared server keeps running). */

@@ -1,0 +1,20 @@
+# Gitleaks configuration — https://github.com/gitleaks/gitleaks
+title = "KASA"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "CI / e2e / docs / test placeholders — not production credentials"
+paths = [
+  '''\.env\.example$''',
+  '''\.github/workflows/.*\.yml$''',
+  '''(^|/)e2e/''',
+  '''(^|/)security/''',
+  '''(^|/)docs/''',
+  '''\.md$''',
+  '''\.test\.(ts|tsx|js)$''',
+  '''\.unit\.test\.(ts|tsx|js)$''',
+  '''\.integration\.test\.(ts|tsx|js)$''',
+  '''\.smoke\.test\.(ts|tsx|js)$''',
+]

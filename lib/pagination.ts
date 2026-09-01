@@ -35,11 +35,7 @@ export function decodeCompoundCursor(raw: string): CompoundCursor | null {
     // a Mongo operator (e.g. `{ [sortField]: { $ne: null } }`) — that's
     // NoSQL operator injection through a client-controlled cursor.
     const v = obj.v
-    if (
-      v !== null &&
-      typeof v !== 'string' &&
-      typeof v !== 'number'
-    ) {
+    if (v !== null && typeof v !== 'string' && typeof v !== 'number') {
       return null
     }
     return { v, id: obj.id }
@@ -70,10 +66,7 @@ export function compoundCursorFilter(
   // The $or branch carries forward the strict inequality on the sort
   // field, then falls back to the _id tiebreak when the sort values match.
   return {
-    $or: [
-      { [sortField]: { [op]: cursorV } },
-      { [sortField]: cursorV, _id: idClause },
-    ],
+    $or: [{ [sortField]: { [op]: cursorV } }, { [sortField]: cursorV, _id: idClause }],
   }
 }
 

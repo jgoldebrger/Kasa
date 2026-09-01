@@ -8,11 +8,7 @@
 
 import { PencilIcon, TrashIcon, CalendarIcon } from '@heroicons/react/24/outline'
 import { useCurrency } from '@/lib/client/useCurrency'
-import {
-  DataView,
-  EmptyState,
-  type DataColumn,
-} from '@/app/components/ui'
+import { DataView, EmptyState, type DataColumn } from '@/app/components/ui'
 
 export interface EventTypeRow {
   _id: string
@@ -93,7 +89,7 @@ export default function EventTypesTable({
           </button>
           <button
             onClick={() => onDelete(e._id)}
-            className="focus-ring inline-flex h-8 w-8 items-center justify-center rounded-md text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+            className="focus-ring inline-flex h-8 w-8 items-center justify-center rounded-md text-danger hover:bg-danger/10"
             title="Delete event type"
             aria-label={`Delete ${e.name}`}
           >
@@ -138,7 +134,7 @@ export default function EventTypesTable({
             <button
               onClick={() => onDelete(e._id)}
               aria-label={`Delete ${e.name}`}
-              className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-md text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+              className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-md text-danger hover:bg-danger/10"
             >
               <TrashIcon className="h-4 w-4" />
             </button>

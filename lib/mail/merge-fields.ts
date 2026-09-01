@@ -160,6 +160,150 @@ export async function loadMergeFieldContext(
   }
 }
 
+type FamilyMergeRow = {
+  _id: Types.ObjectId
+  name?: string
+  hebrewName?: string
+  email?: string
+  phone?: string
+  husbandCellPhone?: string
+  wifeCellPhone?: string
+  street?: string
+  address?: string
+  city?: string
+  state?: string
+  zip?: string
+  paymentPlanId?: Types.ObjectId
+}
+
+async function buildMergeContextForFamily(
+  family: FamilyMergeRow,
+  organizationId: string,
+  orgName: string,
+  cycleConfig: { cycleStartMonth?: number; cycleStartDay?: number } | null,
+  planNames: Map<string, string>,
+  upcomingByFamily: Map<string, Date>,
+): Promise<MergeFieldContext> {
+  const familyId = String(family._id)
+  let balance = 0
+  let dues = 0
+  try {
+    const bal = await calculateFamilyBalance(familyId, organizationId)
+    balance = bal.balance
+    dues = bal.planCost
+  } catch {
+    /* use defaults */
+  }
+
+  const planName = family.paymentPlanId ? planNames.get(String(family.paymentPlanId)) || '' : ''
+  const now = new Date()
+  const nextDueDate = computeNextCycleDueDate(cycleConfig, now)
+  const upcoming = upcomingByFamily.get(familyId)
+  const fullAddress = formatFullAddress(family)
+
+  return {
+    familyName: family.name || '',
+    hebrewName: family.hebrewName || '',
+    email: family.email || '',
+    phone: family.phone || '',
+    husbandCellPhone: family.husbandCellPhone || '',
+    wifeCellPhone: family.wifeCellPhone || '',
+    street: family.street || family.address || '',
+    city: family.city || '',
+    state: family.state || '',
+    zip: family.zip || '',
+    fullAddress,
+    balance,
+    dues,
+    planName,
+    eventDate: upcoming ? formatDate(upcoming) : '',
+    nextDue: nextDueDate ? formatDate(nextDueDate) : '',
+    orgName,
+  }
+}
+
+/** Batch-load merge-field contexts for many families in one org (avoids repeated org/config queries). */
+export async function loadMergeFieldContexts(
+  familyIds: string[],
+  organizationId: string,
+): Promise<Map<string, MergeFieldContext>> {
+  const out = new Map<string, MergeFieldContext>()
+  if (familyIds.length === 0) return out
+
+  const orgId = new Types.ObjectId(organizationId)
+  const uniqueIds = [...new Set(familyIds)]
+  const objectIds = uniqueIds.map((id) => new Types.ObjectId(id))
+
+  const [org, cycleConfig, families, upcomingEvents] = await Promise.all([
+    Organization.findById(orgId).select('name').lean<{ name?: string }>(),
+    CycleConfig.findOne({ organizationId: orgId, isActive: true })
+      .select('cycleStartMonth cycleStartDay')
+      .lean<{ cycleStartMonth?: number; cycleStartDay?: number }>(),
+    Family.find({ _id: { $in: objectIds }, organizationId: orgId })
+      .select(
+        'name hebrewName email phone husbandCellPhone wifeCellPhone street address city state zip paymentPlanId',
+      )
+      .lean<FamilyMergeRow[]>(),
+    LifecycleEventPayment.aggregate<{ _id: Types.ObjectId; eventDate: Date }>([
+      {
+        $match: {
+          organizationId: orgId,
+          familyId: { $in: objectIds },
+          eventDate: { $gte: new Date() },
+          deletedAt: null,
+        },
+      },
+      { $sort: { eventDate: 1 } },
+      { $group: { _id: '$familyId', eventDate: { $first: '$eventDate' } } },
+    ]),
+  ])
+
+  const orgName = org?.name || ''
+  const upcomingByFamily = new Map(
+    upcomingEvents.map((row) => [String(row._id), new Date(row.eventDate)]),
+  )
+
+  const planIds = [
+    ...new Set(
+      families.map((f) => f.paymentPlanId).filter((id): id is Types.ObjectId => Boolean(id)),
+    ),
+  ]
+  const planNames = new Map<string, string>()
+  if (planIds.length > 0) {
+    const plans = await PaymentPlan.find({ _id: { $in: planIds }, organizationId: orgId })
+      .select('name')
+      .lean<Array<{ _id: Types.ObjectId; name?: string }>>()
+    for (const plan of plans) {
+      planNames.set(String(plan._id), plan.name || '')
+    }
+  }
+
+  const contexts = await Promise.all(
+    families.map((family) =>
+      buildMergeContextForFamily(
+        family,
+        organizationId,
+        orgName,
+        cycleConfig,
+        planNames,
+        upcomingByFamily,
+      ),
+    ),
+  )
+
+  for (let i = 0; i < families.length; i++) {
+    out.set(String(families[i]._id), contexts[i])
+  }
+
+  for (const id of uniqueIds) {
+    if (!out.has(id)) {
+      out.set(id, { familyName: '', orgName })
+    }
+  }
+
+  return out
+}
+
 export {
   MERGE_FIELD_DEFINITIONS,
   mergeFieldToken,

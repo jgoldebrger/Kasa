@@ -3,23 +3,16 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  MagnifyingGlassIcon,
-} from '@heroicons/react/24/outline'
+import { ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { useColumnVisibility } from '@/lib/client/useColumnVisibility'
+import { textAlignClass, type TextAlign } from '@/lib/ui/align'
 import {
   useDataFilters,
   filterDataRows,
   type ColumnFilterConfig,
   type FilterableColumn,
 } from '@/lib/client/useDataFilters'
-import {
-  reactNodeToText,
-  todayStamp,
-  type ExportColumn,
-} from '@/lib/client/export'
+import { reactNodeToText, todayStamp, type ExportColumn } from '@/lib/client/export'
 import type { ColumnPickerEntry } from './ColumnPicker'
 import type { FilterPopoverColumn } from './FilterPopover'
 import FilterChips from './FilterChips'
@@ -75,8 +68,8 @@ export interface DataColumn<T> {
   className?: string
   /** Hide this column under the given Tailwind breakpoint (eg "md"). */
   hideBelow?: 'sm' | 'md' | 'lg'
-  /** Header text-alignment. */
-  align?: 'left' | 'right' | 'center'
+  /** Header text-alignment. Physical (`left`/`right`) or logical (`start`/`end`). */
+  align?: TextAlign
   /**
    * Declare that this column should be filterable in the DataView toolbar.
    * The DataView extracts the value (via `filter.getValue`, else `exportValue`,
@@ -220,16 +213,8 @@ export function DataView<T>({
   const showColumns = toolbarEnabled && toolbarCfg.columns !== false
   const showExport = toolbarEnabled && toolbarCfg.export !== false
 
-  const {
-    visibility,
-    isVisible,
-    setVisible,
-    showAll,
-    reset,
-    visibleCount,
-    order,
-    moveColumn,
-  } = useColumnVisibility(tableId, columns)
+  const { visibility, isVisible, setVisible, showAll, reset, visibleCount, order, moveColumn } =
+    useColumnVisibility(tableId, columns)
 
   // Columns sorted according to the user's saved order. Built once per
   // (columns, order) change so the picker, headers, cells, and exports all
@@ -293,7 +278,8 @@ export function DataView<T>({
         .filter((c) => !!c.filter)
         .map((c) => ({
           id: c.id,
-          label: c.filter?.label || c.headerText || (typeof c.header === 'string' ? c.header : c.id),
+          label:
+            c.filter?.label || c.headerText || (typeof c.header === 'string' ? c.header : c.id),
           config: c.filter as ColumnFilterConfig<any>,
           options: filters.optionsByColumn[c.id],
         })),
@@ -413,7 +399,7 @@ export function DataView<T>({
             placeholder={searchPlaceholder}
           />
         )}
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="ms-auto flex flex-wrap items-center gap-2">
           {showFilters && (
             <FilterPopover
               columns={filterColumns}
@@ -503,11 +489,21 @@ export function DataView<T>({
       />
     ) : null
 
+  // Visually hidden status announcing the filtered/visible row count so
+  // screen reader users learn when a search or column filter narrows the
+  // list, without relying on sighted feedback from the row list itself.
+  const liveRegion = (
+    <div className="sr-only" aria-live="polite" aria-atomic="true">
+      {`${totalRows.toLocaleString()} ${totalRows === 1 ? 'result' : 'results'}`}
+    </div>
+  )
+
   if (filteredAll.length === 0 && empty) {
     return (
       <div className={className}>
         {renderToolbar()}
         {chips}
+        {liveRegion}
         {empty}
         {renderImportModal()}
       </div>
@@ -518,18 +514,18 @@ export function DataView<T>({
     tableFrom === 'never'
       ? 'hidden'
       : tableFrom === 'sm'
-      ? 'hidden sm:block'
-      : tableFrom === 'lg'
-      ? 'hidden lg:block'
-      : 'hidden md:block'
+        ? 'hidden sm:block'
+        : tableFrom === 'lg'
+          ? 'hidden lg:block'
+          : 'hidden md:block'
   const cardVisible =
     tableFrom === 'never'
       ? 'block'
       : tableFrom === 'sm'
-      ? 'sm:hidden'
-      : tableFrom === 'lg'
-      ? 'lg:hidden'
-      : 'md:hidden'
+        ? 'sm:hidden'
+        : tableFrom === 'lg'
+          ? 'lg:hidden'
+          : 'md:hidden'
 
   // Virtualize when the list isn't paginated and grows past this many rows.
   // Below the threshold the cost of measuring + windowing isn't worth the
@@ -541,6 +537,7 @@ export function DataView<T>({
     <div className={className}>
       {renderToolbar()}
       {chips}
+      {liveRegion}
 
       {/* Mobile: card list */}
       {shouldVirtualize ? (
@@ -559,7 +556,7 @@ export function DataView<T>({
                 <button
                   type="button"
                   onClick={() => onRowClick(row, i)}
-                  className="focus-ring w-full text-left [&_.surface-card]:transition-colors [&_.surface-card]:hover:bg-fg/[0.02] [&_.surface-card]:active:bg-fg/[0.04]"
+                  className="focus-ring w-full text-start [&_.surface-card]:transition-colors [&_.surface-card]:hover:bg-fg/[0.02] [&_.surface-card]:active:bg-fg/[0.04]"
                 >
                   {mobileCard(row, i)}
                 </button>
@@ -587,21 +584,21 @@ export function DataView<T>({
           />
         ) : (
           <table className="w-full text-sm">
-            <thead className="border-b border-border bg-app-subtle text-left text-[11px] uppercase tracking-wider text-muted-on-subtle">
+            <thead className="border-b border-border bg-app-subtle text-start text-[11px] uppercase tracking-wider text-muted-on-subtle">
               <tr>
                 {renderColumns.map((col) => (
                   <th
                     key={col.id}
                     scope="col"
-                    className={`px-4 py-2.5 font-medium ${alignClass(col.align)} ${hideClass(col.hideBelow)}`}
+                    className={`px-4 py-2.5 font-medium ${textAlignClass(col.align)} ${hideClass(col.hideBelow)}`}
                     aria-sort={
                       col.sortable && sort?.id === col.id
                         ? sort.dir === 'asc'
                           ? 'ascending'
                           : 'descending'
                         : col.sortable
-                        ? 'none'
-                        : undefined
+                          ? 'none'
+                          : undefined
                     }
                   >
                     {col.sortable && onSortChange ? (
@@ -630,7 +627,7 @@ export function DataView<T>({
                   {renderColumns.map((col) => (
                     <td
                       key={col.id}
-                      className={`px-4 py-2.5 align-middle text-fg ${alignClass(col.align)} ${hideClass(col.hideBelow)} ${col.className || ''}`}
+                      className={`px-4 py-2.5 align-middle text-fg ${textAlignClass(col.align)} ${hideClass(col.hideBelow)} ${col.className || ''}`}
                     >
                       {col.cell(row, i)}
                     </td>
@@ -689,21 +686,21 @@ function VirtualTable<T>({
       aria-label="Scrollable table"
     >
       <table className="w-full text-sm">
-        <thead className="sticky top-0 z-10 border-b border-border bg-app-subtle text-left text-[11px] uppercase tracking-wider text-muted-on-subtle">
+        <thead className="sticky top-0 z-10 border-b border-border bg-app-subtle text-start text-[11px] uppercase tracking-wider text-muted-on-subtle">
           <tr>
             {columns.map((col) => (
               <th
                 key={col.id}
                 scope="col"
-                className={`px-4 py-2.5 font-medium ${alignClass(col.align)} ${hideClass(col.hideBelow)}`}
+                className={`px-4 py-2.5 font-medium ${textAlignClass(col.align)} ${hideClass(col.hideBelow)}`}
                 aria-sort={
                   col.sortable && sort?.id === col.id
                     ? sort.dir === 'asc'
                       ? 'ascending'
                       : 'descending'
                     : col.sortable
-                    ? 'none'
-                    : undefined
+                      ? 'none'
+                      : undefined
                 }
               >
                 {col.sortable && onSortChange ? (
@@ -745,7 +742,7 @@ function VirtualTable<T>({
                 {columns.map((col) => (
                   <td
                     key={col.id}
-                    className={`px-4 py-2.5 align-middle text-fg ${alignClass(col.align)} ${hideClass(col.hideBelow)} ${col.className || ''}`}
+                    className={`px-4 py-2.5 align-middle text-fg ${textAlignClass(col.align)} ${hideClass(col.hideBelow)} ${col.className || ''}`}
                   >
                     {col.cell(row, vi.index)}
                   </td>
@@ -814,7 +811,7 @@ function VirtualCardList<T>({
                 <button
                   type="button"
                   onClick={() => onRowClick(row, vi.index)}
-                  className="focus-ring w-full text-left"
+                  className="focus-ring w-full text-start"
                 >
                   {mobileCard(row, vi.index)}
                 </button>
@@ -835,12 +832,13 @@ function defaultSizesFor(initial: number): number[] {
   return Array.from(set).sort((a, b) => a - b)
 }
 
-function alignClass(a?: 'left' | 'right' | 'center') {
-  return a === 'right' ? 'text-right' : a === 'center' ? 'text-center' : 'text-left'
-}
 function hideClass(h?: 'sm' | 'md' | 'lg') {
   if (!h) return ''
-  return h === 'sm' ? 'hidden sm:table-cell' : h === 'md' ? 'hidden md:table-cell' : 'hidden lg:table-cell'
+  return h === 'sm'
+    ? 'hidden sm:table-cell'
+    : h === 'md'
+      ? 'hidden md:table-cell'
+      : 'hidden lg:table-cell'
 }
 
 function SortableHeader({
@@ -946,7 +944,7 @@ function PaginationFooter({
           className="focus-ring inline-flex h-7 w-7 items-center justify-center rounded-md text-fg-muted hover:bg-fg/5 hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Previous page"
         >
-          <ChevronLeftIcon className="h-4 w-4" />
+          <ChevronLeftIcon className="h-4 w-4 rtl:rotate-180" />
         </button>
         {pages.map((p, i) =>
           p === '…' ? (
@@ -961,7 +959,7 @@ function PaginationFooter({
               aria-current={p === page ? 'page' : undefined}
               className={`focus-ring inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded-md px-2 text-xs font-medium tabular ${
                 p === page
-                  ? 'bg-accent text-white'
+                  ? 'bg-accent text-accent-fg'
                   : 'text-fg-muted hover:bg-fg/5 hover:text-fg'
               }`}
             >
@@ -976,7 +974,7 @@ function PaginationFooter({
           className="focus-ring inline-flex h-7 w-7 items-center justify-center rounded-md text-fg-muted hover:bg-fg/5 hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Next page"
         >
-          <ChevronRightIcon className="h-4 w-4" />
+          <ChevronRightIcon className="h-4 w-4 rtl:rotate-180" />
         </button>
       </nav>
     </div>
@@ -1015,7 +1013,7 @@ function SearchInput({
   return (
     <div className="relative w-full max-w-xs">
       <MagnifyingGlassIcon
-        className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle"
+        className="pointer-events-none absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle"
         aria-hidden="true"
       />
       <input
@@ -1028,7 +1026,7 @@ function SearchInput({
         }}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="focus-ring min-h-[var(--touch-target)] w-full rounded-md border border-border bg-surface py-2.5 pl-8 pr-2.5 text-sm text-fg placeholder:text-fg-subtle focus:border-accent md:min-h-0 md:py-1.5"
+        className="focus-ring min-h-[var(--touch-target)] w-full rounded-md border border-border bg-surface py-2.5 ps-8 pe-2.5 text-sm text-fg placeholder:text-fg-subtle focus:border-accent md:min-h-0 md:py-1.5"
       />
     </div>
   )

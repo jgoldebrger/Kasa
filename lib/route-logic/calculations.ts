@@ -43,8 +43,7 @@ export const GET = handler({
 
     // Get all calculations
     const calculations = await collectCompoundCursorPages(
-      (filter, limit) =>
-        YearlyCalculation.find(filter).sort({ year: -1, _id: -1 }).limit(limit),
+      (filter, limit) => YearlyCalculation.find(filter).sort({ year: -1, _id: -1 }).limit(limit),
       { organizationId: ctx!.organizationId },
       'year',
       -1,

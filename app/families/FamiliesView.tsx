@@ -46,6 +46,7 @@ import EmailFamiliesModal from '@/app/families/_components/EmailFamiliesModal'
 import FamilyEmailAdminActions from '@/app/families/_components/FamilyEmailAdminActions'
 import FamilyEmailIndicators from '@/app/families/_components/FamilyEmailIndicators'
 import { handleHebrewInput } from '@/lib/client/hebrew-input'
+import { filterFamiliesListColumns } from './_lib/list-columns'
 
 const capitalizeName = (text: string): string => {
   if (!text) return text
@@ -995,9 +996,7 @@ export default function FamiliesView({
       exportValue: () => '',
     },
   ]
-  const columns = isAdmin
-    ? allColumns
-    : allColumns.filter((c) => !['select', 'plan', 'balance', 'actions'].includes(c.id))
+  const columns = filterFamiliesListColumns(allColumns, isAdmin)
 
   return (
     <div className="min-h-screen bg-app p-4 sm:p-6 md:p-8">

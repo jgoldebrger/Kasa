@@ -30,7 +30,9 @@ export const GET = handler({
       return { status: 429, data: { error: 'Too many requests' } }
     }
 
-    const org = await Organization.findById(ctx!.organizationId).select('timezone').lean<{ timezone?: string }>()
+    const org = await Organization.findById(ctx!.organizationId)
+      .select('timezone')
+      .lean<{ timezone?: string }>()
 
     const url = new URL(request.url)
     const rawWindow = url.searchParams.get('windowYears')

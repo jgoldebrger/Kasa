@@ -30,6 +30,7 @@ import {
   PaymentPlan,
 } from '@/lib/models'
 import { loadAllByIdCursor } from '@/lib/org-pagination'
+import { redactCheckInfoForExport } from '@/lib/payments/sanitize-check-info'
 
 const REDACTED = '[REDACTED]'
 
@@ -67,6 +68,14 @@ function redactOrganization(doc: Record<string, unknown> | null): Record<string,
   if (!doc) return null
   const serialized = serializeDoc(doc)
   // Stripe IDs are kept for migration reference; no raw secrets on org doc.
+  return serialized
+}
+
+function serializePayment(doc: Record<string, unknown>): Record<string, unknown> {
+  const serialized = serializeDoc(doc)
+  if (serialized.checkInfo && typeof serialized.checkInfo === 'object') {
+    serialized.checkInfo = redactCheckInfoForExport(serialized.checkInfo as Record<string, unknown>)
+  }
   return serialized
 }
 
@@ -189,7 +198,7 @@ export async function buildOrgExportBundle(organizationId: string): Promise<OrgE
     paymentPlans: paymentPlans.map(serializeDoc),
     families: families.map(serializeDoc),
     familyMembers: familyMembers.map(serializeDoc),
-    payments: payments.map(serializeDoc),
+    payments: payments.map(serializePayment),
     withdrawals: withdrawals.map(serializeDoc),
     lifecycleEvents: lifecycleEvents.map(serializeDoc),
     lifecycleEventPayments: lifecycleEventPayments.map(serializeDoc),

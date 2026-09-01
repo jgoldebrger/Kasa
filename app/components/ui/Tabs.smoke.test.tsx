@@ -9,7 +9,13 @@ import { Tabs as Component } from './Tabs'
 
 describe('Tabs smoke', () => {
   it('renders without crashing', () => {
-    const { container } = render(React.createElement(Component, { items: [{ id: 'a', label: 'Tab' }], activeId: 'a', onChange: () => {} }) as React.ReactElement)
+    const { container } = render(
+      React.createElement(Component, {
+        items: [{ id: 'a', label: 'Tab' }],
+        activeId: 'a',
+        onChange: () => {},
+      }) as React.ReactElement,
+    )
     expect(container).toBeDefined()
   })
 })

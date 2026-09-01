@@ -35,7 +35,10 @@ export function parseFamiliesListResponse<T = Record<string, unknown>>(
   return { items: [], nextCursor: null }
 }
 
-export function familiesListUrl(cursor: string | null | undefined, limit = FAMILIES_LIST_PAGE_SIZE): string {
+export function familiesListUrl(
+  cursor: string | null | undefined,
+  limit = FAMILIES_LIST_PAGE_SIZE,
+): string {
   const qs = new URLSearchParams({ limit: String(limit) })
   if (cursor) qs.set('cursor', cursor)
   return `/api/families?${qs.toString()}`

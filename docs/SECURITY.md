@@ -95,7 +95,7 @@ Ensure `ENCRYPTION_KEY` is set before migrating. After migration, rotating `NEXT
 
 ## JWT membership staleness
 
-Session JWTs carry a compact org membership list refreshed on a ~30s interval. For elevated authorization:
+Session JWTs carry a compact org membership list refreshed on a ~10s interval. For elevated authorization:
 
 - `requireOrg` always hits `OrgMembership` in the database when `minRole` is `'admin'` or `'owner'`, so role demotions and promotions take effect immediately on privileged routes.
 - Member-level routes may still use the JWT fast path to avoid per-request DB lookups.

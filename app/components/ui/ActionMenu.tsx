@@ -13,6 +13,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { EllipsisVerticalIcon } from '@heroicons/react/24/outline'
+import { getWritingDirection, horizontalNavDelta } from '@/lib/ui/writing-direction'
 
 export interface ActionMenuItem {
   label: string
@@ -25,7 +26,7 @@ export interface ActionMenuItem {
 export interface ActionMenuProps {
   items: ActionMenuItem[]
   ariaLabel?: string
-  align?: 'left' | 'right'
+  align?: 'start' | 'end' | 'left' | 'right'
   /** Optional override for the trigger size (default h-8 w-8). */
   className?: string
 }
@@ -37,14 +38,17 @@ const VIEWPORT_PADDING = 8
 export default function ActionMenu({
   items,
   ariaLabel = 'Actions',
-  align = 'right',
+  align = 'end',
   className,
 }: ActionMenuProps) {
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
-  const [pos, setPos] = useState<{ top: number; left: number; placement: 'top' | 'bottom' } | null>(null)
+  const [pos, setPos] = useState<{ top: number; left: number; placement: 'top' | 'bottom' } | null>(
+    null,
+  )
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const focusedOnOpenRef = useRef(false)
 
   useEffect(() => {
     setMounted(true)
@@ -59,18 +63,25 @@ export default function ActionMenu({
     const spaceAbove = rect.top - VIEWPORT_PADDING
     const flipUp = spaceBelow < menuHeight + VERTICAL_GAP && spaceAbove > spaceBelow
 
+    const logicalAlign = align === 'left' ? 'start' : align === 'right' ? 'end' : align
+    const direction = getWritingDirection(trigger)
+    const alignToRightEdge =
+      (logicalAlign === 'end' && direction === 'ltr') ||
+      (logicalAlign === 'start' && direction === 'rtl')
+
     let left: number
-    if (align === 'right') {
+    if (alignToRightEdge) {
       left = rect.right - MENU_WIDTH
     } else {
       left = rect.left
     }
     // Clamp horizontally to the viewport.
-    left = Math.max(VIEWPORT_PADDING, Math.min(left, window.innerWidth - MENU_WIDTH - VIEWPORT_PADDING))
+    left = Math.max(
+      VIEWPORT_PADDING,
+      Math.min(left, window.innerWidth - MENU_WIDTH - VIEWPORT_PADDING),
+    )
 
-    const top = flipUp
-      ? rect.top - menuHeight - VERTICAL_GAP
-      : rect.bottom + VERTICAL_GAP
+    const top = flipUp ? rect.top - menuHeight - VERTICAL_GAP : rect.bottom + VERTICAL_GAP
 
     setPos({ top, left, placement: flipUp ? 'top' : 'bottom' })
   }
@@ -84,6 +95,62 @@ export default function ActionMenu({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
+  useLayoutEffect(() => {
+    if (!open) {
+      focusedOnOpenRef.current = false
+      return
+    }
+    if (!pos || focusedOnOpenRef.current) return
+    menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus()
+    focusedOnOpenRef.current = true
+  }, [open, pos])
+
+  const closeAndRestoreFocus = () => {
+    setOpen(false)
+    triggerRef.current?.focus()
+  }
+
+  const getEnabledMenuItems = () =>
+    Array.from(
+      menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ??
+        [],
+    )
+
+  const focusMenuItem = (offset: number) => {
+    const enabledItems = getEnabledMenuItems()
+    if (enabledItems.length === 0) return
+
+    const currentIndex = enabledItems.findIndex((item) => item === document.activeElement)
+    const startIndex = currentIndex >= 0 ? currentIndex : offset > 0 ? -1 : 0
+    const nextIndex = (startIndex + offset + enabledItems.length) % enabledItems.length
+    enabledItems[nextIndex]?.focus()
+  }
+
+  const onMenuKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      closeAndRestoreFocus()
+      return
+    }
+    if (e.key === 'Home' || e.key === 'End') {
+      e.preventDefault()
+      const enabledItems = getEnabledMenuItems()
+      const boundaryItem =
+        e.key === 'Home' ? enabledItems[0] : enabledItems[enabledItems.length - 1]
+      boundaryItem?.focus()
+      return
+    }
+
+    const verticalDelta = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0
+    const direction = getWritingDirection(triggerRef.current)
+    const delta = verticalDelta || horizontalNavDelta(e.key, direction)
+    if (delta !== 0) {
+      e.preventDefault()
+      focusMenuItem(delta)
+    }
+  }
+
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
@@ -93,7 +160,7 @@ export default function ActionMenu({
       setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key === 'Escape') closeAndRestoreFocus()
     }
     const onScrollOrResize = () => updatePosition()
     document.addEventListener('mousedown', onDown)
@@ -130,48 +197,50 @@ export default function ActionMenu({
         <EllipsisVerticalIcon className="h-5 w-5" aria-hidden="true" />
       </button>
 
-      {open && mounted && pos && createPortal(
-        <div
-          ref={menuRef}
-          role="menu"
-          style={{ position: 'fixed', top: pos.top, left: pos.left, width: MENU_WIDTH }}
-          className="z-[1000] overflow-hidden rounded-md border border-border bg-surface shadow-popover"
-        >
-          {items.map((item, idx) => (
-            <button
-              key={`${item.label}-${idx}`}
-              type="button"
-              role="menuitem"
-              disabled={item.disabled}
-              onClick={(e) => {
-                e.stopPropagation()
-                setOpen(false)
-                item.onClick()
-              }}
-              className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors disabled:opacity-50 ${
-                item.destructive
-                  ? 'text-red-700 hover:bg-red-50'
-                  : 'text-fg hover:bg-fg/5'
-              } ${idx > 0 ? 'border-t border-border' : ''}`}
-            >
-              {item.icon && (
-                <span
-                  className={
-                    item.destructive
-                      ? 'inline-flex h-4 w-4 items-center justify-center text-red-700'
-                      : 'inline-flex h-4 w-4 items-center justify-center text-fg-subtle'
-                  }
-                  aria-hidden="true"
-                >
-                  {item.icon}
-                </span>
-              )}
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </div>,
-        document.body,
-      )}
+      {open &&
+        mounted &&
+        pos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            onKeyDown={onMenuKeyDown}
+            style={{ position: 'fixed', top: pos.top, left: pos.left, width: MENU_WIDTH }}
+            className="z-[1000] overflow-hidden rounded-md border border-border bg-surface shadow-popover"
+          >
+            {items.map((item, idx) => (
+              <button
+                key={`${item.label}-${idx}`}
+                type="button"
+                role="menuitem"
+                disabled={item.disabled}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  closeAndRestoreFocus()
+                  item.onClick()
+                }}
+                className={`flex w-full items-center gap-2 px-3 py-2 text-start text-sm transition-colors disabled:opacity-50 ${
+                  item.destructive ? 'text-danger hover:bg-danger/10' : 'text-fg hover:bg-fg/5'
+                } ${idx > 0 ? 'border-t border-border' : ''}`}
+              >
+                {item.icon && (
+                  <span
+                    className={
+                      item.destructive
+                        ? 'inline-flex h-4 w-4 items-center justify-center text-danger'
+                        : 'inline-flex h-4 w-4 items-center justify-center text-fg-subtle'
+                    }
+                    aria-hidden="true"
+                  >
+                    {item.icon}
+                  </span>
+                )}
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

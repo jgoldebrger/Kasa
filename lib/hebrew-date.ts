@@ -182,16 +182,12 @@ export function calculateBarMitzvahDate(hebrewBirthDateString: string): Date | n
     // Adar II per common Sephardic practice (and matches the
     // resolveHebrewMonth fallback used in calculateHebrewAge).
     const barMitzvahHebrewYear = year + 13
-    const barMitzvahMonth = resolveBirthMonthInTargetYear(
-      birthMonth,
-      year,
-      barMitzvahHebrewYear,
-    )
+    const barMitzvahMonth = resolveBirthMonthInTargetYear(birthMonth, year, barMitzvahHebrewYear)
     const barMitzvahHebrewDate = new HDate(day, barMitzvahMonth, barMitzvahHebrewYear)
-    
+
     // Convert Hebrew date to Gregorian date
     const gregorianDate = barMitzvahHebrewDate.greg()
-    
+
     return gregorianDate
   } catch (error) {
     console.error('Error calculating Bar Mitzvah date:', error)
@@ -217,4 +213,3 @@ export function hasReachedBarMitzvahAge(hebrewBirthDateString: string): boolean 
 export function formatHebrewDate(hebrewBirthDateString: string): string {
   return hebrewBirthDateString.trim()
 }
-

@@ -1,16 +1,24 @@
 // @ts-nocheck
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { PencilSquareIcon, ArrowsRightLeftIcon } from '@heroicons/react/24/outline'
+import {
+  PencilSquareIcon,
+  ArrowsRightLeftIcon,
+  DocumentTextIcon,
+} from '@heroicons/react/24/outline'
 import { Alert, Button, Card } from '@/app/components/ui'
+import { FamilyPageHeader } from '@/app/families/_lib'
 import FamilyEmailAdminActions from '@/app/families/_components/FamilyEmailAdminActions'
 import FamilyEmailIndicators from '@/app/families/_components/FamilyEmailIndicators'
+import { useT } from '@/lib/client/i18n'
 import type { FamilyDetailContextValue } from '../FamilyDetailContext'
 import { useFamilyDetail } from '../FamilyDetailContext'
+import { familyTabHref } from '../_lib/constants'
 import { normalizePlanId } from '@/lib/payment-plan-display'
 import MemberFinancialPanel from './MemberFinancialPanel'
+import MemberMakePaymentModal from './MemberMakePaymentModal'
 import MergeFamilyModal from './MergeFamilyModal'
 
 function InfoSection({ title, children }: { title: string; children: ReactNode }) {
@@ -57,7 +65,28 @@ function InfoTabContent(props: FamilyDetailContextValue) {
     setData,
   } = props
 
+  const t = useT()
   const [showMergeModal, setShowMergeModal] = useState(false)
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  const [cardPaymentsEnabled, setCardPaymentsEnabled] = useState(false)
+
+  useEffect(() => {
+    if (isAdmin || !memberFinancialAccess) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(`/api/families/${familyId}/member-financials`)
+        if (!res.ok || cancelled) return
+        const payload = await res.json()
+        if (!cancelled) setCardPaymentsEnabled(Boolean(payload.cardPaymentsEnabled))
+      } catch {
+        /* header CTAs still work for offline payments */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [familyId, isAdmin, memberFinancialAccess])
 
   const family = data?.family
   if (!family) return null
@@ -91,6 +120,25 @@ function InfoTabContent(props: FamilyDetailContextValue) {
 
   return (
     <div className="space-y-4">
+      {!isAdmin && memberFinancialAccess && (
+        <FamilyPageHeader
+          title={t('memberPortal.currentBalance')}
+          primaryAction={
+            <Button size="sm" onClick={() => setPaymentModalOpen(true)}>
+              {t('memberPortal.makePayment')}
+            </Button>
+          }
+          secondaryActions={
+            <Link
+              href={familyTabHref(familyId, 'statements')}
+              className="focus-ring inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-fg hover:bg-app-subtle"
+            >
+              <DocumentTextIcon className="h-4 w-4" aria-hidden="true" />
+              {t('memberPortal.viewStatements')}
+            </Link>
+          }
+        />
+      )}
       {!isAdmin && (
         <MemberFinancialPanel
           familyId={familyId}
@@ -99,26 +147,34 @@ function InfoTabContent(props: FamilyDetailContextValue) {
           initialPayments={memberFinancialAccess ? data?.payments : []}
         />
       )}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h3 className="text-base font-semibold text-fg">Family profile</h3>
-          <p className="mt-0.5 text-sm text-fg-muted">
-            {isAdmin
-              ? 'Click any value to edit inline, or use Edit all for the full form.'
-              : 'Contact and household details for this family.'}
-          </p>
-        </div>
-        {isAdmin && (
-          <Button
-            size="sm"
-            variant="secondary"
-            leftIcon={<PencilSquareIcon className="h-4 w-4" aria-hidden="true" />}
-            onClick={openEditAllModal}
-          >
-            Edit all
-          </Button>
-        )}
-      </div>
+      {!isAdmin && memberFinancialAccess && (
+        <MemberMakePaymentModal
+          open={paymentModalOpen}
+          onClose={() => setPaymentModalOpen(false)}
+          familyId={familyId}
+          cardPaymentsEnabled={cardPaymentsEnabled}
+        />
+      )}
+      <FamilyPageHeader
+        title="Family profile"
+        description={
+          isAdmin
+            ? 'Click any value to edit inline, or use Edit all for the full form.'
+            : 'Contact and household details for this family.'
+        }
+        primaryAction={
+          isAdmin ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              leftIcon={<PencilSquareIcon className="h-4 w-4" aria-hidden="true" />}
+              onClick={openEditAllModal}
+            >
+              Edit all
+            </Button>
+          ) : undefined
+        }
+      />
 
       {isAdmin && (
         <Alert variant="info" className="text-sm">

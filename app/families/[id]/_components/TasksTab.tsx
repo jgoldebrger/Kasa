@@ -11,6 +11,7 @@ import {
   CheckCircleIcon,
 } from '@heroicons/react/24/outline'
 import { Badge, Button, Card, EmptyState, SkeletonRows } from '@/app/components/ui'
+import { FamilyPageHeader } from '@/app/families/_lib'
 import { useFamilyDetail } from '../FamilyDetailContext'
 
 const PRIORITY_BADGE: Record<string, 'muted' | 'accent' | 'warning' | 'danger'> = {
@@ -38,16 +39,18 @@ function TasksTabContent(props: FamilyDetailContextValue) {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-fg">Tasks</h3>
-        <Button
-          size="sm"
-          leftIcon={<PlusIcon className="h-4 w-4" aria-hidden="true" />}
-          onClick={() => setShowTaskModal(true)}
-        >
-          Add Task
-        </Button>
-      </div>
+      <FamilyPageHeader
+        title="Tasks"
+        primaryAction={
+          <Button
+            size="sm"
+            leftIcon={<PlusIcon className="h-4 w-4" aria-hidden="true" />}
+            onClick={() => setShowTaskModal(true)}
+          >
+            Add Task
+          </Button>
+        }
+      />
       {loadingFamilyTasks ? (
         <SkeletonRows count={4} />
       ) : familyTasks.length === 0 ? (

@@ -93,11 +93,7 @@ describe('calculations (integration)', () => {
       payments: [{ amount: 200 }, { amount: 150.555 }],
     })
 
-    const result = await calculateFamilyBalance(
-      familyId.toString(),
-      orgId.toString(),
-      asOf,
-    )
+    const result = await calculateFamilyBalance(familyId.toString(), orgId.toString(), asOf)
 
     expect(result.planCost).toBe(500)
     expect(result.totalPayments).toBe(350.56)
@@ -111,11 +107,7 @@ describe('calculations (integration)', () => {
       payments: [{ amount: 80, refundedAmount: 30 }],
     })
 
-    const result = await calculateFamilyBalance(
-      familyId.toString(),
-      orgId.toString(),
-      asOf,
-    )
+    const result = await calculateFamilyBalance(familyId.toString(), orgId.toString(), asOf)
 
     expect(result.totalPayments).toBe(50)
     expect(result.balance).toBe(-50)
@@ -146,11 +138,7 @@ describe('calculations (integration)', () => {
       type: 'membership',
     })
 
-    const result = await calculateFamilyBalance(
-      familyId.toString(),
-      orgId.toString(),
-      asOf,
-    )
+    const result = await calculateFamilyBalance(familyId.toString(), orgId.toString(), asOf)
 
     expect(result.planCost).toBe(0)
     expect(result.totalPayments).toBe(75)
@@ -310,9 +298,7 @@ describe('calculations (integration)', () => {
 
     expect(expenses.totalExpenses).toBe(120)
     expect(expenses.calculatedExpenses).toBe(150)
-    expect(expenses.byEvent.some((e) => e.type === 'bar_mitzvah' && e.amount === 120)).toBe(
-      true,
-    )
+    expect(expenses.byEvent.some((e) => e.type === 'bar_mitzvah' && e.amount === 120)).toBe(true)
   })
 
   it('calculateYearlyBalance combines income and expenses', async () => {
@@ -332,7 +318,9 @@ describe('calculations (integration)', () => {
     const { year } = await seedYearlyFixtures()
 
     const saved = await calculateAndSaveYear(year, orgId.toString())
-    const found = await YearlyCalculation.findOne({ organizationId: orgId, year }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+    const found = (await YearlyCalculation.findOne({ organizationId: orgId, year }).lean()) as
+      | import('@/lib/test/type-helpers').LeanDoc
+      | null
 
     expect(saved?.balance).toBe(55)
     expect(found?.calculatedIncome).toBe(175)
@@ -380,7 +368,9 @@ describe('calculations (integration)', () => {
     const { year } = await seedYearlyFixtures()
 
     await calculateAndSaveYear(year, orgId.toString())
-    const before = await YearlyCalculation.findOne({ organizationId: orgId, year }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+    const before = (await YearlyCalculation.findOne({ organizationId: orgId, year }).lean()) as
+      | import('@/lib/test/type-helpers').LeanDoc
+      | null
     const beforePayments = Number(before?.totalPayments ?? 0)
 
     await Payment.create({
@@ -395,7 +385,9 @@ describe('calculations (integration)', () => {
 
     await updateYearlyCalculationForEvent(year, orgId.toString())
 
-    const after = await YearlyCalculation.findOne({ organizationId: orgId, year }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+    const after = (await YearlyCalculation.findOne({ organizationId: orgId, year }).lean()) as
+      | import('@/lib/test/type-helpers').LeanDoc
+      | null
     expect(after?.totalPayments).toBe(beforePayments + 50)
   })
 
@@ -422,7 +414,9 @@ describe('calculations (integration)', () => {
 
     await updateYearlyCalculationForEvent(year, orgId.toString())
 
-    const saved = await YearlyCalculation.findOne({ organizationId: orgId, year }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+    const saved = (await YearlyCalculation.findOne({ organizationId: orgId, year }).lean()) as
+      | import('@/lib/test/type-helpers').LeanDoc
+      | null
     expect(saved?.extraDonation).toBe(25)
     expect(saved?.extraExpense).toBe(15)
     expect(saved?.calculatedIncome).toBe(200)
@@ -527,5 +521,4 @@ describe('calculations (integration)', () => {
     expect(result.planCost).toBe(0)
     errSpy.mockRestore()
   })
-
 })

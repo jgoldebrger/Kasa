@@ -91,8 +91,7 @@ export const POST = handler({
       }
     }
 
-    const userId =
-      ctx!.userId && Types.ObjectId.isValid(ctx!.userId) ? ctx!.userId : undefined
+    const userId = ctx!.userId && Types.ObjectId.isValid(ctx!.userId) ? ctx!.userId : undefined
 
     const job = await EmailJob.create({
       organizationId: ctx!.organizationId,

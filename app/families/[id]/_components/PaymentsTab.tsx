@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 import type { FamilyDetailContextValue } from '../FamilyDetailContext'
 import { PlusIcon } from '@heroicons/react/24/outline'
 import { DataView, EmptyState, Button, type SortDir } from '@/app/components/ui'
+import { FamilyPageHeader } from '@/app/families/_lib'
 import { useSupportModeReadOnly } from '@/lib/client/support-mode'
 import { paymentColumnsFor, paymentMobileCard } from '../_lib/helpers'
 import { sortPaymentRows } from '@/lib/payments/sort-payments'
@@ -37,25 +38,27 @@ function PaymentsTabContent(props: FamilyDetailContextValue) {
 
   return (
     <div>
-      <div className="flex justify-between mb-4">
-        <h3 className="text-lg font-semibold text-fg">Payments</h3>
-        {!supportReadOnly && (
-          <Button
-            size="sm"
-            leftIcon={<PlusIcon className="h-4 w-4" aria-hidden="true" />}
-            onClick={() => {
-              setPaymentForm({
-                ...paymentForm,
-                paymentFor: 'family',
-                memberId: '',
-              })
-              setShowPaymentModal(true)
-            }}
-          >
-            Add Payment
-          </Button>
-        )}
-      </div>
+      <FamilyPageHeader
+        title="Payments"
+        primaryAction={
+          !supportReadOnly ? (
+            <Button
+              size="sm"
+              leftIcon={<PlusIcon className="h-4 w-4" aria-hidden="true" />}
+              onClick={() => {
+                setPaymentForm({
+                  ...paymentForm,
+                  paymentFor: 'family',
+                  memberId: '',
+                })
+                setShowPaymentModal(true)
+              }}
+            >
+              Add Payment
+            </Button>
+          ) : undefined
+        }
+      />
       <DataView
         tableId="family-payments"
         rows={sortedPayments}

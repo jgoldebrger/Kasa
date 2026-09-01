@@ -3,6 +3,7 @@
 
 import type { FamilyDetailContextValue } from '../FamilyDetailContext'
 import { DataView, EmptyState } from '@/app/components/ui'
+import { FamilyPageHeader } from '@/app/families/_lib'
 import { useFamilyDetail } from '../FamilyDetailContext'
 import SubFamilyTreeView from './SubFamilyTreeView'
 
@@ -12,10 +13,10 @@ function SubFamiliesTabContent(props: FamilyDetailContextValue) {
   return (
     <div>
       <SubFamilyTreeView tree={familyTree} loading={loadingFamilyTree} />
-      <div className="flex justify-between mb-4">
-        <h3 className="text-lg font-semibold">Sub-Families</h3>
-        <p className="text-sm text-fg-muted">Families created from members of this family</p>
-      </div>
+      <FamilyPageHeader
+        title="Sub-Families"
+        description="Families created from members of this family"
+      />
       {loadingSubFamilies ? (
         <div className="text-center py-12">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>

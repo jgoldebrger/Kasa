@@ -18,6 +18,7 @@ const NotificationsBell = dynamic(() => import('./NotificationsBell'), { ssr: fa
 const PATH_TITLE_KEYS: { match: RegExp; key: MessageKey }[] = [
   { match: /^\/$/, key: 'nav.dashboard' },
   { match: /^\/families/, key: 'nav.families' },
+  { match: /^\/payments\/disputes/, key: 'payments.nav.disputes' },
   { match: /^\/payments/, key: 'nav.payments' },
   { match: /^\/tasks/, key: 'nav.tasks' },
   { match: /^\/calendar/, key: 'nav.calendar' },
@@ -27,6 +28,12 @@ const PATH_TITLE_KEYS: { match: RegExp; key: MessageKey }[] = [
   { match: /^\/lifecycle-event-types/, key: 'settings.eventTypes' },
   { match: /^\/reports/, key: 'nav.reports' },
   { match: /^\/statements/, key: 'nav.statements' },
+  { match: /^\/communications\/templates/, key: 'communications.nav.templates' },
+  { match: /^\/communications\/scheduled/, key: 'communications.nav.scheduled' },
+  { match: /^\/communications\/jobs/, key: 'communications.nav.jobs' },
+  { match: /^\/communications\/analytics/, key: 'communications.nav.analytics' },
+  { match: /^\/communications\/automations/, key: 'communications.nav.automations' },
+  { match: /^\/communications/, key: 'communications.nav.main' },
   { match: /^\/settings\/members/, key: 'nav.members' },
   { match: /^\/settings/, key: 'nav.settings' },
   { match: /^\/account/, key: 'nav.account' },
@@ -60,6 +67,7 @@ export default function MobileTopBar({ onOpenMenu, menuOpen }: MobileTopBarProps
       role="banner"
     >
       <button
+        id="mobile-nav-trigger"
         type="button"
         onClick={onOpenMenu}
         aria-label={t('nav.openMenu')}

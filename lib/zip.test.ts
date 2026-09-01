@@ -87,7 +87,7 @@ describe('buildZip', () => {
     const dosTime = zip.readUInt16LE(10)
     const yearBits = (dosDate >> 9) & 0x7f
     expect(yearBits).toBe(0)
-    expect(((dosDate >> 5) & 0x0f)).toBe(6)
+    expect((dosDate >> 5) & 0x0f).toBe(6)
     expect(dosDate & 0x1f).toBe(15)
     expect(dosTime).toBeGreaterThan(0)
   })
@@ -98,7 +98,7 @@ describe('buildZip', () => {
     const dosDate = zip.readUInt16LE(12)
     const yearBits = (dosDate >> 9) & 0x7f
     expect(yearBits).toBe(2024 - 1980)
-    expect(((dosDate >> 5) & 0x0f)).toBe(3)
+    expect((dosDate >> 5) & 0x0f).toBe(3)
     expect(dosDate & 0x1f).toBe(15)
   })
 })

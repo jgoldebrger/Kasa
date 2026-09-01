@@ -1,6 +1,7 @@
 'use client'
 
-import { ButtonLink, Card } from '@/app/components/ui'
+import Link from 'next/link'
+import { ButtonLink } from '@/app/components/ui'
 import LegalFooterLinks from '@/app/components/legal/LegalFooterLinks'
 import { useT } from '@/lib/client/i18n'
 
@@ -38,14 +39,18 @@ export default function WelcomeView() {
   const t = useT()
 
   return (
-    <div className="min-h-screen bg-app">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16">
-        <header className="flex flex-wrap items-center justify-between gap-4 mb-16">
+    <div className="relative min-h-screen bg-app">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-[28rem] bg-[radial-gradient(ellipse_at_top,_rgb(var(--c-accent-soft))_0%,_transparent_70%)]"
+        aria-hidden="true"
+      />
+      <div className="relative max-w-3xl mx-auto px-4 sm:px-6 py-16">
+        <header className="flex flex-wrap items-center justify-between gap-4 mb-20">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-accent text-accent-fg rounded-md flex items-center justify-center font-semibold text-sm">
+            <div className="w-9 h-9 bg-accent text-accent-fg rounded-md flex items-center justify-center font-semibold text-sm">
               K
             </div>
-            <span className="text-lg font-semibold tracking-tight text-fg">
+            <span className="font-display text-2xl font-semibold tracking-tight text-fg">
               {t('welcome.brand')}
             </span>
           </div>
@@ -59,68 +64,75 @@ export default function WelcomeView() {
           </nav>
         </header>
 
-        <section className="text-center max-w-3xl mx-auto mb-20">
-          <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight text-fg text-pretty mb-6">
+        <section className="mb-24">
+          <h1 className="font-display text-4xl sm:text-5xl font-semibold tracking-tight text-fg text-pretty mb-5">
             {t('welcome.hero.title')}
           </h1>
-          <p className="text-lg text-fg-muted mb-10 leading-relaxed text-pretty">
+          <p className="text-lg text-fg-muted mb-8 leading-relaxed text-pretty max-w-2xl">
             {t('welcome.hero.subtitle')}
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <ButtonLink href="/request-invite" size="lg" block className="sm:w-auto">
               {t('auth.requestInvite')}
             </ButtonLink>
             <ButtonLink href="/pricing" variant="secondary" size="lg" block className="sm:w-auto">
               {t('welcome.hero.viewPricing')}
             </ButtonLink>
-            <ButtonLink href="/overview" variant="ghost" size="lg" block className="sm:w-auto">
-              Product overview
-            </ButtonLink>
           </div>
-          <p className="text-sm text-fg-muted mt-4 text-pretty">{t('welcome.earlyAccess')}</p>
+          <p className="mt-4 text-sm text-fg-muted">
+            <Link
+              href="/overview"
+              className="focus-ring rounded underline-offset-2 hover:underline"
+            >
+              Product overview
+            </Link>
+            <span className="mx-2 text-fg-subtle" aria-hidden="true">
+              ·
+            </span>
+            <span className="text-pretty">{t('welcome.earlyAccess')}</span>
+          </p>
         </section>
 
         <section className="mb-20">
-          <h2 className="text-2xl font-semibold tracking-tight text-fg text-center text-pretty mb-8">
+          <h2 className="font-display text-2xl font-semibold tracking-tight text-fg text-pretty mb-8">
             {t('welcome.outcomes.heading')}
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <ul className="space-y-8 border-t border-border">
             {OUTCOMES.map((outcome) => (
-              <Card key={outcome.titleKey}>
+              <li key={outcome.titleKey} className="border-b border-border py-6">
                 <h3 className="font-semibold tracking-tight text-fg mb-2">{t(outcome.titleKey)}</h3>
                 <p className="text-sm text-fg-muted leading-relaxed text-pretty">
                   {t(outcome.bodyKey)}
                 </p>
-              </Card>
+              </li>
             ))}
-          </div>
+          </ul>
         </section>
 
         <section className="mb-20">
-          <h2 className="text-2xl font-semibold tracking-tight text-fg text-center text-pretty mb-8">
+          <h2 className="font-display text-2xl font-semibold tracking-tight text-fg text-pretty mb-8">
             {t('welcome.differentiators.heading')}
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <ul className="space-y-8 border-t border-border">
             {DIFFERENTIATORS.map((item) => (
-              <Card key={item.titleKey}>
+              <li key={item.titleKey} className="border-b border-border py-6">
                 <h3 className="font-semibold tracking-tight text-fg mb-2">{t(item.titleKey)}</h3>
                 <p className="text-sm text-fg-muted leading-relaxed text-pretty">
                   {t(item.bodyKey)}
                 </p>
-              </Card>
+              </li>
             ))}
-          </div>
+          </ul>
         </section>
 
-        <Card className="mb-20 p-8 sm:p-10">
-          <h2 className="text-xl font-semibold tracking-tight text-fg text-pretty mb-3">
+        <section className="mb-16 border-t border-border pt-10">
+          <h2 className="font-display text-xl font-semibold tracking-tight text-fg text-pretty mb-3">
             {t('welcome.billing.title')}
           </h2>
-          <p className="text-fg-muted leading-relaxed text-pretty">{t('welcome.billing.body')}</p>
-        </Card>
-
-        <Card className="text-center p-8 sm:p-10">
-          <h2 className="text-2xl font-semibold tracking-tight text-fg text-pretty mb-3">
+          <p className="text-fg-muted leading-relaxed text-pretty mb-10">
+            {t('welcome.billing.body')}
+          </p>
+          <h2 className="font-display text-2xl font-semibold tracking-tight text-fg text-pretty mb-3">
             {t('welcome.cta.title')}
           </h2>
           <p className="text-fg-muted mb-6 leading-relaxed text-pretty">
@@ -129,7 +141,7 @@ export default function WelcomeView() {
           <ButtonLink href="/request-invite" size="lg">
             {t('auth.requestInvite')}
           </ButtonLink>
-        </Card>
+        </section>
 
         <footer className="mt-16 text-center text-sm text-fg-muted space-y-3">
           <LegalFooterLinks />

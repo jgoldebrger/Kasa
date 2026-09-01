@@ -8,12 +8,14 @@
 
 ## Endpoints
 
-| Endpoint          | Purpose                                                                                                                    |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/health` | Machine-readable probe (JSON). Returns `200` when MongoDB is reachable, `503` otherwise. **Point external monitors here.** |
-| `/status`         | Human-readable status page for prospects and staff.                                                                        |
+| Endpoint                 | Purpose                                                                           |
+| ------------------------ | --------------------------------------------------------------------------------- |
+| `GET /api/health`        | Combined probe (MongoDB). **Existing monitors can keep using this.**              |
+| `GET /api/health/livez`  | Liveness — process is up (no DB). Use for container/orchestrator liveness checks. |
+| `GET /api/health/readyz` | Readiness — MongoDB reachable. Use for load-balancer readiness / traffic cutover. |
+| `/status`                | Human-readable status page for prospects and staff.                               |
 
-### Health response shape
+### Health response shape (`/api/health` and `/api/health/readyz`)
 
 ```json
 {
@@ -23,10 +25,20 @@
 }
 ```
 
+### Liveness (`/api/health/livez`)
+
+```json
+{
+  "status": "ok",
+  "checks": { "process": "ok" },
+  "timestamp": "2026-06-23T12:00:00.000Z"
+}
+```
+
 ## Recommended setup
 
 1. **External monitor** (Better Uptime, UptimeRobot, Pingdom, etc.)
-   - URL: `https://<your-domain>/api/health`
+   - URL: `https://<your-domain>/api/health` (or `/api/health/readyz`)
    - Interval: 1–5 minutes
    - Alert on: HTTP status ≠ 200, or timeout > 30s
 
@@ -34,7 +46,9 @@
 
 3. **Vercel** — enable deployment and function failure notifications in the Vercel project settings.
 
-4. **Cron failures** — daily digest via `/api/jobs/ops-digest` (8:00 UTC in `vercel.json`). Also review `/admin/jobs` in the platform admin console.
+4. **Cron failures** — daily digest via the tick job batch. Also review `/admin/jobs` in the platform admin console.
+
+5. **Containers** — Docker `HEALTHCHECK` uses `/api/health/livez`.
 
 ## Pre-launch checklist
 
@@ -47,8 +61,9 @@
 
 ## Triage
 
-| Symptom                   | Likely cause        | Action                                          |
-| ------------------------- | ------------------- | ----------------------------------------------- |
-| `/api/health` returns 503 | MongoDB unreachable | Check Atlas status, IP allowlist, `MONGODB_URI` |
-| Health OK but app errors  | Application bug     | Check Sentry, Vercel function logs              |
-| Cron jobs failing         | See cron runbook    | `docs/runbooks/cron-failure.md`                 |
+| Symptom                         | Likely cause        | Action                                          |
+| ------------------------------- | ------------------- | ----------------------------------------------- |
+| `/api/health` or `readyz` → 503 | MongoDB unreachable | Check Atlas status, IP allowlist, `MONGODB_URI` |
+| `livez` OK but `readyz` 503     | DB only             | App process fine; fix Mongo connectivity        |
+| Health OK but app errors        | Application bug     | Check Sentry, Vercel function logs              |
+| Cron jobs failing               | See cron runbook    | `docs/runbooks/cron-failure.md`                 |

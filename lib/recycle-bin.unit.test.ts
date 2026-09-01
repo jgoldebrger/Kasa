@@ -6,9 +6,9 @@ describe('RECYCLABLE_MODELS.describe', () => {
     expect(RECYCLABLE_MODELS.family.describe({ name: 'Cohen' })).toBe('Cohen')
     expect(RECYCLABLE_MODELS.family.describe({})).toBe('Unnamed family')
 
-    expect(
-      RECYCLABLE_MODELS.familyMember.describe({ firstName: 'Avi', lastName: 'Katz' }),
-    ).toBe('Avi Katz')
+    expect(RECYCLABLE_MODELS.familyMember.describe({ firstName: 'Avi', lastName: 'Katz' })).toBe(
+      'Avi Katz',
+    )
     expect(RECYCLABLE_MODELS.familyMember.describe({})).toBe('Unnamed member')
 
     expect(
@@ -27,9 +27,7 @@ describe('RECYCLABLE_MODELS.describe', () => {
     expect(RECYCLABLE_MODELS.task.describe({})).toBe('Untitled task')
 
     expect(RECYCLABLE_MODELS.lifecycleEvent.describe({ name: 'Wedding' })).toBe('Wedding')
-    expect(RECYCLABLE_MODELS.lifecycleEvent.describe({ type: 'bar_mitzvah' })).toBe(
-      'bar_mitzvah',
-    )
+    expect(RECYCLABLE_MODELS.lifecycleEvent.describe({ type: 'bar_mitzvah' })).toBe('bar_mitzvah')
 
     expect(
       RECYCLABLE_MODELS.lifecycleEventPayment.describe({

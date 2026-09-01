@@ -10,6 +10,23 @@
 - Vercel project access (deploy + env vars)
 - MongoDB Atlas access (network allowlist, connection string)
 - `CRON_SECRET`, `NEXTAUTH_URL`, Stripe live keys configured in Vercel
+- GitHub **branch protection** on `main` requiring CI status checks (see below)
+
+## Branch protection (required status checks)
+
+`main` must require these checks before merge (configured via GitHub Settings or `gh`):
+
+| Check context   | Workflow          | Why                           |
+| --------------- | ----------------- | ----------------------------- |
+| `ci`            | `ci.yml`          | typecheck, audit, build       |
+| `e2e-smoke`     | `ci.yml`          | Playwright smoke              |
+| `security-safe` | `ci.yml`          | non-destructive security      |
+| `gitleaks`      | `secret-scan.yml` | secret scan                   |
+| `semgrep`       | `semgrep.yml`     | SAST                          |
+| CodeQL analyze  | `codeql.yml`      | SAST (name may vary slightly) |
+
+After changing workflow job names, re-confirm contexts under **Settings → Branches**.
+See also [docs/github-branch-protection.md](../github-branch-protection.md).
 
 ## Pre-deploy checklist
 
@@ -30,11 +47,13 @@ vercel --prod          # or push to the production branch if CI deploys automati
 
 ## Post-deploy smoke test
 
-1. `curl -s https://<domain>/api/health` → `{"status":"ok","checks":{"mongodb":"ok"},...}`
-2. Visit `/` in incognito → redirected to `/login` or `/welcome`.
-3. `curl -s https://<domain>/api/families` (no cookie) → `401` JSON.
-4. Log in as admin → org data loads.
-5. Optional: trigger a password reset and confirm the email link works once.
+1. `curl -s https://<domain>/api/health/readyz` → `{"status":"ok","checks":{"mongodb":"ok"},...}`
+   (or `/api/health` — same readiness semantics for monitors)
+2. `curl -s https://<domain>/api/health/livez` → `{"status":"ok","checks":{"process":"ok"},...}`
+3. Visit `/` in incognito → redirected to `/login` or `/welcome`.
+4. `curl -s https://<domain>/api/families` (no cookie) → `401` JSON.
+5. Log in as admin → org data loads.
+6. Optional: trigger a password reset and confirm the email link works once.
 
 ## Rollback
 

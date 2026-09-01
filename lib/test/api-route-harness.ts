@@ -85,6 +85,7 @@ export function probeBody(route: ApiRouteEntry, ctx: ApiTestContext): unknown {
     return {
       email: `request-${Date.now()}@example.com`,
       name: 'Requester',
+      orgName: 'Test Community',
       message: 'api route probe',
     }
   }

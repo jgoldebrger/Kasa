@@ -194,6 +194,7 @@ describe.sequential('auth route-logic coverage', () => {
         publicJsonReq('/api/auth/request-invite', 'POST', {
           email,
           name: 'Updated Name',
+          orgName: 'Test Community',
           message: 'hello',
         }),
       )
@@ -210,7 +211,13 @@ describe.sequential('auth route-logic coverage', () => {
       await InviteRequest.create({ email, name: 'Old Name', status: 'pending' })
 
       const { POST } = await import('@/lib/route-logic/auth/request-invite')
-      await POST(publicJsonReq('/api/auth/request-invite', 'POST', { email, name: 'New Name' }))
+      await POST(
+        publicJsonReq('/api/auth/request-invite', 'POST', {
+          email,
+          name: 'New Name',
+          orgName: 'Test Community',
+        }),
+      )
       const doc = await InviteRequest.findOne({ email }).lean<{ name?: string }>()
       expect(doc?.name).toBe('New Name')
 
@@ -245,6 +252,7 @@ describe.sequential('auth route-logic coverage', () => {
         publicJsonReq('/api/auth/request-invite', 'POST', {
           email,
           name: 'Notify User Updated',
+          orgName: 'Test Community',
         }),
       )
       expect(updated.status).toBe(200)
@@ -278,6 +286,7 @@ describe.sequential('auth route-logic coverage', () => {
         publicJsonReq('/api/auth/request-invite', 'POST', {
           email,
           name: 'Skip Notify',
+          orgName: 'Test Community',
         }),
       )
       expect(res.status).toBe(200)

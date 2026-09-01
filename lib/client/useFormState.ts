@@ -1,13 +1,6 @@
 'use client'
 
-import {
-  ChangeEvent,
-  FocusEvent,
-  FormEvent,
-  useCallback,
-  useMemo,
-  useState,
-} from 'react'
+import { ChangeEvent, FocusEvent, FormEvent, useCallback, useMemo, useState } from 'react'
 import { ZodError, ZodSchema } from 'zod'
 
 type FieldValue = string | number | boolean | null | undefined
@@ -23,7 +16,10 @@ export interface UseFormStateOptions<TSchemaOut> {
   /** Called after successful client-side validation. Receives the parsed
    *  (and possibly transformed) values from zod. Returning a promise will
    *  set `isSubmitting` until it resolves. */
-  onSubmit: (values: TSchemaOut, helpers: { setFieldError: (k: string, msg: string) => void }) => void | Promise<void>
+  onSubmit: (
+    values: TSchemaOut,
+    helpers: { setFieldError: (k: string, msg: string) => void },
+  ) => void | Promise<void>
 }
 
 export interface UseFormStateResult {
@@ -32,7 +28,10 @@ export interface UseFormStateResult {
   touched: TouchedMap
   isSubmitting: boolean
   /** Spread on a controlled input: <input {...register('email')} /> */
-  register: (name: string, opts?: { type?: 'string' | 'number' | 'checkbox' }) => {
+  register: (
+    name: string,
+    opts?: { type?: 'string' | 'number' | 'checkbox' },
+  ) => {
     name: string
     value: any
     checked?: boolean
@@ -119,7 +118,7 @@ export function useFormState<T = Values>({
       const type = opts.type || 'string'
       return {
         name,
-        value: type === 'checkbox' ? undefined : values[name] ?? '',
+        value: type === 'checkbox' ? undefined : (values[name] ?? ''),
         checked: type === 'checkbox' ? Boolean(values[name]) : undefined,
         onChange: (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
           const t = e.target as HTMLInputElement

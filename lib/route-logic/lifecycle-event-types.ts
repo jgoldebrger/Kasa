@@ -24,8 +24,7 @@ export const GET = handler({
     }
 
     const eventTypes = await loadAllByIdCursor(
-      (filter, limit) =>
-        LifecycleEvent.find(filter).sort({ name: 1, _id: 1 }).limit(limit).lean(),
+      (filter, limit) => LifecycleEvent.find(filter).sort({ name: 1, _id: 1 }).limit(limit).lean(),
       { organizationId: ctx!.organizationId },
     )
     return { data: eventTypes, headers: CACHE_HEADERS }

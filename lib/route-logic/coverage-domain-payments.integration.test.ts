@@ -60,7 +60,12 @@ function orgJsonReq(
   })
 }
 
-function importForm(type: string, csv: string, filename: string, extra?: Record<string, string>): FormData {
+function importForm(
+  type: string,
+  csv: string,
+  filename: string,
+  extra?: Record<string, string>,
+): FormData {
   const form = new FormData()
   form.set('type', type)
   form.set('file', new Blob([csv], { type: 'text/csv' }), filename)
@@ -107,8 +112,8 @@ async function withRateLimitBlocked<T>(fn: () => Promise<T>): Promise<T> {
   const rateLimit = await import('@/lib/rate-limit')
   const spy = vi.spyOn(rateLimit, 'checkRateLimit').mockResolvedValue({
     allowed: false,
-        remaining: 0,
-        resetAt: 0,
+    remaining: 0,
+    resetAt: 0,
   })
   try {
     return await fn()
@@ -128,7 +133,7 @@ describe.sequential('route-logic payments domain coverage', () => {
     process.env.PLATFORM_ADMIN_EMAILS = ''
     ctx = await seedApiRouteFixtures()
     process.env.PLATFORM_ADMIN_EMAILS = ctx.email
-        process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
+    process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
     process.env.KASA_TEST_STRIPE_FAMILY = ctx.fixtures.familyId
     bindSession(ctx)
   })
@@ -218,7 +223,9 @@ describe.sequential('route-logic payments domain coverage', () => {
       form.set('type', 'families')
       form.set(
         'file',
-        new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+        new Blob([buf], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }),
         'empty.xlsx',
       )
       const emptyXlsx = await POST(importReq(form))
@@ -227,14 +234,18 @@ describe.sequential('route-logic payments domain coverage', () => {
       const wb2 = new mod.Workbook()
       const ws2 = wb2.addWorksheet('Payments')
       ws2.addRow(['familyName', 'amount', 'paymentDate'])
-      const fam = await (await import('@/lib/models')).Family.findById(ctx.fixtures.familyId).select('name')
+      const fam = await (
+        await import('@/lib/models')
+      ).Family.findById(ctx.fixtures.familyId).select('name')
       ws2.addRow([fam?.name ?? 'Family', '15', '2024-08-01'])
       const buf2 = await wb2.xlsx.writeBuffer()
       const xlsxForm = new FormData()
       xlsxForm.set('type', 'payments')
       xlsxForm.set(
         'file',
-        new Blob([buf2], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+        new Blob([buf2], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }),
         'payments.xlsx',
       )
       const xlsxRes = await POST(importReq(xlsxForm))
@@ -276,7 +287,11 @@ describe.sequential('route-logic payments domain coverage', () => {
       const { POST } = await import('@/lib/route-logic/import')
       await withRateLimitBlocked(async () => {
         expect(
-          (await POST(importReq(importForm('families', 'name,weddingDate\nRL,2019-01-01', 'rl.csv')))).status,
+          (
+            await POST(
+              importReq(importForm('families', 'name,weddingDate\nRL,2019-01-01', 'rl.csv')),
+            )
+          ).status,
         ).toBe(429)
       })
     })
@@ -392,28 +407,34 @@ describe.sequential('route-logic payments domain coverage', () => {
       const dupErr = Object.assign(new Error('dup'), { code: 11000 })
       const findOrig = Payment.findOne.bind(Payment)
       let includeDeletedHits = 0
-      const findSpy = vi.spyOn(Payment, 'findOne').mockImplementation((filter: unknown, proj?: unknown, opts?: unknown) => {
-        const f = filter as { stripePaymentIntentId?: string; organizationId?: string; _id?: unknown }
-        if (
-          f?.stripePaymentIntentId === piId &&
-          f?.organizationId === ctx.orgId &&
-          opts &&
-          typeof opts === 'object' &&
-          'includeDeleted' in opts
-        ) {
-          includeDeletedHits += 1
-          if (includeDeletedHits >= 2) return Promise.resolve(raced as never)
-          return Promise.resolve(null)
-        }
-        if (f?._id) {
-          return {
-            select: () => ({
-              lean: async () => ({ amount: 44, _id: raced._id }),
-            }),
-          } as never
-        }
-        return findOrig(filter as never, proj as never, opts as never)
-      })
+      const findSpy = vi
+        .spyOn(Payment, 'findOne')
+        .mockImplementation((filter: unknown, proj?: unknown, opts?: unknown) => {
+          const f = filter as {
+            stripePaymentIntentId?: string
+            organizationId?: string
+            _id?: unknown
+          }
+          if (
+            f?.stripePaymentIntentId === piId &&
+            f?.organizationId === ctx.orgId &&
+            opts &&
+            typeof opts === 'object' &&
+            'includeDeleted' in opts
+          ) {
+            includeDeletedHits += 1
+            if (includeDeletedHits >= 2) return Promise.resolve(raced as never)
+            return Promise.resolve(null)
+          }
+          if (f?._id) {
+            return {
+              select: () => ({
+                lean: async () => ({ amount: 44, _id: raced._id }),
+              }),
+            } as never
+          }
+          return findOrig(filter as never, proj as never, opts as never)
+        })
       const createSpy = vi.spyOn(Payment, 'create').mockRejectedValueOnce(dupErr)
       const { POST } = await import('@/lib/route-logic/stripe/confirm-payment')
       const res = await POST(
@@ -469,7 +490,9 @@ describe.sequential('route-logic payments domain coverage', () => {
         card: { last4: '1111', brand: 'visa', exp_month: 1, exp_year: 2030 },
         billing_details: { name: 'Fail Save' },
       })
-      const createSpmSpy = vi.spyOn(SavedPaymentMethod, 'create').mockRejectedValueOnce(new Error('spm db fail'))
+      const createSpmSpy = vi
+        .spyOn(SavedPaymentMethod, 'create')
+        .mockRejectedValueOnce(new Error('spm db fail'))
       const saveFail = await POST(
         orgJsonReq('/api/stripe/confirm-payment', 'POST', {
           paymentIntentId: piSave,
@@ -497,13 +520,15 @@ describe.sequential('route-logic payments domain coverage', () => {
       })
 
       const findOrig = Payment.findOne.bind(Payment)
-      const findSpy = vi.spyOn(Payment, 'findOne').mockImplementation((filter: unknown, _p?: unknown, opts?: unknown) => {
-        const f = filter as { _id?: unknown; stripePaymentIntentId?: string }
-        if (f?._id && !(opts && typeof opts === 'object' && 'includeDeleted' in opts)) {
-          return { select: () => ({ lean: async () => null }) } as never
-        }
-        return findOrig(filter as never, _p as never, opts as never)
-      })
+      const findSpy = vi
+        .spyOn(Payment, 'findOne')
+        .mockImplementation((filter: unknown, _p?: unknown, opts?: unknown) => {
+          const f = filter as { _id?: unknown; stripePaymentIntentId?: string }
+          if (f?._id && !(opts && typeof opts === 'object' && 'includeDeleted' in opts)) {
+            return { select: () => ({ lean: async () => null }) } as never
+          }
+          return findOrig(filter as never, _p as never, opts as never)
+        })
 
       try {
         const { POST } = await import('@/lib/route-logic/stripe/confirm-payment')
@@ -603,15 +628,22 @@ describe.sequential('route-logic payments domain coverage', () => {
       }
       const findOrig = Payment.findOne.bind(Payment)
       let includeDeletedHits = 0
-      const findSpy = vi.spyOn(Payment, 'findOne').mockImplementation((filter: unknown, _p?: unknown, opts?: unknown) => {
-        const f = filter as { stripePaymentIntentId?: string }
-        if (f?.stripePaymentIntentId === piId && opts && typeof opts === 'object' && 'includeDeleted' in opts) {
-          includeDeletedHits += 1
-          if (includeDeletedHits >= 2) return Promise.resolve(raced as never)
-          return Promise.resolve(null)
-        }
-        return findOrig(filter as never, _p as never, opts as never)
-      })
+      const findSpy = vi
+        .spyOn(Payment, 'findOne')
+        .mockImplementation((filter: unknown, _p?: unknown, opts?: unknown) => {
+          const f = filter as { stripePaymentIntentId?: string }
+          if (
+            f?.stripePaymentIntentId === piId &&
+            opts &&
+            typeof opts === 'object' &&
+            'includeDeleted' in opts
+          ) {
+            includeDeletedHits += 1
+            if (includeDeletedHits >= 2) return Promise.resolve(raced as never)
+            return Promise.resolve(null)
+          }
+          return findOrig(filter as never, _p as never, opts as never)
+        })
       const createSpy = vi.spyOn(Payment, 'create').mockRejectedValueOnce(dupErr)
 
       try {
@@ -700,12 +732,20 @@ describe.sequential('route-logic payments domain coverage', () => {
         isActive: true,
       })
       const origUpdate = RecurringPayment.updateOne.bind(RecurringPayment)
-      vi.spyOn(RecurringPayment, 'updateOne').mockImplementation(async (filter: unknown, update: unknown) => {
-        if (filter && typeof filter === 'object' && 'nextPaymentDate' in (filter as object)) {
-          return { acknowledged: true, modifiedCount: 0, matchedCount: 1, upsertedCount: 0, upsertedId: null }
-        }
-        return origUpdate(filter as never, update as never)
-      })
+      vi.spyOn(RecurringPayment, 'updateOne').mockImplementation(
+        async (filter: unknown, update: unknown) => {
+          if (filter && typeof filter === 'object' && 'nextPaymentDate' in (filter as object)) {
+            return {
+              acknowledged: true,
+              modifiedCount: 0,
+              matchedCount: 1,
+              upsertedCount: 0,
+              upsertedId: null,
+            }
+          }
+          return origUpdate(filter as never, update as never)
+        },
+      )
       try {
         const { POST } = await import('@/lib/route-logic/recurring-payments/process')
         const res = await POST(orgJsonReq('/api/recurring-payments/process', 'POST', {}))
@@ -749,13 +789,13 @@ describe.sequential('route-logic payments domain coverage', () => {
       )
 
       const pag = await import('@/lib/pagination')
-      const spy = vi.spyOn(pag, 'collectCompoundCursorPages').mockImplementation(
-        async (loadPage, baseFilter, _sf, _dir, getCursor, _bs) => {
+      const spy = vi
+        .spyOn(pag, 'collectCompoundCursorPages')
+        .mockImplementation(async (loadPage, baseFilter, _sf, _dir, getCursor, _bs) => {
           const page = await loadPage(baseFilter, 2)
           if (page[0]) getCursor(page[0] as never)
           return page
-        },
-      )
+        })
       try {
         const { GET } = await import('@/lib/route-logic/recurring-payments/process')
         const res = await GET(
@@ -813,7 +853,10 @@ describe.sequential('route-logic payments domain coverage', () => {
     it('records ratioVsRecurring on successful charge', async () => {
       bindSession(ctx)
       const { RecurringPayment, Payment } = await import('@/lib/models')
-      await RecurringPayment.deleteMany({ organizationId: ctx.orgId, familyId: ctx.fixtures.familyId })
+      await RecurringPayment.deleteMany({
+        organizationId: ctx.orgId,
+        familyId: ctx.fixtures.familyId,
+      })
       await RecurringPayment.create({
         organizationId: ctx.orgId,
         familyId: ctx.fixtures.familyId,
@@ -824,7 +867,10 @@ describe.sequential('route-logic payments domain coverage', () => {
         nextPaymentDate: new Date(),
         isActive: true,
       })
-      await Payment.deleteMany({ organizationId: ctx.orgId, stripePaymentIntentId: 'pi_ratiocharge1' })
+      await Payment.deleteMany({
+        organizationId: ctx.orgId,
+        stripePaymentIntentId: 'pi_ratiocharge1',
+      })
 
       const client = await stripeTestClient()
       vi.mocked(client.paymentIntents.create).mockResolvedValueOnce({
@@ -855,16 +901,14 @@ describe.sequential('route-logic payments domain coverage', () => {
       const path = `/api/families/${ctx.fixtures.familyId}/saved-payment-methods`
       const { POST } = await import('@/lib/route-logic/families/[id]/saved-payment-methods')
 
-      const badPm = await POST(
-        orgJsonReq(path, 'POST', { paymentMethodId: 'bad-id' }),
-        { params: { id: ctx.fixtures.familyId } },
-      )
+      const badPm = await POST(orgJsonReq(path, 'POST', { paymentMethodId: 'bad-id' }), {
+        params: { id: ctx.fixtures.familyId },
+      })
       expect(badPm.status).toBe(400)
 
-      const noPi = await POST(
-        orgJsonReq(path, 'POST', { paymentMethodId: 'pm_test123' }),
-        { params: { id: ctx.fixtures.familyId } },
-      )
+      const noPi = await POST(orgJsonReq(path, 'POST', { paymentMethodId: 'pm_test123' }), {
+        params: { id: ctx.fixtures.familyId },
+      })
       expect(noPi.status).toBe(400)
     })
 

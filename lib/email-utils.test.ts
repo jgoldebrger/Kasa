@@ -47,7 +47,8 @@ describe('generateStatementPDF', () => {
     const origToLocaleDateString = Date.prototype.toLocaleDateString
     const dateSpy = vi.spyOn(Date.prototype, 'toLocaleDateString')
     dateSpy.mockImplementation(function (this: Date, locales?, options?) {
-      const loc = typeof locales === 'string' ? locales : Array.isArray(locales) ? locales[0] : undefined
+      const loc =
+        typeof locales === 'string' ? locales : Array.isArray(locales) ? locales[0] : undefined
       if (loc === 'he-IL') {
         return origToLocaleDateString.call(this, 'en-US', options)
       }
@@ -58,7 +59,8 @@ describe('generateStatementPDF', () => {
       locale?: string | string[],
       options?: Intl.NumberFormatOptions,
     ) {
-      const loc = typeof locale === 'string' ? locale : Array.isArray(locale) ? locale[0] : undefined
+      const loc =
+        typeof locale === 'string' ? locale : Array.isArray(locale) ? locale[0] : undefined
       return new RealNumberFormat(loc === 'he-IL' ? 'en-US' : (locale as string), options)
     }
     const nfSpy = vi
@@ -239,9 +241,9 @@ describe('generateStatementPDF', () => {
 
   it('rethrows when PDF creation fails', async () => {
     const pdfLib = await import('pdf-lib')
-    const spy = vi.spyOn(pdfLib.PDFDocument, 'create').mockRejectedValueOnce(
-      new Error('PDF mock failure'),
-    )
+    const spy = vi
+      .spyOn(pdfLib.PDFDocument, 'create')
+      .mockRejectedValueOnce(new Error('PDF mock failure'))
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     await expect(
       generateStatementPDF(baseStatement, 'Fail Family', [], { name: 'Org' }),
@@ -271,8 +273,7 @@ describe('generateTaxReceiptPDF', () => {
       taxId: '12-3456789',
       signatureName: 'Jane Treasurer',
       signatureTitle: 'Financial Secretary',
-      receiptThankYou:
-        'Thank you for your generous support of our community programs.',
+      receiptThankYou: 'Thank you for your generous support of our community programs.',
       taxDeductibleDisclosure:
         'No goods or services were provided in exchange for these contributions.',
     },
@@ -332,12 +333,7 @@ describe('generateTaxReceiptPDF', () => {
       })
     }
 
-    const pdf = await generateTaxReceiptPDF(
-      fullOrg,
-      fullFamily,
-      payments,
-      2024,
-    )
+    const pdf = await generateTaxReceiptPDF(fullOrg, fullFamily, payments, 2024)
     expectValidPdf(pdf)
   })
 

@@ -39,9 +39,7 @@ describe('wedding-converter (integration)', () => {
       slug: `wed-${orgId.toString().slice(-6)}`,
       ownerId,
       timezone: 'UTC',
-      ...(opts?.defaultPlan !== false
-        ? { weddingConversionDefaultPlanId: planId }
-        : {}),
+      ...(opts?.defaultPlan !== false ? { weddingConversionDefaultPlanId: planId } : {}),
     })
 
     if (opts?.defaultPlan !== false) {
@@ -121,10 +119,10 @@ describe('wedding-converter (integration)', () => {
     const { converted } = await convertMembersOnWeddingDate(orgId.toString())
     expect(converted).toBe(1)
 
-    const newFamily = await Family.findOne({
+    const newFamily = (await Family.findOne({
       organizationId: orgId,
       parentFamilyId,
-    }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+    }).lean()) as import('@/lib/test/type-helpers').LeanDoc | null
     expect(newFamily).toBeTruthy()
     expect(newFamily!.wifeFirstName).toBe('Rivka')
     expect(newFamily!.wifeHebrewName).toBe('רבקה')
@@ -151,7 +149,9 @@ describe('wedding-converter (integration)', () => {
     const { converted } = await convertMembersOnWeddingDate(orgId.toString())
     expect(converted).toBe(0)
 
-    const after = await FamilyMember.findById(member._id).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+    const after = (await FamilyMember.findById(member._id).lean()) as
+      | import('@/lib/test/type-helpers').LeanDoc
+      | null
     expect(after).toBeTruthy()
     expect(after!.convertedToFamily).not.toBe(true)
   })
@@ -178,7 +178,9 @@ describe('wedding-converter (integration)', () => {
     const { converted } = await convertMembersOnWeddingDate(orgId.toString())
     expect(converted).toBe(0)
 
-    const after = await FamilyMember.findById(member._id).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+    const after = (await FamilyMember.findById(member._id).lean()) as
+      | import('@/lib/test/type-helpers').LeanDoc
+      | null
     expect(after?.convertedToFamily).not.toBe(true)
 
     claimSpy.mockRestore()
@@ -201,7 +203,9 @@ describe('wedding-converter (integration)', () => {
     const { converted } = await convertMembersOnWeddingDate(orgId.toString())
     expect(converted).toBe(0)
 
-    const after = await FamilyMember.findById(member._id).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+    const after = (await FamilyMember.findById(member._id).lean()) as
+      | import('@/lib/test/type-helpers').LeanDoc
+      | null
     expect(after).toBeTruthy()
     expect(after!.convertedToFamily).not.toBe(true)
   })
@@ -227,7 +231,9 @@ describe('wedding-converter (integration)', () => {
     const { converted } = await convertMembersOnWeddingDate(orgId.toString())
     expect(converted).toBe(0)
 
-    const after = await FamilyMember.findById(member._id).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+    const after = (await FamilyMember.findById(member._id).lean()) as
+      | import('@/lib/test/type-helpers').LeanDoc
+      | null
     expect(after?.convertedToFamily).not.toBe(true)
 
     createSpy.mockRestore()
@@ -253,14 +259,16 @@ describe('wedding-converter (integration)', () => {
     const { converted } = await convertMembersOnWeddingDate(orgId.toString())
     expect(converted).toBe(1)
 
-    const newFamily = await Family.findOne({ organizationId: orgId, parentFamilyId }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+    const newFamily = (await Family.findOne({ organizationId: orgId, parentFamilyId }).lean()) as
+      | import('@/lib/test/type-helpers').LeanDoc
+      | null
     expect(newFamily?.name).toMatch(/Sarah Cohen & David Cohen/)
 
-    const spouse = await FamilyMember.findOne({
+    const spouse = (await FamilyMember.findOne({
       organizationId: orgId,
       familyId: newFamily?._id,
       firstName: 'David',
-    }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+    }).lean()) as import('@/lib/test/type-helpers').LeanDoc | null
     expect(spouse?.gender).toBe('male')
   })
 
@@ -297,7 +305,9 @@ describe('wedding-converter (integration)', () => {
 
     expect(first.converted + second.converted).toBe(1)
 
-    const newFamilies = await Family.find({ organizationId: orgId, parentFamilyId }).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+    const newFamilies = (await Family.find({ organizationId: orgId, parentFamilyId }).lean()) as
+      | import('@/lib/test/type-helpers').LeanDoc
+      | null
     expect(newFamilies).toHaveLength(1)
 
     const remaining = await FamilyMember.find({

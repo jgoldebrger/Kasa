@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { formatLocaleDate } from '@/lib/date-utils'
 import { Badge, Button } from '@/app/components/ui'
+import { sanitizeEmailHtml } from '@/lib/client/sanitize-email-html'
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
 import type { FamilyOption, ScheduledEmailRow } from './types'
@@ -164,7 +165,7 @@ export default function ScheduledEmailDetailDrawer({
               </p>
               <div
                 className="rounded-lg border border-border bg-surface p-4 text-sm text-fg prose-sm max-w-none max-h-64 overflow-y-auto"
-                dangerouslySetInnerHTML={{ __html: row.html }}
+                dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(row.html) }}
               />
             </div>
           )}

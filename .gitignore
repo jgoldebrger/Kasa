@@ -43,8 +43,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
-.env*.local
+# operator scripts with credential access
+scripts/show-email-password.ts
+
 .env
 
 # vercel
@@ -53,3 +54,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# generated SBOM (uploaded as CI artifact)
+sbom.cdx.json
+
+.env*
+
+# Superdesign scratch (keep .superdesign/init/ tracked)
+.superdesign/tmp/
+
+# Isolated git worktrees (subagent-driven development)
+.worktrees/

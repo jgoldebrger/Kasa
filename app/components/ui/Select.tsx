@@ -1,8 +1,13 @@
 'use client'
 
-import { SelectHTMLAttributes, forwardRef, useId } from 'react'
+import { SelectHTMLAttributes, forwardRef } from 'react'
+import { useFieldIds } from '@/lib/ui/field-ids'
 
 export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
+  /**
+   * Field label rendered above the select.
+   * At least one of `label`, `aria-label`, or `aria-labelledby` is required for accessibility.
+   */
   label?: string
   hint?: string
   error?: string | null
@@ -29,11 +34,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
   },
   ref,
 ) {
-  const autoId = useId()
-  const fieldId = id || `s-${autoId}`
-  const hintId = hint ? `${fieldId}-hint` : undefined
-  const errorId = error ? `${fieldId}-err` : undefined
-  const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined
+  const { fieldId, hintId, errorId, describedBy } = useFieldIds(id)
 
   return (
     <div className={`flex flex-col gap-1.5 ${wrapperClassName}`}>
@@ -44,7 +45,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         >
           {label}
           {required && (
-            <span className="ml-0.5 text-red-600 dark:text-red-400" aria-hidden="true">
+            <span className="ms-0.5 text-danger" aria-hidden="true">
               *
             </span>
           )}
@@ -55,17 +56,17 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         id={fieldId}
         aria-invalid={error ? true : undefined}
         aria-required={required || undefined}
-        aria-describedby={describedBy}
+        aria-describedby={describedBy(error ? undefined : hint, error)}
         required={required}
         className={`focus-ring w-full rounded-md border bg-surface px-3 py-2 text-sm text-fg transition-colors disabled:bg-app-subtle disabled:text-fg-muted ${
-          error ? 'border-red-400 focus:border-red-500 dark:border-red-500/60' : 'border-border focus:border-accent'
+          error ? 'border-danger focus:border-danger' : 'border-border focus:border-accent'
         } ${className}`}
         {...rest}
       >
         {children}
       </select>
       {error ? (
-        <p id={errorId} role="alert" className="text-xs text-red-600 dark:text-red-400">
+        <p id={errorId} role="alert" className="text-xs text-danger">
           {error}
         </p>
       ) : hint ? (

@@ -33,25 +33,31 @@ describe('buildPaymentYearFilter', () => {
   })
 
   it('uses UTC year bounds when timezone is omitted', () => {
-    const filter = buildPaymentYearFilter(2024, 'org-1') as unknown as { $or: [{ year: number }, { year: null; paymentDate: { $gte: Date; $lt: Date } }]
+    const filter = buildPaymentYearFilter(2024, 'org-1') as unknown as {
+      $or: [{ year: number }, { year: null; paymentDate: { $gte: Date; $lt: Date } }]
     }
     expect(filter.$or[1].paymentDate.$gte).toEqual(new Date(Date.UTC(2024, 0, 1)))
     expect(filter.$or[1].paymentDate.$lt).toEqual(new Date(Date.UTC(2025, 0, 1)))
   })
 
   it('uses org timezone for paymentDate fallback bounds', () => {
-    const filter = buildPaymentYearFilter(2024, 'org-1', 'America/New_York') as unknown as { $or: [{ year: number }, { year: null; paymentDate: { $gte: Date; $lt: Date } }]
+    const filter = buildPaymentYearFilter(2024, 'org-1', 'America/New_York') as unknown as {
+      $or: [{ year: number }, { year: null; paymentDate: { $gte: Date; $lt: Date } }]
     }
     expect(filter.$or[1].paymentDate.$gte.toISOString()).toBe('2024-01-01T05:00:00.000Z')
     expect(filter.$or[1].paymentDate.$lt.toISOString()).toBe('2025-01-01T05:00:00.000Z')
   })
 
   it('treats null timezone like UTC', () => {
-    const withNull = buildPaymentYearFilter(2024, 'org-1', null) as unknown as { $or: [{ year: number }, { year: null; paymentDate: { $gte: Date; $lt: Date } }]
+    const withNull = buildPaymentYearFilter(2024, 'org-1', null) as unknown as {
+      $or: [{ year: number }, { year: null; paymentDate: { $gte: Date; $lt: Date } }]
     }
-    const withUtc = buildPaymentYearFilter(2024, 'org-1', 'UTC') as unknown as { $or: [{ year: number }, { year: null; paymentDate: { $gte: Date; $lt: Date } }]
+    const withUtc = buildPaymentYearFilter(2024, 'org-1', 'UTC') as unknown as {
+      $or: [{ year: number }, { year: null; paymentDate: { $gte: Date; $lt: Date } }]
     }
-    expect(withNull.$or[1].paymentDate.$gte.getTime()).toBe(withUtc.$or[1].paymentDate.$gte.getTime())
+    expect(withNull.$or[1].paymentDate.$gte.getTime()).toBe(
+      withUtc.$or[1].paymentDate.$gte.getTime(),
+    )
     expect(withNull.$or[1].paymentDate.$lt.getTime()).toBe(withUtc.$or[1].paymentDate.$lt.getTime())
   })
 
@@ -59,7 +65,8 @@ describe('buildPaymentYearFilter', () => {
     // The old `$or: [{ year }, { paymentDate: ... }]` shape would have
     // pulled a `{ year: 2023, paymentDate: 2024-... }` doc into both
     // years. The new filter only counts it under 2023.
-    const filter = buildPaymentYearFilter(2024, 'org-1') as unknown as { $or: Array<Record<string, unknown>>
+    const filter = buildPaymentYearFilter(2024, 'org-1') as unknown as {
+      $or: Array<Record<string, unknown>>
     }
     const matchesYearClause = (filter.$or[0] as { year: number }).year === 2023
     expect(matchesYearClause).toBe(false)

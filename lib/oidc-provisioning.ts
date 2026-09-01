@@ -2,6 +2,7 @@ import connectDB from '@/lib/database'
 import { Invite, Organization, OrgMembership, User } from '@/lib/models'
 import { audit } from '@/lib/audit'
 import { getOidcConfig } from '@/lib/oidc-config'
+import { logError } from '@/lib/log'
 import type { Role } from '@/types/auth'
 
 export type OidcProvisionInput = {
@@ -48,7 +49,14 @@ async function resolveOrgFromDomainMap(
   const org = await Organization.findOne({ slug })
     .select('_id slug')
     .lean<{ _id: { toString(): string }; slug: string }>()
-  if (!org) return null
+  if (!org) {
+    logError(new Error('OIDC domain map references unknown organization slug'), {
+      module: 'oidc-provisioning',
+      slug,
+      domain: emailDomain(email),
+    })
+    return null
+  }
   return { orgId: org._id.toString(), slug: org.slug }
 }
 

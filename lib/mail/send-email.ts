@@ -276,6 +276,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       { _id: doc._id },
       {
         $set: { status: 'sent' },
+        $unset: { html: '', text: '' },
         $push: { events: { type: 'sent', at: new Date() } },
       },
     )

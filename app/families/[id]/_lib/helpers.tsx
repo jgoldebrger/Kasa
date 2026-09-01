@@ -1,5 +1,6 @@
 import type React from 'react'
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { moneyAmountCell } from '@/app/families/_lib'
 import { calculateHebrewAge, convertToHebrewDate } from '@/lib/hebrew-date'
 import { handleHebrewInput, qwertyToHebrew } from '@/lib/client/hebrew-input'
 import { netPaymentAmount } from '@/lib/money'
@@ -50,11 +51,18 @@ export function paymentColumnsFor(
       headerText: 'Amount',
       sortable: true,
       align: 'right',
-      cell: (p) => (
-        <span className="font-semibold tabular text-green-700 dark:text-green-400">
-          {formatPaymentAmount(p, fmt)}
-        </span>
-      ),
+      cell: (p) => {
+        const net = netPaymentAmount(p)
+        const refunded = Number(p.refundedAmount || 0)
+        return (
+          <span>
+            {moneyAmountCell(net, fmt, 'positive')}
+            {refunded > 0 && (
+              <span className="text-xs text-fg-muted"> (refunded {fmt(refunded)})</span>
+            )}
+          </span>
+        )
+      },
       exportValue: (p) => netPaymentAmount(p),
       filter: { type: 'numberRange', getValue: (p) => netPaymentAmount(p) },
     },
@@ -134,7 +142,9 @@ export function paymentMobileCard(p: any, fmt: (n: number) => string) {
     <div className="surface-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="font-semibold text-fg tabular">{formatPaymentAmount(p, fmt)}</div>
+          <div className="font-semibold text-fg tabular">
+            {moneyAmountCell(netPaymentAmount(p), fmt, 'positive')}
+          </div>
           <div className="text-xs text-fg-muted capitalize">{p.type}</div>
         </div>
         <div className="text-right text-xs">
@@ -209,11 +219,11 @@ export function computeMemberDisplay(
 export const PLAN_COLOR_PALETTE = [
   'text-accent',
   'text-success dark:text-green-400',
-  'text-purple-600 dark:text-purple-400',
+  'text-cyan-700 dark:text-cyan-400',
   'text-warning dark:text-orange-400',
   'text-pink-600 dark:text-pink-400',
   'text-amber-600 dark:text-amber-400',
-  'text-cyan-600 dark:text-cyan-400',
+  'text-sky-700 dark:text-sky-400',
   'text-rose-600 dark:text-rose-400',
 ] as const
 export function planColorForNumber(planNumber: number | null | undefined): string {
@@ -281,7 +291,7 @@ export function buildMemberColumns({
           <div className="text-fg-muted">
             <div className="font-medium">{displayHebrewDate}</div>
             {m.barMitzvahDate && (
-              <div className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+              <div className="text-xs text-accent mt-1">
                 Bar/Bat Mitzvah: {new Date(m.barMitzvahDate).toLocaleDateString()}
               </div>
             )}

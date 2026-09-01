@@ -9,7 +9,10 @@ import { handler } from '@/lib/api/handler'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { loadSetupProgress } from '@/lib/organizations/setup-progress-data'
 
-export type { SetupProgressStep, SetupProgressStepId } from '@/lib/organizations/setup-progress-data'
+export type {
+  SetupProgressStep,
+  SetupProgressStepId,
+} from '@/lib/organizations/setup-progress-data'
 
 export const dynamic = 'force-dynamic'
 

@@ -108,9 +108,7 @@ function StatusIcon({ status }: { status: ChecklistStatus }) {
       />
     )
   }
-  return (
-    <XCircleIcon className="h-5 w-5 shrink-0 text-red-600 dark:text-red-400" aria-hidden="true" />
-  )
+  return <XCircleIcon className="h-5 w-5 shrink-0 text-danger" aria-hidden="true" />
 }
 
 function formatRelative(iso: string): string {

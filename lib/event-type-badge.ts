@@ -3,8 +3,8 @@
 // hash is stable across reloads so users see consistent colors per type
 // without us hardcoding which event gets which color.
 const EVENT_BADGE_PALETTE = [
-  'bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300',
   'bg-accent/10 text-accent',
+  'bg-accent-soft text-accent',
   'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300',
   'bg-pink-100 text-pink-800 dark:bg-pink-500/15 dark:text-pink-300',
   'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',

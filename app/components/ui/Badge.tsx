@@ -25,6 +25,10 @@ const sizeClass: Record<BadgeSize, string> = {
   md: 'px-2 py-0.5 text-xs',
 }
 
+/**
+ * Compact status label. When the same meaning is already conveyed by nearby text,
+ * pass `aria-hidden="true"` to avoid duplicate announcements.
+ */
 export function Badge({
   variant = 'default',
   size = 'sm',

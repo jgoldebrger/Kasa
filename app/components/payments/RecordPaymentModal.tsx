@@ -17,10 +17,29 @@ export interface RecordPaymentDefaults {
   familyId?: string
 }
 
+export interface RecordedPaymentSummary {
+  _id: string
+  familyId: {
+    _id: string
+    name: string
+    hebrewName?: string
+    email?: string
+    phone?: string
+  }
+  amount: number
+  paymentDate: string
+  year: number
+  type: 'membership' | 'donation' | 'other'
+  paymentMethod: 'cash' | 'credit_card' | 'check' | 'quick_pay'
+  notes?: string
+  createdAt: string
+}
+
 export interface RecordPaymentModalProps {
   open: boolean
   onClose: () => void
-  onCreated?: () => void
+  /** Called with the created payment so callers can update lists optimistically. */
+  onCreated?: (payment: RecordedPaymentSummary) => void
   defaults?: RecordPaymentDefaults
   lockFamily?: boolean
 }
@@ -129,10 +148,59 @@ export default function RecordPaymentModal({
         }),
       })
       if (res.ok) {
+        const created = (await res.json().catch(() => null)) as {
+          _id?: string
+          amount?: number
+          paymentDate?: string
+          year?: number
+          type?: string
+          paymentMethod?: string
+          notes?: string
+          createdAt?: string
+        } | null
+        const family = families.find((f) => f._id === form.familyId)
         onClose()
         setForm(buildEmptyForm(defaults))
         toast.success(t('payments.recordModal.success'))
-        onCreated?.()
+        if (created?._id) {
+          onCreated?.({
+            _id: String(created._id),
+            familyId: {
+              _id: form.familyId,
+              name: family?.name || 'Family',
+              hebrewName: family?.hebrewName,
+              email: family?.email,
+              phone: family?.phone,
+            },
+            amount: Number(created.amount ?? form.amount),
+            paymentDate: String(created.paymentDate ?? form.paymentDate),
+            year: Number(created.year ?? year),
+            type: (created.type as RecordedPaymentSummary['type']) || form.type,
+            paymentMethod:
+              (created.paymentMethod as RecordedPaymentSummary['paymentMethod']) ||
+              form.paymentMethod,
+            notes: created.notes,
+            createdAt: String(created.createdAt ?? new Date().toISOString()),
+          })
+        } else {
+          onCreated?.({
+            _id: `temp-${Date.now()}`,
+            familyId: {
+              _id: form.familyId,
+              name: family?.name || 'Family',
+              hebrewName: family?.hebrewName,
+              email: family?.email,
+              phone: family?.phone,
+            },
+            amount: form.amount,
+            paymentDate: form.paymentDate,
+            year,
+            type: form.type,
+            paymentMethod: form.paymentMethod,
+            notes: form.notes || undefined,
+            createdAt: new Date().toISOString(),
+          })
+        }
       } else {
         const body = await res.json().catch(() => ({}))
         toast.error(body?.error || t('payments.recordModal.error'))

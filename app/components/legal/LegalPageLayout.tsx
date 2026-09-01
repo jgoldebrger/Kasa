@@ -1,10 +1,15 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
+import JsonLd from '@/app/components/seo/JsonLd'
+import { resolveAppBaseUrl } from '@/lib/app-base-url'
+import { organizationJsonLd, webPageJsonLd } from '@/lib/seo/json-ld'
 import LegalFooterLinks from './LegalFooterLinks'
 
 interface LegalPageLayoutProps {
   title: string
   lastUpdated: string
+  canonicalPath: string
+  description: string
   children: ReactNode
   /** When true, shows a counsel-review notice (legacy template mode). */
   showTemplateNotice?: boolean
@@ -16,11 +21,16 @@ interface LegalPageLayoutProps {
 export default function LegalPageLayout({
   title,
   lastUpdated,
+  canonicalPath,
+  description,
   children,
   showTemplateNotice = false,
 }: LegalPageLayoutProps) {
+  const baseUrl = resolveAppBaseUrl()
   return (
     <div className="min-h-screen bg-app">
+      <JsonLd data={organizationJsonLd(baseUrl)} />
+      <JsonLd data={webPageJsonLd({ baseUrl, path: canonicalPath, name: title, description })} />
       <div className="max-w-3xl mx-auto px-6 py-12 sm:py-16">
         <header className="mb-8">
           <Link

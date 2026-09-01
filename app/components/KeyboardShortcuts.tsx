@@ -1,19 +1,15 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Modal } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
+import { useOrgRole } from '@/lib/client/useOrgRole'
 import type { MessageKey } from '@/lib/i18n/load-locale'
+import { PRIMARY_NAV_SECTIONS, filterNavSections } from '@/lib/nav'
+import { getNavShortcutHelpItems } from '@/lib/nav/shortcuts'
 
 const GO_SEQUENCE_MS = 1000
-
-const GO_ROUTES: Record<string, string> = {
-  f: '/families',
-  p: '/payments',
-  e: '/events',
-  t: '/tasks',
-}
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!target || !(target instanceof HTMLElement)) return false
@@ -30,20 +26,45 @@ interface ShortcutRow {
   labelKey: MessageKey
 }
 
-const SHORTCUT_ROWS: ShortcutRow[] = [
-  { keys: '?', labelKey: 'shortcuts.showHelp' },
-  { keys: '/', labelKey: 'shortcuts.openSearch' },
-  { keys: 'Ctrl+K', labelKey: 'shortcuts.openSearch' },
-  { keys: 'g f', labelKey: 'shortcuts.goFamilies' },
-  { keys: 'g p', labelKey: 'shortcuts.goPayments' },
-  { keys: 'g e', labelKey: 'shortcuts.goEvents' },
-  { keys: 'g t', labelKey: 'shortcuts.goTasks' },
-]
-
 export default function KeyboardShortcuts() {
   const router = useRouter()
   const t = useT()
+  const { isAdmin } = useOrgRole()
   const [helpOpen, setHelpOpen] = useState(false)
+
+  // Only register/show shortcuts for destinations the current user can see —
+  // derive the shortcut map from the same role-filtered tree the Sidebar uses.
+  const navShortcuts = useMemo(() => {
+    const filtered = filterNavSections(PRIMARY_NAV_SECTIONS, {
+      isAdmin,
+      isPlatformAdmin: false,
+    })
+    return getNavShortcutHelpItems(filtered)
+  }, [isAdmin])
+
+  const goRoutes = useMemo(
+    () =>
+      Object.fromEntries(
+        navShortcuts.flatMap((item) => {
+          const [prefix, key] = item.keys.split(' ')
+          return prefix === 'g' && key && item.href ? [[key, item.href]] : []
+        }),
+      ),
+    [navShortcuts],
+  )
+
+  const shortcutRows = useMemo<ShortcutRow[]>(
+    () => [
+      { keys: '?', labelKey: 'shortcuts.showHelp' },
+      { keys: '/', labelKey: 'shortcuts.openSearch' },
+      { keys: 'Ctrl+K', labelKey: 'shortcuts.openSearch' },
+      ...navShortcuts.map((item) => ({
+        keys: item.keys,
+        labelKey: item.labelKey as MessageKey,
+      })),
+    ],
+    [navShortcuts],
+  )
   const goPendingRef = useRef(false)
   const goTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -76,7 +97,7 @@ export default function KeyboardShortcuts() {
       }
 
       if (goPendingRef.current) {
-        const route = GO_ROUTES[e.key]
+        const route = goRoutes[e.key]
         if (route) {
           e.preventDefault()
           clearGoPending()
@@ -98,13 +119,13 @@ export default function KeyboardShortcuts() {
       window.removeEventListener('keydown', onKeyDown)
       clearGoPending()
     }
-  }, [router, helpOpen, clearGoPending, startGoPending])
+  }, [router, helpOpen, clearGoPending, startGoPending, goRoutes])
 
   return (
     <Modal open={helpOpen} onClose={() => setHelpOpen(false)} title={t('shortcuts.title')}>
       <p className="mb-4 text-sm text-fg-muted">{t('shortcuts.subtitle')}</p>
       <ul className="divide-y divide-border rounded-md border border-border">
-        {SHORTCUT_ROWS.map((row) => (
+        {shortcutRows.map((row) => (
           <li
             key={row.keys + row.labelKey}
             className="flex items-center justify-between gap-4 px-3 py-2.5"

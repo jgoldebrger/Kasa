@@ -1474,7 +1474,11 @@ describe.sequential('route-logic final coverage push', () => {
       })
     })
 
-    it('jobs process-recurring-payments throws when per-org fetch fails', async () => {
+    it('jobs process-recurring-payments throws when per-org processing fails', async () => {
+      const processOrg = await import('@/lib/recurring-payments/process-org')
+      const processSpy = vi
+        .spyOn(processOrg, 'processRecurringPaymentsForOrg')
+        .mockRejectedValueOnce(new Error('per-org fail'))
       const jobs = await import('@/lib/jobs')
       const spy = vi.spyOn(jobs, 'runChunked').mockImplementationOnce(async (opts) => {
         await opts.perOrg(ctx.orgId)
@@ -1487,10 +1491,6 @@ describe.sequential('route-logic final coverage push', () => {
           errors: [],
         }
       })
-      const fetchSpy = vi
-        .fn()
-        .mockResolvedValue({ ok: false, status: 500, text: async () => 'fail' })
-      vi.stubGlobal('fetch', fetchSpy)
       try {
         const { POST } = await import('@/lib/route-logic/jobs/process-recurring-payments')
         const res = await POST(
@@ -1499,7 +1499,7 @@ describe.sequential('route-logic final coverage push', () => {
         expect(res.status).toBe(500)
       } finally {
         spy.mockRestore()
-        vi.unstubAllGlobals()
+        processSpy.mockRestore()
       }
     })
   })

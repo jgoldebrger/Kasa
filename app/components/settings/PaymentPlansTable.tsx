@@ -21,11 +21,7 @@ import {
   UserGroupIcon,
   CreditCardIcon,
 } from '@heroicons/react/24/outline'
-import {
-  DataView,
-  EmptyState,
-  type DataColumn,
-} from '@/app/components/ui'
+import { DataView, EmptyState, type DataColumn } from '@/app/components/ui'
 
 export interface PaymentPlanFamily {
   _id: string
@@ -79,7 +75,9 @@ export default function PaymentPlansTable({
       header: 'Yearly Price',
       headerText: 'Yearly Price',
       align: 'right',
-      cell: (p) => <span className="font-semibold tabular text-fg">{formatMoney(p.yearlyPrice)}</span>,
+      cell: (p) => (
+        <span className="font-semibold tabular text-fg">{formatMoney(p.yearlyPrice)}</span>
+      ),
       exportValue: (p) => p.yearlyPrice || 0,
       filter: { type: 'numberRange', getValue: (p) => p.yearlyPrice || 0 },
     },
@@ -132,7 +130,7 @@ export default function PaymentPlansTable({
           </button>
           <button
             onClick={() => onDelete(p._id)}
-            className="focus-ring inline-flex h-8 w-8 items-center justify-center rounded-md text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+            className="focus-ring inline-flex h-8 w-8 items-center justify-center rounded-md text-danger hover:bg-danger/10"
             title="Delete plan"
             aria-label={`Delete ${p.name}`}
           >
@@ -177,7 +175,7 @@ export default function PaymentPlansTable({
                   <button
                     onClick={() => onDelete(p._id)}
                     aria-label={`Delete ${p.name}`}
-                    className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-md text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                    className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-md text-danger hover:bg-danger/10"
                   >
                     <TrashIcon className="h-4 w-4" />
                   </button>

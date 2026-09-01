@@ -6,10 +6,7 @@ import connectDB from './database'
 import { Statement, Family, Organization, nextCounter } from './models'
 import { calculateFamilyBalance } from './calculations'
 import { loadStatementPeriod, statementSnapshotFromPeriod } from './statements/period'
-import {
-  previousStatementPeriodBounds,
-  tolerantMsRange,
-} from './date-utils'
+import { previousStatementPeriodBounds, tolerantMsRange } from './date-utils'
 import { DEFAULT_FAMILY_BATCH_SIZE, runChunkedFamilies } from './jobs'
 
 export type GenerateMonthlyStatementsOptions = {

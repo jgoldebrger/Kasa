@@ -100,10 +100,7 @@ describe('calculateBarMitzvahDate', () => {
     })
 
     expect(calculateBarMitzvahDate('15 Tishrei 5772')).toBeNull()
-    expect(errSpy).toHaveBeenCalledWith(
-      'Error calculating Bar Mitzvah date:',
-      expect.any(Error),
-    )
+    expect(errSpy).toHaveBeenCalledWith('Error calculating Bar Mitzvah date:', expect.any(Error))
   })
 })
 
@@ -183,9 +180,6 @@ describe('calculateHebrewAge', () => {
     })
 
     expect(calculateHebrewAge('15 Tishrei 5772')).toBeNull()
-    expect(errSpy).toHaveBeenCalledWith(
-      'Error calculating Hebrew age:',
-      expect.any(Error),
-    )
+    expect(errSpy).toHaveBeenCalledWith('Error calculating Hebrew age:', expect.any(Error))
   })
 })

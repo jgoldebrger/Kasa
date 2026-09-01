@@ -17,15 +17,22 @@
   --c-border-strong:  209 213 219;
   --c-fg:             17 24 39;
   --c-fg-muted:       107 114 128;
-  --c-fg-subtle:      156 163 175;
-  --c-accent:         79 70 229;
-  --c-accent-hover:   67 56 202;
-  --c-accent-soft:    238 242 255;
+  /* gray-500 — 4.83:1 on white (AA for normal text); was gray-400 at 2.54:1 */
+  --c-fg-subtle:      107 114 128;
+  /* Deep teal — treasurer/kehilla brand; avoids indigo SaaS default */
+  --c-accent:         15 118 110;
+  --c-accent-hover:   17 94 89;
+  --c-accent-soft:    240 253 250;
   --c-accent-fg:      255 255 255;
 
-  --c-success:        22 163 74;
-  --c-warning:        217 119 6;
+  /* green-700 / amber-700 — AA normal text on white (was green-600/amber-600) */
+  --c-success:        21 128 61;
+  --c-warning:        180 83 9;
   --c-danger:         220 38 38;
+  --c-success-soft: 220 252 231; /* green-100-ish */
+  --c-warning-soft: 255 251 235; /* amber-50-ish */
+  --c-danger-soft:  254 242 242; /* red-50-ish */
+  --c-danger-fg:    255 255 255;
 
   /* Spacing scale (multiples of 4px). */
   --space-1: 4px;
@@ -65,15 +72,20 @@
   --c-border-strong:  63 63 70;
   --c-fg:             250 250 250;
   --c-fg-muted:       161 161 170;
-  --c-fg-subtle:      113 113 122;
-  --c-accent:         99 102 241;
-  --c-accent-hover:   129 140 248;
-  --c-accent-soft:    30 27 75;
+  /* zinc-400 — ~7.7:1 on #0A0A0A (AA); was zinc-500 at 4.10:1 */
+  --c-fg-subtle:      161 161 170;
+  --c-accent:         15 118 110;
+  --c-accent-hover:   20 184 166;
+  --c-accent-soft:    19 78 74;
   --c-accent-fg:      255 255 255;
 
   --c-success:        74 222 128;
   --c-warning:        251 191 36;
   --c-danger:         248 113 113;
+  --c-success-soft: 6 46 26;
+  --c-warning-soft: 69 26 3;
+  --c-danger-soft:  69 10 10;
+  --c-danger-fg:    69 10 10;
 }
 
 html {
@@ -117,6 +129,9 @@ body {
 
 /* Reduced motion: kill non-essential animations entirely. */
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
   *,
   *::before,
   *::after {
@@ -124,6 +139,11 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
     scroll-behavior: auto !important;
+  }
+  .animate-ui-fade,
+  .animate-ui-scale,
+  .animate-ui-slide {
+    animation: none !important;
   }
 }
 
@@ -194,7 +214,7 @@ body {
 .skip-link {
   position: absolute;
   top: 8px;
-  left: 8px;
+  inset-inline-start: 8px;
   z-index: 200;
   background: rgb(var(--c-fg));
   color: rgb(var(--c-app));

@@ -5,10 +5,7 @@ import { getYearInTimeZone } from '@/lib/date-utils'
 import { audit } from '@/lib/audit'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { handler } from '@/lib/api/handler'
-import {
-  familyLedgerListQuery,
-  listFamilyLedger,
-} from '@/lib/family-ledger-list'
+import { familyLedgerListQuery, listFamilyLedger } from '@/lib/family-ledger-list'
 
 const LEDGER_CACHE_HEADERS = {
   'Cache-Control': 'private, max-age=15, stale-while-revalidate=60',
@@ -39,10 +36,7 @@ export const GET = handler({
 
     const baseFilter = { familyId: id, organizationId: ctx!.organizationId }
     const loadPage = (filter: Record<string, unknown>, limit: number) =>
-      LifecycleEventPayment.find(filter)
-        .sort({ eventDate: -1, _id: -1 })
-        .limit(limit)
-        .lean()
+      LifecycleEventPayment.find(filter).sort({ eventDate: -1, _id: -1 }).limit(limit).lean()
 
     const effectiveQuery = {
       limit: query.limit ?? 0,
@@ -123,7 +117,9 @@ export const POST = handler({
     if (parsedYear !== eventYear) {
       return {
         status: 400,
-        data: { error: `Year ${parsedYear} does not match event date year ${eventYear} in org timezone` },
+        data: {
+          error: `Year ${parsedYear} does not match event date year ${eventYear} in org timezone`,
+        },
       }
     }
 

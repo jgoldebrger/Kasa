@@ -65,4 +65,32 @@ describe('GET /api/health (integration)', () => {
       spy.mockRestore()
     }
   })
+
+  it('livez returns 200 without requiring MongoDB', async () => {
+    const { GET_LIVEZ } = await import('@/lib/route-logic/health')
+    const res = await GET_LIVEZ(
+      new NextRequest(`${API_ORIGIN}/api/health/livez`, {
+        method: 'GET',
+        headers: { host: 'localhost:3000', origin: API_ORIGIN },
+      }),
+      withRouteParams(),
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toMatchObject({ status: 'ok', checks: { process: 'ok' } })
+  })
+
+  it('readyz returns 200 when MongoDB is reachable', async () => {
+    const { GET_READYZ } = await import('@/lib/route-logic/health')
+    const res = await GET_READYZ(
+      new NextRequest(`${API_ORIGIN}/api/health/readyz`, {
+        method: 'GET',
+        headers: { host: 'localhost:3000', origin: API_ORIGIN },
+      }),
+      withRouteParams(),
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toMatchObject({ status: 'ok', checks: { mongodb: 'ok' } })
+  })
 })

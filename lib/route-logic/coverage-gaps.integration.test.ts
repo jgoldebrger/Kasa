@@ -586,7 +586,9 @@ describe.sequential('route-logic coverage gaps', () => {
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.family.openBalance).toBeUndefined()
-      expect(body.payments).toEqual([])
+      expect(body.memberFinancialAccess).toBe(true)
+      expect(Array.isArray(body.payments)).toBe(true)
+      expect(body.payments.length).toBeGreaterThan(0)
       bindSession(ctx)
     })
 

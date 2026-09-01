@@ -155,3 +155,23 @@ describe('auth.config authorized — cron secret middleware gate', () => {
     expect(result).toBe(true)
   })
 })
+
+describe('auth.config authorized — public marketing pages', () => {
+  function pageRequest(path: string): Parameters<typeof authorized>[0]['request'] {
+    return {
+      nextUrl: new URL(`https://app.test${path}`),
+      headers: new Headers(),
+    } as unknown as Parameters<typeof authorized>[0]['request']
+  }
+
+  it('allows unauthenticated visitors on help, overview, trust, and dpa', () => {
+    for (const path of ['/help', '/help/first-login', '/overview', '/trust', '/dpa']) {
+      expect(authorized({ auth: null, request: pageRequest(path) })).toBe(true)
+    }
+  })
+
+  it('still requires a session for family ledger pages', () => {
+    const result = authorized({ auth: null, request: pageRequest('/families') })
+    expect(result).toBe(false)
+  })
+})

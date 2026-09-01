@@ -32,12 +32,33 @@ module.exports = {
           soft: 'rgb(var(--c-accent-soft) / <alpha-value>)',
           fg: 'rgb(var(--c-accent-fg) / <alpha-value>)',
         },
-        success: 'rgb(var(--c-success) / <alpha-value>)',
-        warning: 'rgb(var(--c-warning) / <alpha-value>)',
-        danger: 'rgb(var(--c-danger) / <alpha-value>)',
+        success: {
+          DEFAULT: 'rgb(var(--c-success) / <alpha-value>)',
+          soft: 'rgb(var(--c-success-soft) / <alpha-value>)',
+        },
+        warning: {
+          DEFAULT: 'rgb(var(--c-warning) / <alpha-value>)',
+          soft: 'rgb(var(--c-warning-soft) / <alpha-value>)',
+        },
+        danger: {
+          DEFAULT: 'rgb(var(--c-danger) / <alpha-value>)',
+          soft: 'rgb(var(--c-danger-soft) / <alpha-value>)',
+          fg: 'rgb(var(--c-danger-fg) / <alpha-value>)',
+        },
+        'success-soft': 'rgb(var(--c-success-soft) / <alpha-value>)',
+        'warning-soft': 'rgb(var(--c-warning-soft) / <alpha-value>)',
+        'danger-soft': 'rgb(var(--c-danger-soft) / <alpha-value>)',
+        'danger-fg': 'rgb(var(--c-danger-fg) / <alpha-value>)',
       },
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        display: [
+          'var(--font-display)',
+          'Iowan Old Style',
+          'Palatino Linotype',
+          'Palatino',
+          'serif',
+        ],
       },
       boxShadow: {
         card: '0 1px 0 rgb(0 0 0 / 0.04), 0 1px 2px rgb(0 0 0 / 0.04)',

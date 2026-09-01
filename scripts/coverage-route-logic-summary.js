@@ -7,7 +7,9 @@ const path = require('path')
 
 const summaryPath = path.join(__dirname, '..', 'coverage-route-logic', 'coverage-summary.json')
 if (!fs.existsSync(summaryPath)) {
-  console.error('Missing coverage-route-logic/coverage-summary.json — run npm run test:route-logic-coverage first.')
+  console.error(
+    'Missing coverage-route-logic/coverage-summary.json — run npm run test:route-logic-coverage first.',
+  )
   process.exit(1)
 }
 

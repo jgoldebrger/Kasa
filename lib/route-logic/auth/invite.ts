@@ -12,6 +12,7 @@ import { password as passwordSchema } from '@/lib/schemas/common'
 import { auth as authSchemas } from '@/lib/schemas'
 import { handler } from '@/lib/api/handler'
 import { hashInviteToken, findInviteByToken, findInviteByTokenLean } from '@/lib/invite-token'
+import { canAssignOrgRole } from '@/lib/org-role-policy'
 
 const INVITE_TTL_DAYS = 7
 
@@ -35,8 +36,16 @@ export const POST = handler({
     }
 
     const { email, role } = body
-    if (role === 'owner' && ctx.role !== 'owner') {
-      return { status: 403, data: { error: 'Only owners can invite other owners' } }
+    if (!canAssignOrgRole(ctx.role, role)) {
+      return {
+        status: 403,
+        data: {
+          error:
+            role === 'owner'
+              ? 'Only owners can invite other owners'
+              : 'Insufficient permissions to invite with this role',
+        },
+      }
     }
 
     const existingUser = await User.findOne({ email }).lean<{ _id: any }>()

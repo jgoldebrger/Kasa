@@ -14,12 +14,8 @@ describe('member schemas', () => {
     })
 
     it('accepts owner and admin roles', () => {
-      expect(addMemberBody.safeParse({ email: 'a@example.com', role: 'owner' }).success).toBe(
-        true,
-      )
-      expect(addMemberBody.safeParse({ email: 'b@example.com', role: 'admin' }).success).toBe(
-        true,
-      )
+      expect(addMemberBody.safeParse({ email: 'a@example.com', role: 'owner' }).success).toBe(true)
+      expect(addMemberBody.safeParse({ email: 'b@example.com', role: 'admin' }).success).toBe(true)
     })
 
     it('rejects invalid role', () => {

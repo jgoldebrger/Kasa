@@ -1,6 +1,7 @@
 'use client'
 
 import { KeyboardEvent, ReactNode, useId, useRef } from 'react'
+import { getWritingDirection, horizontalNavDelta } from '@/lib/ui/writing-direction'
 
 export interface TabItem {
   /** Stable key. */
@@ -46,12 +47,11 @@ export function Tabs({ items, activeId, onChange, label = 'Tabs', className = ''
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLButtonElement>, idx: number) {
-    if (e.key === 'ArrowRight') {
+    const dir = getWritingDirection(e.currentTarget)
+    const delta = horizontalNavDelta(e.key, dir)
+    if (delta !== 0) {
       e.preventDefault()
-      focusByOffset(idx, 1)
-    } else if (e.key === 'ArrowLeft') {
-      e.preventDefault()
-      focusByOffset(idx, -1)
+      focusByOffset(idx, delta)
     } else if (e.key === 'Home') {
       e.preventDefault()
       focusByOffset(-1, 1)

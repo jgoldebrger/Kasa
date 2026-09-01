@@ -12,7 +12,5 @@ export default function MembersRedirect() {
   useEffect(() => {
     router.replace('/settings?tab=members')
   }, [router])
-  return (
-    <div className="p-6 text-sm text-fg-muted">Redirecting to Settings…</div>
-  )
+  return <div className="p-6 text-sm text-fg-muted">Redirecting to Settings…</div>
 }

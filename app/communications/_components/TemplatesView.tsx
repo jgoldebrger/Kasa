@@ -17,7 +17,6 @@ import {
 } from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
-import CommunicationsNav from './CommunicationsNav'
 import EmailComposeEditor from './EmailComposeEditor'
 import {
   apiErrorMessage,
@@ -291,8 +290,6 @@ export default function TemplatesView() {
             'Manage reusable subject lines and message bodies.',
           )}
         />
-
-        <CommunicationsNav />
 
         <div className="flex flex-wrap items-end gap-3">
           <Select

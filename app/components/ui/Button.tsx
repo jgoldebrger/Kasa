@@ -26,7 +26,7 @@ const variantClass: Record<Variant, string> = {
   ghost:
     'bg-transparent text-fg-muted hover:bg-fg/5 hover:text-fg active:bg-fg/10 disabled:text-fg-subtle',
   destructive:
-    'bg-danger text-white shadow-sm hover:bg-danger/90 active:bg-danger/80 disabled:bg-danger/40 disabled:text-white/80',
+    'bg-danger text-danger-fg shadow-sm hover:bg-danger/90 active:bg-danger/80 disabled:bg-danger/40 disabled:text-danger-fg/80',
   link: 'bg-transparent text-accent hover:underline disabled:text-accent/50 px-0 py-0',
 }
 
@@ -81,10 +81,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       {loading ? (
         <Spinner size={size} />
       ) : (
-        leftIcon && <span className="-ml-0.5 inline-flex">{leftIcon}</span>
+        leftIcon && <span className="-ms-0.5 inline-flex">{leftIcon}</span>
       )}
       {children}
-      {!loading && rightIcon && <span className="-mr-0.5 inline-flex">{rightIcon}</span>}
+      {!loading && rightIcon && <span className="-me-0.5 inline-flex">{rightIcon}</span>}
     </button>
   )
 })

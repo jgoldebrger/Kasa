@@ -9,7 +9,13 @@ import { Modal as Component } from './Modal'
 
 describe('Modal smoke', () => {
   it('renders without crashing', () => {
-    const { container } = render(React.createElement(Component, { open: false, onClose: () => {}, title: 'Smoke' }, 'body') as React.ReactElement)
+    const { container } = render(
+      React.createElement(
+        Component,
+        { open: false, onClose: () => {}, title: 'Smoke' },
+        'body',
+      ) as React.ReactElement,
+    )
     expect(container).toBeDefined()
   })
 })

@@ -82,10 +82,7 @@ describe('database (unit)', () => {
     )
 
     listeners.error![0](new Error('socket reset'))
-    expect(errorSpy).toHaveBeenCalledWith(
-      '[database] MongoDB connection error:',
-      'socket reset',
-    )
+    expect(errorSpy).toHaveBeenCalledWith('[database] MongoDB connection error:', 'socket reset')
 
     warnSpy.mockRestore()
     errorSpy.mockRestore()

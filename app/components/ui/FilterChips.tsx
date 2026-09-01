@@ -33,7 +33,7 @@ export default function FilterChips({ filters, onClearAll, summary }: Props) {
             type="button"
             onClick={f.clear}
             aria-label={`Clear ${f.label} filter`}
-            className="focus-ring -mr-0.5 rounded p-0.5 text-fg-subtle hover:text-fg"
+            className="focus-ring -me-0.5 rounded p-0.5 text-fg-subtle hover:text-fg"
           >
             <XMarkIcon className="h-3 w-3" />
           </button>
@@ -48,7 +48,7 @@ export default function FilterChips({ filters, onClearAll, summary }: Props) {
           Clear all
         </button>
       )}
-      {summary && <span className="ml-auto text-fg-subtle">{summary}</span>}
+      {summary && <span className="ms-auto text-fg-subtle">{summary}</span>}
     </div>
   )
 }

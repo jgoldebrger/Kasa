@@ -32,8 +32,8 @@ export default function ConfirmDialog({
       title={
         destructive ? (
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-500/10 flex items-center justify-center shrink-0">
-              <ExclamationTriangleIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
+            <div className="w-10 h-10 rounded-full bg-danger/10 flex items-center justify-center shrink-0">
+              <ExclamationTriangleIcon className="h-6 w-6 text-danger" />
             </div>
             <span>{title}</span>
           </div>

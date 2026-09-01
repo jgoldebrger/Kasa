@@ -9,7 +9,13 @@ import { Select as Component } from './Select'
 
 describe('Select smoke', () => {
   it('renders without crashing', () => {
-    const { container } = render(React.createElement(Component, { 'aria-label': 'smoke' }, React.createElement('option', null, 'a')) as React.ReactElement)
+    const { container } = render(
+      React.createElement(
+        Component,
+        { 'aria-label': 'smoke' },
+        React.createElement('option', null, 'a'),
+      ) as React.ReactElement,
+    )
     expect(container).toBeDefined()
   })
 })

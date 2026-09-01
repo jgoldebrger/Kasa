@@ -21,7 +21,6 @@ import { formatLocaleDate } from '@/lib/date-utils'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { useT } from '@/lib/client/i18n'
 import type { MessageKey } from '@/lib/i18n/load-locale'
-import PaymentsNav from './PaymentsNav'
 
 export interface RecurringPaymentRow {
   _id: string
@@ -306,8 +305,6 @@ export default function RecurringPaymentsView() {
             ) : undefined
           }
         />
-
-        <PaymentsNav />
 
         {failedQueue.length > 0 && (
           <Card>

@@ -15,6 +15,7 @@ import { checkRateLimit } from '@/lib/rate-limit'
 import { scheduleYearlyCalculationRefresh } from '@/lib/calculations'
 import { familyLedgerListQuery, listFamilyLedger } from '@/lib/family-ledger-list'
 import { requireFamilyPaymentAccess } from '@/lib/member-family-access.server'
+import { sanitizeRoutingNumber } from '@/lib/payments/sanitize-check-info'
 
 const LEDGER_CACHE_HEADERS = {
   'Cache-Control': 'private, max-age=15, stale-while-revalidate=60',
@@ -215,7 +216,13 @@ export const POST = handler({
     }
     if (body.memberId) doc.memberId = body.memberId
     if (method === 'credit_card' && body.ccInfo) doc.ccInfo = body.ccInfo
-    if (method === 'check' && body.checkInfo) doc.checkInfo = body.checkInfo
+    if (method === 'check' && body.checkInfo) {
+      const checkInfo = { ...body.checkInfo }
+      if (body.checkInfo.routingNumber) {
+        checkInfo.routingNumber = sanitizeRoutingNumber(body.checkInfo.routingNumber)
+      }
+      doc.checkInfo = checkInfo
+    }
 
     const payment = await Payment.create(doc)
 

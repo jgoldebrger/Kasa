@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Sidebar from './Sidebar'
 import MobileTopBar from './MobileTopBar'
@@ -10,6 +10,7 @@ import OfflineSyncIndicator from './OfflineSyncIndicator'
 import OfflineQueueSyncHost from './OfflineQueueSyncHost'
 import KeyboardShortcuts from './KeyboardShortcuts'
 import GlobalQuickActionModals from './GlobalQuickActionModals'
+import { useT } from '@/lib/client/i18n'
 import {
   fetchSupportModeStatus,
   useSupportModeChanged,
@@ -28,14 +29,21 @@ const FULLSCREEN_PATHS = [
   '/terms',
   '/subprocessors',
   '/pricing',
+  '/help',
+  '/overview',
+  '/trust',
+  '/status',
+  '/dpa',
 ]
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || ''
+  const t = useT()
   const isFullscreen = FULLSCREEN_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [supportMode, setSupportMode] = useState<SupportModeDetail>({ active: false })
+  const drawerRef = useRef<HTMLDivElement>(null)
 
   useSupportModeChanged(
     useCallback((detail) => {
@@ -54,11 +62,48 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     setMenuOpen(false)
   }, [pathname])
 
-  // Close on Escape — Modal handles its own, but the drawer needs its own listener.
+  // Move focus into the drawer on open — mirrors Modal's focus-trap pattern.
+  // The drawer is rendered inline (not a portal), so the ref is already
+  // attached by the time this effect runs; no need for Modal's setTimeout.
+  // Focus restoration on close is handled explicitly below (Escape) or by
+  // Sidebar's close button / backdrop click returning focus naturally.
+  useEffect(() => {
+    if (!menuOpen) return
+    const node = drawerRef.current
+    const focusable = node?.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    )
+    ;(focusable || node)?.focus()
+  }, [menuOpen])
+
+  // Escape closes + restores focus to the trigger; Tab/Shift+Tab cycle
+  // focus within the drawer's focusable elements while it's open.
   useEffect(() => {
     if (!menuOpen) return
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setMenuOpen(false)
+      if (e.key === 'Escape') {
+        setMenuOpen(false)
+        document.getElementById('mobile-nav-trigger')?.focus()
+        return
+      }
+      if (e.key !== 'Tab') return
+      const node = drawerRef.current
+      if (!node) return
+      const focusables = Array.from(
+        node.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.offsetParent !== null || el === document.activeElement)
+      if (focusables.length === 0) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
@@ -72,7 +117,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <>
       {/* Skip-to-content link — first focusable element in the page. */}
       <a href="#main-content" className="skip-link">
-        Skip to main content
+        {t('nav.skipToContent')}
       </a>
 
       {/* Mobile top bar (hidden on md+). */}
@@ -97,10 +142,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             aria-hidden="true"
           />
           <div
+            ref={drawerRef}
             id="primary-sidebar"
             role="dialog"
             aria-modal="true"
-            aria-label="Navigation menu"
+            aria-label={t('nav.primary')}
+            tabIndex={-1}
             className="relative h-full w-72 max-w-[85vw] animate-ui-slide shadow-2xl"
           >
             <Sidebar onClose={() => setMenuOpen(false)} />

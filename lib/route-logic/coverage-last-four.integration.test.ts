@@ -87,7 +87,7 @@ describe.sequential('route-logic last four coverage gaps', () => {
     process.env.PLATFORM_ADMIN_EMAILS = ''
     ctx = await seedApiRouteFixtures()
     process.env.PLATFORM_ADMIN_EMAILS = ctx.email
-        process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
+    process.env.KASA_TEST_STRIPE_ORG = ctx.orgId
     process.env.KASA_TEST_STRIPE_FAMILY = ctx.fixtures.familyId
     bindSession(ctx)
   })
@@ -117,7 +117,8 @@ describe.sequential('route-logic last four coverage gaps', () => {
         lean: vi.fn().mockRejectedValue(new Error('plan lookup failed')),
       }),
     } as never)
-    const { POST } = await import('@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family')
+    const { POST } =
+      await import('@/lib/route-logic/families/[id]/members/[memberId]/convert-to-family')
     const res = await POST(
       orgJsonReq(
         `/api/families/${ctx.fixtures.familyId}/members/${member._id}/convert-to-family`,
@@ -133,17 +134,25 @@ describe.sequential('route-logic last four coverage gaps', () => {
     )
     consoleSpy.mockRestore()
     planSpy.mockRestore()
-    const created = await Family.findOne({ parentFamilyId: ctx.fixtures.familyId, name: /Last Four/ })
+    const created = await Family.findOne({
+      parentFamilyId: ctx.fixtures.familyId,
+      name: /Last Four/,
+    })
     if (created) await Family.deleteOne({ _id: created._id })
     await FamilyMember.deleteOne({ _id: member._id })
-    await Organization.updateOne({ _id: ctx.orgId }, { $unset: { weddingConversionDefaultPlanId: 1 } })
+    await Organization.updateOne(
+      { _id: ctx.orgId },
+      { $unset: { weddingConversionDefaultPlanId: 1 } },
+    )
   })
 
   it('tax-receipts worker logs continuation HTTP errors', async () => {
     await seedEmailConfig()
     const { Family, EmailJob } = await import('@/lib/models')
     const taxMod = await import('@/lib/tax-receipts/send-receipt')
-    const sendSpy = vi.spyOn(taxMod, 'sendOneFamilyTaxReceipt').mockResolvedValue({ ok: true, email: null })
+    const sendSpy = vi
+      .spyOn(taxMod, 'sendOneFamilyTaxReceipt')
+      .mockResolvedValue({ ok: true, email: null })
     const logMod = await import('@/lib/log')
     const logSpy = vi.spyOn(logMod, 'logError').mockImplementation(() => {})
     const fetchSpy = vi.fn().mockResolvedValue({
@@ -192,5 +201,4 @@ describe.sequential('route-logic last four coverage gaps', () => {
       vi.unstubAllGlobals()
     }
   })
-
 })

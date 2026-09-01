@@ -10,11 +10,7 @@ vi.mock('next/headers', () => ({
 
 const API_ORIGIN = 'http://localhost:3000'
 
-function cronJsonReq(
-  path: string,
-  method: string,
-  opts?: { query?: string },
-): NextRequest {
+function cronJsonReq(path: string, method: string, opts?: { query?: string }): NextRequest {
   const secret = process.env.CRON_SECRET || 'test-cron-secret'
   const headers: Record<string, string> = {
     host: 'localhost:3000',
@@ -85,7 +81,15 @@ describe('generate-monthly-statements family chunking (integration)', () => {
 
     const calculations = await import('@/lib/calculations')
     const period = await import('@/lib/statements/period')
-    vi.spyOn(calculations, 'calculateFamilyBalance').mockResolvedValue({ openingBalance: 0, planCost: 0, totalPayments: 0, totalWithdrawals: 0, totalLifecyclePayments: 0, totalCycleCharges: 0, balance: 0 })
+    vi.spyOn(calculations, 'calculateFamilyBalance').mockResolvedValue({
+      openingBalance: 0,
+      planCost: 0,
+      totalPayments: 0,
+      totalWithdrawals: 0,
+      totalLifecyclePayments: 0,
+      totalCycleCharges: 0,
+      balance: 0,
+    })
     vi.spyOn(period, 'loadStatementPeriod').mockResolvedValue({
       payments: [],
       priorPeriodRefunds: [],

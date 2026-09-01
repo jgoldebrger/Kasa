@@ -158,7 +158,7 @@ export async function requireOrg(
     return NextResponse.json({ error: 'Invalid organization id' }, { status: 400 })
   }
 
-  // Fast path: JWT memberships (refreshed ~30s). Skipped for admin/owner
+  // Fast path: JWT memberships (refreshed ~10s). Skipped for admin/owner
   // gates so demotions and role changes take effect immediately.
   const requireFreshMembership = options.minRole === 'admin' || options.minRole === 'owner'
 

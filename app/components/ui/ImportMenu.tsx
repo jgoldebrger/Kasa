@@ -6,17 +6,13 @@
  * upload modal. Used internally by <DataView> when `import` is configured.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   ArrowUpTrayIcon,
   DocumentArrowDownIcon,
   DocumentArrowUpIcon,
 } from '@heroicons/react/24/outline'
-import {
-  downloadImportTemplate,
-  IMPORT_LABELS,
-  type ImportType,
-} from '@/lib/import-templates'
+import { downloadImportTemplate, IMPORT_LABELS, type ImportType } from '@/lib/import-templates'
 
 interface Props {
   type: ImportType
@@ -33,6 +29,46 @@ interface Props {
 export default function ImportMenu({ type, onUpload, disabled, boundToFamily }: Props) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement | null>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
+
+  const closeAndRestoreFocus = () => {
+    setOpen(false)
+    triggerRef.current?.focus()
+  }
+
+  useLayoutEffect(() => {
+    if (!open) return
+    menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus()
+  }, [open])
+
+  const focusMenuItem = (offset: number) => {
+    const enabledItems = Array.from(
+      menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ??
+        [],
+    )
+    if (enabledItems.length === 0) return
+
+    const currentIndex = enabledItems.findIndex((item) => item === document.activeElement)
+    const startIndex = currentIndex >= 0 ? currentIndex : offset > 0 ? -1 : 0
+    const nextIndex = (startIndex + offset + enabledItems.length) % enabledItems.length
+    enabledItems[nextIndex]?.focus()
+  }
+
+  const onMenuKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      closeAndRestoreFocus()
+      return
+    }
+
+    const delta = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0
+    if (delta !== 0) {
+      e.preventDefault()
+      focusMenuItem(delta)
+    }
+  }
 
   useEffect(() => {
     if (!open) return
@@ -40,7 +76,7 @@ export default function ImportMenu({ type, onUpload, disabled, boundToFamily }: 
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key === 'Escape') closeAndRestoreFocus()
     }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -51,23 +87,25 @@ export default function ImportMenu({ type, onUpload, disabled, boundToFamily }: 
   }, [open])
 
   const handleTemplate = () => {
-    setOpen(false)
+    closeAndRestoreFocus()
     void downloadImportTemplate(type, { boundToFamily: !!boundToFamily })
   }
 
   const handleUpload = () => {
-    setOpen(false)
+    closeAndRestoreFocus()
     onUpload()
   }
 
   return (
     <div className="relative" ref={ref}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => !disabled && setOpen((o) => !o)}
         disabled={disabled}
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label="Import"
         title="Import"
         className="focus-ring inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-fg-muted hover:bg-fg/5 hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
       >
@@ -77,8 +115,10 @@ export default function ImportMenu({ type, onUpload, disabled, boundToFamily }: 
 
       {open && (
         <div
+          ref={menuRef}
           role="menu"
-          className="absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-md border border-border bg-surface shadow-popover"
+          onKeyDown={onMenuKeyDown}
+          className="absolute end-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-md border border-border bg-surface shadow-popover"
         >
           <div className="border-b border-border px-3 py-2">
             <p className="text-[11px] font-medium text-fg-muted">
@@ -89,7 +129,7 @@ export default function ImportMenu({ type, onUpload, disabled, boundToFamily }: 
             type="button"
             role="menuitem"
             onClick={handleTemplate}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-fg hover:bg-fg/5"
+            className="flex w-full items-center gap-2 px-3 py-2 text-start text-sm text-fg hover:bg-fg/5"
           >
             <DocumentArrowDownIcon className="h-4 w-4 text-fg-subtle" aria-hidden="true" />
             <div>
@@ -103,7 +143,7 @@ export default function ImportMenu({ type, onUpload, disabled, boundToFamily }: 
             type="button"
             role="menuitem"
             onClick={handleUpload}
-            className="flex w-full items-center gap-2 border-t border-border px-3 py-2 text-left text-sm text-fg hover:bg-fg/5"
+            className="flex w-full items-center gap-2 border-t border-border px-3 py-2 text-start text-sm text-fg hover:bg-fg/5"
           >
             <DocumentArrowUpIcon className="h-4 w-4 text-fg-subtle" aria-hidden="true" />
             <div>

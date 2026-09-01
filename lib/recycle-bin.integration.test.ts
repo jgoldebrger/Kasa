@@ -155,13 +155,13 @@ describe('recycle-bin (integration)', () => {
     expect(restored).toBeTruthy()
     expect(restored!.cascadeRestored).toBe(0)
 
-    const visible = await Family.findById(family._id).lean() as import('@/lib/test/type-helpers').LeanDoc | null
+    const visible = (await Family.findById(family._id).lean()) as
+      | import('@/lib/test/type-helpers').LeanDoc
+      | null
     expect(visible).toBeTruthy()
     expect(visible!.deletedAt).toBeFalsy()
 
-    expect(auditMock).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'family.restore' }),
-    )
+    expect(auditMock).toHaveBeenCalledWith(expect.objectContaining({ action: 'family.restore' }))
   })
 
   it('restoreFromBin rejects child restore when parent family is still deleted', async () => {
@@ -215,9 +215,7 @@ describe('recycle-bin (integration)', () => {
     const gone = await Task.findById(task._id, null, { includeDeleted: true })
     expect(gone).toBeNull()
 
-    expect(auditMock).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'task.purge' }),
-    )
+    expect(auditMock).toHaveBeenCalledWith(expect.objectContaining({ action: 'task.purge' }))
   })
 
   it('purgeFromBin returns null when the item is not in the bin', async () => {

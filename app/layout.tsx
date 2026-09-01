@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+import { Inter, Source_Serif_4 } from 'next/font/google'
 import './globals.css'
 import './error-handler'
 import SessionProviderWrapper from './components/SessionProviderWrapper'
@@ -15,6 +15,8 @@ import { enforceLayoutSubscriptionGate } from '@/lib/billing/layout-subscription
 import { loadServerOrgShell } from '@/lib/server-org-shell'
 import { OrgRoleProvider } from '@/lib/client/useOrgRole'
 import { headers, cookies } from 'next/headers'
+import { resolveAppBaseUrl } from '@/lib/app-base-url'
+import { NOINDEX_NOFOLLOW } from '@/lib/seo/metadata'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -22,9 +24,29 @@ const inter = Inter({
   variable: '--font-inter',
 })
 
+const sourceSerif = Source_Serif_4({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-display',
+})
+
 export const metadata: Metadata = {
-  title: 'Kasa Family Management',
-  description: 'Family financial management system with age-based payment plans',
+  metadataBase: new URL(resolveAppBaseUrl()),
+  title: {
+    default: 'Kasa',
+    template: '%s',
+  },
+  description:
+    'Membership books for kehilla treasurers. Age-based dues, Hebrew-calendar statements, and family balances — without spreadsheet reconciliation.',
+  robots: NOINDEX_NOFOLLOW,
+  openGraph: {
+    type: 'website',
+    siteName: 'Kasa',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image',
+  },
   manifest: '/manifest.webmanifest',
   icons: {
     icon: '/icons/icon.svg',
@@ -101,7 +123,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const initialDir = RTL_LOCALES_SERVER.includes(initialLocale) ? 'rtl' : 'ltr'
 
   return (
-    <html lang={initialLocale} dir={initialDir} className={inter.variable} suppressHydrationWarning>
+    <html
+      lang={initialLocale}
+      dir={initialDir}
+      className={`${inter.variable} ${sourceSerif.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         {/*
           Preconnect to Stripe origins. The payment form is dynamically

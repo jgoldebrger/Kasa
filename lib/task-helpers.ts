@@ -38,8 +38,7 @@ export async function createPaymentDeclinedTask(
       relatedFamilyId: familyId,
       relatedMemberId: memberId || undefined,
       relatedPaymentId: paymentId || undefined,
-      notes:
-        `Payment amount: $${amount.toLocaleString()}. This task was automatically created due to payment failure.`,
+      notes: `Payment amount: $${amount.toLocaleString()}. This task was automatically created due to payment failure.`,
     })
 
     await notifyAdmins(organizationId, {
@@ -60,4 +59,3 @@ export async function createPaymentDeclinedTask(
     return null
   }
 }
-

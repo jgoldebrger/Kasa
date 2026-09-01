@@ -41,9 +41,7 @@ describe('processLogoDataUrl', () => {
   })
 
   it('rejects non-data-url input', async () => {
-    expect(
-      await processLogoDataUrl('https://example.com/assets/org-logo-v2.png'),
-    ).toEqual({
+    expect(await processLogoDataUrl('https://example.com/assets/org-logo-v2.png')).toEqual({
       error: 'Logo must be a data URL of type png, jpeg, webp, gif, or svg.',
     })
   })
@@ -78,9 +76,7 @@ describe('processLogoDataUrl', () => {
 
   it('retries at 128px when the first resize exceeds the output cap', async () => {
     const huge = Buffer.alloc(210 * 1024, 1)
-    toBuffer
-      .mockResolvedValueOnce(huge)
-      .mockResolvedValueOnce(outBuffer)
+    toBuffer.mockResolvedValueOnce(huge).mockResolvedValueOnce(outBuffer)
     resize.mockClear()
 
     const result = await processLogoDataUrl(TINY_PNG_DATA_URL)
