@@ -2,6 +2,7 @@ import { Types } from 'mongoose'
 import { Family, PaymentPlan, LifecycleEventPayment, CycleConfig, Organization } from '@/lib/models'
 import { calculateFamilyBalance } from '@/lib/calculations'
 import { MERGE_FIELD_DEFINITIONS, type MergeFieldKey } from './merge-field-definitions'
+import { formatPhoneDisplay } from '@/lib/phone-format'
 
 export type MergeFieldContext = Partial<Record<MergeFieldKey, string | number>>
 
@@ -143,9 +144,9 @@ export async function loadMergeFieldContext(
     familyName: family.name || '',
     hebrewName: family.hebrewName || '',
     email: family.email || '',
-    phone: family.phone || '',
-    husbandCellPhone: family.husbandCellPhone || '',
-    wifeCellPhone: family.wifeCellPhone || '',
+    phone: formatPhoneDisplay(family.phone || ''),
+    husbandCellPhone: formatPhoneDisplay(family.husbandCellPhone || ''),
+    wifeCellPhone: formatPhoneDisplay(family.wifeCellPhone || ''),
     street: family.street || family.address || '',
     city: family.city || '',
     state: family.state || '',
@@ -205,9 +206,9 @@ async function buildMergeContextForFamily(
     familyName: family.name || '',
     hebrewName: family.hebrewName || '',
     email: family.email || '',
-    phone: family.phone || '',
-    husbandCellPhone: family.husbandCellPhone || '',
-    wifeCellPhone: family.wifeCellPhone || '',
+    phone: formatPhoneDisplay(family.phone || ''),
+    husbandCellPhone: formatPhoneDisplay(family.husbandCellPhone || ''),
+    wifeCellPhone: formatPhoneDisplay(family.wifeCellPhone || ''),
     street: family.street || family.address || '',
     city: family.city || '',
     state: family.state || '',

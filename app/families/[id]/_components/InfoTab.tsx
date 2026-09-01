@@ -17,6 +17,8 @@ import type { FamilyDetailContextValue } from '../FamilyDetailContext'
 import { useFamilyDetail } from '../FamilyDetailContext'
 import { familyTabHref } from '../_lib/constants'
 import { normalizePlanId } from '@/lib/payment-plan-display'
+import { formatPhoneInput } from '@/lib/phone-format'
+import { EmailLink, PhoneLink } from '@/app/components/ContactLinks'
 import MemberFinancialPanel from './MemberFinancialPanel'
 import MemberMakePaymentModal from './MemberMakePaymentModal'
 import MergeFamilyModal from './MergeFamilyModal'
@@ -104,11 +106,11 @@ function InfoTabContent(props: FamilyDetailContextValue) {
       wifeFirstName: family.wifeFirstName || '',
       wifeHebrewName: family.wifeHebrewName || '',
       wifeFatherHebrewName: family.wifeFatherHebrewName || '',
-      husbandCellPhone: family.husbandCellPhone || '',
-      wifeCellPhone: family.wifeCellPhone || '',
+      husbandCellPhone: formatPhoneInput(family.husbandCellPhone || ''),
+      wifeCellPhone: formatPhoneInput(family.wifeCellPhone || ''),
       address: family.address || '',
       street: family.street || '',
-      phone: family.phone || '',
+      phone: formatPhoneInput(family.phone || ''),
       email: family.email || '',
       city: family.city || '',
       state: family.state || '',
@@ -285,7 +287,11 @@ function InfoTabContent(props: FamilyDetailContextValue) {
           {renderEditableField(
             'husbandCellPhone',
             <p className="font-medium text-fg tabular">
-              {family.husbandCellPhone || emptyValue()}
+              {family.husbandCellPhone ? (
+                <PhoneLink value={family.husbandCellPhone} />
+              ) : (
+                emptyValue()
+              )}
             </p>,
             'phone',
           )}
@@ -317,7 +323,9 @@ function InfoTabContent(props: FamilyDetailContextValue) {
         <InfoField label="Cell phone">
           {renderEditableField(
             'wifeCellPhone',
-            <p className="font-medium text-fg tabular">{family.wifeCellPhone || emptyValue()}</p>,
+            <p className="font-medium text-fg tabular">
+              {family.wifeCellPhone ? <PhoneLink value={family.wifeCellPhone} /> : emptyValue()}
+            </p>,
             'phone',
           )}
         </InfoField>
@@ -328,7 +336,9 @@ function InfoTabContent(props: FamilyDetailContextValue) {
           {renderEditableField(
             'email',
             <div className="space-y-2">
-              <p className="font-medium text-fg break-all">{family.email || emptyValue()}</p>
+              <p className="font-medium text-fg break-all">
+                {family.email ? <EmailLink value={family.email} /> : emptyValue()}
+              </p>
               {family.email && <FamilyEmailIndicators family={family} />}
               {isAdmin && family.email && (
                 <FamilyEmailAdminActions
@@ -348,7 +358,9 @@ function InfoTabContent(props: FamilyDetailContextValue) {
         <InfoField label="Home phone">
           {renderEditableField(
             'phone',
-            <p className="font-medium text-fg tabular">{family.phone || emptyValue()}</p>,
+            <p className="font-medium text-fg tabular">
+              {family.phone ? <PhoneLink value={family.phone} /> : emptyValue()}
+            </p>,
             'phone',
           )}
         </InfoField>

@@ -11,6 +11,8 @@ import {
   PlusIcon,
 } from '@heroicons/react/24/outline'
 import RecordPaymentModal from '@/app/components/payments/RecordPaymentModal'
+import { formatPhoneDisplay } from '@/lib/phone-format'
+import { PhoneLink } from '@/app/components/ContactLinks'
 import BatchChargeModal from '@/app/payments/_components/BatchChargeModal'
 import { useToast } from '@/app/components/Toast'
 import {
@@ -276,9 +278,15 @@ export default function PaymentsView({
         sortable: true,
         defaultHidden: true,
         cell: (p) => (
-          <span className="text-fg-muted text-sm tabular">{p.familyId?.phone || '—'}</span>
+          <span className="text-fg-muted text-sm tabular">
+            {p.familyId?.phone ? (
+              <PhoneLink value={p.familyId.phone} className="text-fg-muted text-sm" />
+            ) : (
+              '—'
+            )}
+          </span>
         ),
-        exportValue: (p) => p.familyId?.phone || '',
+        exportValue: (p) => (p.familyId?.phone ? formatPhoneDisplay(p.familyId.phone) : ''),
       },
       {
         id: 'amount',

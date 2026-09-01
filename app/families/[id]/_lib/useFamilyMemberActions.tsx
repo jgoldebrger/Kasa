@@ -7,6 +7,7 @@ import {
   handleHebrewInput,
   capitalizeName,
   formatPhone,
+  formatPhoneInput,
   validateEmail,
   type FamilyDetails,
 } from './helpers'
@@ -230,6 +231,8 @@ export function useFamilyMemberActions({
     if ((fieldName === 'birthDate' || fieldName === 'weddingDate') && currentValue) {
       const date = new Date(currentValue)
       setEditMemberValue(date.toISOString().split('T')[0])
+    } else if (['phone', 'spouseCellPhone'].includes(fieldName)) {
+      setEditMemberValue(formatPhoneInput(currentValue ? String(currentValue) : ''))
     } else {
       setEditMemberValue(currentValue || '')
     }
@@ -357,7 +360,7 @@ export function useFamilyMemberActions({
           type: 'tel' as const,
           value: editMemberValue,
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-            setEditMemberValue(formatPhone(e.target.value))
+            setEditMemberValue(formatPhoneInput(e.target.value))
           },
           onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
             if (e.key === 'Enter') handleMemberFieldSave(fieldName, memberId)
@@ -488,6 +491,25 @@ export function useFamilyMemberActions({
             title="Cancel"
           >
             ✕
+          </button>
+        </div>
+      )
+    }
+
+    const isContactField = fieldType === 'phone' || fieldType === 'email'
+
+    if (isContactField) {
+      return (
+        <div className="group flex min-h-[2.5rem] items-center justify-between gap-2 rounded-md border border-transparent px-3 py-2 transition-colors hover:border-border hover:bg-app-subtle">
+          <div className="min-w-0 flex-1 text-sm">{displayValue}</div>
+          <button
+            type="button"
+            onClick={() => handleMemberFieldEdit(fieldName, currentValue, memberId)}
+            className="focus-ring inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-fg-subtle opacity-70 transition-opacity hover:bg-fg/5 group-hover:opacity-100"
+            title="Edit"
+            aria-label="Edit"
+          >
+            <PencilIcon className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       )

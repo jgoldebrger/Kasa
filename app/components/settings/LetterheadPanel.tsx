@@ -4,6 +4,7 @@ import type React from 'react'
 import { IdentificationIcon } from '@heroicons/react/24/outline'
 import { SettingsPanel } from '@/app/components/settings/SettingsPanel'
 import { Button, Input, Textarea } from '@/app/components/ui'
+import { formatPhoneInput } from '@/lib/phone-format'
 
 /**
  * Per-organization letterhead editor. Every field is optional free
@@ -84,7 +85,13 @@ export default function LetterheadPanel({ letterhead, setLetterhead, saving, onS
             Contact
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label="Phone" type="tel" placeholder="(555) 123-4567" {...bindInput('phone')} />
+            <Input
+              label="Phone"
+              type="tel"
+              placeholder="(555) 123-4567"
+              value={formatPhoneInput(letterhead.phone ?? '')}
+              onChange={(e) => update('phone', formatPhoneInput(e.target.value))}
+            />
             <Input
               label="Email"
               type="email"

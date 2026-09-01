@@ -11,6 +11,7 @@ import { calculateHebrewAge, convertToHebrewDate } from '@/lib/hebrew-date'
 import { buildMemberColumns, computeMemberDisplay } from '../_lib/helpers'
 import { paymentColumnsFor, paymentMobileCard } from '../_lib/helpers'
 import { sortPaymentRows } from '@/lib/payments/sort-payments'
+import { EmailLink, PhoneLink } from '@/app/components/ContactLinks'
 import { useFamilyDetail } from '../FamilyDetailContext'
 
 function InfoSection({ title, children }: { title: string; children: ReactNode }) {
@@ -353,7 +354,9 @@ function MembersTabContent(props: FamilyDetailContextValue) {
                         {renderEditableMemberField(
                           'spouseCellPhone',
                           <p className="font-medium text-fg">
-                            {member.spouseCellPhone || (
+                            {member.spouseCellPhone ? (
+                              <PhoneLink value={member.spouseCellPhone} />
+                            ) : (
                               <span className="text-fg-subtle font-normal">Not provided</span>
                             )}
                           </p>,
@@ -366,7 +369,9 @@ function MembersTabContent(props: FamilyDetailContextValue) {
                         {renderEditableMemberField(
                           'phone',
                           <p className="font-medium text-fg">
-                            {member.phone || (
+                            {member.phone ? (
+                              <PhoneLink value={member.phone} />
+                            ) : (
                               <span className="text-fg-subtle font-normal">Not provided</span>
                             )}
                           </p>,
@@ -379,7 +384,9 @@ function MembersTabContent(props: FamilyDetailContextValue) {
                         {renderEditableMemberField(
                           'email',
                           <p className="font-medium text-fg">
-                            {member.email || (
+                            {member.email ? (
+                              <EmailLink value={member.email} />
+                            ) : (
                               <span className="text-fg-subtle font-normal">Not provided</span>
                             )}
                           </p>,

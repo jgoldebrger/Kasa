@@ -14,6 +14,7 @@ import EmailFamilyModal from '@/app/families/_components/EmailFamilyModal'
 import FamilyEmailAdminActions from '@/app/families/_components/FamilyEmailAdminActions'
 import FamilyEmailIndicators from '@/app/families/_components/FamilyEmailIndicators'
 import FamilyTagsEditor from '@/app/families/_components/FamilyTagsEditor'
+import { EmailLink } from '@/app/components/ContactLinks'
 import { familyTabHref } from './_lib/constants'
 import MemberMakePaymentModal from './_components/MemberMakePaymentModal'
 import { useFamilyDetail } from './FamilyDetailContext'
@@ -67,7 +68,7 @@ export default function FamilyHeader() {
           {family.email && (
             <div className="mt-1 space-y-2">
               <p className="flex flex-wrap items-center gap-2 text-sm text-fg-muted">
-                <span>{family.email}</span>
+                <EmailLink value={family.email} className="text-fg-muted" />
                 <FamilyEmailIndicators family={family} />
               </p>
               {isAdmin && (

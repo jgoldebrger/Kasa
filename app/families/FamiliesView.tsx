@@ -27,6 +27,8 @@ import { getPlanDisplayName, normalizePlanId } from '@/lib/payment-plan-display'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import { formatLocaleDate, isFiniteDate } from '@/lib/date-utils'
+import { formatPhoneDisplay, formatPhoneInput, normalizePhoneDigits } from '@/lib/phone-format'
+import { EmailLink, PhoneLink } from '@/app/components/ContactLinks'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { useT } from '@/lib/client/i18n'
 import { useSupportModeReadOnly } from '@/lib/client/support-mode'
@@ -55,8 +57,6 @@ const capitalizeName = (text: string): string => {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ')
 }
-
-const formatPhone = (value: string): string => value.replace(/\D/g, '')
 
 const validateEmail = (email: string): boolean => {
   if (!email) return true
@@ -367,9 +367,9 @@ export default function FamiliesView({
       name: capitalizeName(formData.name),
       husbandFirstName: capitalizeName(formData.husbandFirstName),
       wifeFirstName: capitalizeName(formData.wifeFirstName),
-      husbandCellPhone: formatPhone(formData.husbandCellPhone),
-      wifeCellPhone: formatPhone(formData.wifeCellPhone),
-      phone: formatPhone(formData.phone),
+      husbandCellPhone: normalizePhoneDigits(formData.husbandCellPhone),
+      wifeCellPhone: normalizePhoneDigits(formData.wifeCellPhone),
+      phone: normalizePhoneDigits(formData.phone),
       email: (formData.email || '').trim(),
       emailOptOut: !!formData.emailOptOut,
       communicationsOptOut: !!formData.communicationsOptOut,
@@ -469,11 +469,11 @@ export default function FamiliesView({
       wifeFirstName: family.wifeFirstName || '',
       wifeHebrewName: family.wifeHebrewName || '',
       wifeFatherHebrewName: family.wifeFatherHebrewName || '',
-      husbandCellPhone: family.husbandCellPhone || '',
-      wifeCellPhone: family.wifeCellPhone || '',
+      husbandCellPhone: formatPhoneInput(family.husbandCellPhone || ''),
+      wifeCellPhone: formatPhoneInput(family.wifeCellPhone || ''),
       address: family.address || '',
       street: family.street || '',
-      phone: family.phone || '',
+      phone: formatPhoneInput(family.phone || ''),
       email: family.email || '',
       city: family.city || '',
       state: family.state || '',
@@ -918,7 +918,7 @@ export default function FamiliesView({
       defaultHidden: true,
       cell: (f) => (
         <span className="inline-flex items-center gap-1.5 text-fg-muted">
-          <span>{f.email || '—'}</span>
+          {f.email ? <EmailLink value={f.email} className="text-fg-muted" /> : <span>—</span>}
           <FamilyEmailIndicators family={f} compact />
         </span>
       ),
@@ -929,12 +929,18 @@ export default function FamiliesView({
       header: t('common.phone'),
       headerText: t('common.phone'),
       defaultHidden: true,
-      cell: (f) => (
-        <span className="text-fg-muted tabular">
-          {f.phone || f.husbandCellPhone || f.wifeCellPhone || '—'}
-        </span>
-      ),
-      exportValue: (f) => f.phone || f.husbandCellPhone || f.wifeCellPhone || '',
+      cell: (f) => {
+        const phone = f.phone || f.husbandCellPhone || f.wifeCellPhone
+        return (
+          <span className="text-fg-muted tabular">
+            {phone ? <PhoneLink value={phone} className="text-fg-muted" /> : '—'}
+          </span>
+        )
+      },
+      exportValue: (f) => {
+        const phone = f.phone || f.husbandCellPhone || f.wifeCellPhone
+        return phone ? formatPhoneDisplay(phone) : ''
+      },
     },
     {
       id: 'address',
@@ -1655,11 +1661,10 @@ function FamilyModalBody({
             autoComplete="tel"
             value={formData.husbandCellPhone}
             onChange={(e) =>
-              setFormData({ ...formData, husbandCellPhone: formatPhone(e.target.value) })
+              setFormData({ ...formData, husbandCellPhone: formatPhoneInput(e.target.value) })
             }
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none"
-            placeholder="1234567890"
-            pattern="[0-9]*"
+            placeholder="(555) 123-4567"
           />
         </div>
         <div>
@@ -1671,11 +1676,10 @@ function FamilyModalBody({
             autoComplete="tel"
             value={formData.wifeCellPhone}
             onChange={(e) =>
-              setFormData({ ...formData, wifeCellPhone: formatPhone(e.target.value) })
+              setFormData({ ...formData, wifeCellPhone: formatPhoneInput(e.target.value) })
             }
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none"
-            placeholder="1234567890"
-            pattern="[0-9]*"
+            placeholder="(555) 123-4567"
           />
         </div>
         <div className="sm:col-span-2">
@@ -1783,10 +1787,9 @@ function FamilyModalBody({
             type="tel"
             autoComplete="tel"
             value={formData.phone}
-            onChange={(e) => setFormData({ ...formData, phone: formatPhone(e.target.value) })}
+            onChange={(e) => setFormData({ ...formData, phone: formatPhoneInput(e.target.value) })}
             className="focus-ring w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none"
-            placeholder="1234567890"
-            pattern="[0-9]*"
+            placeholder="(555) 123-4567"
           />
         </div>
         <div>
