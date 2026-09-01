@@ -20,16 +20,7 @@ import {
 import LegalFooterLinks from './legal/LegalFooterLinks'
 import { Badge } from '@/app/components/ui'
 import type { MessageKey } from '@/lib/i18n/load-locale'
-import {
-  PRIMARY_NAV_SECTIONS,
-  filterNavSections,
-  findActiveNavItem,
-  readOpenSections,
-  writeOpenSections,
-  ensureSectionOpen,
-  sectionIdForPath,
-  type NavItem,
-} from '@/lib/nav'
+import { PRIMARY_NAV_SECTIONS, filterNavSections, findActiveNavItem, type NavItem } from '@/lib/nav'
 import {
   ArrowDownTrayIcon,
   ArrowRightOnRectangleIcon,
@@ -67,8 +58,6 @@ import {
 
 const GlobalSearch = dynamic(() => import('./GlobalSearch'), { ssr: false })
 const NotificationsBell = dynamic(() => import('./NotificationsBell'), { ssr: false })
-
-const SIDEBAR_FOOTER_STORAGE_KEY = 'kasa-sidebar-footer-open'
 
 /** Maps `NavItem.iconName` (declared in lib/nav/config.ts) to its Heroicon component. */
 const NAV_ICONS: Record<string, typeof ChartBarIcon> = {
@@ -161,53 +150,18 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
     [pathname, search, navSections],
   )
 
-  // Start empty (no localStorage read during render) to avoid SSR/client
-  // hydration mismatches; hydrate persisted + route-derived open sections
-  // in the effect below, after mount.
   const [openSectionIds, setOpenSectionIds] = useState<string[]>([])
 
-  useEffect(() => {
-    const stored = readOpenSections()
-    const activeSectionId = sectionIdForPath(pathname ?? '', search, navSections)
-    const next = activeSectionId ? ensureSectionOpen(stored, activeSectionId) : stored
-    setOpenSectionIds(next)
-    if (next !== stored) writeOpenSections(next)
-  }, [pathname, search, navSections])
-
   const toggleSection = useCallback((sectionId: string) => {
-    setOpenSectionIds((prev) => {
-      const next = prev.includes(sectionId)
-        ? prev.filter((id) => id !== sectionId)
-        : [...prev, sectionId]
-      writeOpenSections(next)
-      return next
-    })
+    setOpenSectionIds((prev) =>
+      prev.includes(sectionId) ? prev.filter((id) => id !== sectionId) : [...prev, sectionId],
+    )
   }, [])
 
-  // Footer (admin links + account + legal) starts collapsed; hydrate from
-  // localStorage after mount to avoid SSR/client mismatch.
   const [footerOpen, setFooterOpen] = useState(false)
 
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(SIDEBAR_FOOTER_STORAGE_KEY)
-      if (stored === '0') setFooterOpen(false)
-      if (stored === '1') setFooterOpen(true)
-    } catch {
-      /* ignore private-mode / blocked storage */
-    }
-  }, [])
-
   const toggleFooter = useCallback(() => {
-    setFooterOpen((prev) => {
-      const next = !prev
-      try {
-        localStorage.setItem(SIDEBAR_FOOTER_STORAGE_KEY, next ? '1' : '0')
-      } catch {
-        /* ignore */
-      }
-      return next
-    })
+    setFooterOpen((prev) => !prev)
   }, [])
 
   return (
