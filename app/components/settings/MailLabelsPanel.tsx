@@ -76,6 +76,16 @@ const MARITAL_OPTIONS: Array<{ value: MaritalFilter; label: string }> = [
 /** Presets only pre-fill the controls below, so they stay adjustable afterwards. */
 const PRESETS: Array<{ id: string; label: string; apply: Partial<MailLabelFilters> }> = [
   {
+    id: 'household',
+    label: 'Households',
+    apply: {
+      recipients: { household: true, husband: false, wife: false, sons: false, daughters: false },
+      marital: 'any',
+      minAge: null,
+      maxAge: null,
+    },
+  },
+  {
     id: 'ladies',
     label: 'Ladies',
     apply: {
@@ -106,6 +116,22 @@ const PRESETS: Array<{ id: string; label: string; apply: Partial<MailLabelFilter
     },
   },
 ]
+
+function chipClass(active: boolean, disabled = false): string {
+  return `focus-ring rounded-full border px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+    active
+      ? 'border-accent bg-accent text-accent-fg'
+      : 'border-border bg-surface text-fg hover:bg-fg/5'
+  }`
+}
+
+function segmentClass(active: boolean, disabled = false): string {
+  return `focus-ring whitespace-nowrap rounded-md border px-3 py-2 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+    active
+      ? 'border-accent bg-accent text-accent-fg'
+      : 'border-border bg-surface text-fg hover:bg-fg/5'
+  }`
+}
 
 function buildLabelHTML(rows: LabelRow[]): string {
   // Pad the array up to a full sheet so the grid renders consistently.
@@ -359,182 +385,172 @@ export default function MailLabelsPanel({ families, plans, filters, setFilters }
         </>
       }
     >
-      {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Input
-          label="Search by name or address"
-          placeholder="Smith / Main St…"
-          value={filters.search}
-          onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-        />
-        <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">Balance filter</label>
-          <div className="flex gap-2">
-            {(['all', 'negative'] as const).map((opt) => (
+      <div className="space-y-6">
+        {/* Quick presets — primary path for most mailings */}
+        <section>
+          <h3 className="text-sm font-medium text-fg">Mailing type</h3>
+          <p className="mt-0.5 text-xs text-fg-muted">
+            Pick a preset, then print. Tweak below if needed.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {PRESETS.map((preset) => (
               <button
-                key={opt}
+                key={preset.id}
                 type="button"
-                onClick={() => setFilters((f) => ({ ...f, balance: opt }))}
-                className={`focus-ring px-3 py-2 text-sm rounded-md border transition-colors ${
-                  filters.balance === opt
-                    ? 'bg-accent text-accent-fg border-accent'
-                    : 'bg-surface text-fg border-border hover:bg-fg/5'
-                }`}
+                onClick={() => setFilters((f) => ({ ...f, ...preset.apply }))}
+                className={chipClass(false)}
               >
-                {opt === 'all' ? 'All families' : 'Negative balance only'}
+                {preset.label}
               </button>
             ))}
           </div>
-          {filters.balance === 'negative' && balancesLoading && (
-            <p className="text-xs text-fg-muted mt-1">Loading balances…</p>
-          )}
-        </div>
-        <div className="flex items-end">
-          <label className="inline-flex items-center gap-2 text-sm text-fg cursor-pointer">
-            <input
-              type="checkbox"
-              checked={filters.requireAddress}
-              onChange={(e) => setFilters((f) => ({ ...f, requireAddress: e.target.checked }))}
-              className="h-4 w-4 rounded border-border text-accent focus-ring"
-            />
-            Require street address (skip families with no mailing address)
-          </label>
-        </div>
-      </div>
-      {plans.length > 0 && (
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-fg mb-1.5">
-            Payment plans
-            {filters.planIds.length > 0 && (
+        </section>
+
+        {/* Who gets a label */}
+        <section className="rounded-lg border border-border bg-app-subtle/30 p-4">
+          <h3 className="text-sm font-medium text-fg">Who gets a label</h3>
+          <p className="mt-0.5 text-xs text-fg-muted">
+            One label per selection. Everyone uses the household mailing address.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {RECIPIENT_OPTIONS.map(({ key, label }) => (
               <button
+                key={key}
                 type="button"
-                className="ml-2 text-xs text-accent hover:underline"
-                onClick={() => setFilters((f) => ({ ...f, planIds: [] }))}
-              >
-                Clear
-              </button>
-            )}
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {plans.map((p) => {
-              const on = filters.planIds.includes(p._id)
-              return (
-                <button
-                  key={p._id}
-                  type="button"
-                  onClick={() => togglePlan(p._id)}
-                  className={`focus-ring px-3 py-1.5 text-xs rounded-full border transition-colors ${
-                    on
-                      ? 'bg-accent text-accent-fg border-accent'
-                      : 'bg-surface text-fg border-border hover:bg-fg/5'
-                  }`}
-                >
-                  {p.name}
-                </button>
-              )
-            })}
-          </div>
-          {filters.planIds.length === 0 && (
-            <p className="text-xs text-fg-muted mt-1">No plans selected = all plans.</p>
-          )}
-        </div>
-      )}
-      {/* Recipients — who inside each matching family gets a label */};
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-fg mb-1.5">Recipients</label>
-        <div className="flex flex-wrap gap-4">
-          {RECIPIENT_OPTIONS.map(({ key, label }) => (
-            <label
-              key={key}
-              className="inline-flex items-center gap-2 text-sm text-fg cursor-pointer"
-            >
-              <input
-                type="checkbox"
-                checked={filters.recipients[key]}
-                onChange={(e) =>
+                aria-pressed={filters.recipients[key]}
+                onClick={() =>
                   setFilters((f) => ({
                     ...f,
-                    recipients: { ...f.recipients, [key]: e.target.checked },
+                    recipients: { ...f.recipients, [key]: !f.recipients[key] },
                   }))
                 }
-                className="h-4 w-4 rounded border-border text-accent focus-ring"
-              />
-              {label}
-            </label>
-          ))}
-        </div>
-        <p className="text-xs text-fg-muted mt-1">
-          Household prints one label per family addressed to the family name. Everyone else prints
-          one label per person, all sharing the household address.
-        </p>
-      </div>
-      {/* Presets — shortcuts that pre-fill the controls above and below */};
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-fg mb-1.5">Presets</label>
-        <div className="flex flex-wrap gap-2">
-          {PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              onClick={() => setFilters((f) => ({ ...f, ...preset.apply }))}
-              className="focus-ring px-3 py-1.5 text-xs rounded-full border border-border bg-surface text-fg hover:bg-fg/5 transition-colors"
-            >
-              {preset.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      {/* Child-only filters — meaningless unless Sons or Daughters is selected */};
-      <div
-        className={`grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 ${needMembers ? '' : 'opacity-50'}`}
-      >
-        <div>
-          <label className="block text-sm font-medium text-fg mb-1.5">Marital status</label>
-          <div className="flex flex-wrap gap-2">
-            {MARITAL_OPTIONS.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                disabled={!needMembers}
-                onClick={() => setFilters((f) => ({ ...f, marital: value }))}
-                className={`focus-ring px-3 py-2 text-sm rounded-md border transition-colors disabled:cursor-not-allowed ${
-                  filters.marital === value
-                    ? 'bg-accent text-accent-fg border-accent'
-                    : 'bg-surface text-fg border-border hover:bg-fg/5'
-                }`}
+                className={chipClass(filters.recipients[key])}
               >
                 {label}
               </button>
             ))}
           </div>
-          <p className="text-xs text-fg-muted mt-1">
-            A bochur or unmarried girl is a child with no wedding date. Married children usually
-            become their own family, so reach them with Household instead.
-          </p>
-        </div>
-        <Input
-          label="Minimum age"
-          type="number"
-          min={0}
-          placeholder="Any"
-          hint="Applies to sons and daughters."
-          disabled={!needMembers}
-          value={filters.minAge === null ? '' : String(filters.minAge)}
-          onChange={(e) => setFilters((f) => ({ ...f, minAge: parseAgeInput(e.target.value) }))}
-        />
-        <Input
-          label="Maximum age"
-          type="number"
-          min={0}
-          placeholder="Any"
-          hint="Both ages are inclusive."
-          disabled={!needMembers}
-          value={filters.maxAge === null ? '' : String(filters.maxAge)}
-          onChange={(e) => setFilters((f) => ({ ...f, maxAge: parseAgeInput(e.target.value) }))}
-        />
+
+          {needMembers && (
+            <div className="mt-4 grid grid-cols-1 gap-4 border-t border-border pt-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] md:items-end">
+              <div>
+                <span className="mb-1.5 block text-sm font-medium text-fg">Marital status</span>
+                <div className="flex flex-wrap gap-2">
+                  {MARITAL_OPTIONS.map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setFilters((f) => ({ ...f, marital: value }))}
+                      className={segmentClass(filters.marital === value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Input
+                label="Min age"
+                type="number"
+                min={0}
+                placeholder="Any"
+                value={filters.minAge === null ? '' : String(filters.minAge)}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, minAge: parseAgeInput(e.target.value) }))
+                }
+              />
+              <Input
+                label="Max age"
+                type="number"
+                min={0}
+                placeholder="Any"
+                value={filters.maxAge === null ? '' : String(filters.maxAge)}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, maxAge: parseAgeInput(e.target.value) }))
+                }
+              />
+            </div>
+          )}
+        </section>
+
+        {/* Family scope — collapsed by default */}
+        <details className="group rounded-lg border border-border bg-surface/40 open:bg-surface/60">
+          <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-fg marker:content-none [&::-webkit-details-marker]:hidden">
+            <span className="flex items-center justify-between gap-2">
+              Filter which families
+              <span className="text-xs font-normal text-fg-muted group-open:hidden">
+                Search, balance, plans…
+              </span>
+            </span>
+          </summary>
+          <div className="space-y-4 border-t border-border px-4 pb-4 pt-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Input
+                label="Search"
+                placeholder="Name or address…"
+                value={filters.search}
+                onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+              />
+              <div>
+                <span className="mb-1.5 block text-sm font-medium text-fg">Balance</span>
+                <div className="flex flex-wrap gap-2">
+                  {(['all', 'negative'] as const).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setFilters((f) => ({ ...f, balance: opt }))}
+                      className={segmentClass(filters.balance === opt)}
+                    >
+                      {opt === 'all' ? 'All families' : 'Negative only'}
+                    </button>
+                  ))}
+                </div>
+                {filters.balance === 'negative' && balancesLoading && (
+                  <p className="mt-1 text-xs text-fg-muted">Loading balances…</p>
+                )}
+              </div>
+            </div>
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-fg">
+              <input
+                type="checkbox"
+                checked={filters.requireAddress}
+                onChange={(e) => setFilters((f) => ({ ...f, requireAddress: e.target.checked }))}
+                className="focus-ring h-4 w-4 rounded border-border text-accent"
+              />
+              Skip families without a street address
+            </label>
+            {plans.length > 0 && (
+              <div>
+                <div className="mb-1.5 flex items-center gap-2">
+                  <span className="text-sm font-medium text-fg">Payment plans</span>
+                  {filters.planIds.length > 0 && (
+                    <button
+                      type="button"
+                      className="text-xs text-accent hover:underline"
+                      onClick={() => setFilters((f) => ({ ...f, planIds: [] }))}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {plans.map((p) => (
+                    <button
+                      key={p._id}
+                      type="button"
+                      onClick={() => togglePlan(p._id)}
+                      className={chipClass(filters.planIds.includes(p._id))}
+                    >
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </details>
       </div>
-      {/* Preview */}
-      <div className="mt-4">
+
+      <div className="mt-6 border-t border-border pt-6">
         <div className="flex items-baseline justify-between mb-2">
           <h3 className="text-sm font-semibold text-fg">
             Preview ({audience.rows.length} {audience.rows.length === 1 ? 'label' : 'labels'})
