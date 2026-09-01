@@ -42,10 +42,12 @@ describe('Sidebar a11y', () => {
     localStorage.clear()
   })
 
-  it('marks money section expanded on /payments and toggles aria-expanded', async () => {
+  it('starts nav sections collapsed and toggles aria-expanded', async () => {
     const Sidebar = (await import('./Sidebar')).default
     render(<Sidebar />)
     const moneyToggle = screen.getByRole('button', { name: /nav.section.money/i })
+    expect(moneyToggle.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(moneyToggle)
     expect(moneyToggle.getAttribute('aria-expanded')).toBe('true')
     fireEvent.click(moneyToggle)
     expect(moneyToggle.getAttribute('aria-expanded')).toBe('false')
@@ -54,6 +56,7 @@ describe('Sidebar a11y', () => {
   it('marks the active nav item with aria-current for the matched route', async () => {
     const Sidebar = (await import('./Sidebar')).default
     render(<Sidebar />)
+    fireEvent.click(screen.getByRole('button', { name: /nav.section.money/i }))
     const paymentsLink = screen.getByRole('link', { name: /^nav.payments$/i })
     expect(paymentsLink.getAttribute('aria-current')).toBe('page')
   })
