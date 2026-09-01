@@ -125,9 +125,15 @@ switch). `TaskFormModal.tsx` is the reference for calling this endpoint.
 
 ### 7. Module boundaries
 
-**New:** `app/components/settings/mail-label-audience.ts`
+**New:** `lib/client/mail-label-audience.ts`
 
-Pure, React-free, no fetching. Signature:
+Pure, React-free, no fetching. This lives in `lib/client/` rather than beside the panel
+because that is where the repo already keeps pure, unit-tested client helpers
+(`families-list.ts`, `family-form.ts`, `useDataFilters.ts`, `export.ts`), and the `app`
+vitest project only collects `*.test.tsx` — a `.test.ts` colocated with the component
+would silently never run.
+
+Signature:
 
 ```ts
 export interface LabelRow {
@@ -196,9 +202,10 @@ initial-state literal in `SettingsView` needs the new defaults:
 The filter shape is currently declared in three places — an inline type literal on
 `useState` in `SettingsView`, the `LabelFilters` interface in `LabelsPanel`, and the
 `Filters` interface in `MailLabelsPanel`. Rather than adding four fields to all three,
-extract one exported type (alongside `AudienceFilters` in `mail-label-audience.ts`) and
-import it in all three call sites. This is a targeted cleanup that directly serves the
-change; it is not a broader refactor.
+extract one exported type (`MailLabelFilters`, alongside `AudienceFilters` in
+`lib/client/mail-label-audience.ts`) plus an exported `DEFAULT_MAIL_LABEL_FILTERS`
+constant, and import both in all three call sites. This is a targeted cleanup that
+directly serves the change; it is not a broader refactor.
 
 ### 9. Print behavior
 
