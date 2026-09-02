@@ -25,7 +25,10 @@ function PaymentsTabContent(props: FamilyDetailContextValue) {
     loadingMoreLedgerTab,
   } = props
 
-  const [sort, setSort] = useState<{ id: string; dir: SortDir } | null>(null)
+  const [sort, setSort] = useState<{ id: string; dir: SortDir } | null>({
+    id: 'date',
+    dir: 'desc',
+  })
   const { readOnly: supportReadOnly } = useSupportModeReadOnly()
   const familyPayments = useMemo(
     () => data.payments.filter((payment: any) => !payment.memberId),

@@ -13,6 +13,7 @@ import {
   type FilterableColumn,
 } from '@/lib/client/useDataFilters'
 import { reactNodeToText, todayStamp, type ExportColumn } from '@/lib/client/export'
+import { columnIsSortable, sortDataRows } from '@/lib/client/sort-data-rows'
 import type { ColumnPickerEntry } from './ColumnPicker'
 import type { FilterPopoverColumn } from './FilterPopover'
 import FilterChips from './FilterChips'
@@ -102,6 +103,8 @@ export interface DataViewProps<T> {
   sort?: { id: string; dir: SortDir } | null
   /** Called when a sortable header is activated. */
   onSortChange?: (id: string, dir: SortDir) => void
+  /** Initial sort when sorting is managed internally (no `onSortChange`). */
+  defaultSort?: { id: string; dir: SortDir } | null
   /**
    * Tailwind breakpoint at which to switch to the table layout. Default 'md'.
    * Pass `'never'` to use the responsive card list at every breakpoint (handy
@@ -182,6 +185,7 @@ export function DataView<T>({
   mobileCard,
   sort = null,
   onSortChange,
+  defaultSort = null,
   tableFrom = 'md',
   className = '',
   empty,
@@ -208,6 +212,24 @@ export function DataView<T>({
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(paginationCfg?.initial ?? 10)
   const [importOpen, setImportOpen] = useState(false)
+  const isControlledSort = onSortChange != null
+  const [internalSort, setInternalSort] = useState<{ id: string; dir: SortDir } | null>(defaultSort)
+  const activeSort = isControlledSort ? sort : internalSort
+  const handleSortChange = useCallback(
+    (id: string, dir: SortDir) => {
+      if (isControlledSort) {
+        onSortChange!(id, dir)
+      } else {
+        setInternalSort({ id, dir })
+      }
+    },
+    [isControlledSort, onSortChange],
+  )
+  const sortedInputRows = useMemo(() => {
+    if (isControlledSort) return rows
+    return sortDataRows(rows, activeSort, columns)
+  }, [rows, activeSort, columns, isControlledSort])
+  const hasSortableColumns = useMemo(() => columns.some(columnIsSortable), [columns])
   const toolbarEnabled = toolbar !== false
   const toolbarCfg: ToolbarConfig = toolbar === false ? {} : toolbar || {}
   const showColumns = toolbarEnabled && toolbarCfg.columns !== false
@@ -253,7 +275,7 @@ export function DataView<T>({
     [orderedColumns],
   )
 
-  const filters = useDataFilters<T>(filterableForHook, rows, { globalSearch })
+  const filters = useDataFilters<T>(filterableForHook, sortedInputRows, { globalSearch })
 
   // Notify parent of filter changes (debounced via effect to avoid render storms).
   useEffect(() => {
@@ -296,7 +318,7 @@ export function DataView<T>({
   // upstream row list itself).
   useEffect(() => {
     if (paginationCfg) setPage(1)
-  }, [filters.search, filters.columnFilters, rows, paginationCfg])
+  }, [filters.search, filters.columnFilters, sortedInputRows, paginationCfg, activeSort])
 
   // Filtered (full) set vs. the slice actually shown on screen.
   const filteredAll = filters.filteredRows
@@ -337,7 +359,7 @@ export function DataView<T>({
 
   const resolveExportSet = useCallback(async (): Promise<T[]> => {
     if (exportRows) return exportRows
-    let base = rows
+    let base = isControlledSort ? rows : sortedInputRows
     if (expandExportRows) {
       const expanded = await expandExportRows()
       if (expanded && expanded.length > 0) base = expanded
@@ -349,6 +371,8 @@ export function DataView<T>({
   }, [
     exportRows,
     rows,
+    sortedInputRows,
+    isControlledSort,
     expandExportRows,
     filterableForHook,
     filters.search,
@@ -578,8 +602,8 @@ export function DataView<T>({
             rows={displayRows}
             rowKey={rowKey}
             columns={renderColumns}
-            sort={sort}
-            onSortChange={onSortChange}
+            sort={activeSort}
+            onSortChange={hasSortableColumns ? handleSortChange : undefined}
             onRowClick={onRowClick}
           />
         ) : (
@@ -592,21 +616,21 @@ export function DataView<T>({
                     scope="col"
                     className={`px-4 py-2.5 font-medium ${textAlignClass(col.align)} ${hideClass(col.hideBelow)}`}
                     aria-sort={
-                      col.sortable && sort?.id === col.id
-                        ? sort.dir === 'asc'
+                      columnIsSortable(col) && activeSort?.id === col.id
+                        ? activeSort.dir === 'asc'
                           ? 'ascending'
                           : 'descending'
-                        : col.sortable
+                        : columnIsSortable(col)
                           ? 'none'
                           : undefined
                     }
                   >
-                    {col.sortable && onSortChange ? (
+                    {columnIsSortable(col) && hasSortableColumns ? (
                       <SortableHeader
                         id={col.id}
                         header={col.header}
-                        sort={sort}
-                        onSortChange={onSortChange}
+                        sort={activeSort}
+                        onSortChange={handleSortChange}
                       />
                     ) : (
                       col.header
@@ -694,16 +718,16 @@ function VirtualTable<T>({
                 scope="col"
                 className={`px-4 py-2.5 font-medium ${textAlignClass(col.align)} ${hideClass(col.hideBelow)}`}
                 aria-sort={
-                  col.sortable && sort?.id === col.id
+                  columnIsSortable(col) && sort?.id === col.id
                     ? sort.dir === 'asc'
                       ? 'ascending'
                       : 'descending'
-                    : col.sortable
+                    : columnIsSortable(col)
                       ? 'none'
                       : undefined
                 }
               >
-                {col.sortable && onSortChange ? (
+                {columnIsSortable(col) && onSortChange ? (
                   <SortableHeader
                     id={col.id}
                     header={col.header}

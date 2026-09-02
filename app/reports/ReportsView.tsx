@@ -8,6 +8,7 @@ import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
 import type { PlReportData } from '@/lib/reports/pl-data'
 import { buildYoYMetrics } from '@/lib/reports/yoy'
+import YoyComparisonTable from '@/app/components/YoyComparisonTable'
 import {
   Badge,
   Button,
@@ -397,50 +398,17 @@ export default function ReportsView({
             </div>
 
             {yoyMetrics && (
-              <div className="mb-6 overflow-x-auto">
+              <div className="mb-6">
                 <h3 className="text-sm font-semibold text-fg mb-3">{t('reports.yoy.title')}</h3>
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left text-fg-muted">
-                      <th className="py-2 pr-4 font-medium">{t('reports.yoy.metric')}</th>
-                      <th className="py-2 px-4 font-medium text-right">
-                        {t('reports.yoy.priorYear').replace('{year}', String(year - 1))}
-                      </th>
-                      <th className="py-2 px-4 font-medium text-right">
-                        {t('reports.yoy.currentYear').replace('{year}', String(year))}
-                      </th>
-                      <th className="py-2 pl-4 font-medium text-right">
-                        {t('reports.yoy.change')}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {yoyMetrics.map((row) => (
-                      <tr key={row.label} className="border-b border-border">
-                        <td className="py-2 pr-4 text-fg">{row.label}</td>
-                        <td className="py-2 px-4 text-right tabular text-fg-muted">
-                          {formatMoney(row.prior)}
-                        </td>
-                        <td className="py-2 px-4 text-right tabular text-fg">
-                          {formatMoney(row.current)}
-                        </td>
-                        <td
-                          className={`py-2 pl-4 text-right tabular font-medium ${
-                            row.delta >= 0 ? 'text-success' : 'text-danger'
-                          }`}
-                        >
-                          {formatMoney(row.delta)}
-                          {row.deltaPct != null && (
-                            <span className="text-xs text-fg-muted ml-1">
-                              ({row.deltaPct >= 0 ? '+' : ''}
-                              {row.deltaPct.toFixed(1)}%)
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <YoyComparisonTable
+                  tableId="reports-yoy"
+                  rows={yoyMetrics}
+                  metricColumnLabel={t('reports.yoy.metric')}
+                  priorYearLabel={t('reports.yoy.priorYear').replace('{year}', String(year - 1))}
+                  currentYearLabel={t('reports.yoy.currentYear').replace('{year}', String(year))}
+                  changeColumnLabel={t('reports.yoy.change')}
+                  formatMoney={formatMoney}
+                />
               </div>
             )}
 
@@ -449,6 +417,7 @@ export default function ReportsView({
               rows={reportData.transactions}
               columns={columns}
               rowKey={(_row, i) => String(i)}
+              defaultSort={{ id: 'date', dir: 'desc' }}
               exportFileName={reportFileName}
               globalSearch={{ placeholder: t('reports.searchPlaceholder') }}
               pageSize={25}

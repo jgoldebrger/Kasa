@@ -193,6 +193,7 @@ export default function ScheduledView() {
             rows={rows}
             columns={columns}
             rowKey={(r) => r._id}
+            defaultSort={{ id: 'scheduledFor', dir: 'asc' }}
             pageSize={15}
             exportFileName="scheduled-emails"
             onRowClick={(row) => setDetailId(row._id)}

@@ -379,6 +379,7 @@ export default function ActivityPanel({
               rows={items}
               rowKey={(r) => r._id}
               columns={columns}
+              defaultSort={{ id: 'when', dir: 'desc' }}
               pageSize={50}
               exportFileName="activity-log"
               globalSearch={{

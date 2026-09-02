@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowPathIcon, InformationCircleIcon } from '@heroicons/react/24/outline'
-import { Button, Card, PageHeader, Tooltip } from '@/app/components/ui'
+import { Button, Card, DataView, PageHeader, Tooltip, type DataColumn } from '@/app/components/ui'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useToast } from '@/app/components/Toast'
@@ -189,6 +189,174 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
       duesChangePct,
     )
   }, [r, headlineRow, duesChangePct])
+
+  const multiYearColumns = useMemo<DataColumn<YearlyDuesRow>[]>(() => {
+    const cols: DataColumn<YearlyDuesRow>[] = [
+      {
+        id: 'year',
+        header: t('projections.table.year'),
+        headerText: t('projections.table.year'),
+        cell: (row) => (
+          <span className="tabular text-fg">
+            {row.year}
+            {row.year === currentYear && (
+              <span className="ml-2 text-[10px] uppercase tracking-wide text-accent">
+                {t('projections.table.thisYear')}
+              </span>
+            )}
+          </span>
+        ),
+        exportValue: (row) => row.year,
+      },
+      {
+        id: 'projectedFamilies',
+        header: t('projections.table.families'),
+        headerText: t('projections.table.families'),
+        align: 'right',
+        cell: (row) => <span className="tabular text-fg">{fmt(row.projectedFamilies)}</span>,
+        exportValue: (row) => row.projectedFamilies,
+      },
+    ]
+    if (showBM) {
+      cols.push({
+        id: 'projectedBarMitzvahPayers',
+        header: t('projections.table.bmPayers'),
+        headerText: t('projections.table.bmPayers'),
+        align: 'right',
+        cell: (row) => (
+          <span className="tabular text-fg">{fmt(row.projectedBarMitzvahPayers)}</span>
+        ),
+        exportValue: (row) => row.projectedBarMitzvahPayers,
+      })
+    }
+    cols.push(
+      {
+        id: 'projectedPayers',
+        header: t('projections.table.totalPayers'),
+        headerText: t('projections.table.totalPayers'),
+        align: 'right',
+        cell: (row) => <span className="tabular text-fg">{fmt(row.projectedPayers)}</span>,
+        exportValue: (row) => row.projectedPayers,
+      },
+      {
+        id: 'projectedExpenses',
+        header: t('projections.table.projectedExpenses'),
+        headerText: t('projections.table.projectedExpenses'),
+        align: 'right',
+        cell: (row) => (
+          <span className="tabular text-fg-muted">{formatMoney(row.projectedExpenses)}</span>
+        ),
+        exportValue: (row) => row.projectedExpenses,
+      },
+      {
+        id: 'projectedPlanIncome',
+        header: t('projections.table.planIncome'),
+        headerText: t('projections.table.planIncome'),
+        align: 'right',
+        cell: (row) => (
+          <span className="tabular text-fg-muted">{formatMoney(row.projectedPlanIncome)}</span>
+        ),
+        exportValue: (row) => row.projectedPlanIncome,
+      },
+      {
+        id: 'closingFundBalance',
+        header: t('projections.table.closingFund'),
+        headerText: t('projections.table.closingFund'),
+        align: 'right',
+        cell: (row) => (
+          <span className={`tabular font-medium ${row.fundSolvent ? 'text-fg' : 'text-danger'}`}>
+            {formatMoney(row.closingFundBalance)}
+          </span>
+        ),
+        exportValue: (row) => row.closingFundBalance,
+      },
+      {
+        id: 'scaleFactor',
+        header: t('projections.table.adjustment'),
+        headerText: t('projections.table.adjustment'),
+        align: 'right',
+        cell: (row) => (
+          <span className="tabular font-semibold text-fg">
+            {row.projectedPlanIncome > 0 ? formatAdjustment(row.scaleFactor) : '—'}
+          </span>
+        ),
+        exportValue: (row) => row.scaleFactor,
+      },
+    )
+    if ((r?.plans.length ?? 0) > 0) {
+      cols.push({
+        id: 'planRecommendations',
+        header: t('projections.table.recommendedPlans'),
+        headerText: t('projections.table.recommendedPlans'),
+        align: 'right',
+        cell: (row) => (
+          <span className="tabular text-xs text-fg">
+            {row.planRecommendations.map((p) => (
+              <div key={p.planId}>
+                {p.planName}: {formatMoney(p.recommendedPrice)}
+              </div>
+            ))}
+          </span>
+        ),
+        exportValue: (row) =>
+          row.planRecommendations.map((p) => `${p.planName}:${p.recommendedPrice}`).join('; '),
+      })
+    }
+    return cols
+  }, [currentYear, formatMoney, r?.plans.length, showBM, t])
+
+  const perEventColumns = useMemo<DataColumn<PerEventRow>[]>(
+    () => [
+      {
+        id: 'name',
+        header: t('projections.how.eventColumn'),
+        headerText: t('projections.how.eventColumn'),
+        cell: (row) => <span className="text-fg">{row.name}</span>,
+        exportValue: (row) => row.name,
+      },
+      {
+        id: 'historicalAvgPerYear',
+        header: t('projections.how.avgPerYear'),
+        headerText: t('projections.how.avgPerYear'),
+        align: 'right',
+        cell: (row) => (
+          <span className="tabular text-fg-muted">{row.historicalAvgPerYear.toFixed(1)}</span>
+        ),
+        exportValue: (row) => row.historicalAvgPerYear,
+      },
+      {
+        id: 'projectedCountStartYear',
+        header: t('projections.how.countInYear'),
+        headerText: t('projections.how.countInYear'),
+        align: 'right',
+        cell: (row) => <span className="tabular text-fg">{row.projectedCountStartYear}</span>,
+        exportValue: (row) => row.projectedCountStartYear,
+      },
+      {
+        id: 'currentCost',
+        header: t('projections.how.cost'),
+        headerText: t('projections.how.cost'),
+        align: 'right',
+        cell: (row) => (
+          <span className="tabular text-fg-muted">{formatMoney(row.currentCost)}</span>
+        ),
+        exportValue: (row) => row.currentCost,
+      },
+      {
+        id: 'projectedExpenseStartYear',
+        header: t('projections.how.total'),
+        headerText: t('projections.how.total'),
+        align: 'right',
+        cell: (row) => (
+          <span className="tabular font-medium text-fg">
+            {formatMoney(row.projectedExpenseStartYear)}
+          </span>
+        ),
+        exportValue: (row) => row.projectedExpenseStartYear,
+      },
+    ],
+    [formatMoney, t],
+  )
 
   return (
     <div className="min-h-screen p-4 sm:p-6 md:p-8">
@@ -499,113 +667,50 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
               noPadding
               aria-label={t('projections.table.ariaLabel').replace('{horizon}', String(horizon))}
             >
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="bg-app-subtle border-b-2 border-border text-fg-muted text-xs uppercase tracking-wide">
-                      <th className="text-left px-3 py-2 sticky left-0 bg-app-subtle z-10">
-                        {t('projections.table.year')}
-                      </th>
-                      <th className="text-right px-3 py-2">{t('projections.table.families')}</th>
-                      {showBM && (
-                        <th className="text-right px-3 py-2">{t('projections.table.bmPayers')}</th>
-                      )}
-                      <th className="text-right px-3 py-2">{t('projections.table.totalPayers')}</th>
-                      <th className="text-right px-3 py-2">
-                        {t('projections.table.projectedExpenses')}
-                      </th>
-                      <th className="text-right px-3 py-2">{t('projections.table.planIncome')}</th>
-                      <th className="text-right px-3 py-2">{t('projections.table.closingFund')}</th>
-                      <th className="text-right px-3 py-2 bg-accent/5">
-                        <span className="inline-flex items-center justify-end gap-1">
-                          {t('projections.table.adjustment')}
-                          <Tooltip content={t('projections.table.adjustmentTooltip')}>
-                            <button
-                              type="button"
-                              className="text-fg-subtle hover:text-fg-muted focus-ring rounded normal-case"
-                              aria-label={t('projections.table.adjustmentAria')}
-                            >
-                              <InformationCircleIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                            </button>
-                          </Tooltip>
+              <DataView
+                tableId="projections-multi-year"
+                rows={r.multiYear}
+                columns={multiYearColumns}
+                rowKey={(row) => String(row.year)}
+                toolbar={false}
+                defaultSort={{ id: 'year', dir: 'asc' }}
+                mobileCard={(row) => (
+                  <Card compact>
+                    <p className="font-medium tabular text-fg">
+                      {row.year}
+                      {row.year === currentYear && (
+                        <span className="ml-2 text-[10px] uppercase text-accent">
+                          {t('projections.table.thisYear')}
                         </span>
-                      </th>
-                      {r.plans.length > 0 && (
-                        <th className="text-right px-3 py-2 bg-accent/5">
-                          {t('projections.table.recommendedPlans')}
-                        </th>
                       )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {r.multiYear.map((row, i) => {
-                      const isCurrent = row.year === currentYear
-                      const isFifth = (i + 1) % 5 === 0
-                      return (
-                        <tr
-                          key={row.year}
-                          className={`border-b border-border last:border-b-0 ${
-                            isCurrent
-                              ? 'bg-accent/5 font-medium'
-                              : isFifth
-                                ? 'bg-app-subtle/40'
-                                : ''
-                          }`}
+                    </p>
+                    <dl className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <dt className="text-fg-muted">{t('projections.table.families')}</dt>
+                        <dd className="tabular">{fmt(row.projectedFamilies)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-fg-muted">{t('projections.table.totalPayers')}</dt>
+                        <dd className="tabular">{fmt(row.projectedPayers)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-fg-muted">{t('projections.table.closingFund')}</dt>
+                        <dd
+                          className={`tabular font-medium ${row.fundSolvent ? 'text-fg' : 'text-danger'}`}
                         >
-                          <td className="text-left px-3 py-1.5 sticky left-0 bg-inherit tabular text-fg">
-                            {row.year}
-                            {isCurrent && (
-                              <span className="ml-2 text-[10px] uppercase tracking-wide text-accent">
-                                {t('projections.table.thisYear')}
-                              </span>
-                            )}
-                          </td>
-                          <td className="text-right px-3 py-1.5 tabular text-fg">
-                            {fmt(row.projectedFamilies)}
-                          </td>
-                          {showBM && (
-                            <td className="text-right px-3 py-1.5 tabular text-fg">
-                              {fmt(row.projectedBarMitzvahPayers)}
-                            </td>
-                          )}
-                          <td className="text-right px-3 py-1.5 tabular text-fg">
-                            {fmt(row.projectedPayers)}
-                          </td>
-                          <td className="text-right px-3 py-1.5 tabular text-fg-muted">
-                            {formatMoney(row.projectedExpenses)}
-                          </td>
-                          <td className="text-right px-3 py-1.5 tabular text-fg-muted">
-                            {formatMoney(row.projectedPlanIncome)}
-                          </td>
-                          <td
-                            className={`text-right px-3 py-1.5 tabular font-medium ${
-                              row.fundSolvent ? 'text-fg' : 'text-danger'
-                            }`}
-                          >
-                            {formatMoney(row.closingFundBalance)}
-                          </td>
-                          <td
-                            className={`text-right px-3 py-1.5 tabular bg-accent/5 ${
-                              isCurrent ? 'font-bold text-fg' : 'font-semibold text-fg'
-                            }`}
-                          >
-                            {row.projectedPlanIncome > 0 ? formatAdjustment(row.scaleFactor) : '—'}
-                          </td>
-                          {r.plans.length > 0 && (
-                            <td className="text-right px-3 py-1.5 tabular text-xs bg-accent/5 text-fg">
-                              {row.planRecommendations.map((p) => (
-                                <div key={p.planId}>
-                                  {p.planName}: {formatMoney(p.recommendedPrice)}
-                                </div>
-                              ))}
-                            </td>
-                          )}
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                          {formatMoney(row.closingFundBalance)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-fg-muted">{t('projections.table.adjustment')}</dt>
+                        <dd className="tabular">
+                          {row.projectedPlanIncome > 0 ? formatAdjustment(row.scaleFactor) : '—'}
+                        </dd>
+                      </div>
+                    </dl>
+                  </Card>
+                )}
+              />
             </Card>
 
             <details>
@@ -708,46 +813,23 @@ export default function ProjectionsView({ initialRecommendation, initialWindowYe
                           .
                         </p>
                       ) : (
-                        <table className="w-full text-xs">
-                          <thead className="text-fg-muted">
-                            <tr>
-                              <th className="text-left py-1">{t('projections.how.eventColumn')}</th>
-                              <th className="text-right py-1">{t('projections.how.avgPerYear')}</th>
-                              <th className="text-right py-1">
-                                {t('projections.how.countInYear')}
-                              </th>
-                              <th className="text-right py-1">{t('projections.how.cost')}</th>
-                              <th className="text-right py-1">{t('projections.how.total')}</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {r.perEvent.map((e) => (
-                              <tr key={e.eventTypeId} className="border-t border-border">
-                                <td className="py-1 text-fg">{e.name}</td>
-                                <td className="py-1 text-right tabular text-fg-muted">
-                                  {e.historicalAvgPerYear.toFixed(1)}
-                                </td>
-                                <td className="py-1 text-right tabular text-fg">
-                                  {e.projectedCountStartYear}
-                                </td>
-                                <td className="py-1 text-right tabular text-fg-muted">
-                                  {formatMoney(e.currentCost)}
-                                </td>
-                                <td className="py-1 text-right tabular font-medium text-fg">
-                                  {formatMoney(e.projectedExpenseStartYear)}
-                                </td>
-                              </tr>
-                            ))}
-                            <tr className="border-t-2 border-border">
-                              <td className="py-1 font-semibold text-fg" colSpan={4}>
-                                {t('projections.how.total')}
-                              </td>
-                              <td className="py-1 text-right tabular font-bold text-fg">
-                                {formatMoney(startYearExpenses)}
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
+                        <DataView
+                          tableId="projections-per-event"
+                          rows={r.perEvent}
+                          columns={perEventColumns}
+                          rowKey={(row) => row.eventTypeId}
+                          toolbar={false}
+                          defaultSort={{ id: 'name', dir: 'asc' }}
+                          mobileCard={(row) => (
+                            <Card compact>
+                              <p className="font-medium text-fg">{row.name}</p>
+                              <p className="mt-1 text-sm tabular text-fg-muted">
+                                {t('projections.how.total')}:{' '}
+                                {formatMoney(row.projectedExpenseStartYear)}
+                              </p>
+                            </Card>
+                          )}
+                        />
                       )}
                     </div>
                   </div>

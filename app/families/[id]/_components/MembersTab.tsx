@@ -69,7 +69,10 @@ function MembersTabContent(props: FamilyDetailContextValue) {
     handleDeleteMember,
   } = props
 
-  const [paymentSort, setPaymentSort] = useState<{ id: string; dir: SortDir } | null>(null)
+  const [paymentSort, setPaymentSort] = useState<{ id: string; dir: SortDir } | null>({
+    id: 'date',
+    dir: 'desc',
+  })
 
   return (
     <div>
@@ -699,6 +702,7 @@ function MembersTabContent(props: FamilyDetailContextValue) {
           <DataView
             tableId="family-children"
             rows={data.members}
+            defaultSort={{ id: 'name', dir: 'asc' }}
             globalSearch={{ placeholder: 'Search children…' }}
             pageSize={10}
             {...(isAdmin

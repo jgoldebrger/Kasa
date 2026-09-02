@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useToast } from '@/app/components/Toast'
 import { PLATFORM_ADMIN_2FA_REQUIRED_CODE } from '@/lib/platform-admin-constants'
@@ -10,10 +10,12 @@ import {
   Button,
   ButtonLink,
   Card,
+  DataView,
   EmptyState,
   PageHeader,
   Select,
   SkeletonRows,
+  type DataColumn,
 } from '@/app/components/ui'
 
 type JobRunRow = {
@@ -105,6 +107,104 @@ export default function JobsAdminPage() {
     void load()
   }, [load])
 
+  const failedEmailColumns = useMemo<DataColumn<EmailJobRow>[]>(
+    () => [
+      {
+        id: 'kind',
+        header: 'Kind',
+        headerText: 'Kind',
+        cell: (row) => row.kind,
+        exportValue: (row) => row.kind,
+      },
+      {
+        id: 'organizationId',
+        header: 'Org',
+        headerText: 'Org',
+        cell: (row) => <span className="font-mono text-xs">{row.organizationId}</span>,
+        exportValue: (row) => row.organizationId,
+      },
+      {
+        id: 'lastError',
+        header: 'Error',
+        headerText: 'Error',
+        cell: (row) => (
+          <span className="max-w-md truncate text-fg-muted">{row.lastError || '—'}</span>
+        ),
+        exportValue: (row) => row.lastError || '',
+      },
+      {
+        id: 'createdAt',
+        header: 'When',
+        headerText: 'When',
+        cell: (row) => (
+          <span className="whitespace-nowrap text-fg-muted">
+            {new Date(row.createdAt).toLocaleString()}
+          </span>
+        ),
+        exportValue: (row) => new Date(row.createdAt),
+      },
+    ],
+    [],
+  )
+
+  const jobRunColumns = useMemo<DataColumn<JobRunRow>[]>(
+    () => [
+      {
+        id: 'name',
+        header: 'Job',
+        headerText: 'Job',
+        cell: (row) => <span className="font-mono text-xs">{row.name}</span>,
+        exportValue: (row) => row.name,
+      },
+      {
+        id: 'status',
+        header: 'Status',
+        headerText: 'Status',
+        cell: (row) => statusBadge(row),
+        exportValue: (row) => row.status,
+      },
+      {
+        id: 'processed',
+        header: 'Processed',
+        headerText: 'Processed',
+        align: 'right',
+        cell: (row) => row.processed,
+        exportValue: (row) => row.processed,
+      },
+      {
+        id: 'failed',
+        header: 'Failed',
+        headerText: 'Failed',
+        align: 'right',
+        cell: (row) => row.failed,
+        exportValue: (row) => row.failed,
+      },
+      {
+        id: 'startedAt',
+        header: 'Started',
+        headerText: 'Started',
+        cell: (row) => (
+          <span className="whitespace-nowrap text-fg-muted">
+            {new Date(row.startedAt).toLocaleString()}
+          </span>
+        ),
+        exportValue: (row) => new Date(row.startedAt),
+      },
+      {
+        id: 'error',
+        header: 'Error',
+        headerText: 'Error',
+        cell: (row) => (
+          <span className="max-w-xs truncate text-fg-muted">
+            {row.lastError || (row.errorCount > 0 ? `${row.errorCount} errors` : '—')}
+          </span>
+        ),
+        exportValue: (row) => row.lastError || (row.errorCount > 0 ? String(row.errorCount) : ''),
+      },
+    ],
+    [],
+  )
+
   if (forbidden) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10">
@@ -171,32 +271,24 @@ export default function JobsAdminPage() {
           {failedEmails.length > 0 && (
             <section>
               <h2 className="text-base font-semibold text-fg mb-2">Failed email jobs</h2>
-              <div className="overflow-x-auto rounded-lg border border-border">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-app-subtle border-b border-border">
-                    <tr>
-                      <th className="px-4 py-2 font-semibold">Kind</th>
-                      <th className="px-4 py-2 font-semibold">Org</th>
-                      <th className="px-4 py-2 font-semibold">Error</th>
-                      <th className="px-4 py-2 font-semibold">When</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {failedEmails.map((j) => (
-                      <tr key={j.id}>
-                        <td className="px-4 py-2">{j.kind}</td>
-                        <td className="px-4 py-2 font-mono text-xs">{j.organizationId}</td>
-                        <td className="px-4 py-2 text-fg-muted max-w-md truncate">
-                          {j.lastError || '—'}
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap text-fg-muted">
-                          {new Date(j.createdAt).toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataView
+                tableId="admin-failed-email-jobs"
+                rows={failedEmails}
+                columns={failedEmailColumns}
+                rowKey={(row) => row.id}
+                toolbar={false}
+                defaultSort={{ id: 'createdAt', dir: 'desc' }}
+                mobileCard={(row) => (
+                  <Card compact>
+                    <p className="font-medium text-fg">{row.kind}</p>
+                    <p className="text-xs font-mono text-fg-muted">{row.organizationId}</p>
+                    <p className="mt-2 text-xs text-fg-muted">
+                      {new Date(row.createdAt).toLocaleString()}
+                    </p>
+                    {row.lastError && <p className="mt-1 text-xs text-danger">{row.lastError}</p>}
+                  </Card>
+                )}
+              />
             </section>
           )}
 
@@ -210,36 +302,30 @@ export default function JobsAdminPage() {
                 description="Try widening the time window or filters."
               />
             ) : (
-              <div className="overflow-x-auto rounded-lg border border-border">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-app-subtle border-b border-border">
-                    <tr>
-                      <th className="px-4 py-2 font-semibold">Job</th>
-                      <th className="px-4 py-2 font-semibold">Status</th>
-                      <th className="px-4 py-2 font-semibold">Processed</th>
-                      <th className="px-4 py-2 font-semibold">Failed</th>
-                      <th className="px-4 py-2 font-semibold">Started</th>
-                      <th className="px-4 py-2 font-semibold">Error</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {jobRuns.map((row) => (
-                      <tr key={row.id}>
-                        <td className="px-4 py-2 font-mono text-xs">{row.name}</td>
-                        <td className="px-4 py-2">{statusBadge(row)}</td>
-                        <td className="px-4 py-2">{row.processed}</td>
-                        <td className="px-4 py-2">{row.failed}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-fg-muted">
+              <DataView
+                tableId="admin-cron-job-runs"
+                rows={jobRuns}
+                columns={jobRunColumns}
+                rowKey={(row) => row.id}
+                toolbar={false}
+                defaultSort={{ id: 'startedAt', dir: 'desc' }}
+                mobileCard={(row) => (
+                  <Card compact>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-mono text-xs text-fg">{row.name}</p>
+                        <p className="mt-1 text-xs text-fg-muted">
                           {new Date(row.startedAt).toLocaleString()}
-                        </td>
-                        <td className="px-4 py-2 text-fg-muted max-w-xs truncate">
-                          {row.lastError || (row.errorCount > 0 ? `${row.errorCount} errors` : '—')}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        </p>
+                      </div>
+                      {statusBadge(row)}
+                    </div>
+                    <p className="mt-2 text-sm tabular text-fg-muted">
+                      Processed {row.processed} · Failed {row.failed}
+                    </p>
+                  </Card>
+                )}
+              />
             )}
           </section>
 

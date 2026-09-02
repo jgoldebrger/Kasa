@@ -37,6 +37,7 @@ function WithdrawalsTabContent(props: FamilyDetailContextValue) {
       <DataView
         tableId="family-withdrawals"
         rows={withdrawals}
+        defaultSort={{ id: 'date', dir: 'desc' }}
         globalSearch={{ placeholder: 'Search withdrawals…' }}
         pageSize={10}
         columns={[

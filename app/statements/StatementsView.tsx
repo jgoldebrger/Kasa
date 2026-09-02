@@ -784,6 +784,7 @@ export default function StatementsView({ initialStatements }: StatementsViewProp
                   tableId="statements"
                   rows={statements}
                   rowKey={(s) => s._id}
+                  defaultSort={{ id: 'fromDate', dir: 'desc' }}
                   tableFrom="never"
                   globalSearch={{
                     placeholder: 'Search statement #, family…',
@@ -987,6 +988,7 @@ export default function StatementsView({ initialStatements }: StatementsViewProp
                               rows={transactions}
                               columns={statementTxColumns}
                               rowKey={(_t, i) => String(i)}
+                              defaultSort={{ id: 'date', dir: 'desc' }}
                               exportFileName={`statement-${statement.statementNumber || statement._id}-transactions`}
                               pageSize={10}
                               globalSearch={{ placeholder: 'Search…' }}

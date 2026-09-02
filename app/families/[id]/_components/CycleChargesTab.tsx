@@ -19,6 +19,7 @@ function CycleChargesTabContent(props: FamilyDetailContextValue) {
       <DataView
         tableId="family-cycle-charges"
         rows={cycleCharges}
+        defaultSort={{ id: 'date', dir: 'desc' }}
         globalSearch={{ placeholder: 'Search charges…' }}
         pageSize={10}
         columns={[

@@ -1,12 +1,22 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChartBarIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useToast } from '@/app/components/Toast'
-import { Button, Card, EmptyState, PageHeader, Select, SkeletonRows } from '@/app/components/ui'
+import {
+  Button,
+  Card,
+  DataView,
+  EmptyState,
+  PageHeader,
+  Select,
+  SkeletonRows,
+  type DataColumn,
+  type SortDir,
+} from '@/app/components/ui'
 import { useT } from '@/lib/client/i18n'
-import type { EmailAnalytics, TopCampaignRow } from './types'
+import type { EmailAnalytics, EmailAnalyticsBucket, TopCampaignRow } from './types'
 
 const PERIOD_OPTIONS = ['30', '90'] as const
 
@@ -17,6 +27,14 @@ export default function AnalyticsView() {
   const [data, setData] = useState<EmailAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
+  const [trendSort, setTrendSort] = useState<{ id: string; dir: SortDir } | null>({
+    id: 'date',
+    dir: 'desc',
+  })
+  const [campaignSort, setCampaignSort] = useState<{ id: string; dir: SortDir } | null>({
+    id: 'sent',
+    dir: 'desc',
+  })
 
   const loadAnalytics = useCallback(async () => {
     setLoading(true)
@@ -61,6 +79,146 @@ export default function AnalyticsView() {
   const topCampaigns = data?.topCampaigns ?? []
 
   const formatRate = (rate?: number) => (rate != null ? `${Math.round(rate * 100)}%` : '—')
+
+  const sortedBuckets = useMemo(() => {
+    if (!trendSort) return buckets
+    const dir = trendSort.dir === 'asc' ? 1 : -1
+    return [...buckets].sort((a, b) => {
+      switch (trendSort.id) {
+        case 'date':
+          return dir * a.date.localeCompare(b.date)
+        case 'sent':
+          return dir * ((a.sent ?? 0) - (b.sent ?? 0))
+        case 'opened':
+          return dir * ((a.opened ?? 0) - (b.opened ?? 0))
+        case 'clicked':
+          return dir * ((a.clicked ?? 0) - (b.clicked ?? 0))
+        case 'failed':
+          return dir * ((a.failed ?? 0) - (b.failed ?? 0))
+        default:
+          return 0
+      }
+    })
+  }, [buckets, trendSort])
+
+  const sortedTopCampaigns = useMemo(() => {
+    if (!campaignSort) return topCampaigns
+    const dir = campaignSort.dir === 'asc' ? 1 : -1
+    return [...topCampaigns].sort((a, b) => {
+      switch (campaignSort.id) {
+        case 'subject': {
+          const aVal = (a.subject || a.campaignId).toLowerCase()
+          const bVal = (b.subject || b.campaignId).toLowerCase()
+          return dir * aVal.localeCompare(bVal)
+        }
+        case 'sent':
+          return dir * ((a.sent ?? 0) - (b.sent ?? 0))
+        case 'openRate':
+          return dir * ((a.openRate ?? 0) - (b.openRate ?? 0))
+        case 'clickRate':
+          return dir * ((a.clickRate ?? 0) - (b.clickRate ?? 0))
+        default:
+          return 0
+      }
+    })
+  }, [topCampaigns, campaignSort])
+
+  const trendColumns = useMemo<DataColumn<EmailAnalyticsBucket>[]>(
+    () => [
+      {
+        id: 'date',
+        header: t('communications.analytics.column.date'),
+        headerText: t('communications.analytics.column.date'),
+        sortable: true,
+        cell: (row) => <span className="tabular text-fg">{row.date}</span>,
+        exportValue: (row) => row.date,
+      },
+      {
+        id: 'sent',
+        header: t('communications.analytics.sent'),
+        headerText: t('communications.analytics.sent'),
+        align: 'right',
+        sortable: true,
+        cell: (row) => <span className="tabular">{row.sent ?? 0}</span>,
+        exportValue: (row) => row.sent ?? 0,
+      },
+      {
+        id: 'opened',
+        header: t('communications.analytics.opened'),
+        headerText: t('communications.analytics.opened'),
+        align: 'right',
+        sortable: true,
+        cell: (row) => <span className="tabular">{row.opened ?? 0}</span>,
+        exportValue: (row) => row.opened ?? 0,
+      },
+      {
+        id: 'clicked',
+        header: t('communications.analytics.clicked'),
+        headerText: t('communications.analytics.clicked'),
+        align: 'right',
+        sortable: true,
+        cell: (row) => <span className="tabular">{row.clicked ?? 0}</span>,
+        exportValue: (row) => row.clicked ?? 0,
+      },
+      {
+        id: 'failed',
+        header: t('communications.analytics.failed'),
+        headerText: t('communications.analytics.failed'),
+        align: 'right',
+        sortable: true,
+        cell: (row) => (
+          <span className={`tabular ${(row.failed ?? 0) > 0 ? 'text-danger' : ''}`}>
+            {row.failed ?? 0}
+          </span>
+        ),
+        exportValue: (row) => row.failed ?? 0,
+      },
+    ],
+    [t],
+  )
+
+  const topCampaignColumns = useMemo<DataColumn<TopCampaignRow>[]>(
+    () => [
+      {
+        id: 'subject',
+        header: t('communications.analytics.campaignSubject'),
+        headerText: t('communications.analytics.campaignSubject'),
+        sortable: true,
+        cell: (row) => (
+          <span className="max-w-xs truncate text-fg">{row.subject || row.campaignId}</span>
+        ),
+        exportValue: (row) => row.subject || row.campaignId,
+      },
+      {
+        id: 'sent',
+        header: t('communications.analytics.sent'),
+        headerText: t('communications.analytics.sent'),
+        align: 'right',
+        sortable: true,
+        cell: (row) => <span className="tabular">{row.sent ?? 0}</span>,
+        exportValue: (row) => row.sent ?? 0,
+      },
+      {
+        id: 'openRate',
+        header: t('communications.analytics.openRate'),
+        headerText: t('communications.analytics.openRate'),
+        align: 'right',
+        sortable: true,
+        cell: (row) => <span className="tabular">{formatRate(row.openRate)}</span>,
+        exportValue: (row) => formatRate(row.openRate),
+      },
+      {
+        id: 'clickRate',
+        header: t('communications.analytics.clickRate'),
+        headerText: t('communications.analytics.clickRate'),
+        align: 'right',
+        sortable: true,
+        cell: (row) => <span className="tabular">{formatRate(row.clickRate)}</span>,
+        exportValue: (row) => formatRate(row.clickRate),
+      },
+    ],
+    [t],
+  )
 
   const exportCsv = async () => {
     setExporting(true)
@@ -141,93 +299,66 @@ export default function AnalyticsView() {
 
             {buckets.length > 0 && (
               <Card className="overflow-hidden">
-                <div className="p-4 border-b border-border">
+                <div className="border-b border-border p-4">
                   <h2 className="text-sm font-medium text-fg">
                     {t('communications.analytics.trend')}
                   </h2>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border bg-app-subtle/50 text-left text-fg-muted">
-                        <th className="px-4 py-2 font-medium">
-                          {t('communications.analytics.column.date')}
-                        </th>
-                        <th className="px-4 py-2 font-medium text-right">
-                          {t('communications.analytics.sent')}
-                        </th>
-                        <th className="px-4 py-2 font-medium text-right">
-                          {t('communications.analytics.opened')}
-                        </th>
-                        <th className="px-4 py-2 font-medium text-right">
-                          {t('communications.analytics.clicked')}
-                        </th>
-                        <th className="px-4 py-2 font-medium text-right">
-                          {t('communications.analytics.failed')}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {buckets.map((row) => (
-                        <tr key={row.date} className="border-b border-border last:border-0">
-                          <td className="px-4 py-2 tabular text-fg">{row.date}</td>
-                          <td className="px-4 py-2 tabular text-right">{row.sent ?? 0}</td>
-                          <td className="px-4 py-2 tabular text-right">{row.opened ?? 0}</td>
-                          <td className="px-4 py-2 tabular text-right">{row.clicked ?? 0}</td>
-                          <td className="px-4 py-2 tabular text-right text-danger">
-                            {row.failed ?? 0}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DataView
+                  tableId="email-analytics-trend"
+                  rows={sortedBuckets}
+                  columns={trendColumns}
+                  rowKey={(row) => row.date}
+                  sort={trendSort}
+                  onSortChange={(id, dir) => setTrendSort({ id, dir })}
+                  toolbar={false}
+                  pageSize={15}
+                  exportFileName={`email-analytics-trend-${period}d`}
+                  mobileCard={(row) => (
+                    <Card compact>
+                      <p className="font-medium tabular text-fg">{row.date}</p>
+                      <p className="mt-1 text-sm text-fg-muted tabular">
+                        {t('communications.analytics.sent')}: {row.sent ?? 0} ·{' '}
+                        {t('communications.analytics.opened')}: {row.opened ?? 0} ·{' '}
+                        {t('communications.analytics.clicked')}: {row.clicked ?? 0} ·{' '}
+                        {t('communications.analytics.failed')}: {row.failed ?? 0}
+                      </p>
+                    </Card>
+                  )}
+                />
               </Card>
             )}
 
             {topCampaigns.length > 0 && (
               <Card className="overflow-hidden">
-                <div className="p-4 border-b border-border">
+                <div className="border-b border-border p-4">
                   <h2 className="text-sm font-medium text-fg">
                     {t('communications.analytics.topCampaigns')}
                   </h2>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border bg-app-subtle/50 text-left text-fg-muted">
-                        <th className="px-4 py-2 font-medium">
-                          {t('communications.analytics.campaignSubject')}
-                        </th>
-                        <th className="px-4 py-2 font-medium text-right">
-                          {t('communications.analytics.sent')}
-                        </th>
-                        <th className="px-4 py-2 font-medium text-right">
-                          {t('communications.analytics.openRate')}
-                        </th>
-                        <th className="px-4 py-2 font-medium text-right">
-                          {t('communications.analytics.clickRate')}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {topCampaigns.map((row) => (
-                        <tr key={row.campaignId} className="border-b border-border last:border-0">
-                          <td className="px-4 py-2 text-fg max-w-xs truncate">
-                            {row.subject || row.campaignId}
-                          </td>
-                          <td className="px-4 py-2 tabular text-right">{row.sent ?? 0}</td>
-                          <td className="px-4 py-2 tabular text-right">
-                            {formatRate(row.openRate)}
-                          </td>
-                          <td className="px-4 py-2 tabular text-right">
-                            {formatRate(row.clickRate)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DataView
+                  tableId="email-analytics-top-campaigns"
+                  rows={sortedTopCampaigns}
+                  columns={topCampaignColumns}
+                  rowKey={(row) => row.campaignId}
+                  sort={campaignSort}
+                  onSortChange={(id, dir) => setCampaignSort({ id, dir })}
+                  toolbar={false}
+                  pageSize={10}
+                  exportFileName={`email-analytics-campaigns-${period}d`}
+                  mobileCard={(row) => (
+                    <Card compact>
+                      <p className="truncate font-medium text-fg">
+                        {row.subject || row.campaignId}
+                      </p>
+                      <p className="mt-1 text-sm text-fg-muted tabular">
+                        {t('communications.analytics.sent')}: {row.sent ?? 0} ·{' '}
+                        {t('communications.analytics.openRate')}: {formatRate(row.openRate)} ·{' '}
+                        {t('communications.analytics.clickRate')}: {formatRate(row.clickRate)}
+                      </p>
+                    </Card>
+                  )}
+                />
               </Card>
             )}
 

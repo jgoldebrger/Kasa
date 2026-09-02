@@ -8,6 +8,7 @@ import { PLAN_DEFINITIONS } from '@/lib/billing/plans'
 import { SUPPORT_CONTACT_EMAIL } from '@/lib/legal/contacts'
 import { organizationJsonLd, softwareApplicationJsonLd, webPageJsonLd } from '@/lib/seo/json-ld'
 import { publicPageMetadata } from '@/lib/seo/metadata'
+import PlanPricingTable from './PlanPricingTable'
 
 const TITLE = 'Kasa for Kehillos — Overview'
 const DESCRIPTION =
@@ -99,28 +100,7 @@ export default function OverviewPage() {
             ).
           </p>
           <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-surface text-fg">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Plan</th>
-                  <th className="px-4 py-3 font-semibold">Monthly list price</th>
-                  <th className="px-4 py-3 font-semibold">Family cap</th>
-                </tr>
-              </thead>
-              <tbody className="text-fg-muted">
-                {PLAN_DEFINITIONS.map((plan) => (
-                  <tr key={plan.tier} className="border-t border-border">
-                    <td className="px-4 py-3 text-fg">{plan.name}</td>
-                    <td className="px-4 py-3">{plan.monthlyPriceLabel}</td>
-                    <td className="px-4 py-3">
-                      {plan.familyCap === null
-                        ? 'Unlimited'
-                        : plan.familyCap.toLocaleString('en-US')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <PlanPricingTable plans={PLAN_DEFINITIONS} />
           </div>
         </section>
 

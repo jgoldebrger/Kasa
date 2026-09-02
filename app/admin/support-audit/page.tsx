@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useToast } from '@/app/components/Toast'
@@ -12,11 +12,13 @@ import {
   Button,
   ButtonLink,
   Card,
+  DataView,
   EmptyState,
   Input,
   PageHeader,
   Select,
   SkeletonRows,
+  type DataColumn,
 } from '@/app/components/ui'
 
 type AuditEntry = {
@@ -48,6 +50,8 @@ type SessionAction = {
   action: string
   at: string
 }
+
+type SessionActionRow = SessionAction & { id: string }
 
 type AppliedFilters = {
   action: string
@@ -234,6 +238,135 @@ export default function SupportAuditAdminPage() {
     window.location.href = `/api/admin/impersonation-audit?${qs.toString()}`
   }
 
+  const sessionActionRows = useMemo<SessionActionRow[]>(
+    () =>
+      sessionActions.map((row, index) => ({
+        ...row,
+        id: `${row.action}-${row.at}-${index}`,
+      })),
+    [sessionActions],
+  )
+
+  const sessionActionColumns = useMemo<DataColumn<SessionActionRow>[]>(
+    () => [
+      {
+        id: 'at',
+        header: t('admin.supportAudit.colTime'),
+        headerText: t('admin.supportAudit.colTime'),
+        cell: (row) => (
+          <span className="whitespace-nowrap text-fg-muted">
+            {row.at ? new Date(row.at).toLocaleString() : '—'}
+          </span>
+        ),
+        exportValue: (row) => (row.at ? new Date(row.at) : ''),
+      },
+      {
+        id: 'action',
+        header: t('admin.supportAudit.colAction'),
+        headerText: t('admin.supportAudit.colAction'),
+        cell: (row) => <code className="font-mono text-xs">{row.action}</code>,
+        exportValue: (row) => row.action,
+      },
+    ],
+    [t],
+  )
+
+  const auditColumns = useMemo<DataColumn<AuditEntry>[]>(
+    () => [
+      {
+        id: 'createdAt',
+        header: t('admin.supportAudit.colTime'),
+        headerText: t('admin.supportAudit.colTime'),
+        cell: (row) => (
+          <span className="whitespace-nowrap text-fg-muted">
+            {row.createdAt ? new Date(row.createdAt).toLocaleString() : '—'}
+          </span>
+        ),
+        exportValue: (row) => (row.createdAt ? new Date(row.createdAt) : ''),
+      },
+      {
+        id: 'user',
+        header: t('admin.supportAudit.colAdmin'),
+        headerText: t('admin.supportAudit.colAdmin'),
+        cell: (row) => (
+          <>
+            <div>{row.userName || row.userId}</div>
+            {row.userEmail && <div className="text-xs">{row.userEmail}</div>}
+          </>
+        ),
+        exportValue: (row) => row.userEmail || row.userName || row.userId,
+      },
+      {
+        id: 'organization',
+        header: t('admin.supportAudit.colOrganization'),
+        headerText: t('admin.supportAudit.colOrganization'),
+        cell: (row) => (
+          <>
+            <div className="font-medium text-fg">{row.organizationName || '—'}</div>
+            {row.organizationSlug && (
+              <div className="text-xs font-mono text-fg-muted">{row.organizationSlug}</div>
+            )}
+          </>
+        ),
+        exportValue: (row) => row.organizationName || row.organizationSlug || '',
+      },
+      {
+        id: 'action',
+        header: t('admin.supportAudit.colAction'),
+        headerText: t('admin.supportAudit.colAction'),
+        cell: (row) => actionBadge(row.action),
+        exportValue: (row) => row.action,
+      },
+      {
+        id: 'reason',
+        header: t('admin.supportAudit.colReason'),
+        headerText: t('admin.supportAudit.colReason'),
+        cell: (row) => (
+          <span className="max-w-xs text-fg-muted">
+            {row.reason || (row.action === 'platform.impersonate.start' ? '—' : '')}
+          </span>
+        ),
+        exportValue: (row) => row.reason || '',
+      },
+      {
+        id: 'readOnly',
+        header: t('admin.supportAudit.colReadOnly'),
+        headerText: t('admin.supportAudit.colReadOnly'),
+        cell: (row) =>
+          row.action === 'platform.impersonate.start' ? (
+            row.readOnly ? (
+              <Badge variant="warning">{t('admin.supportAudit.readOnlyYes')}</Badge>
+            ) : (
+              <Badge variant="muted">{t('admin.supportAudit.readOnlyNo')}</Badge>
+            )
+          ) : (
+            '—'
+          ),
+        exportValue: (row) =>
+          row.action === 'platform.impersonate.start' ? (row.readOnly ? 'yes' : 'no') : '',
+      },
+      {
+        id: 'session',
+        header: t('admin.supportAudit.colSession'),
+        headerText: t('admin.supportAudit.colSession'),
+        sortable: false,
+        cell: (row) =>
+          row.sessionId ? (
+            <Link
+              href={`/admin/support-audit?sessionId=${encodeURIComponent(row.sessionId)}`}
+              className="text-sm font-medium text-accent hover:text-accent-hover"
+            >
+              {t('admin.supportAudit.viewSession')}
+            </Link>
+          ) : (
+            '—'
+          ),
+        exportValue: () => '',
+      },
+    ],
+    [t],
+  )
+
   if (forbidden) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10">
@@ -350,30 +483,22 @@ export default function SupportAuditAdminPage() {
                     {t('admin.supportMode.sessionSummaryEmpty')}
                   </p>
                 ) : (
-                  <div className="overflow-x-auto rounded-lg border border-border">
-                    <table className="w-full text-sm text-left">
-                      <thead className="bg-app-subtle border-b border-border">
-                        <tr>
-                          <th className="px-4 py-2 font-semibold">
-                            {t('admin.supportAudit.colTime')}
-                          </th>
-                          <th className="px-4 py-2 font-semibold">
-                            {t('admin.supportAudit.colAction')}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {sessionActions.map((row, i) => (
-                          <tr key={`${row.action}-${row.at}-${i}`} className="bg-surface">
-                            <td className="px-4 py-2 whitespace-nowrap text-fg-muted">
-                              {row.at ? new Date(row.at).toLocaleString() : '—'}
-                            </td>
-                            <td className="px-4 py-2 font-mono text-xs">{row.action}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataView
+                    tableId="admin-support-audit-session-actions"
+                    rows={sessionActionRows}
+                    columns={sessionActionColumns}
+                    rowKey={(row) => row.id}
+                    toolbar={false}
+                    defaultSort={{ id: 'at', dir: 'desc' }}
+                    mobileCard={(row) => (
+                      <Card compact>
+                        <p className="text-xs text-fg-muted">
+                          {row.at ? new Date(row.at).toLocaleString() : '—'}
+                        </p>
+                        <code className="mt-1 block font-mono text-xs text-fg">{row.action}</code>
+                      </Card>
+                    )}
+                  />
                 )}
               </div>
             </>
@@ -431,75 +556,37 @@ export default function SupportAuditAdminPage() {
               description={t('admin.supportAudit.emptyDescription')}
             />
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-app-subtle border-b border-border">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">{t('admin.supportAudit.colTime')}</th>
-                    <th className="px-4 py-3 font-semibold">{t('admin.supportAudit.colAdmin')}</th>
-                    <th className="px-4 py-3 font-semibold">
-                      {t('admin.supportAudit.colOrganization')}
-                    </th>
-                    <th className="px-4 py-3 font-semibold">{t('admin.supportAudit.colAction')}</th>
-                    <th className="px-4 py-3 font-semibold">{t('admin.supportAudit.colReason')}</th>
-                    <th className="px-4 py-3 font-semibold">
-                      {t('admin.supportAudit.colReadOnly')}
-                    </th>
-                    <th className="px-4 py-3 font-semibold">
-                      {t('admin.supportAudit.colSession')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {rows.map((row) => (
-                    <tr key={row.id} className="bg-surface">
-                      <td className="px-4 py-3 text-fg-muted whitespace-nowrap">
-                        {row.createdAt ? new Date(row.createdAt).toLocaleString() : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-fg-muted">
-                        <div>{row.userName || row.userId}</div>
-                        {row.userEmail && <div className="text-xs">{row.userEmail}</div>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-fg">{row.organizationName || '—'}</div>
-                        {row.organizationSlug && (
-                          <div className="text-xs text-fg-muted font-mono">
-                            {row.organizationSlug}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">{actionBadge(row.action)}</td>
-                      <td className="px-4 py-3 text-fg-muted max-w-xs">
-                        {row.reason || (row.action === 'platform.impersonate.start' ? '—' : '')}
-                      </td>
-                      <td className="px-4 py-3">
-                        {row.action === 'platform.impersonate.start' ? (
-                          row.readOnly ? (
-                            <Badge variant="warning">{t('admin.supportAudit.readOnlyYes')}</Badge>
-                          ) : (
-                            <Badge variant="muted">{t('admin.supportAudit.readOnlyNo')}</Badge>
-                          )
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {row.sessionId ? (
-                          <Link
-                            href={`/admin/support-audit?sessionId=${encodeURIComponent(row.sessionId)}`}
-                            className="text-sm font-medium text-accent hover:text-accent-hover"
-                          >
-                            {t('admin.supportAudit.viewSession')}
-                          </Link>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataView
+              tableId="admin-support-audit"
+              rows={rows}
+              columns={auditColumns}
+              rowKey={(row) => row.id}
+              defaultSort={{ id: 'createdAt', dir: 'desc' }}
+              mobileCard={(row) => (
+                <Card compact>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-fg">{row.organizationName || '—'}</p>
+                      <p className="text-xs text-fg-muted">
+                        {row.userName || row.userEmail || row.userId}
+                      </p>
+                    </div>
+                    {actionBadge(row.action)}
+                  </div>
+                  <p className="mt-2 text-xs text-fg-muted">
+                    {row.createdAt ? new Date(row.createdAt).toLocaleString() : '—'}
+                  </p>
+                  {row.sessionId && (
+                    <Link
+                      href={`/admin/support-audit?sessionId=${encodeURIComponent(row.sessionId)}`}
+                      className="mt-2 inline-flex text-sm font-medium text-accent hover:text-accent-hover"
+                    >
+                      {t('admin.supportAudit.viewSession')}
+                    </Link>
+                  )}
+                </Card>
+              )}
+            />
           )}
 
           {nextCursor && (
