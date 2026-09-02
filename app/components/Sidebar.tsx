@@ -22,6 +22,13 @@ import { Badge } from '@/app/components/ui'
 import type { MessageKey } from '@/lib/i18n/load-locale'
 import { PRIMARY_NAV_SECTIONS, filterNavSections, findActiveNavItem, type NavItem } from '@/lib/nav'
 import {
+  ensureSectionOpen,
+  isCollapsibleSection,
+  readOpenSections,
+  sectionIdForPath,
+  writeOpenSections,
+} from '@/lib/nav/collapse'
+import {
   ArrowDownTrayIcon,
   ArrowRightOnRectangleIcon,
   BanknotesIcon,
@@ -150,12 +157,26 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
     [pathname, search, navSections],
   )
 
-  const [openSectionIds, setOpenSectionIds] = useState<string[]>([])
+  const [openSectionIds, setOpenSectionIds] = useState<string[]>(() => readOpenSections())
+
+  useEffect(() => {
+    const activeSectionId = sectionIdForPath(pathname ?? '', search, navSections)
+    if (!activeSectionId) return
+    setOpenSectionIds((prev) => {
+      const next = ensureSectionOpen(prev, activeSectionId)
+      if (next.length !== prev.length) writeOpenSections(next)
+      return next
+    })
+  }, [pathname, search, navSections])
 
   const toggleSection = useCallback((sectionId: string) => {
-    setOpenSectionIds((prev) =>
-      prev.includes(sectionId) ? prev.filter((id) => id !== sectionId) : [...prev, sectionId],
-    )
+    setOpenSectionIds((prev) => {
+      const next = prev.includes(sectionId)
+        ? prev.filter((id) => id !== sectionId)
+        : [...prev, sectionId]
+      writeOpenSections(next)
+      return next
+    })
   }, [])
 
   const [footerOpen, setFooterOpen] = useState(false)
@@ -232,13 +253,14 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
 
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto" aria-label={t('nav.primary')}>
         {navSections.map((section) => {
-          const isOpen = openSectionIds.includes(section.id)
+          const isCollapsible = isCollapsibleSection(section)
+          const isOpen = isCollapsible ? openSectionIds.includes(section.id) : true
           const sectionLabel = section.labelKey ? t(section.labelKey as MessageKey) : null
           const panelId = `nav-section-${section.id}`
 
           return (
             <div key={section.id} className="space-y-0.5">
-              {sectionLabel && (
+              {isCollapsible && sectionLabel && (
                 <button
                   type="button"
                   onClick={() => toggleSection(section.id)}
@@ -253,7 +275,7 @@ export default function Sidebar({ onClose }: SidebarProps = {}) {
                   />
                 </button>
               )}
-              <div id={panelId} hidden={!isOpen} className="space-y-0.5">
+              <div id={panelId} hidden={isCollapsible && !isOpen} className="space-y-0.5">
                 {section.items.map((item) => {
                   const isActive = activeItem?.id === item.id
                   const Icon = iconForNavItem(item)
