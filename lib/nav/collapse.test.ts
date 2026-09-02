@@ -6,6 +6,7 @@ import {
   readOpenSections,
   writeOpenSections,
   ensureSectionOpen,
+  isCollapsibleSection,
   sectionIdForPath,
   NAV_COLLAPSE_STORAGE_KEY,
 } from './collapse'
@@ -35,5 +36,26 @@ describe('nav collapse', () => {
 
   it('resolves section for pathname', () => {
     expect(sectionIdForPath('/payments', '', sections)).toBe('money')
+  })
+
+  it('treats single-item and unlabeled sections as flat', () => {
+    expect(
+      isCollapsibleSection({
+        id: 'overview',
+        labelKey: null,
+        items: [{ id: 'dashboard', href: '/', labelKey: 'nav.dashboard', roles: ['member'] }],
+      }),
+    ).toBe(false)
+    expect(isCollapsibleSection(sections[0])).toBe(false)
+    expect(
+      isCollapsibleSection({
+        id: 'people',
+        labelKey: 'nav.section.people',
+        items: [
+          { id: 'families', href: '/families', labelKey: 'nav.families', roles: ['member'] },
+          { id: 'events', href: '/events', labelKey: 'nav.events', roles: ['admin'] },
+        ],
+      }),
+    ).toBe(true)
   })
 })

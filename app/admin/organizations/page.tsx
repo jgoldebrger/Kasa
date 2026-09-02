@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -18,10 +18,12 @@ import {
   Button,
   ButtonLink,
   Card,
+  DataView,
   EmptyState,
   Input,
   PageHeader,
   SkeletonRows,
+  type DataColumn,
 } from '@/app/components/ui'
 
 type OrgRow = {
@@ -203,6 +205,96 @@ export default function OrganizationsAdminPage() {
     }
   }
 
+  const orgColumns = useMemo<DataColumn<OrgRow>[]>(
+    () => [
+      {
+        id: 'name',
+        header: 'Organization',
+        headerText: 'Organization',
+        cell: (org) => (
+          <>
+            <div className="font-medium text-fg">{org.name}</div>
+            <div className="text-xs text-fg-muted font-mono">{org.slug}</div>
+          </>
+        ),
+        exportValue: (org) => org.name,
+      },
+      {
+        id: 'owner',
+        header: 'Owner',
+        headerText: 'Owner',
+        cell: (org) =>
+          org.owner ? (
+            <>
+              <div>{org.owner.name || '—'}</div>
+              <div className="text-xs">{org.owner.email}</div>
+            </>
+          ) : (
+            '—'
+          ),
+        exportValue: (org) => org.owner?.email || org.owner?.name || '',
+      },
+      {
+        id: 'familyCount',
+        header: 'Families',
+        headerText: 'Families',
+        align: 'right',
+        cell: (org) => <span className="text-fg-muted">{org.familyCount}</span>,
+        exportValue: (org) => org.familyCount,
+      },
+      {
+        id: 'setup',
+        header: 'Setup',
+        headerText: 'Setup',
+        cell: (org) => setupBadge(org.setupCompletedAt),
+        exportValue: (org) => (org.setupCompletedAt ? 'complete' : 'in progress'),
+      },
+      {
+        id: 'plan',
+        header: 'Plan',
+        headerText: 'Plan',
+        cell: (org) => planBadge(org.planTier),
+        exportValue: (org) => org.planTier || '',
+      },
+      {
+        id: 'subscription',
+        header: 'Subscription',
+        headerText: 'Subscription',
+        cell: (org) => statusBadge(org.subscriptionStatus),
+        exportValue: (org) => org.subscriptionStatus || '',
+      },
+      {
+        id: 'createdAt',
+        header: 'Created',
+        headerText: 'Created',
+        cell: (org) => (
+          <span className="whitespace-nowrap text-fg-muted">
+            {org.createdAt ? new Date(org.createdAt).toLocaleDateString() : '—'}
+          </span>
+        ),
+        exportValue: (org) => (org.createdAt ? new Date(org.createdAt) : ''),
+      },
+      {
+        id: 'actions',
+        header: <span className="sr-only">Actions</span>,
+        headerText: 'Actions',
+        align: 'right',
+        sortable: false,
+        cell: (org) => (
+          <SupportModeOpenButton
+            loading={enteringId === org.id}
+            onSelect={(redirectTo) => {
+              setModalRedirectTo(redirectTo)
+              setModalOrg(org)
+            }}
+          />
+        ),
+        exportValue: () => '',
+      },
+    ],
+    [enteringId],
+  )
+
   if (forbidden) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10">
@@ -273,60 +365,36 @@ export default function OrganizationsAdminPage() {
           ) : rows.length === 0 ? (
             <EmptyState title="No organizations found" description="Try a different search term." />
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-app-subtle border-b border-border">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">Organization</th>
-                    <th className="px-4 py-3 font-semibold">Owner</th>
-                    <th className="px-4 py-3 font-semibold">Families</th>
-                    <th className="px-4 py-3 font-semibold">Setup</th>
-                    <th className="px-4 py-3 font-semibold">Plan</th>
-                    <th className="px-4 py-3 font-semibold">Subscription</th>
-                    <th className="px-4 py-3 font-semibold">Created</th>
-                    <th className="px-4 py-3 font-semibold">
-                      <span className="sr-only">Actions</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {rows.map((org) => (
-                    <tr key={org.id} className="bg-surface">
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-fg">{org.name}</div>
-                        <div className="text-xs text-fg-muted font-mono">{org.slug}</div>
-                      </td>
-                      <td className="px-4 py-3 text-fg-muted">
-                        {org.owner ? (
-                          <>
-                            <div>{org.owner.name || '—'}</div>
-                            <div className="text-xs">{org.owner.email}</div>
-                          </>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-fg-muted">{org.familyCount}</td>
-                      <td className="px-4 py-3">{setupBadge(org.setupCompletedAt)}</td>
-                      <td className="px-4 py-3">{planBadge(org.planTier)}</td>
-                      <td className="px-4 py-3">{statusBadge(org.subscriptionStatus)}</td>
-                      <td className="px-4 py-3 text-fg-muted whitespace-nowrap">
-                        {org.createdAt ? new Date(org.createdAt).toLocaleDateString() : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <SupportModeOpenButton
-                          loading={enteringId === org.id}
-                          onSelect={(redirectTo) => {
-                            setModalRedirectTo(redirectTo)
-                            setModalOrg(org)
-                          }}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataView
+              tableId="admin-organizations"
+              rows={rows}
+              columns={orgColumns}
+              rowKey={(org) => org.id}
+              defaultSort={{ id: 'createdAt', dir: 'desc' }}
+              mobileCard={(org) => (
+                <Card compact>
+                  <p className="font-medium text-fg">{org.name}</p>
+                  <p className="text-xs font-mono text-fg-muted">{org.slug}</p>
+                  <p className="mt-2 text-sm text-fg-muted">
+                    {org.owner?.name || org.owner?.email || 'No owner'} · {org.familyCount} families
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {setupBadge(org.setupCompletedAt)}
+                    {planBadge(org.planTier)}
+                    {statusBadge(org.subscriptionStatus)}
+                  </div>
+                  <div className="mt-3 flex justify-end">
+                    <SupportModeOpenButton
+                      loading={enteringId === org.id}
+                      onSelect={(redirectTo) => {
+                        setModalRedirectTo(redirectTo)
+                        setModalOrg(org)
+                      }}
+                    />
+                  </div>
+                </Card>
+              )}
+            />
           )}
 
           {nextCursor && (

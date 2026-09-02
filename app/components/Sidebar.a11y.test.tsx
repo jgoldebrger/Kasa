@@ -42,21 +42,28 @@ describe('Sidebar a11y', () => {
     localStorage.clear()
   })
 
-  it('starts nav sections collapsed and toggles aria-expanded', async () => {
+  it('starts inactive nav sections collapsed and toggles aria-expanded', async () => {
+    const Sidebar = (await import('./Sidebar')).default
+    render(<Sidebar />)
+    const peopleToggle = screen.getByRole('button', { name: /nav.section.people/i })
+    expect(peopleToggle.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(peopleToggle)
+    expect(peopleToggle.getAttribute('aria-expanded')).toBe('true')
+    fireEvent.click(peopleToggle)
+    expect(peopleToggle.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('auto-expands the section for the active route', async () => {
     const Sidebar = (await import('./Sidebar')).default
     render(<Sidebar />)
     const moneyToggle = screen.getByRole('button', { name: /nav.section.money/i })
-    expect(moneyToggle.getAttribute('aria-expanded')).toBe('false')
-    fireEvent.click(moneyToggle)
     expect(moneyToggle.getAttribute('aria-expanded')).toBe('true')
-    fireEvent.click(moneyToggle)
-    expect(moneyToggle.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.getByRole('link', { name: /^nav.payments$/i })).toBeDefined()
   })
 
   it('marks the active nav item with aria-current for the matched route', async () => {
     const Sidebar = (await import('./Sidebar')).default
     render(<Sidebar />)
-    fireEvent.click(screen.getByRole('button', { name: /nav.section.money/i }))
     const paymentsLink = screen.getByRole('link', { name: /^nav.payments$/i })
     expect(paymentsLink.getAttribute('aria-current')).toBe('page')
   })
@@ -80,7 +87,6 @@ describe('Sidebar a11y', () => {
     const Sidebar = (await import('./Sidebar')).default
     render(<Sidebar />)
     expect(screen.queryByRole('button', { name: /nav.section.money/i })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /nav.section.overview/i }))
     expect(screen.getByRole('link', { name: /^nav.dashboard$/i })).toBeDefined()
   })
 })

@@ -36,6 +36,10 @@ export function writeOpenSections(ids: string[], storage?: Storage): void {
   }
 }
 
+export function isCollapsibleSection(section: NavSection): boolean {
+  return section.items.length > 1 && Boolean(section.labelKey)
+}
+
 export function ensureSectionOpen(openIds: string[], sectionId: string): string[] {
   if (openIds.includes(sectionId)) return openIds
   return [...openIds, sectionId]

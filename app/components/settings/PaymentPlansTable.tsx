@@ -151,6 +151,7 @@ export default function PaymentPlansTable({
         rows={plans}
         columns={columns}
         rowKey={(p) => p._id}
+        defaultSort={{ id: 'name', dir: 'asc' }}
         globalSearch={{ placeholder: 'Search plans…' }}
         pageSize={10}
         mobileCard={(p) => {

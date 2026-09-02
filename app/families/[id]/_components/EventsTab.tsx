@@ -36,6 +36,7 @@ function EventsTabContent(props: FamilyDetailContextValue) {
       <DataView
         tableId="family-events"
         rows={events}
+        defaultSort={{ id: 'date', dir: 'desc' }}
         globalSearch={{ placeholder: 'Search events…' }}
         pageSize={10}
         import={{

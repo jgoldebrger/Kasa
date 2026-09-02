@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useToast } from '@/app/components/Toast'
 import { PLATFORM_ADMIN_2FA_REQUIRED_CODE } from '@/lib/platform-admin-constants'
@@ -11,10 +11,12 @@ import {
   Button,
   ButtonLink,
   Card,
+  DataView,
   EmptyState,
   PageHeader,
   Select,
   SkeletonRows,
+  type DataColumn,
 } from '@/app/components/ui'
 
 type SmtpFailureRow = {
@@ -96,6 +98,98 @@ export default function OpsAdminPage() {
     void load()
   }, [load])
 
+  const smtpColumns = useMemo<DataColumn<SmtpFailureRow>[]>(
+    () => [
+      {
+        id: 'organization',
+        header: t('admin.ops.colOrganization'),
+        headerText: t('admin.ops.colOrganization'),
+        cell: (row) => (
+          <>
+            <div className="font-medium">{row.organizationName || '—'}</div>
+            {row.organizationSlug && (
+              <div className="text-xs text-fg-muted font-mono">{row.organizationSlug}</div>
+            )}
+          </>
+        ),
+        exportValue: (row) => row.organizationName || row.organizationSlug || '',
+      },
+      {
+        id: 'failedCount',
+        header: t('admin.ops.colFailures'),
+        headerText: t('admin.ops.colFailures'),
+        align: 'right',
+        cell: (row) => <Badge variant="danger">{row.failedCount}</Badge>,
+        exportValue: (row) => row.failedCount,
+      },
+      {
+        id: 'lastFailedAt',
+        header: t('admin.ops.colLastFailed'),
+        headerText: t('admin.ops.colLastFailed'),
+        cell: (row) => (
+          <span className="whitespace-nowrap text-fg-muted">
+            {row.lastFailedAt ? new Date(row.lastFailedAt).toLocaleString() : '—'}
+          </span>
+        ),
+        exportValue: (row) => (row.lastFailedAt ? new Date(row.lastFailedAt) : ''),
+      },
+      {
+        id: 'lastError',
+        header: t('admin.ops.colLastError'),
+        headerText: t('admin.ops.colLastError'),
+        cell: (row) => (
+          <span className="max-w-md truncate text-fg-muted">{row.lastError || '—'}</span>
+        ),
+        exportValue: (row) => row.lastError || '',
+      },
+    ],
+    [t],
+  )
+
+  const bounceColumns = useMemo<DataColumn<BounceRateRow>[]>(
+    () => [
+      {
+        id: 'organization',
+        header: t('admin.ops.colOrganization'),
+        headerText: t('admin.ops.colOrganization'),
+        cell: (row) => (
+          <>
+            <div className="font-medium">{row.organizationName || '—'}</div>
+            {row.organizationSlug && (
+              <div className="text-xs text-fg-muted font-mono">{row.organizationSlug}</div>
+            )}
+          </>
+        ),
+        exportValue: (row) => row.organizationName || row.organizationSlug || '',
+      },
+      {
+        id: 'bouncedCount',
+        header: t('admin.ops.colBounced'),
+        headerText: t('admin.ops.colBounced'),
+        align: 'right',
+        cell: (row) => row.bouncedCount,
+        exportValue: (row) => row.bouncedCount,
+      },
+      {
+        id: 'sentCount',
+        header: t('admin.ops.colSent'),
+        headerText: t('admin.ops.colSent'),
+        align: 'right',
+        cell: (row) => row.sentCount,
+        exportValue: (row) => row.sentCount,
+      },
+      {
+        id: 'bounceRate',
+        header: t('admin.ops.colBounceRate'),
+        headerText: t('admin.ops.colBounceRate'),
+        align: 'right',
+        cell: (row) => <Badge variant="warning">{row.bounceRate}%</Badge>,
+        exportValue: (row) => row.bounceRate,
+      },
+    ],
+    [t],
+  )
+
   if (forbidden) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10">
@@ -158,45 +252,31 @@ export default function OpsAdminPage() {
                 {smtpFailures.length === 0 ? (
                   <EmptyState title={t('admin.ops.smtpFailuresEmpty')} />
                 ) : (
-                  <div className="overflow-x-auto rounded-lg border border-border">
-                    <table className="w-full text-sm text-left">
-                      <thead className="bg-app-subtle border-b border-border">
-                        <tr>
-                          <th className="px-4 py-2 font-semibold">
-                            {t('admin.ops.colOrganization')}
-                          </th>
-                          <th className="px-4 py-2 font-semibold">{t('admin.ops.colFailures')}</th>
-                          <th className="px-4 py-2 font-semibold">
-                            {t('admin.ops.colLastFailed')}
-                          </th>
-                          <th className="px-4 py-2 font-semibold">{t('admin.ops.colLastError')}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {smtpFailures.map((row) => (
-                          <tr key={row.organizationId} className="bg-surface">
-                            <td className="px-4 py-2">
-                              <div className="font-medium">{row.organizationName || '—'}</div>
-                              {row.organizationSlug && (
-                                <div className="text-xs text-fg-muted font-mono">
-                                  {row.organizationSlug}
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-4 py-2">
-                              <Badge variant="danger">{row.failedCount}</Badge>
-                            </td>
-                            <td className="px-4 py-2 whitespace-nowrap text-fg-muted">
-                              {row.lastFailedAt ? new Date(row.lastFailedAt).toLocaleString() : '—'}
-                            </td>
-                            <td className="px-4 py-2 text-fg-muted max-w-md truncate">
-                              {row.lastError || '—'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataView
+                    tableId="admin-ops-smtp-failures"
+                    rows={smtpFailures}
+                    columns={smtpColumns}
+                    rowKey={(row) => row.organizationId}
+                    toolbar={false}
+                    defaultSort={{ id: 'failedCount', dir: 'desc' }}
+                    mobileCard={(row) => (
+                      <Card compact>
+                        <p className="font-medium text-fg">{row.organizationName || '—'}</p>
+                        {row.organizationSlug && (
+                          <p className="text-xs font-mono text-fg-muted">{row.organizationSlug}</p>
+                        )}
+                        <p className="mt-2 text-sm text-fg-muted">
+                          {t('admin.ops.colFailures')}: {row.failedCount}
+                        </p>
+                        <p className="text-xs text-fg-muted">
+                          {row.lastFailedAt ? new Date(row.lastFailedAt).toLocaleString() : '—'}
+                        </p>
+                        {row.lastError && (
+                          <p className="mt-1 text-xs text-danger truncate">{row.lastError}</p>
+                        )}
+                      </Card>
+                    )}
+                  />
                 )}
               </section>
 
@@ -208,41 +288,26 @@ export default function OpsAdminPage() {
                 {highBounceRate.length === 0 ? (
                   <EmptyState title={t('admin.ops.bounceRateEmpty')} />
                 ) : (
-                  <div className="overflow-x-auto rounded-lg border border-border">
-                    <table className="w-full text-sm text-left">
-                      <thead className="bg-app-subtle border-b border-border">
-                        <tr>
-                          <th className="px-4 py-2 font-semibold">
-                            {t('admin.ops.colOrganization')}
-                          </th>
-                          <th className="px-4 py-2 font-semibold">{t('admin.ops.colBounced')}</th>
-                          <th className="px-4 py-2 font-semibold">{t('admin.ops.colSent')}</th>
-                          <th className="px-4 py-2 font-semibold">
-                            {t('admin.ops.colBounceRate')}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {highBounceRate.map((row) => (
-                          <tr key={row.organizationId} className="bg-surface">
-                            <td className="px-4 py-2">
-                              <div className="font-medium">{row.organizationName || '—'}</div>
-                              {row.organizationSlug && (
-                                <div className="text-xs text-fg-muted font-mono">
-                                  {row.organizationSlug}
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-4 py-2">{row.bouncedCount}</td>
-                            <td className="px-4 py-2">{row.sentCount}</td>
-                            <td className="px-4 py-2">
-                              <Badge variant="warning">{row.bounceRate}%</Badge>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataView
+                    tableId="admin-ops-bounce-rate"
+                    rows={highBounceRate}
+                    columns={bounceColumns}
+                    rowKey={(row) => row.organizationId}
+                    toolbar={false}
+                    defaultSort={{ id: 'bounceRate', dir: 'desc' }}
+                    mobileCard={(row) => (
+                      <Card compact>
+                        <p className="font-medium text-fg">{row.organizationName || '—'}</p>
+                        <p className="mt-2 text-sm tabular text-fg-muted">
+                          {t('admin.ops.colBounced')}: {row.bouncedCount} · {t('admin.ops.colSent')}
+                          : {row.sentCount}
+                        </p>
+                        <p className="mt-1">
+                          <Badge variant="warning">{row.bounceRate}%</Badge>
+                        </p>
+                      </Card>
+                    )}
+                  />
                 )}
               </section>
 

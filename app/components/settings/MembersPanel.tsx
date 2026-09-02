@@ -546,6 +546,7 @@ function MembersTable({
         rows={members}
         columns={columns}
         rowKey={(m) => m.membershipId}
+        defaultSort={{ id: 'name', dir: 'asc' }}
         globalSearch={{ placeholder: 'Search name, email…' }}
         pageSize={10}
         mobileCard={(m) => {
@@ -675,6 +676,7 @@ function InvitesTable({
         rows={invites}
         columns={columns}
         rowKey={(i) => i.id}
+        defaultSort={{ id: 'email', dir: 'asc' }}
         globalSearch={{ placeholder: 'Search invites…' }}
         pageSize={10}
         mobileCard={(i) => (

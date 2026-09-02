@@ -107,6 +107,7 @@ export default function EventTypesTable({
       rows={eventTypes}
       columns={columns}
       rowKey={(e) => e._id}
+      defaultSort={{ id: 'name', dir: 'asc' }}
       globalSearch={{ placeholder: 'Search event types…' }}
       pageSize={10}
       mobileCard={(e) => (

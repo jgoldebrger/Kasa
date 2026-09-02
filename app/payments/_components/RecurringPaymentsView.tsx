@@ -183,12 +183,14 @@ export default function RecurringPaymentsView() {
           ) : (
             <span className="italic text-fg-muted">{t('payments.familyDeleted')}</span>
           ),
+        exportValue: (r) => r.familyId?.name || '',
       },
       {
         id: 'amount',
         header: t('payments.column.amount'),
         sortable: true,
         cell: (r) => <span className="tabular font-medium">{formatMoney(r.amount)}</span>,
+        exportValue: (r) => r.amount,
         className: 'text-right',
       },
       {
@@ -196,6 +198,7 @@ export default function RecurringPaymentsView() {
         header: t('payments.recurring.column.nextDate'),
         sortable: true,
         cell: (r) => formatLocaleDate(r.nextPaymentDate),
+        exportValue: (r) => (r.nextPaymentDate ? new Date(r.nextPaymentDate) : ''),
       },
       {
         id: 'card',
@@ -235,17 +238,20 @@ export default function RecurringPaymentsView() {
             {r.familyName}
           </Link>
         ),
+        exportValue: (r) => r.familyName,
       },
       {
         id: 'amount',
         header: t('payments.column.amount'),
         cell: (r) => <span className="tabular font-medium">{formatMoney(r.amount)}</span>,
+        exportValue: (r) => r.amount,
         className: 'text-right',
       },
       {
         id: 'due',
         header: t('payments.recurring.column.dueSince'),
         cell: (r) => formatLocaleDate(r.nextPaymentDate),
+        exportValue: (r) => (r.nextPaymentDate ? new Date(r.nextPaymentDate) : ''),
       },
       {
         id: 'card',
@@ -323,8 +329,10 @@ export default function RecurringPaymentsView() {
               </div>
             </div>
             <DataView
+              tableId="recurring-payments-failed"
               columns={failedColumns}
               rows={failedQueue}
+              defaultSort={{ id: 'due', dir: 'asc' }}
               rowKey={(r) => r.recurringPaymentId}
               mobileCard={(r) => (
                 <Card compact>
@@ -373,6 +381,7 @@ export default function RecurringPaymentsView() {
             rows={rows}
             rowKey={(r) => r._id}
             tableId="recurring-payments"
+            defaultSort={{ id: 'nextDate', dir: 'asc' }}
             globalSearch={{
               placeholder: t('payments.recurring.searchPlaceholder'),
               getValue: (r) =>

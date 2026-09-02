@@ -3,6 +3,7 @@ import LegalPageLayout from '@/app/components/legal/LegalPageLayout'
 import { LEGAL_LAST_UPDATED, PRIVACY_CONTACT_EMAIL } from '@/lib/legal/contacts'
 import { SUBPROCESSORS } from '@/lib/legal/subprocessors'
 import { publicPageMetadata } from '@/lib/seo/metadata'
+import SubprocessorsTable from './SubprocessorsTable'
 
 const TITLE = 'Subprocessors — Kasa'
 const DESCRIPTION =
@@ -44,39 +45,7 @@ export default function SubprocessorsPage() {
       <section>
         <h2>Current subprocessors</h2>
         <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-app-subtle border-b border-border">
-              <tr>
-                <th scope="col" className="px-4 py-3 font-semibold text-fg">
-                  Subprocessor
-                </th>
-                <th scope="col" className="px-4 py-3 font-semibold text-fg">
-                  Purpose
-                </th>
-                <th scope="col" className="px-4 py-3 font-semibold text-fg">
-                  Location
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {SUBPROCESSORS.map((row) => (
-                <tr key={row.name} className="bg-surface">
-                  <td className="px-4 py-3 text-fg">
-                    <a
-                      href={row.website}
-                      className="text-accent hover:underline"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {row.name}
-                    </a>
-                  </td>
-                  <td className="px-4 py-3 text-fg-muted">{row.purpose}</td>
-                  <td className="px-4 py-3 text-fg-muted text-xs">{row.location}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <SubprocessorsTable rows={SUBPROCESSORS} />
         </div>
       </section>
 

@@ -362,6 +362,7 @@ export default function CommunicationsView() {
                 rows={logs}
                 columns={columns}
                 rowKey={(r) => r._id}
+                defaultSort={{ id: 'date', dir: 'desc' }}
                 pageSize={15}
                 exportFileName="email-log"
                 onRowClick={(row) => setDetailEmailId(row._id)}

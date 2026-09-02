@@ -417,6 +417,7 @@ export default function TaxReceiptsPanel() {
             rows={rows}
             rowKey={(r) => r.familyId}
             columns={columns}
+            defaultSort={{ id: 'familyName', dir: 'asc' }}
             pageSize={20}
             exportFileName={`tax-receipts-${year}`}
             globalSearch={{

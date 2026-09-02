@@ -6,7 +6,7 @@ const MEMBER_ROLES: NavItem['roles'] = ['member', 'admin']
 export const PRIMARY_NAV_SECTIONS: NavSection[] = [
   {
     id: 'overview',
-    labelKey: 'nav.section.overview',
+    labelKey: null,
     items: [
       {
         id: 'dashboard',
@@ -154,7 +154,7 @@ export const PRIMARY_NAV_SECTIONS: NavSection[] = [
   },
   {
     id: 'insights',
-    labelKey: 'nav.section.insights',
+    labelKey: null,
     items: [
       {
         id: 'reports',
@@ -294,7 +294,7 @@ export const PRIMARY_NAV_SECTIONS: NavSection[] = [
   },
   {
     id: 'help',
-    labelKey: 'nav.section.help',
+    labelKey: null,
     items: [
       {
         id: 'help',

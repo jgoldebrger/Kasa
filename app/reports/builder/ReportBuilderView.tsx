@@ -4,7 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useToast, useConfirm } from '@/app/components/Toast'
 import { useOrgChanged } from '@/lib/client/useOrgChanged'
 import { useRequestGeneration } from '@/lib/client/useRequestGeneration'
-import { Button, Input, PageHeader, Select, SkeletonRows } from '@/app/components/ui'
+import {
+  Button,
+  Card,
+  DataView,
+  Input,
+  PageHeader,
+  Select,
+  SkeletonRows,
+  type DataColumn,
+} from '@/app/components/ui'
 import { useCurrency } from '@/lib/client/useCurrency'
 import { useT } from '@/lib/client/i18n'
 
@@ -351,6 +360,58 @@ export default function ReportBuilderView({
 
   const fmt = (n: number) => (isMoneyMeasure ? format(n) : Number(n).toLocaleString())
 
+  type PivotRow = {
+    id: string
+    group: string
+    total: number
+    [key: string]: string | number
+  }
+
+  const pivotRows = useMemo<PivotRow[]>(() => {
+    if (!result) return []
+    return result.rowLabels.map((rl) => {
+      const row: PivotRow = { id: rl, group: rl, total: result.totals.rows[rl] ?? 0 }
+      for (const cl of result.colLabels) {
+        row[cl] = result.values[rl]?.[cl] ?? 0
+      }
+      return row
+    })
+  }, [result])
+
+  const pivotColumns = useMemo<DataColumn<PivotRow>[]>(() => {
+    if (!result) return []
+    const groupLabel =
+      currentSource?.dimensions.find((d) => d.id === config.rowDim)?.label || 'Group'
+    const cols: DataColumn<PivotRow>[] = [
+      {
+        id: 'group',
+        header: groupLabel,
+        headerText: groupLabel,
+        cell: (row) => <span className="text-fg">{row.group}</span>,
+        exportValue: (row) => row.group,
+      },
+      ...result.colLabels.map((cl) => ({
+        id: cl,
+        header: cl,
+        headerText: cl,
+        align: 'right' as const,
+        cell: (row: PivotRow) => (
+          <span className="tabular text-fg">{fmt(Number(row[cl] ?? 0))}</span>
+        ),
+        exportValue: (row: PivotRow) => Number(row[cl] ?? 0),
+      })),
+      {
+        id: 'total',
+        header: 'Total',
+        headerText: 'Total',
+        align: 'right',
+        cell: (row) => <span className="tabular font-medium text-fg">{fmt(row.total)}</span>,
+        exportValue: (row) => row.total,
+      },
+    ]
+    return cols
+  }, [config.rowDim, currentSource?.dimensions, fmt, result])
+
   return (
     <div className="min-h-screen p-4 sm:p-6 md:p-8">
       <div className="max-w-7xl mx-auto">
@@ -583,61 +644,38 @@ export default function ReportBuilderView({
                   Query returned no rows. Try widening the date range or removing filters.
                 </p>
               ) : (
-                <div className="overflow-x-auto">
+                <div>
                   <p className="text-xs text-fg-muted mb-2">
                     {result.rowCount.toLocaleString()} source row{result.rowCount === 1 ? '' : 's'}{' '}
                     aggregated.
                   </p>
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-app-subtle">
-                      <tr>
-                        <th className="text-left px-3 py-2 font-semibold text-fg">
-                          {currentSource?.dimensions.find((d) => d.id === config.rowDim)?.label ||
-                            'Group'}
-                        </th>
-                        {result.colLabels.map((cl) => (
-                          <th
-                            key={cl}
-                            className="text-right px-3 py-2 font-semibold text-fg whitespace-nowrap"
-                          >
-                            {cl}
-                          </th>
-                        ))}
-                        <th className="text-right px-3 py-2 font-semibold text-fg">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.rowLabels.map((rl) => (
-                        <tr key={rl} className="border-t border-border">
-                          <td className="px-3 py-2 text-fg">{rl}</td>
-                          {result.colLabels.map((cl) => (
-                            <td key={cl} className="text-right px-3 py-2 tabular text-fg">
-                              {fmt(result.values[rl]?.[cl] ?? 0)}
-                            </td>
-                          ))}
-                          <td className="text-right px-3 py-2 tabular text-fg font-medium">
-                            {fmt(result.totals.rows[rl] ?? 0)}
-                          </td>
-                        </tr>
+                  <DataView
+                    tableId="report-builder-pivot"
+                    rows={pivotRows}
+                    columns={pivotColumns}
+                    rowKey={(row) => row.id}
+                    toolbar={false}
+                    defaultSort={{ id: 'group', dir: 'asc' }}
+                    mobileCard={(row) => (
+                      <Card compact>
+                        <p className="font-medium text-fg">{row.group}</p>
+                        <p className="mt-1 text-sm tabular text-fg-muted">
+                          Total: {fmt(row.total)}
+                        </p>
+                      </Card>
+                    )}
+                  />
+                  <div className="mt-3 overflow-x-auto rounded-lg border border-border bg-app-subtle px-3 py-2 text-sm">
+                    <div className="flex min-w-full items-center gap-4 font-semibold text-fg">
+                      <span className="shrink-0">Total</span>
+                      {result.colLabels.map((cl) => (
+                        <span key={cl} className="ms-auto tabular">
+                          {cl}: {fmt(result.totals.cols[cl] ?? 0)}
+                        </span>
                       ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t-2 border-border bg-app-subtle">
-                        <td className="px-3 py-2 font-semibold text-fg">Total</td>
-                        {result.colLabels.map((cl) => (
-                          <td
-                            key={cl}
-                            className="text-right px-3 py-2 tabular font-semibold text-fg"
-                          >
-                            {fmt(result.totals.cols[cl] ?? 0)}
-                          </td>
-                        ))}
-                        <td className="text-right px-3 py-2 tabular font-bold text-fg">
-                          {fmt(result.totals.grand)}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
+                      <span className="tabular font-bold">Grand: {fmt(result.totals.grand)}</span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

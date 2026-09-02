@@ -158,6 +158,7 @@ export default function JobsView() {
               rows={rows}
               columns={columns}
               rowKey={(r) => r.jobId}
+              defaultSort={{ id: 'date', dir: 'desc' }}
               pageSize={15}
               exportFileName="email-jobs"
               mobileCard={(row) => (

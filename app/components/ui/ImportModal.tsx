@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { Modal } from './Modal'
 import { Button } from './Button'
+import { DataView, type DataColumn } from './DataView'
 import { useToast } from '@/app/components/Toast'
 import { useT } from '@/lib/client/i18n'
 import { getImportColumns, IMPORT_LABELS, type ImportType } from '@/lib/import-templates'
@@ -448,35 +449,41 @@ function FilePreviewTable({
   rows: PreviewRow[]
   t: ReturnType<typeof useT>
 }) {
+  const columns = useMemo<DataColumn<PreviewRow>[]>(
+    () =>
+      headers.map((header) => ({
+        id: header,
+        header,
+        headerText: header,
+        cell: (row) => <span className="whitespace-nowrap text-fg">{row[header] || '—'}</span>,
+        exportValue: (row) => row[header] || '',
+      })),
+    [headers],
+  )
+
   return (
     <div>
       <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-fg-muted">
         {t('import.filePreview').replace('{count}', String(rows.length))}
       </h3>
-      <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-xs">
-          <thead className="border-b border-border bg-app-subtle text-start text-muted-on-subtle">
-            <tr>
-              {headers.map((h) => (
-                <th key={h} className="whitespace-nowrap px-3 py-1.5 font-medium">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={i} className="border-t border-border">
-                {headers.map((h) => (
-                  <td key={h} className="whitespace-nowrap px-3 py-1.5 text-fg">
-                    {row[h] || '—'}
-                  </td>
-                ))}
-              </tr>
+      <DataView
+        tableId="import-file-preview"
+        rows={rows}
+        columns={columns}
+        rowKey={(_row, index) => String(index)}
+        toolbar={false}
+        defaultSort={headers[0] ? { id: headers[0], dir: 'asc' } : null}
+        mobileCard={(row) => (
+          <div className="surface-card p-3 text-xs">
+            {headers.map((header) => (
+              <div key={header} className="flex gap-2">
+                <span className="text-fg-muted">{header}:</span>
+                <span className="text-fg">{row[header] || '—'}</span>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+        )}
+      />
     </div>
   )
 }
@@ -504,6 +511,50 @@ function ColumnMappingPanel({
     return m
   }, [columnMapping])
 
+  const mappingColumns = useMemo<DataColumn<(typeof templateColumns)[number]>[]>(
+    () => [
+      {
+        id: 'template',
+        header: t('import.mapping.templateColumn'),
+        headerText: t('import.mapping.templateColumn'),
+        cell: (col) => (
+          <>
+            <span className="font-medium">{col.key}</span>
+            {col.required && <span className="ms-1 text-danger">*</span>}
+            {col.hint && <p className="mt-0.5 text-fg-muted">{col.hint}</p>}
+          </>
+        ),
+        exportValue: (col) => col.key,
+      },
+      {
+        id: 'fileColumn',
+        header: t('import.mapping.fileColumn'),
+        headerText: t('import.mapping.fileColumn'),
+        sortable: false,
+        cell: (col) => {
+          const mappedHeader = reverseMap.get(col.key) || ''
+          return (
+            <select
+              className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-fg"
+              value={mappedHeader}
+              onChange={(e) => onChange(col.key, e.target.value)}
+              aria-label={`${t('import.mapping.fileColumn')}: ${col.key}`}
+            >
+              <option value={SKIP_COLUMN}>{t('import.mapping.skip')}</option>
+              {fileHeaders.map((h) => (
+                <option key={h} value={h}>
+                  {h}
+                </option>
+              ))}
+            </select>
+          )
+        },
+        exportValue: (col) => reverseMap.get(col.key) || '',
+      },
+    ],
+    [fileHeaders, onChange, reverseMap, t],
+  )
+
   return (
     <div className="space-y-3">
       <div>
@@ -518,45 +569,37 @@ function ColumnMappingPanel({
           )}
         </div>
       )}
-      <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-xs">
-          <thead className="border-b border-border bg-app-subtle text-start text-muted-on-subtle">
-            <tr>
-              <th className="px-3 py-2 font-medium">{t('import.mapping.templateColumn')}</th>
-              <th className="px-3 py-2 font-medium">{t('import.mapping.fileColumn')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {templateColumns.map((col) => {
-              const mappedHeader = reverseMap.get(col.key) || ''
-              return (
-                <tr key={col.key} className="border-t border-border">
-                  <td className="px-3 py-2 text-fg">
-                    <span className="font-medium">{col.key}</span>
-                    {col.required && <span className="ms-1 text-danger">*</span>}
-                    {col.hint && <p className="mt-0.5 text-fg-muted">{col.hint}</p>}
-                  </td>
-                  <td className="px-3 py-2">
-                    <select
-                      className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-fg"
-                      value={mappedHeader}
-                      onChange={(e) => onChange(col.key, e.target.value)}
-                      aria-label={`${t('import.mapping.fileColumn')}: ${col.key}`}
-                    >
-                      <option value={SKIP_COLUMN}>{t('import.mapping.skip')}</option>
-                      {fileHeaders.map((h) => (
-                        <option key={h} value={h}>
-                          {h}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+      <DataView
+        tableId="import-column-mapping"
+        rows={templateColumns}
+        columns={mappingColumns}
+        rowKey={(col) => col.key}
+        toolbar={false}
+        defaultSort={{ id: 'template', dir: 'asc' }}
+        mobileCard={(col) => {
+          const mappedHeader = reverseMap.get(col.key) || ''
+          return (
+            <div className="surface-card p-3 text-xs space-y-2">
+              <p className="font-medium text-fg">
+                {col.key}
+                {col.required ? ' *' : ''}
+              </p>
+              <select
+                className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-fg"
+                value={mappedHeader}
+                onChange={(e) => onChange(col.key, e.target.value)}
+              >
+                <option value={SKIP_COLUMN}>{t('import.mapping.skip')}</option>
+                {fileHeaders.map((h) => (
+                  <option key={h} value={h}>
+                    {h}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )
+        }}
+      />
     </div>
   )
 }
@@ -564,6 +607,39 @@ function ColumnMappingPanel({
 function DryRunPreview({ result, t }: { result: DryRunResult; t: ReturnType<typeof useT> }) {
   const duplicateRows = result.preview.filter(
     (r) => r.similarFamilies && r.similarFamilies.length > 0,
+  )
+  const previewColumns = useMemo<DataColumn<ImportPreviewRow>[]>(
+    () => [
+      {
+        id: 'rowNumber',
+        header: t('import.col.row'),
+        headerText: t('import.col.row'),
+        cell: (row) => <span className="whitespace-nowrap text-fg">{row.rowNumber}</span>,
+        exportValue: (row) => row.rowNumber,
+      },
+      {
+        id: 'action',
+        header: t('import.col.action'),
+        headerText: t('import.col.action'),
+        cell: (row) => <ActionBadge action={row.action} t={t} />,
+        exportValue: (row) => row.action,
+      },
+      {
+        id: 'label',
+        header: t('import.col.label'),
+        headerText: t('import.col.label'),
+        cell: (row) => <span className="text-fg">{row.label || '—'}</span>,
+        exportValue: (row) => row.label || '',
+      },
+      {
+        id: 'reason',
+        header: t('import.col.reason'),
+        headerText: t('import.col.reason'),
+        cell: (row) => <span className="text-fg-muted">{row.reason || '—'}</span>,
+        exportValue: (row) => row.reason || '',
+      },
+    ],
+    [t],
   )
 
   return (
@@ -620,35 +696,29 @@ function DryRunPreview({ result, t }: { result: DryRunResult; t: ReturnType<type
         <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-fg-muted">
           {t('import.previewRows')}
         </h3>
-        <div className="max-h-64 overflow-y-auto rounded-lg border border-border">
-          <table className="w-full text-xs">
-            <thead className="sticky top-0 border-b border-border bg-app-subtle text-start text-muted-on-subtle">
-              <tr>
-                <th className="px-3 py-1.5 font-medium">{t('import.col.row')}</th>
-                <th className="px-3 py-1.5 font-medium">{t('import.col.action')}</th>
-                <th className="px-3 py-1.5 font-medium">{t('import.col.label')}</th>
-                <th className="px-3 py-1.5 font-medium">{t('import.col.reason')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {result.preview.slice(0, 50).map((row) => (
-                <tr key={row.rowNumber} className="border-t border-border">
-                  <td className="whitespace-nowrap px-3 py-1.5 text-fg">{row.rowNumber}</td>
-                  <td className="whitespace-nowrap px-3 py-1.5">
-                    <ActionBadge action={row.action} t={t} />
-                  </td>
-                  <td className="px-3 py-1.5 text-fg">{row.label || '—'}</td>
-                  <td className="px-3 py-1.5 text-fg-muted">{row.reason || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {result.preview.length > 50 && (
-            <p className="border-t border-border px-3 py-2 text-xs text-fg-muted">
-              {t('import.previewTruncated').replace('{count}', String(result.preview.length - 50))}
-            </p>
+        <DataView
+          tableId="import-dry-run-preview"
+          rows={result.preview.slice(0, 50)}
+          columns={previewColumns}
+          rowKey={(row) => String(row.rowNumber)}
+          toolbar={false}
+          defaultSort={{ id: 'rowNumber', dir: 'asc' }}
+          mobileCard={(row) => (
+            <div className="surface-card p-3 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-fg-muted">#{row.rowNumber}</span>
+                <ActionBadge action={row.action} t={t} />
+              </div>
+              <p className="mt-1 font-medium text-fg">{row.label || '—'}</p>
+              {row.reason && <p className="mt-1 text-fg-muted">{row.reason}</p>}
+            </div>
           )}
-        </div>
+        />
+        {result.preview.length > 50 && (
+          <p className="border-t border-border px-3 py-2 text-xs text-fg-muted">
+            {t('import.previewTruncated').replace('{count}', String(result.preview.length - 50))}
+          </p>
+        )}
       </div>
     </div>
   )

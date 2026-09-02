@@ -26,6 +26,7 @@ function SubFamiliesTabContent(props: FamilyDetailContextValue) {
         <DataView
           tableId="family-sub-families"
           rows={subFamilies}
+          defaultSort={{ id: 'name', dir: 'asc' }}
           rowKey={(s: any) => s._id}
           globalSearch={{
             placeholder: 'Search sub-families…',
