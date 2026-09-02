@@ -26,6 +26,6 @@ describe('legal pages smoke', () => {
     render(<SubprocessorsPage />)
     expect(screen.getByRole('heading', { level: 1, name: /subprocessors/i })).toBeDefined()
     expect(screen.getByRole('table')).toBeDefined()
-    expect(screen.getByText(/MongoDB Atlas/i)).toBeDefined()
+    expect(screen.getAllByText(/MongoDB Atlas/i).length).toBeGreaterThan(0)
   })
 })
