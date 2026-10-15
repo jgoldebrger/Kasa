@@ -125,7 +125,11 @@ export interface EmailAutomationRuleRow {
   enabled: boolean
   templateId: string
   templateName?: string
-  ruleType: 'balance_gt_zero' | 'event_within_30_days'
+  ruleType: 'balance_gt_zero' | 'event_within_30_days' | 'dunning_arrears'
+  minOwed?: number
+  daysSinceObligation?: number
+  maxAttempts?: number
+  intervalDays?: number
   lastRunAt?: string | null
   lastRunSentCount?: number | null
   lastRunSkippedCount?: number | null

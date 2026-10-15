@@ -9,6 +9,7 @@ import {
 } from '@/lib/mail'
 import { escapeHtml } from '@/lib/html-escape'
 import { listAutomationRecipients } from './resolve-recipients'
+import { executeDunningArrearsRule } from '@/lib/dunning/execute'
 
 const MIN_RUN_INTERVAL_MS = 24 * 60 * 60 * 1000
 
@@ -42,12 +43,17 @@ export async function executeEmailAutomationRule(
   rule: {
     _id: Types.ObjectId
     templateId: Types.ObjectId
-    ruleType: 'balance_gt_zero' | 'event_within_30_days'
+    ruleType: 'balance_gt_zero' | 'event_within_30_days' | 'dunning_arrears'
     lastRunAt?: Date | null
+    minOwed?: number | null
+    daysSinceObligation?: number | null
+    maxAttempts?: number | null
+    intervalDays?: number | null
   },
   opts?: { force?: boolean },
 ): Promise<ExecuteEmailAutomationRuleResult> {
   if (
+    rule.ruleType !== 'dunning_arrears' &&
     !opts?.force &&
     rule.lastRunAt &&
     Date.now() - new Date(rule.lastRunAt).getTime() < MIN_RUN_INTERVAL_MS
@@ -61,6 +67,34 @@ export async function executeEmailAutomationRule(
   }).lean<{ subject?: string; html?: string; text?: string } | null>()
   if (!template?.subject || !template.html) {
     return { sent: 0, failed: 0, skipped: true, reason: 'Template missing subject or html' }
+  }
+
+  if (rule.ruleType === 'dunning_arrears') {
+    const minOwed = rule.minOwed
+    if (minOwed == null || minOwed <= 0) {
+      await persistLastRunStats(rule._id, {
+        sent: 0,
+        skipped: 0,
+        failed: 0,
+        error: 'minOwed missing',
+      })
+      return { sent: 0, failed: 0, skipped: true, reason: 'minOwed missing' }
+    }
+
+    const stats = await executeDunningArrearsRule(
+      organizationId,
+      {
+        _id: rule._id,
+        templateId: rule.templateId,
+        minOwed,
+        daysSinceObligation: rule.daysSinceObligation ?? 30,
+        maxAttempts: rule.maxAttempts ?? 3,
+        intervalDays: rule.intervalDays ?? 7,
+      },
+      { subject: template.subject, html: template.html, text: template.text },
+    )
+    await persistLastRunStats(rule._id, stats)
+    return { sent: stats.sent, failed: stats.failed, skipped: false }
   }
 
   const recipients = await listAutomationRecipients(organizationId, rule.ruleType)

@@ -58,13 +58,20 @@ export const POST = handler({
       return { status: 400, data: { error: 'Email template not found' } }
     }
 
-    const rule = await EmailAutomationRule.create({
+    const doc: Record<string, unknown> = {
       organizationId: ctx!.organizationId,
       name: body.name,
       enabled: body.enabled ?? false,
       templateId: body.templateId,
       ruleType: body.ruleType,
-    })
+    }
+    if (body.ruleType === 'dunning_arrears') {
+      doc.minOwed = body.minOwed
+      doc.daysSinceObligation = body.daysSinceObligation
+      doc.maxAttempts = body.maxAttempts
+      doc.intervalDays = body.intervalDays
+    }
+    const rule = await EmailAutomationRule.create(doc)
 
     await audit({
       organizationId: ctx!.organizationId,

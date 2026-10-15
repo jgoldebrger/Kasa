@@ -99,4 +99,30 @@ PaymentSchema.index(
 )
 PaymentSchema.plugin(softDeletePlugin)
 
+PaymentSchema.pre('save', function () {
+  ;(this as { $wasNew?: boolean }).$wasNew = this.isNew
+})
+
+PaymentSchema.post('save', function () {
+  const doc = this as {
+    $wasNew?: boolean
+    organizationId?: unknown
+    familyId?: unknown
+    deletedAt?: Date | null
+  }
+  if (!doc.$wasNew) return
+  if (!doc.organizationId || !doc.familyId) return
+  if (doc.deletedAt) return
+  const organizationId = String(doc.organizationId)
+  const familyId = String(doc.familyId)
+  void import('@/lib/dunning/episodes')
+    .then(({ closeDunningEpisodesForPayment }) =>
+      closeDunningEpisodesForPayment({ organizationId, familyId }),
+    )
+    .catch(async (err) => {
+      const { logError } = await import('@/lib/log')
+      logError(err, { module: 'dunning.payment-hook', organizationId, familyId })
+    })
+})
+
 export const Payment = mongoose.models.Payment || mongoose.model('Payment', PaymentSchema)
